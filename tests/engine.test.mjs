@@ -43,7 +43,7 @@ function fixture({ dir = temp(), pm, lead, specialist, settings = {}, hub = null
   const models = { resolve: ({ role }) => ({ model: role === 'specialist' ? 'specialist' : role === 'pm' ? 'pm' : 'lead', effort: '' }), instance: async ({ model }) => new ScriptedModel(model, scripts[model], { meter }) };
   const completed = [];
   const engine = new OfficeEngine({ dataDir: dir, office, models, toolHub: hub, knowledgeDir: path.join(dir, 'knowledge'), knowledgeIndex, brain, settings: () => settings, onComplete: async job => { completed.push(job.id); } });
-  return { dir, office, engine, workers, worker: workers[0], meter, completed, close: async () => { await engine.close(); if (!keep) fs.rmSync(dir, { recursive: true, force: true }); } };
+  return { dir, office, engine, workers, worker: workers[0], meter, completed, close: async () => { await engine.close(); if (!keep) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } };
 }
 async function until(engine, id, states, ms = 20000) {
   const end = Date.now() + ms;
@@ -104,7 +104,7 @@ test('an outbound tool pauses for the CEO, survives a restart, and runs once aft
     assert.deepEqual(sent, [{ to: 'client@example.com', body: 'Hello' }]);
     assert.equal(done.decisions[0].type, 'approve'); assert.equal(done.runs.filter(r => r.role === 'specialist').length, 1);
     assert.equal(second.engine.notifications.counts().needsYou, 0);
-  } finally { if (second) await second.close(); else { await first.engine.close(); fs.rmSync(dir, { recursive: true, force: true }); } }
+  } finally { if (second) await second.close(); else { await first.engine.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } }
 });
 
 test('a rejected action never runs; an edited one must match the tool and runs as edited; a second decision is a no-op', async () => {
