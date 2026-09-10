@@ -33,11 +33,13 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const TERMINAL = new Set(['done', 'cancelled', 'blocked', 'escalated', 'awaiting_ceo', 'waiting']);
 const mins = ms => (ms / 60000).toFixed(1);
 
+// Polls until the task reaches a terminal state or the deadline passes; a server that is restarting mid-run is waited for, not fatal.
 async function waitFor(id, deadline) {
+  let last = null;
   for (;;) {
-    const job = await api(`/tasks/${id}`);
-    if (TERMINAL.has(job.state)) return job;
-    if (Date.now() > deadline) return job;
+    try { last = await api(`/tasks/${id}`); if (TERMINAL.has(last.state)) return last; }
+    catch (error) { if (!/fetch failed|ECONNREFUSED|ECONNRESET|socket/i.test(String(error.message))) throw error; console.log(`  (office unreachable, waiting: ${error.message.slice(0, 60)})`); }
+    if (Date.now() > deadline) return last || { id, state: 'unknown', title: id, runs: [], events: [] };
     await sleep(10000);
   }
 }
