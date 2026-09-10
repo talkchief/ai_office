@@ -18,6 +18,7 @@ import { DEPTS, AGENTS, DEPT_KEYS } from './data.js';
 import { P, rnd, ri } from './v1data.js';
 import { parseWhen, describe, nextRun, fromPicker, untilText } from './when.js';
 import { MODEL_KEYS, MODELS, DEFAULT_MODEL, modelName, normModel, FROM_TEXT , EFFORT_KEYS, EFFORT_NAME, normEffort, effortName, effortFor } from './models.js';
+import { officeReady } from './auth.js';
 
 const SEGMENTS = ['roofing', 'HVAC', 'dental', 'logistics', 'fitness', 'property', 'landscaping', 'legal'];
 
@@ -123,7 +124,8 @@ export function initTasks(ctx) {
           getFocused, esc, brainWrite, brain, onLive, onTools, requestApproval, setStuck, onUsage } = ctx;
   // LIVE mode (served by serve.mjs): the bar routes through Claude, agents produce real
   // deliverables saved as notes in the brain, and tasks persist. Opened as a file it stays demo.
-  let live = false;
+  const demo = location.protocol === 'file:';
+  let live = !demo;
   const API = '/api';
   const slug = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48);
 
@@ -214,8 +216,8 @@ export function initTasks(ctx) {
     return t;
   }
 
-  /* ---------- seed a believable morning ---------- */
-  {
+  /* ---------- standalone demo only ---------- */
+  if (demo) {
     const now = performance.now(), wall = Date.now();
     for (const a of AGENTS) {
       const r = R[a.id];
@@ -579,12 +581,13 @@ export function initTasks(ctx) {
   }
   async function connect() {
     if (!location.protocol.startsWith('http')) return;
+    await officeReady;
     try {
       const h = await (await fetch(API + '/health')).json();
       if (!h.ok) return;
       live = true; setOfficeModel(h.model); setOfficeEffort(h.effort);
       const mode = panel.querySelector('.tp-mode');
-      if (mode) { mode.hidden = false; mode.textContent = 'LIVE · ' + (h.backend === 'anthropic-sdk' ? 'CLAUDE API' : 'CLAUDE'); mode.classList.add('live'); mode.title = `${h.name} · ${h.backend} · ${modelName(h.model)} by default · brain: ${h.brain}`; }
+      if (mode) { mode.hidden = false; mode.textContent = h.auth?.authenticated ? 'CONNECTED · CLAUDE' : 'CLAUDE NOT CONNECTED'; mode.classList.add('live'); mode.title = `${h.name} · ${h.backend} · ${modelName(h.model)} by default · brain: ${h.brain}`; }
       if (brain) { try { brain.setGraph(await (await fetch(API + '/brain')).json()); } catch {} }
       const list = await (await fetch(API + '/tasks')).json();
       for (const st of list) {
@@ -598,10 +601,11 @@ export function initTasks(ctx) {
       dirty = true;
       if (onLive) onLive(h);
       await poll(); setInterval(poll, 6000); // V3.5: routines fire on the server's clock — the page keeps up
-    } catch (e) { console.warn('office server not reachable — running offline:', e.message); }
+    } catch (e) { console.warn('office server not reachable:', e.message); const mode = panel.querySelector('.tp-mode'); if (mode) { mode.hidden = false; mode.textContent = 'SERVER OFFLINE'; mode.classList.remove('live'); } }
   }
   connect();
   function addTask(agentId, title, by = 'you') {
+    if (!demo) return null;
     if (agentTasks(agentId, 'next').length >= 5) return null;
     const t = mk({ agent: agentId, title, by });
     touch(t, 'added');
@@ -825,6 +829,13 @@ export function initTasks(ctx) {
     if (m) {
       let title = m[1].trim().replace(/[.!]+$/, '');
       title = title.charAt(0).toUpperCase() + title.slice(1);
+      if (live) return (async () => {
+        const response = await fetch(API + '/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dept: k, text: title }) });
+        const task = await response.json();
+        if (!response.ok) throw new Error(task.error || 'The task could not be added.');
+        reconcile(task);
+        return `Added to the ${DEPTS[k].short} backlog. ${agentOf(task.agent).name} will handle it.`;
+      })().catch(error => `Could not add that task: ${error.message}`);
       const { agent: a, matched } = route(k, title);
       const to = matched ? a.id : agentId;
       const t = addTask(to, title, 'you');
@@ -862,8 +873,8 @@ export function initTasks(ctx) {
       } else {
         const nx = agentTasks(id, 'next').sort((a, b) => a.addedAt - b.addedAt)[0];
         if (nx) { start(nx, now); r.nextBrainAt = null; }
-        else if (!r.nextBrainAt) r.nextBrainAt = now + 6000 + Math.random() * 16000;
-        else if (now > r.nextBrainAt) { r.nextBrainAt = null; brainSend(id); }
+        else if (demo && !r.nextBrainAt) r.nextBrainAt = now + 6000 + Math.random() * 16000;
+        else if (demo && now > r.nextBrainAt) { r.nextBrainAt = null; brainSend(id); }
       }
     }
     if (now - lastBadge > 400) { syncBadges(); lastBadge = now; }

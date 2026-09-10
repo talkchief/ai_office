@@ -2,7 +2,7 @@
 import { build } from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { buildBrainGraph } from './graph-build.mjs';
-await buildBrainGraph(); // V3.6: bake the vault's wiki-link graph into src/braingraph.js
+await buildBrainGraph(new URL('./brain/', import.meta.url).pathname); // V3.6: bake the vault's wiki-link graph into src/braingraph.js
 
 const res = await build({
   entryPoints: ['src/main.js'],
@@ -13,13 +13,14 @@ const res = await build({
   target: 'es2020',
 });
 const js = res.outputFiles[0].text;
+const outDir = process.env.AO_DIST || 'dist';
 const shell = readFileSync('src/shell.html', 'utf8');
 const html = shell.replace('<!--APP-->', () => `<script>${js}</script>`);
-mkdirSync('dist', { recursive: true });
-writeFileSync('dist/command-centre-v2.html', html);
+mkdirSync(outDir, { recursive: true });
+writeFileSync(outDir + '/command-centre-v2.html', html);
 
 // dev variant with external script for faster iteration
-mkdirSync('dist', { recursive: true });
-writeFileSync('dist/app.js', js);
-writeFileSync('dist/dev.html', shell.replace('<!--APP-->', '<script src="app.js"></script>'));
-console.log(`built dist/command-centre-v2.html (${(html.length / 1024).toFixed(0)} KB)`);
+mkdirSync(outDir, { recursive: true });
+writeFileSync(outDir + '/app.js', js);
+writeFileSync(outDir + '/dev.html', shell.replace('<!--APP-->', '<script src="app.js"></script>'));
+console.log(`built ${outDir}/command-centre-v2.html (${(html.length / 1024).toFixed(0)} KB)`);

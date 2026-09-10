@@ -29,12 +29,13 @@ const agentOf = id => AGENTS.find(a => a.id === id);
 
 export function initBrain({ scene, brainGroup, getR, esc, hud, toScreen, getCamera }) {
   /* ---------- data ---------- */
-  let nodes = BRAIN.nodes.map((n, i) => ({ ...n, i }));
-  let links = BRAIN.links.map(([a, b]) => [a, b]);
+  const initial = location.protocol === 'file:' ? BRAIN : { nodes: [], links: [], floor: [], notes: 0 };
+  let nodes = initial.nodes.map((n, i) => ({ ...n, i }));
+  let links = initial.links.map(([a, b]) => [a, b]);
   let adj = nodes.map(() => new Set());
   for (const [a, b] of links) { adj[a].add(b); adj[b].add(a); }
   let byId = new Map(nodes.map(n => [n.id, n.i]));
-  const state = { notes: BRAIN.notes, lastRead: null, newToday: 0, reads: new Map(), written: new Map() };
+  const state = { notes: initial.notes, lastRead: null, newToday: 0, reads: new Map(), written: new Map() };
   let hubs = nodes.slice(0, 8);
   const folderNodes = f => nodes.filter(n => n.g === f && n.d >= 2);
   function pickFor(dept) {
@@ -51,13 +52,13 @@ export function initBrain({ scene, brainGroup, getR, esc, hud, toScreen, getCame
      The mock's graph faces the camera: an upright ink drawing hovering over the pod (that is what
      reads as a 3D object in the artifact). So the drawing lives on a camera-facing sprite, 15.4 ×
      9.2 world units, centred above the slab — the 90 most linked notes in their own compact layout
-     (BRAIN.floor), edges rgba(ink,.224) at W/260, dots rgba(ink,.44) sized (0.8 + √links·0.28)·W/130,
+     (initial.floor), edges rgba(ink,.224) at W/260, dots rgba(ink,.44) sized (0.8 + √links·0.28)·W/130,
      the layout squashed to 0.6 vertically as the mock's sq .58 was. Every 6 s the biggest hub
      pulses green for 2 s — the mock's glint. Colour and names live in the overlay. */
   const BW = 17, BH = BW * 0.6;            // world size of the billboard
   const PX = 1024, PY = Math.round(PX * 0.6);
   const CENTRE = new THREE.Vector3(0, 1.3, 0);   // centred on the slab, as in the mock
-  let floorPos = new Map(BRAIN.floor.map(([x, y], i) => [i, { x, y }]));
+  let floorPos = new Map(initial.floor.map(([x, y], i) => [i, { x, y }]));
   const onFloor = n => floorPos.has(n.i);
   const FP = n => floorPos.get(n.i);
   const cv = document.createElement('canvas'); cv.width = PX; cv.height = PY;
@@ -159,14 +160,14 @@ export function initBrain({ scene, brainGroup, getR, esc, hud, toScreen, getCame
   }
   // LIVE: replace the graph with the server's (the user's real vault), keeping today's state
   function setGraph(g) {
-    if (!g || !g.nodes || !g.nodes.length) return;
+    if (!g || !Array.isArray(g.nodes)) return;
     const today = new Date().toISOString().slice(0, 10);
     nodes = g.nodes.map((n, i) => ({ ...n, i, fresh: n.g === 'Agents Office' && n.id.startsWith(today) })); // notes the office wrote today glow green
     links = g.links.map(([a, b]) => [a, b]);
     adj = nodes.map(() => new Set()); for (const [a, b] of links) { adj[a].add(b); adj[b].add(a); }
     byId = new Map(nodes.map(n => [n.id, n.i])); hubs = nodes.slice(0, 8);
     floorPos = new Map((g.floor || []).map(([x, y], i) => [i, { x, y }]));
-    state.notes = g.notes; sel = null;
+    state.notes = g.notes; sel = null; hover = null; groups = [...new Set(nodes.map(n => n.g))].sort(); on.clear(); groups.forEach(g => on.add(g)); chips();
     etch(); updateStrip();
   }
   // LIVE: an agent read a named note (the server tells us which) — glint it if it is on the floor
@@ -217,7 +218,7 @@ export function initBrain({ scene, brainGroup, getR, esc, hud, toScreen, getCame
     if (!strip) return;
     strip.querySelector('.tb-count').textContent = state.notes.toLocaleString('en-NZ');
     const lr = strip.querySelector('.tb-last');
-    lr.innerHTML = state.lastRead ? `Last read <b>${esc(state.lastRead.note)}</b> by ${esc(state.lastRead.agent)} · ${timeStr(state.lastRead.ts)}` : `${BRAIN.links.length} wiki links · nothing read yet`;
+    lr.innerHTML = state.lastRead ? `Last read <b>${esc(state.lastRead.note)}</b> by ${esc(state.lastRead.agent)} · ${timeStr(state.lastRead.ts)}` : `${links.length} wiki links · nothing read yet`;
     strip.querySelector('.tb-new').textContent = state.newToday ? `+${state.newToday} note${state.newToday > 1 ? 's' : ''} today` : '';
   }
   updateStrip();
@@ -228,10 +229,10 @@ export function initBrain({ scene, brainGroup, getR, esc, hud, toScreen, getCame
   const search = document.getElementById('bvSearch'); const chipsEl = document.getElementById('bvChips');
   const pane = document.getElementById('bvPane'); const meta = document.getElementById('bvMeta');
   let openNow = false, k = 1.2, tx = 0, ty = 0, hover = null, sel = null, drag = null, match = null, freshOnly = false;
-  const groups = [...new Set(nodes.map(n => n.g))].sort();
+  let groups = [...new Set(nodes.map(n => n.g))].sort();
   const on = new Set(groups);
   function chips() {
-    chipsEl.innerHTML = groups.map(g => `<button class="bv-chip${on.has(g) ? ' on' : ''}" data-g="${g}"><i style="background:${GROUP_COL[g] || '#B0ADA3'}"></i>${GROUP_NAME(g)}</button>`).join('') +
+    chipsEl.innerHTML = groups.map(g => `<button class="bv-chip${on.has(g) ? ' on' : ''}" data-g="${esc(g)}"><i style="background:${GROUP_COL[g] || '#B0ADA3'}"></i>${esc(GROUP_NAME(g))}</button>`).join('') +
       `<button class="bv-chip live${freshOnly ? ' on' : ''}" data-g="__fresh">New today · ${state.newToday}</button>`;
   }
   chipsEl.addEventListener('click', e => {

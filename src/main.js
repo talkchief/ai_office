@@ -10,15 +10,17 @@ import {
 import { initMcp } from './mcp.js';
 import { loadConnectors } from './connectors.js';
 import { initTasks } from './tasks.js';
+import { initOfficeWork } from './office.js';
 import { initBrain } from './brain.js';
+const DEMO = location.protocol === 'file:';
 let tasks = null; // V3 task boards — initialised after the rail constants exist
 
 /* ---------- renderer / scene / camera ---------- */
 const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.VSMShadowMap;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
 
@@ -31,7 +33,7 @@ const CAM_DIST = 220;
 // float above their back rows instead of being shoved out to the screen edges.
 // V3.3: the Task Status panel owns the right ~430px at every zoom, so the overview target slides
 // along screen-right by half the panel width — the scene sits centred in what is left.
-const OVERVIEW = { base: [-9, 0, -9], zoom: 0.8 }; // (-9,-9) shifts the scene straight DOWN the screen, no sideways drift
+const OVERVIEW = { base: [-9, 0, -9], zoom: Math.min(0.8, 0.8 * 6 / Math.max(6,DEPT_KEYS.length)) }; // (-9,-9) shifts the scene straight DOWN the screen, no sideways drift
 const SR_ = new THREE.Vector3(1, 0, -1).normalize();
 function overviewPos() {
   const pw = (tasks ? tasks.panelWidth() : 400) + 30;
@@ -124,7 +126,7 @@ const R = {};              // runtime per agent
 const deptRT = {};         // runtime per dept
 const screenSets = [];
 
-for (const [key_, L] of Object.entries(LAYOUT)) {
+for (const [key_, L] of Object.entries(LAYOUT).filter(([k])=>k==='brain'||DEPT_KEYS.includes(k))) {
   const dept = DEPTS[key_];
   const g = new THREE.Group();
   g.position.set(L.pos[0], 0, L.pos[1]);
@@ -144,6 +146,7 @@ let brain;
 {
   const bg = deptRT.brain.group;
   brain = initBrain({ scene, brainGroup: bg, getR: () => R, esc: (t) => esc(t), hud, toScreen: (p) => toScreen(p), getCamera: () => camera });
+  if (!DEMO) brain.setQuiet(true);
   const plant = makePlant(); plant.position.set(6.2, 0.12, -5.8); bg.add(plant);
 }
 
@@ -195,13 +198,24 @@ deptRT.brain.group.traverse(o => { if ((o.isMesh || o.isSprite) && !o.userData.d
 /* (M5.3 per AJ: the bridge cables are gone — the walkways alone carry the connection;
    the brain↔dept relationship shows through the badge sweep + meetings.) */
 
+// A separate project office: one standing Program Manager, above team coordination.
+let programPerson=null,programPill=null;
+if (!DEMO) {
+  const floor=makePlinth(15,13,'#EEE7D5');floor.position.set(-28,0,0);
+  floor.traverse(o=>{if(o.isMesh){o.userData.dept='program';clickTargets.push(o);}});scene.add(floor);
+  programPerson=makePerson({hair:'#303038',skin:'#D7A37D',chip:'#465B70',lead:true});programPerson.position.set(-28,.12,0);programPerson.rotation.y=Math.PI/4;
+  programPerson.traverse(o=>{if(o.isMesh){o.userData.agentId='program-manager';personTargets.push(o);}});scene.add(programPerson);
+  const plant=makePlant();plant.position.set(-33,.12,-3);scene.add(plant);
+  programPill=document.createElement('div');programPill.className='pill program-manager-pill';programPill.innerHTML='<span class="star">◆</span> PROGRAM MANAGER';programPill.onclick=()=>tasks?.openProjects();hud.appendChild(programPill);
+}
+
 /* desks + people per dept */
 const COLS = { emails: 2, sales: 2, marketing: 2, ops: 2, fin: 2, delivery: 2 };
 for (const a of AGENTS) {
   const dRT = deptRT[a.dept];
   const dept = DEPTS[a.dept];
   const L = dRT.L;
-  const cols = COLS[a.dept];
+  const cols = !DEMO && AGENTS.filter(x => x.dept === a.dept).length > 8 ? 3 : (COLS[a.dept] || 2);
   const gx = (a.grid[0] - (cols - 1) / 2) * 8.6;
   const gz = (a.grid[1] - 1) * 6.4 - 1;
   const base = new THREE.Vector3(L.pos[0] + gx, 0.12, L.pos[1] + gz);
@@ -213,7 +227,8 @@ for (const a of AGENTS) {
   const station = new THREE.Group();
   station.position.copy(base);
   station.rotation.y = ANG;
-  const { group: desk, screenSet } = makeDesk(dept.chip);
+  const { group: desk, screenSet, activity } = makeDesk(dept.chip, { lead: !!a.lead });
+  if (!DEMO) { screenSet.draw(['Ready when you are'], 'idle'); screenSet.tex.needsUpdate = true; }
   station.add(desk);
   screenSets.push({ screenSet, dept: a.dept });
   const chair = makeChair();
@@ -235,15 +250,15 @@ for (const a of AGENTS) {
   // name pill (HTML) — clickable, same as clicking the agent
   const pill = document.createElement('div');
   pill.className = 'pill';
-  pill.innerHTML = (a.lead ? '<span class="star">★</span>' : '') + a.name;
-  pill.addEventListener('click', () => openAgent(a.id, 'chat'));
+  pill.innerHTML = (a.lead ? '<span class="star">★</span>' : '') + esc(a.name);
+  pill.addEventListener('click', () => openAgent(a.id, DEMO ? 'chat' : 'activity'));
   hud.appendChild(pill);
 
   R[a.id] = {
-    a, person, warn, pill, seat: person.position.clone(), seatRot: ANG + Math.PI,
+    a, person, warn, pill, desk, screenSet, activity, seat: person.position.clone(), seatRot: ANG + Math.PI,
     stand: person.position.clone().add(rot(new THREE.Vector3(1.5, 0, 0.15))),
     state: 'working', bob: Math.random() * 10, path: null, pathI: 0, speed: 9.5, ask: null,
-    v1: V1.find(x => x.id === a.id), feed: [],
+    v1: V1.find(x => x.id === a.id) || { role: a.role || a.name, tagline: a.does || '', greeting: 'Ready for your task.', chips: [], stats: [], chart: [], tasks: [] }, feed: [],
   };
 }
 
@@ -264,10 +279,10 @@ const mcp = {
   isLive: () => !!(mcpImpl && mcpImpl.live),
 };
 let mcpUsage = null;
-loadConnectors().then(c => { mcpImpl = initMcp({ scene, hud, LAYOUT, DEPTS, FR, R, connectors: c }); if (mcpDark) mcpImpl.setDark(true); if (mcpUsage) mcpImpl.setUsage(mcpUsage); });
+if (DEMO) loadConnectors().then(c => { mcpImpl = initMcp({ scene, hud, LAYOUT, DEPTS, FR, R, connectors: c }); if (mcpDark) mcpImpl.setDark(true); if (mcpUsage) mcpImpl.setUsage(mcpUsage); });
 
 // plants on outer corners
-for (const k of ['emails', 'sales', 'marketing', 'ops', 'delivery']) {
+for (const k of DEPT_KEYS) {
   const L = LAYOUT[k];
   const sx = Math.sign(L.pos[0]), sz = Math.sign(L.pos[1]);
   const p = makePlant();
@@ -337,13 +352,14 @@ const BB_ROWS = {
   brain: [
     ['NOTES INDEXED', () => brainNotes.toLocaleString('en-NZ')]],
 };
+if (!DEMO) { document.body.classList.add('live-office'); for (const k of DEPT_KEYS) BB_ROWS[k] = []; }
 for (const k of [...DEPT_KEYS, 'brain']) {
   const dept = DEPTS[k];
   const n = AGENTS.filter(a => a.dept === k).length;
   const b = document.createElement('div');
   b.className = 'badge';
   b.innerHTML = `
-    <div class="b-name"><span class="dot" style="background:${dept.chip}"></span>${dept.short}<span class="live"></span></div>
+    <div class="b-name"><span class="dot" style="background:${dept.chip}"></span>${esc(dept.short)}<span class="live"></span></div>
     <div class="b-count">${k === 'brain' ? '<span class="b-num">∞</span><span class="b-lab">KNOWLEDGE</span>' : `<span class="b-num">${n}</span><span class="b-lab">AGENTS</span>`}</div>
     <div class="b-metrics">${BB_ROWS[k].map((row, i) => `
       <div class="m-row"><span class="m-lab">${row[0]}</span><span class="m-val" data-m="${k}-${i}">${row[1]()}</span></div>`).join('')}
@@ -351,7 +367,7 @@ for (const k of [...DEPT_KEYS, 'brain']) {
     <div class="b-appr" style="display:none">⚠ <span class="ap-n">1</span> WAITING APPROVAL</div>`;
   b.addEventListener('click', (e) => {
     if (e.target.closest('.b-appr')) { zoomToApproval(k); e.stopPropagation(); }
-    else if (e.target.closest('.b-tasks') && tasks) { tasks.openFor(k); e.stopPropagation(); }
+    else if (DEMO && e.target.closest('.b-tasks') && tasks) { tasks.openFor(k); e.stopPropagation(); }
     else zoomToDept(k);
   });
   if (k === 'brain') { // V3.6: a small tag names the etched floor and opens the graph (the big card stays retired)
@@ -381,12 +397,12 @@ for (const k of [...DEPT_KEYS, 'brain']) {
     fin:       [43.5, 4, 17],      // side RIGHT
     brain:     [-5.5, 3.2, -5.5],  // just above the pod's back corner
   };
-  deptRT[k].badgeAnchor = new THREE.Vector3(...ANCHOR[k]);
-  if (k === 'fin') deptRT[k].sideBadge = true;
-  if (k === 'ops') { deptRT[k].sideBadge = true; deptRT[k].sideLeft = true; }
+  deptRT[k].badgeAnchor = new THREE.Vector3(...((DEPT_KEYS.length>6 && k!=='brain') || !ANCHOR[k] ? [LAYOUT[k].pos[0],9,LAYOUT[k].pos[1]-LAYOUT[k].d/2-2] : ANCHOR[k]));
+  if (k === 'fin' && DEPT_KEYS.length<=6) deptRT[k].sideBadge = true;
+  if (k === 'ops' && DEPT_KEYS.length<=6) { deptRT[k].sideBadge = true; deptRT[k].sideLeft = true; }
 }
 function updateBillboards() {
-  for (const k of Object.keys(BB_ROWS)) {
+  for (const k of Object.keys(BB_ROWS).filter(k=>deptRT[k])) {
     BB_ROWS[k].forEach((row, i) => {
       const nv = String(row[1]());
       if (nv !== deptRT[k].vals[i]) {
@@ -439,7 +455,7 @@ addEventListener('wheel', (e) => {
   view.arc = 0;
   const nx = (e.clientX / innerWidth) * 2 - 1, ny = -(e.clientY / innerHeight) * 2 + 1;
   const before = worldAt(nx, ny);
-  view.zoom = clamp(view.zoom * Math.exp(-e.deltaY * 0.0032), 0.72, 5.2);
+  view.zoom = clamp(view.zoom * Math.exp(-e.deltaY * 0.0032), Math.min(0.72,OVERVIEW.zoom), 5.2);
   applyCamera();
   const after = worldAt(nx, ny);
   if (before && after) view.target.add(before.sub(after));
@@ -480,12 +496,14 @@ addEventListener('pointerup', (e) => {
   const pHits = ray.intersectObjects(personTargets, false);
   if (pHits.length) {
     // clicking an agent opens its rail — a stuck agent opens straight to Chat (v1 rule)
-    openAgent(pHits[0].object.userData.agentId, 'chat');
+    if(pHits[0].object.userData.agentId==='program-manager'){tasks?.openProjects();return;}
+    openAgent(pHits[0].object.userData.agentId, DEMO ? 'chat' : 'activity');
     return;
   }
   const hits = ray.intersectObjects(clickTargets, false);
   if (hits.length) {
     const dk = hits[0].object.userData.dept;
+    if(dk==='program'){tasks?.openProjects();return;}
     if (dk === 'brain') { brain.open(); return; } // V3.6: the Brain opens as the graph
     if (dk !== focused) enterFocus(dk);
   }
@@ -511,7 +529,7 @@ addEventListener('keydown', (e) => {
   }
   else if (e.key === 'v' || e.key === 'V') setCam(!document.body.classList.contains('cam'));
   else if (e.key === 'd' || e.key === 'D') setDark(!darkOn);
-  else if (e.key === 'w' || e.key === 'W') requestApproval('apay'); // demo cue: Accounts Payable asks for approval
+  else if (DEMO && (e.key === 'w' || e.key === 'W')) requestApproval('apay'); // demo cue: Accounts Payable asks for approval
 });
 
 // camera mode: mid-tone backdrop for filming the screen (#cam=1 / V toggles)
@@ -550,7 +568,7 @@ canvas.addEventListener('dblclick', (e) => {
 
 // on-screen zoom controls
 function zoomStep(f) {
-  flyTo([view.target.x, 0, view.target.z], clamp(view.zoom * f, 0.72, 5.2), 350);
+  flyTo([view.target.x, 0, view.target.z], clamp(view.zoom * f, Math.min(0.72,OVERVIEW.zoom), 5.2), 350);
   if (view.zoom * f < 1.6 && focused) {
     if (focused === 'brain') focused = null; else exitFocus(false);
   }
@@ -580,17 +598,17 @@ const vignette = document.getElementById('vignette');
 const mMsgs = document.getElementById('mMsgs');
 let modalOpen = null, modalTab = 'chat'; // modalOpen = agent id open in the rail slide-over
 // V3.3: the rail docks LEFT for every department — the task panel has the right side
-const RAIL_SIDE = { marketing: 'left', emails: 'left', sales: 'left', ops: 'left', fin: 'left', delivery: 'left' };
+const RAIL_SIDE = Object.fromEntries(DEPT_KEYS.map(k=>[k,'left']));
 const SCREEN_RIGHT = new THREE.Vector3(1, 0, -1).normalize();
 
 function ensureChat(id) {
   if (chatHist[id]) return;
   const v = R[id].v1;
   chatHist[id] = [
-    { who: 'agent', text: v.greeting },
-    { who: 'work', i: '⏺', text: 'session attached — live work stream below' },
+    { who: 'agent', text: DEMO ? v.greeting : (R[id].a.lead ? `I coordinate ${DEPTS[R[id].a.dept].name}. My team includes ${Object.values(R).filter(r=>r.a.dept===R[id].a.dept&&!r.a.lead).map(r=>r.a.name).join(', ')}. Send a request and I’ll plan, delegate and verify the work.` : `I’m ${R[id].a.name}. ${R[id].a.does || R[id].a.role || ''}`) },
+    { who: 'work', i: '⏺', text: DEMO ? 'Demo activity' : 'Only your real tasks and results appear here.' },
   ];
-  if (FILE_GEN[id] && !(tasks && tasks.isLive())) chatHist[id].push({ who: 'file', ...FILE_GEN[id]() }); // demo-only sample file; a live office shows real deliverables
+  if (FILE_GEN[id] && DEMO) chatHist[id].push({ who: 'file', ...FILE_GEN[id]() }); // demo-only sample file; a live office shows real deliverables
 }
 function chatPush(id, msg) {
   ensureChat(id);
@@ -601,7 +619,7 @@ function chatPush(id, msg) {
 function renderChat(id) {
   const r = R[id];
   mMsgs.innerHTML = chatHist[id].map((m, i) => {
-    if (m.who === 'agent') return `<div class="m-agent">${esc(m.text)}</div>`;
+    if (m.who === 'agent') return `<div class="m-agent">${esc(m.text)}${m.taskId ? `<button class="space-chat-task" data-chat-task="${esc(m.taskId)}">Open plan, progress & result ↗</button>` : ''}</div>`;
     if (m.who === 'user') return `<div class="m-user">${esc(m.text)}</div>`;
     if (m.who === 'work') return `<div class="m-work"><span class="wi">${m.i || '▸'}</span>${esc(m.text)}</div>`;
     if (m.who === 'file') return `
@@ -620,6 +638,7 @@ function renderChat(id) {
       </div>`;
     return '';
   }).join('');
+  mMsgs.querySelectorAll('[data-chat-task]').forEach(el=>el.onclick=()=>tasks.openTask(el.dataset.chatTask));
   mMsgs.querySelectorAll('.m-file').forEach(el =>
     el.addEventListener('click', () => el.classList.toggle('exp')));
   mMsgs.querySelectorAll('.m-appr .a-yes').forEach(el =>
@@ -629,13 +648,15 @@ function renderChat(id) {
   mMsgs.scrollTop = mMsgs.scrollHeight;
 }
 function renderActivity(id) {
+  if (!DEMO && tasks?.renderAgent) { tasks.renderAgent(id); return; }
   const r = R[id], v = r.v1;
-  const task = rnd(v.tasks || ['Working through the queue'])
-    .replace('{co}', rnd(P.co)).replace('{person}', person()).replace('{count}', ri(3, 9));
+  const task = DEMO ? rnd(v.tasks || ['Working through the queue'])
+    .replace('{co}', rnd(P.co)).replace('{person}', person()).replace('{count}', ri(3, 9)) : (tasks?.tasks.find(t => t.agent === id && t.state === 'doing')?.title || 'Ready for your next task');
   document.getElementById('mNow').innerHTML = `NOW &nbsp;<b>${esc(task)}</b>`;
-  document.getElementById('mStats').innerHTML = (v.stats || []).map(([l, val]) => `
+  document.getElementById('mStats').innerHTML = (DEMO ? v.stats || [] : []).map(([l, val]) => `
     <div class="st"><div class="st-l">${esc(l)}</div><div class="st-v">${esc(String(typeof val === 'function' ? val() : val))}</div></div>`).join('');
   const chip = DEPTS[r.a.dept].chip;
+  document.getElementById('mChart').hidden = !DEMO;
   const mx = Math.max(...(v.chart || [1]));
   document.querySelector('#mChart .ch-lbl').textContent = v.chartLbl || '';
   document.querySelector('#mChart .ch-bars').innerHTML = (v.chart || []).map(n =>
@@ -681,7 +702,7 @@ function enterFocus(k, pendingAgentId) {
   // V3.4: the rail IS the chat — it opens on the department lead (or first agent) at once
   // (after the className reset above, which would otherwise drop the agentOpen state)
   const first = pendingAgentId || (AGENTS.find(x => x.dept === k && x.lead) || AGENTS.find(x => x.dept === k)).id;
-  openAgentRail(first, pendingAgentId ? pendingTab : 'chat', false);
+  openAgentRail(first, pendingAgentId ? pendingTab : (DEMO ? 'chat' : 'activity'), false);
   document.getElementById('overviewBtn').classList.toggle('right', RAIL_SIDE[k] === 'left');
   requestAnimationFrame(() => requestAnimationFrame(() => {
     rail.classList.add('open');
@@ -711,14 +732,14 @@ function buildDeptRail(k) {
   const rh = document.getElementById('railHeader');
   rh.classList.remove('show');
   rh.innerHTML = `
-    <div class="b-name"><span class="dot" style="background:${dept.chip}"></span>${dept.name}<span class="live"></span></div>
+    <div class="b-name"><span class="dot" style="background:${dept.chip}"></span>${esc(dept.name)}<span class="live"></span></div>
     <div class="b-count"><span class="b-num">${n}</span><span class="b-lab">AGENTS</span></div>
     <div class="b-metrics">${BB_ROWS[k].map((row, i) => `
       <div class="m-row"><span class="m-lab">${row[0]}</span><span class="m-val" data-rm="${k}-${i}">${row[1]()}</span></div>`).join('')}</div>
     ${tasks ? tasks.rowHTML(k) : ''}
     <div class="b-appr" style="display:${stuckIn(k).length ? 'flex' : 'none'}">⚠ <span class="ap-n">${stuckIn(k).length}</span> WAITING APPROVAL</div>`;
   const trow = rh.querySelector('.b-tasks');
-  if (trow) trow.addEventListener('click', () => tasks.toggle());
+  if (trow && DEMO) trow.addEventListener('click', () => tasks.toggle());
   rh.querySelector('.b-appr').addEventListener('click', () => {
     const s = stuckIn(k)[0];
     if (s) openAgentRail(s.a.id);
@@ -789,7 +810,7 @@ function railBack() { // V3.4: "back" = back to the pod view, chat stays on the 
 document.getElementById('railBack').addEventListener('click', railBack);
 let pendingTab = 'chat';
 // compat entry point (person clicks, pills, CC export): route through focus mode
-function openAgent(id, tab = 'chat') {
+function openAgent(id, tab = DEMO ? 'chat' : 'activity') {
   const dept = R[id].a.dept;
   if (focused === dept) { openAgentRail(id, tab); return; }
   pendingTab = tab;
@@ -812,7 +833,7 @@ function sendChat(text) {
   chatPush(id, { who: 'user', text });
   document.getElementById('mIn').value = '';
   const low = text.toLowerCase();
-  setTimeout(() => {
+  setTimeout(async () => {
     if (tasks && tasks.pendingReject(id)) { tasks.rejectLive(id, text); return; } // V3.5: the line after REJECT is the note the agent reworks with
     if (r.state === 'stuck' && /\b(approve|reject)\b/.test(low)) {
       resolveApproval(id, /approve/.test(low));
@@ -820,7 +841,7 @@ function sendChat(text) {
     }
     const rv = tasks && tasks.isLive() && text.match(/^\s*revise\s*[:\-–]\s*(.+)$/i); // LIVE: "revise: …" re-runs the last deliverable
     if (rv && tasks.revise(id, rv[1].trim())) { chatPush(id, { who: 'agent', text: 'On it — revising now. It will land here when it is ready.' }); return; }
-    const tr = tasks && tasks.handleChat(id, text); // "add task: …" / "what's on the board"
+    const tr = tasks && await tasks.handleChat(id, text); // "add task: …" / "what's on the board"
     if (tr) { chatPush(id, { who: 'agent', text: tr }); return; }
     if (tasks && tasks.isLive()) { // LIVE: a real conversation with the agent, grounded in the brain
       chatPush(id, { who: 'work', i: '…', text: `${r.a.name} is thinking` });
@@ -829,7 +850,8 @@ function sendChat(text) {
         .then(async res => { if (!res.ok) throw new Error((await res.json()).error || res.statusText); return res.json(); })
         .then(j => {
           const h = chatHist[id]; const k = h.findIndex(m => m.who === 'work' && m.text === `${r.a.name} is thinking`); if (k >= 0) h.splice(k, 1);
-          chatPush(id, { who: 'agent', text: j.reply });
+          chatPush(id, { who: 'agent', text: j.reply, taskId:j.taskId });
+          if(j.taskId)tasks.refresh();
           if (j.routines && tasks.refresh) tasks.refresh(); // a routine was set, paused, run or deleted in chat
           if (j.read) for (const n of j.read.slice(0, 2)) brain.readNote(id, n);
           if (j.tools && j.tools.length) mcp.onToolsUsed(id, j.tools);
@@ -926,6 +948,7 @@ function mockupFor(id) {
 
 /* ---------- approvals: agent STUCK → amber billboard row → chat approval message ---------- */
 function requestApproval(id, ask) {
+  if (!DEMO) return;
   const r = R[id];
   if (!r || r.state !== 'working') return;
   r.state = 'stuck';
@@ -1002,6 +1025,7 @@ function weightedEv(evs) {
   return evs[0];
 }
 function fireAgentEvent(seedTs) {
+  if (!DEMO) return;
   const ids = Object.keys(R).filter(id => R[id].v1 && R[id].v1.ev && R[id].state !== 'stuck');
   const r = R[ids[Math.floor(Math.random() * ids.length)]];
   const ev = weightedEv(r.v1.ev);
@@ -1156,8 +1180,28 @@ function tickEmotes(now, dt) {
   }
 }
 function tickSim(now, dt) {
+  if(programPerson){posePerson(programPerson,'stand',now);const p=tasks?.projectActivity();const phase=p?.state;programPill.classList.toggle('is-working',!!p);programPill.classList.toggle('is-supervising',['planning','verifying'].includes(phase));programPill.dataset.workState=phase==='running'?'Coordinating teams':phase || '';programPill.title=p?p.title:'Projects · Scope, team delivery & reporting';}
+
   for (const r of Object.values(R)) {
     if (r.state === 'working') {
+      if (!DEMO) {
+        const work = tasks?.agentActivity(r.a.id);
+        const active = !!work && !['done','submitted'].includes(work.phase);
+        const phase = work?.phase || 'idle';
+        const motion = active ? (phase === 'reviewing' || phase === 'planning' ? 'read' : 'type') : 'idle';
+        poseWork(r.person, motion, now + r.bob * 500, dt);
+        applyStandAndFacing(r, motion, now, dt);
+        r.activity.material.color.set(phase==='done'?'#36C98B':phase==='reviewing'?'#B491ED':phase==='planning'?'#E5B54A':'#62BCEA');
+        r.activity.material.opacity = active ? 0.38 + 0.18 * Math.sin(now / 500 + r.bob) : phase==='done' ? 0.32 : 0;
+        const screenKey = phase + (work?.title || '') + (active ? Math.floor(now/400) : '');
+        if (r.screenKey !== screenKey) {
+          r.screenKey = screenKey; r.livePhase = phase;
+          const status = phase === 'reviewing' ? 'verifying' : phase === 'planning' ? 'planning' : phase==='done' ? 'done' : phase==='submitted' ? 'submitted' : active ? 'working' : 'idle';
+          r.screenSet.draw(work ? [work.title.slice(0,26),work.title.slice(26,52)] : ['Ready when you are'], status, now);r.screenSet.tex.needsUpdate=true;
+          r.pill.classList.toggle('is-working',active);r.pill.classList.toggle('is-supervising',phase==='planning'||phase==='reviewing');r.pill.classList.toggle('is-complete',phase==='done');r.pill.classList.toggle('is-submitted',phase==='submitted');r.pill.dataset.workState=status==='done'?'✓ Verified':status==='submitted'?'✓ Submitted · awaiting review':status==='working'?'In progress':status;r.pill.title=active ? `${status}: ${work.title}` : 'Idle · ready for a task';
+        }
+        continue;
+      }
       let mode;
       if (r.cheerUntil && now < r.cheerUntil) mode = 'cheer';
       else if (r.slumpUntil && now < r.slumpUntil) mode = 'slump';
@@ -1217,18 +1261,19 @@ function tickSim(now, dt) {
     }
   }
   // ambient emoji work-bubbles pop over random desks every beat or two
-  if (now > nextEmoteAt) {
+  if (DEMO && now > nextEmoteAt) {
     const ids = Object.keys(R).filter(id => R[id].state === 'working');
     if (ids.length) spawnEmote(R[ids[Math.floor(Math.random() * ids.length)]],
       rnd(['💬', '✉️', '📈', '💡', '✓', '📞', '🔍', '📎']));
     nextEmoteAt = now + 1200 + Math.random() * 1800;
   }
   tickEmotes(now, dt);
-  tickSweep(now);
+  if (DEMO) tickSweep(now);
+  else for (const k of DEPT_KEYS) { const active=Object.values(R).some(r=>r.a.dept===k&&['working','planning','reviewing'].includes(r.livePhase));deptRT[k].badge.classList.toggle('team-working',active); }
   brain.tick(now);
   // schedule a new approval request now and then — capped so a long unattended demo
   // never ends up with half the office stuck waving (v1 demo-safety rule)
-  if (now > nextApprovalAt && !(tasks && tasks.isLive())) { // V3.5: a live office's approvals are real (routine drafts) — no theatre ones
+  if (DEMO && now > nextApprovalAt) { // V3.5: a live office's approvals are real (routine drafts) — no theatre ones
     const pending = Object.values(R).filter(r => r.state === 'stuck').length;
     if (pending < 2) {
       const ids = Object.keys(R).filter(id => R[id].state === 'working' && !R[id].a.lead);
@@ -1237,12 +1282,12 @@ function tickSim(now, dt) {
     nextApprovalAt = now + 50000 + Math.random() * 40000;
   }
   // agent events drive everything — feed, chat streams, billboard metrics (nothing is static)
-  if (now > nextMetricAt) {
+  if (DEMO && now > nextMetricAt) {
     fireAgentEvent();
     nextMetricAt = now + 2600 + Math.random() * 3800;
   }
   // rotate desk screen content — a couple of screens refresh every beat so the room reads busy
-  if (Math.floor(now / 1800) !== Math.floor((now - dt * 1000) / 1800)) {
+  if (DEMO && Math.floor(now / 1800) !== Math.floor((now - dt * 1000) / 1800)) {
     const n = 1 + (Math.random() < 0.5 ? 1 : 0);
     for (let i = 0; i < n; i++) {
       const ss = screenSets[Math.floor(Math.random() * screenSets.length)];
@@ -1261,6 +1306,8 @@ function toScreen(p) {
 function smooth(a, b, x) { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
 
 function tickLOD() {
+  if(programPill){programPill.style.display='block';const [x,y]=toScreen(new THREE.Vector3(-28,4,0));programPill.style.transform=`translate(${x}px,${y}px) translate(-50%,-100%)`;programPill.style.opacity=focused?0.35:1;}
+
   const z = view.zoom;
   const detail = smooth(1.75, 2.5, z);
   const pillA = smooth(1.45, 1.85, z); // pills stay on at near — they name the agents
@@ -1293,7 +1340,7 @@ function tickLOD() {
     const p = r.person.position;
     const [sx, sy] = toScreen(v3.set(p.x, p.y + 5.9 * (r.a.lead ? 1.12 : 1), p.z).clone());
     r.pill.style.display = 'block';
-    r.pill.style.transform = `translate(${sx}px,${sy}px) translate(-50%,-100%) scale(${pillScale})`;
+    r.pill.style.transform = `translate(${sx}px,${sy}px) translate(-50%,-100%) scale(${r.pill.classList.contains('is-supervising') ? Math.max(.95,pillScale) : pillScale})`;
     const dimmed = focused && focused !== 'brain' && r.a.dept !== focused;
     r.pill.style.opacity = dimmed ? 1 - 0.85 * focusDim : 1;
   }
@@ -1334,18 +1381,17 @@ function applyRoster(agents) {
     r.pill.innerHTML = (r.a.lead ? '<span class="star">★</span>' : '') + esc(a.name);
     r.v1 = r.v1 || {};
     r.v1.role = a.role || r.v1.role || ''; r.v1.tagline = a.does || r.v1.tagline || '';
-    r.v1.greeting = `${a.does || 'I am ' + a.name + '.'} Give me a task in the bar on the right, or ask me something here.` +
-      (a.interviewer && a.setUp === false ? ` Nothing in this department is yours yet: say "set up" and I will ask you five questions about how it works here, then write it down for the team.` : '');
-    r.v1.chips = a.interviewer && a.setUp === false ? ['set up', 'What can you do for me?', 'What tools can you use?'] : ['What are you working on?', 'What can you do for me?', 'What tools can you use?'];
+    r.v1.greeting = a.lead ? `I coordinate ${DEPTS[r.a.dept].name}. My current specialists: ${agents.filter(x=>x.department===a.department&&!x.lead).map(x=>x.name).join(', ')}. Send a request and I’ll plan, delegate and verify it.` : `${a.does || 'I am '+a.name+'.'} Add a task for the team lead to plan and verify, or ask me something here.`;
+    r.v1.chips = ['What are you working on?', 'What can you do for me?', 'What tools can you use?'];
     if (chatHist[a.id] && chatHist[a.id][0] && chatHist[a.id][0].who === 'agent') chatHist[a.id][0].text = r.v1.greeting;
     if (modalOpen === a.id) openAgentRail(a.id, modalTab, false);
   }
   if (tasks && tasks.syncPills) tasks.syncPills(); // the pills were rebuilt — put the clock chips back
 }
-tasks = initTasks({
+tasks = (DEMO ? initTasks : initOfficeWork)({
   hud, R, deptRT, RAIL_SIDE, spawnEmote, chatPush, chatHist, feedPush, zoomToApproval, enterFocus, openAgent, esc,
   brainWrite: (id, title) => brain.write(id, title), brain,
-  onLive: (h) => { document.querySelector('#topbar .brand .ver').textContent = 'BETA'; document.title = `${h.name} — Agents Office`; brain.setOwner(h.name); brain.setQuiet(true); applyRoster(h.agents); },
+  onLive: (h) => { document.querySelector('#topbar .brand .ver').textContent = ''; document.title = h.name; brainNotes = h.notes; brain.setOwner(h.name); brain.setQuiet(true); applyRoster(h.agents); },
   onTools: (agentId, keys) => mcp.onToolsUsed(agentId, keys),
   requestApproval, setStuck: setStuckLive,
   onUsage: (u) => { if (mcp && mcp.setUsage) mcp.setUsage(u); }, // V3.6: the plan's gauge in the top bar
@@ -1385,6 +1431,7 @@ window.CC = { flyTo, zoomToDept, zoomOut, zoomToApproval, requestApproval, openA
 
 let last = performance.now();
 function loop(now) {
+  if (now - last < 1000 / 30) { requestAnimationFrame(loop); return; }
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   tickTween(now);
   applyCamera();

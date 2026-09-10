@@ -26,7 +26,7 @@ export const DEPTS = {
 };
 
 // 35 agents (V3.4, 7 Sep 2026: every department has a lead). grid = [col,row] desk slot on the department plinth.
-export const AGENTS = [
+const DEFAULT_AGENTS = [
   // EMAILS (5) — replaced Customer Support, 5 Sep 2026
   { id: 'elead', name: 'EMAILS LEAD',         dept: 'emails',    lead: true,  grid: [0.5, 0], hair: '#2b2b2b', skin: '#E8B98E' },
   { id: 'cmail', name: 'CLIENT EMAILS',       dept: 'emails',    grid: [0, 1], hair: '#3b2b1d', skin: '#F0C9A0' },
@@ -80,6 +80,34 @@ export const LAYOUT = {
   fin:       { pos: [30, 23],   w: 20, d: 26 },
   ops:       { pos: [0, 48],    w: 20, d: 30 },   // the 5th pod fills the empty bottom-left gap
 };
+
+// The live roster comes from the saved office; standalone files retain their sample roster.
+const boot = typeof window !== 'undefined' ? window.__OFFICE_BOOT__ : null;
+if (boot?.teams) {
+  const palette = Object.values(DEPTS).filter(d => d !== DEPTS.brain);
+  DEPT_KEYS.splice(0, DEPT_KEYS.length, ...boot.teams.map(t => t.id));
+  boot.teams.forEach((team, i) => {
+    DEPTS[team.id] = { ...(DEPTS[team.id] || palette[i % palette.length]), name: team.name, short: team.name };
+    if (!LAYOUT[team.id] || boot.teams.length > 6) {
+      const angle = i * Math.PI * 2 / boot.teams.length;
+      const radius = Math.max(48, boot.teams.length * 7.5);
+      LAYOUT[team.id] = { pos: [Math.sin(angle)*radius, Math.cos(angle)*radius], w: 24, d: 32 };
+    }
+  });
+}
+export const AGENTS = boot?.agents ? boot.agents.map(a => {
+  const original = DEFAULT_AGENTS.find(x => x.id === a.id) || { hair: '#332c27', skin: '#C68B59' };
+  const members = boot.agents.filter(x => x.department === a.department).sort((a,b) => Number(b.lead) - Number(a.lead));
+  const index = members.findIndex(x => x.id === a.id), cols = members.length > 8 ? 3 : 2;
+  return { ...original, ...a, dept: a.department, grid: a.lead ? [(cols - 1) / 2, 0] : [(index - 1) % cols, 1 + Math.floor((index - 1) / cols)] };
+}) : DEFAULT_AGENTS;
+if (boot) for (const key of DEPT_KEYS) {
+  const count = AGENTS.filter(a => a.dept === key).length, cols = count > 8 ? 3 : 2;
+  LAYOUT[key].w = Math.max(20, cols * 8.6 + 4);
+  LAYOUT[key].d = Math.max(26, (1 + Math.ceil((count - 1) / cols)) * 6.4 + 7);
+  const team = boot.teams.find(t => t.id === key);
+  if (team) { DEPTS[key].name = team.name; DEPTS[key].short = team.name; }
+}
 
 // Department billboard metrics (v1 rule #5: live metrics float above each dept,
 // values tick green on change, "Waiting Approval" pulses amber when > 0).

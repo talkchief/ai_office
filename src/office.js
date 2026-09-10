@@ -1,0 +1,367 @@
+import {projectWorkspace} from './projects.js';
+import { DEPTS, DEPT_KEYS } from './data.js';
+import { officeReady } from './auth.js';
+import { renderTaskWorkspace, renderDocument } from './task-output.js';
+
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const labels = { backlog: 'Backlog', queued: 'Queued', planning: 'Planning', working: 'Working', reviewing: 'Lead review', saving: 'Saving deliverable', waiting: 'Your approval', blocked: 'Blocked', done: 'Approved', cancelled: 'Cancelled', pending: 'Pending', failed: 'Failed', interrupted: 'Interrupted' };
+const when = value => value ? new Date(value).toLocaleString() : '—';
+const lines = value => String(value || '').split('\n').map(s => s.trim()).filter(Boolean);
+async function api(path, method = 'GET', body) {
+  const response = await fetch('/api' + path, { method, signal: AbortSignal.timeout((path.startsWith('/tools')||path.startsWith('/projects/documents')) ? 45000 : 15000), ...(body !== undefined ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) });
+  const value = await response.json();
+  if (!response.ok) throw new Error(value.error || 'Request failed.');
+  return value;
+}
+
+export function initOfficeWork(ctx) {
+  const { R, deptRT, onLive, onUsage, getFocused } = ctx;
+  let jobs = [], config = null, tools = [], selectedTeam = DEPT_KEYS.includes('marketing') ? 'marketing' : DEPT_KEYS[0], filter = 'all', refreshing = false, agentOpen = null, modalKind = '', modalTask = null;
+  let reportDays = 7, reportFetchCounter = 0, taskFetchCounter = 0, taskDirty = false, connectionStale = false;
+  let taskCurrent = null, taskTab = 'work', taskTabTouched = false, taskSignature = '';
+  let taskExpanded = new Map(), taskScroll = {}, taskInputDraft = {};
+  const activityByAgent = new Map();
+  let settingsDraft = null, settingsTeam = selectedTeam, settingsSection = 'overview', toolPoll = null;
+  const panel = document.getElementById('tpanel');
+  panel.innerHTML = `<form class="space-command">
+    <div class="space-team-picker"><button id="spaceDept" type="button" aria-expanded="false" aria-controls="spaceTeamMenu"><i style="background:${DEPTS[selectedTeam].chip}"></i><span>${esc(DEPTS[selectedTeam].name)}</span><span class="space-chevron">⌄</span></button><div id="spaceTeamMenu" hidden>${DEPT_KEYS.map(k => `<button type="button" data-pick-team="${k}"><i style="background:${DEPTS[k].chip}"></i>${esc(DEPTS[k].name)}</button>`).join('')}</div></div>
+    <textarea id="spaceBrief" rows="2" aria-label="Task brief" placeholder="What needs to get done?" required></textarea>
+    <div class="space-command-actions"><span>Lead-reviewed work</span><button type="submit" class="space-save-draft" data-backlog="true" title="Save without starting agents">Save idea</button><button type="submit">Add task <span aria-hidden="true">↗</span></button></div><p id="spaceHint" role="status"></p></form>
+    <div class="space-feed-head"><h2>Work & results</h2><span class="tp-mode" hidden></span></div>
+    <div id="spaceFilters" class="space-filters"></div><div id="spaceJobs" class="space-jobs"></div>`;
+  const dialog = document.createElement('dialog'); dialog.id = 'spaceDialog';
+  dialog.innerHTML = '<header><h2 id="spaceTitle"></h2><button type="button" id="spaceClose" aria-label="Close">×</button></header><p id="spaceMessage" role="status"></p><div id="spaceContent"></div>';
+  document.body.appendChild(dialog);
+  const $ = id => document.getElementById(id), content = $('spaceContent');
+  for(const event of ['input','change'])content.addEventListener(event,e=>{if(modalKind==='task'&&e.target.matches('input,textarea,select')){taskDirty=true;if(e.target.id)taskInputDraft[e.target.id]=e.target.value;}});
+  const feedback = (text, error = false) => { $('spaceMessage').textContent = text; $('spaceMessage').classList.toggle('error', error); };
+  function open(kind, title) { modalKind = kind; dialog.dataset.view = kind; $('spaceTitle').textContent = title; feedback(''); if (!dialog.open) dialog.showModal(); requestAnimationFrame(()=>{dialog.scrollTop=0;content.scrollTop=0;}); }
+  function close() { dialog.close(); modalKind = ''; if (toolPoll) { clearInterval(toolPoll); toolPoll = null; } }
+  $('spaceClose').onclick = close; dialog.addEventListener('cancel', close); dialog.addEventListener('keydown', event => event.stopPropagation());
+  const projectUI=projectWorkspace({api,open,content,feedback,showTask,isOpen:()=>dialog.open&&modalKind==='projects'});
+  const manage = document.createElement('div'); manage.className = 'space-manage';
+  manage.innerHTML = `<button id="spaceManage" type="button" aria-label="Manage office" aria-expanded="false" aria-controls="spaceManageMenu"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.5" fill="var(--cream)"/><circle cx="15" cy="17" r="2.5" fill="var(--cream)"/></svg><span>Manage</span></button><div id="spaceManageMenu" hidden><span class="space-menu-label">YOUR OFFICE</span><button id="spaceProjects" type="button">Projects <span>↗</span></button><button id="spaceTeams" type="button">Teams <span>↗</span></button><button id="spaceTools" type="button">Tools & MCPs <span>↗</span></button><button id="spaceSkills" type="button">Skills <span>↗</span></button><button id="spaceReports" type="button">Reports <span>↗</span></button><button id="spaceBrain" type="button">Brain <span>↗</span></button><div class="space-menu-divider"></div></div>`;
+  $('claudeConnect').before(manage); $('spaceManageMenu').appendChild($('claudeConnect'));
+  const toggleMenu = (button, menu, visible) => { $(menu).hidden = !visible; $(button).setAttribute('aria-expanded', String(visible)); };
+  $('spaceManage').onclick = () => toggleMenu('spaceManage', 'spaceManageMenu', $('spaceManageMenu').hidden);
+  for (const [id, action] of [['spaceProjects',()=>projectUI.open()], ['spaceTeams', () => showSettings('teams')], ['spaceTools', () => showSettings('tools')], ['spaceSkills', showSkills], ['spaceReports', showReports], ['spaceBrain', showKnowledge]]) $(id).onclick = () => { toggleMenu('spaceManage','spaceManageMenu',false); action(); };
+  $('claudeConnect').addEventListener('click', () => toggleMenu('spaceManage','spaceManageMenu',false));
+  $('spaceDept').onclick = () => toggleMenu('spaceDept','spaceTeamMenu',$('spaceTeamMenu').hidden);
+  $('spaceTeamMenu').querySelectorAll('[data-pick-team]').forEach(button => button.onclick = () => {
+    selectedTeam = button.dataset.pickTeam;
+    $('spaceDept').innerHTML = `<i style="background:${DEPTS[selectedTeam].chip}"></i><span>${esc(DEPTS[selectedTeam].name)}</span><span class="space-chevron">⌄</span>`;
+    toggleMenu('spaceDept','spaceTeamMenu',false); $('spaceBrief').focus();
+  });
+  document.addEventListener('click', event => {
+    if (!manage.contains(event.target)) toggleMenu('spaceManage','spaceManageMenu',false);
+    if (!event.target.closest('.space-team-picker')) toggleMenu('spaceDept','spaceTeamMenu',false);
+  });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') { if (!$('spaceManageMenu').hidden) { toggleMenu('spaceManage','spaceManageMenu',false); $('spaceManage').focus(); } if (!$('spaceTeamMenu').hidden) { toggleMenu('spaceDept','spaceTeamMenu',false); $('spaceDept').focus(); } } });
+  panel.querySelector('form').onsubmit = async event => {
+    event.preventDefault(); const button = event.submitter; button.disabled = true;
+    try {
+      const job = await api('/tasks', 'POST', { dept: selectedTeam, text: $('spaceBrief').value, backlog: !!event.submitter.dataset.backlog });
+      $('spaceBrief').value = ''; $('spaceHint').textContent = job.state === 'backlog' ? 'Idea saved. Start it when you are ready.' : 'Task received. The lead will create the plan.';
+      await refresh(); await showTask(job.id);
+    } catch (error) { $('spaceHint').textContent = error.message; if (/Connect Claude/.test(error.message)) $('claudeConnect').click(); }
+    finally { button.disabled = false; }
+  };
+  function scopedJobs() { const dept = getFocused(); return dept && dept !== 'brain' ? jobs.filter(j => j.dept === dept) : jobs; }
+  function render() {
+    activityByAgent.clear();
+    for (const job of [...jobs].reverse()) {
+      if (job.state === 'done') {
+        for (const id of [job.agent,...job.subtasks.map(s=>s.agent).filter(Boolean)]) activityByAgent.set(id,{phase:'done',title:job.title,jobId:job.id});
+      } else if (!['cancelled','backlog'].includes(job.state)) for(const step of job.subtasks) if(step.state==='done' && step.agent) activityByAgent.set(step.agent,{phase:'submitted',title:step.title,jobId:job.id});
+    }
+    for (const job of jobs) {
+      if (['planning','reviewing'].includes(job.state)) activityByAgent.set(job.agent,{phase:job.state,title:job.title,jobId:job.id});
+      if (!['cancelled','done'].includes(job.state)) for (const step of job.subtasks) if (step.state==='working'&&step.agent) activityByAgent.set(step.agent,{phase:'working',title:step.title,jobId:job.id});
+    }
+    const scope = scopedJobs();
+    $('spaceFilters').innerHTML = [['all', 'All'], ['backlog', 'Ideas'], ['active', 'Active'], ['waiting', 'Review'], ['blocked', 'Blocked'], ['done', 'Results']].map(([id, name]) => {
+      const count = scope.filter(j => id === 'all' || (id === 'active' ? ['queued', 'planning', 'working', 'reviewing', 'saving'].includes(j.state) : j.state === id)).length;
+      return `<button class="${filter === id ? 'selected' : ''}" data-filter="${id}">${name} <b>${count}</b></button>`;
+    }).join('');
+    $('spaceFilters').querySelectorAll('button').forEach(b => b.onclick = () => { filter = b.dataset.filter; render(); });
+    const visible = scope.filter(j => filter === 'all' || (filter === 'active' ? ['queued', 'planning', 'working', 'reviewing', 'saving'].includes(j.state) : j.state === filter));
+    const historyOpen = $('spaceJobs').querySelector('[data-task-history]')?.open || false;
+    const card = j => {
+      const terminal = ['done','cancelled'].includes(j.state);
+      const caption = j.state==='done' ? 'Lead verified · View result ↗' : j.state==='cancelled' ? 'Task closed' : j.state==='backlog' ? 'Saved for later' : j.subtasks.length ? `${j.completedSteps}/${j.subtasks.length} assignments submitted` : j.state==='blocked' ? 'Open to resolve the blocker' : 'Awaiting the lead’s plan';
+      return `<button class="space-job ${j.state}" data-job="${j.id}"><span class="space-card-top"><span class="space-state">${j.state==='done'?'Ready':labels[j.state] || esc(j.state)}${j.priority===2?' · Priority':''}${j.kind==='evaluation'?' · Test':''}</span><time>${new Date(j.doneAt || j.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</time></span><strong>${esc(j.title)}</strong>${j.resultPreview&&j.state==='done'?`<span class="space-result-excerpt">${esc(j.resultPreview)}</span>`:''}<span class="space-card-context">${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)} · ${caption}</span>${!terminal&&j.subtasks.length?`<progress value="${j.completedSteps}" max="${j.subtasks.length}" aria-label="Assignments submitted"></progress>`:''}</button>`;
+    };
+    const groups = [['attention','Needs your attention',['waiting','blocked']],['active','In progress',['queued','planning','working','reviewing','saving']],['results','Ready results',['done']],['ideas','Ideas',['backlog']],['history','Closed tasks',['cancelled']]];
+    $('spaceJobs').innerHTML = groups.map(([id,title,states])=>{
+      const items=visible.filter(j=>states.includes(j.state)).sort((a,b)=>(b.doneAt||b.updatedAt||b.createdAt)-(a.doneAt||a.updatedAt||a.createdAt));
+      if(!items.length)return '';
+      const cards=items.map(card).join('');
+      if(id==='history'&&filter==='all')return `<details class="space-closed-tasks" data-task-history ${historyOpen?'open':''}><summary>${title} <span>${items.length}</span></summary>${cards}</details>`;
+      return `<section class="space-feed-group" aria-label="${title}">${filter==='all'?`<div class="space-group-heading">${title}<span>${items.length}</span></div>`:''}${cards}</section>`;
+    }).join('') || '<div class="space-empty"><span class="space-empty-mark" aria-hidden="true">○</span><h3>A little room for your next idea.</h3><p>Add a task to put your team to work.</p></div>';
+    $('spaceJobs').querySelectorAll('[data-job]').forEach(b => b.onclick = () => showTask(b.dataset.job));
+    for (const key of DEPT_KEYS) {
+      const list = jobs.filter(j => j.dept === key);
+      const values = { doing: list.filter(j => ['planning', 'working', 'reviewing'].includes(j.state)).length, next: list.filter(j => j.state === 'queued').length, done: list.filter(j => j.state === 'done').length };
+      for (const [state, count] of Object.entries(values)) document.querySelectorAll(`[data-tk="${key}-${state}"]`).forEach(el => el.textContent = count);
+    }
+  }
+  async function syncBrain() { const graph = await api('/brain'); ctx.brain.setGraph(graph); const count = document.querySelector('.brainTag b'); if (count) count.textContent = graph.notes; }
+  async function refresh() {
+    if (refreshing) return; refreshing = true;
+    try {
+      const before = jobs.filter(j => j.state === 'done').length; jobs = await api('/tasks'); if(connectionStale){$('spaceHint').textContent='Connection restored.';connectionStale=false;} render(); if (jobs.filter(j => j.state === 'done').length !== before) await syncBrain();
+      await projectUI.refresh();
+      if (agentOpen) renderAgent(agentOpen);
+      if (dialog.open && modalKind === 'reports' && document.activeElement?.id !== 'spaceReportPeriod') await showReports(false);
+      if (dialog.open && modalKind === 'task' && !taskDirty && !dialog.contains(document.activeElement?.closest('textarea,input,select'))) await showTask(modalTask, false);
+    } catch (error) { connectionStale=true;activityByAgent.clear();$('spaceHint').textContent='Live updates interrupted. Showing the last recorded state; reconnecting…'; }
+    finally { refreshing = false; }
+  }
+  function taskActions(job) {
+    const queued=job.calls===0 && ['backlog','queued'].includes(job.state);
+    if(['done','cancelled','saving'].includes(job.state))return '';
+    if(queued)return `<label>Task brief<textarea id="spaceQueueBrief" rows="3">${esc(job.text)}</textarea></label><label>Queue priority<select id="spaceQueuePriority">${[[2,'High'],[1,'Normal'],[0,'Low']].map(([value,label])=>`<option value="${value}" ${value===(job.priority??1)?'selected':''}>${label}</option>`).join('')}</select></label><div class="space-actions"><button data-action="queue" data-queue-state="${job.state}">Save changes</button><button data-action="queue" data-queue-state="${job.state==='backlog'?'queued':'backlog'}">${job.state==='backlog'?'Start task':'Move to ideas'}</button><button class="space-text-action" data-action="cancel">Cancel task</button></div>`;
+    if(['waiting','blocked'].includes(job.state))return `${job.state==='waiting'&&job.review?.approved?'<div class="space-owner-approval"><p>The lead has verified this result. Your approval saves it to the Brain.</p><button data-action="approve">Approve completion</button></div>':''}<details data-detail-key="revision" ${job.state==='blocked'?'open':''}><summary>${job.state==='waiting'?'Request changes':'Resolve and retry'}</summary><label>Feedback for the team<textarea id="spaceRevision" placeholder="${job.state==='waiting'?'Describe what needs to change.':'Describe a correction, or leave blank to retry unfinished work.'}"></textarea></label><div class="space-actions"><button data-action="${job.state==='waiting'?'reject':'retry'}">${job.state==='waiting'?'Send for revision':'Retry task'}</button><button class="space-text-action" data-action="cancel">Cancel task</button></div></details>`;
+    return taskTab==='work'?'<button class="space-text-action" data-action="cancel">Cancel task</button>':'';
+  }
+  function rememberTaskView() {
+    content.querySelectorAll('[data-detail-key]').forEach(el=>taskExpanded.set(el.dataset.detailKey,el.open));
+    taskScroll[taskTab]=content.scrollTop;
+  }
+  function renderTaskView() {
+    const job=taskCurrent;if(!job)return;
+    content.innerHTML=renderTaskWorkspace(job,taskTab,taskActions(job));
+    content.querySelectorAll('[data-detail-key]').forEach(el=>{if(taskExpanded.has(el.dataset.detailKey))el.open=taskExpanded.get(el.dataset.detailKey);});
+    for(const [id,value] of Object.entries(taskInputDraft)){const field=$(id);if(field)field.value=value;}
+    content.scrollTop=taskScroll[taskTab] || 0;
+    content.querySelectorAll('[data-task-tab]').forEach(button=>button.onclick=()=>{
+      rememberTaskView();taskTab=button.dataset.taskTab;taskTabTouched=true;renderTaskView();$('spaceTaskTab-'+taskTab)?.focus({preventScroll:true});
+    });
+    content.querySelector('[role=tablist]').onkeydown=event=>{
+      if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+      event.preventDefault();const tabs=['result','work','review'];const index=tabs.indexOf(taskTab);
+      const next=event.key==='Home'?0:event.key==='End'?2:(index+(event.key==='ArrowRight'?1:2))%3;
+      content.querySelector(`[data-task-tab="${tabs[next]}"]`).click();
+    };
+    content.querySelectorAll('[data-output-anchor]').forEach(link=>link.onclick=event=>{event.preventDefault();$(link.dataset.outputAnchor)?.scrollIntoView({behavior:'smooth',block:'start'});});
+    if($('spaceCopyResult'))$('spaceCopyResult').onclick=async event=>{
+      const button=event.currentTarget,article=content.querySelector('.space-deliverable');
+      try{
+        if(navigator.clipboard.write&&window.ClipboardItem)await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([article.innerHTML],{type:'text/html'}),'text/plain':new Blob([article.innerText],{type:'text/plain'})})]);
+        else await navigator.clipboard.writeText(article.innerText);
+        button.textContent='Copied';setTimeout(()=>{if(button.isConnected)button.textContent='Copy';},1800);
+      }catch{feedback('Copy is unavailable in this browser. You can select the result text or download it.',true);}
+    };
+    if($('spaceDownloadResult'))$('spaceDownloadResult').onclick=()=>{
+      const filename=(job.title || 'result').replace(/[^\p{L}\p{N}._-]+/gu,'-').slice(0,80);
+      const text=(job.state==='done'?'':'> Draft — not approved for completion.\n\n')+job.result+'\n';
+      const url=URL.createObjectURL(new Blob([text],{type:'text/markdown;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download=(job.state==='done'?'':'draft-')+filename+'.md';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    };
+    content.querySelectorAll('[data-action]').forEach(button=>button.onclick=async()=>{
+      button.disabled=true;
+      try{
+        await api(`/tasks/${job.id}/${button.dataset.action}`,'POST',button.dataset.action==='queue'?{text:$('spaceQueueBrief').value,priority:Number($('spaceQueuePriority').value),state:button.dataset.queueState}:{feedback:$('spaceRevision')?.value || ''});
+        taskDirty=false;taskInputDraft={};taskSignature='';await refresh();await showTask(job.id,false);
+      }catch(error){feedback(error.message,true);button.disabled=false;}
+    });
+  }
+  async function showTask(id,reveal=true) {
+    const request=++taskFetchCounter;
+    if(reveal){taskDirty=false;modalTask=id;taskCurrent=null;taskTabTouched=false;taskSignature='';taskExpanded=new Map();taskScroll={};taskInputDraft={};open('task','Task');content.innerHTML='<p>Loading task…</p>';}
+    try{
+      const job=await api('/tasks/'+id);
+      if((!reveal&&taskDirty)||request!==taskFetchCounter||!dialog.open||modalKind!=='task'||modalTask!==id)return;
+      const signature=String(job.updatedAt)+':'+job.state+':'+job.events.length;
+      // Do not replace a finished document every poll: preserve reading position,
+      // text selections, focused controls, and any open verification details.
+      if(!reveal&&signature===taskSignature)return;
+      if(!reveal&&window.getSelection()?.toString()&&content.contains(window.getSelection().anchorNode))return;
+      if(taskCurrent)rememberTaskView();
+      taskCurrent=job;taskSignature=signature;if(!taskTabTouched)taskTab=job.result?'result':'work';
+      $('spaceTitle').textContent=job.title;renderTaskView();
+    }catch(error){feedback(error.message,true);}
+  }
+  function renderAgent(id) {
+    agentOpen = id;
+    const assigned = jobs.filter(j => j.agent === id || j.subtasks.some(s => s.agent === id || s.eligible?.includes(id)));
+    $('mNow').innerHTML = `<b>${assigned.some(j => ['working', 'planning', 'reviewing'].includes(j.state)) ? 'Assigned work' : 'Ready for your next task'}</b>`;
+    $('mStats').innerHTML = ''; $('mChart').hidden = true;
+    $('mFeed').innerHTML = assigned.map(j => `<button class="space-agent-task" data-job="${j.id}"><b>${esc(j.title)}</b><span>${labels[j.state]} · ${j.completedSteps}/${j.subtasks.length} subtasks submitted</span>${j.subtasks.filter(s => s.agent === id || s.eligible?.includes(id)).map(s => `<span>${s.state === 'done' ? 'Submitted' : labels[s.state]}: ${esc(s.title)}</span>`).join('')}<span>Open plan, deliverables and verification →</span></button>`).join('') || '<p>No tasks assigned. Real plans and progress will appear here.</p>';
+    $('mFeed').querySelectorAll('[data-job]').forEach(b => b.onclick = () => showTask(b.dataset.job));
+  }
+  async function showSettings(tab) {
+    try {
+      [config, tools] = await Promise.all([api('/office'), api('/tools')]); settingsDraft = structuredClone(config);
+      open(tab, tab === 'tools' ? 'Tools & MCP servers' : 'Teams & working instructions');
+      if (tab === 'tools') renderTools(); else { if(!settingsDraft.teams.some(t=>t.id===settingsTeam))settingsTeam=settingsDraft.teams[0].id;renderTeam(); }
+    } catch (error) { feedback(error.message, true); }
+  }
+  const toolChoices = (selected, prefix) => tools.map(t => `<label class="space-check"><input type="checkbox" data-${prefix}="${esc(t.id)}" ${selected.includes(t.id) ? 'checked' : ''}>${esc(t.name)} <small>${esc(t.origin || t.type)} · ${selected.includes(t.id) ? 'Enabled' : 'Not assigned'}</small></label>`).join('');
+  function collectTeam() {
+    const form = $('spaceTeamForm'); if (!form) return;
+    const team = settingsDraft.teams.find(t => t.id === settingsTeam);
+    for (const name of ['name', 'lead', 'purpose', 'instructions', 'planningModel', 'reviewModel']) team[name] = form.elements[name].value;
+    for (const name of ['concurrency', 'maxSubtasks', 'maxRevisions', 'maxCalls', 'maxTokens']) team[name] = Number(form.elements[name].value);
+    team.guardrails = lines(form.elements.guardrails.value); team.skills = [...form.querySelectorAll('[data-teamskill]:checked')].map(el => el.dataset.teamskill);
+    team.requireHumanApproval = form.elements.requireHumanApproval.checked; team.criteria = lines(form.elements.criteria.value);
+    team.checks = [...form.querySelectorAll('[data-check-editor]')].map(field => {
+      const type = field.querySelector('[data-check-type]').value, value = field.querySelector('[data-check-value]').value;
+      return { type, label: field.querySelector('[data-check-label]').value, value: type.includes('length') ? Number(value) : value };
+    });
+    team.tools = [...form.querySelectorAll('[data-teamtool]:checked')].map(el => el.dataset.teamtool);
+    form.querySelectorAll('[data-agent-editor]').forEach(fieldset => {
+      const a = settingsDraft.agents.find(a => a.id === fieldset.dataset.agentEditor);
+      for (const name of ['name', 'role', 'does', 'brief', 'model', 'effort']) a[name] = fieldset.querySelector(`[data-field="${name}"]`).value;
+      a.skills = [...fieldset.querySelectorAll('[data-agentskill]:checked')].map(el => el.dataset.agentskill);
+      a.inheritTools = fieldset.querySelector('[data-field="inheritTools"]').checked;
+      a.tools = [...fieldset.querySelectorAll('[data-agenttool]:checked')].map(el => el.dataset.agenttool);
+    });
+    team.tests = [...form.querySelectorAll('[data-test-editor]')].map(field => ({id:field.dataset.testEditor,name:field.querySelector('[data-test-name]').value,prompt:field.querySelector('[data-test-prompt]').value,requiredText:lines(field.querySelector('[data-test-required]').value)}));
+  }
+  const skillChoices = (selected = [], prefix) => settingsDraft.skills.map(skill => `<label class="space-check"><input type="checkbox" data-${prefix}="${esc(skill.id)}" ${selected.includes(skill.id) ? 'checked' : ''}>${esc(skill.name)} <small>v${skill.revision}</small></label>`).join('');
+  function renderTeam() {
+    const team = settingsDraft.teams.find(t => t.id === settingsTeam), agents = settingsDraft.agents.filter(a => a.department === team.id);
+    const models = selected => ['sonnet', 'opus', 'fable'].map(m => `<option ${m === selected ? 'selected' : ''}>${m}</option>`).join('');
+    content.innerHTML = `<div class="space-settings-layout"><aside class="space-settings-nav"><span class="space-eyebrow">FUNCTIONAL AREAS</span><nav class="space-tabs">${settingsDraft.teams.map(t => `<button data-team="${t.id}" class="${t.id === team.id ? 'selected' : ''}">${esc(t.name)}</button>`).join('')}</nav><button type="button" class="secondary" id="spaceAddTeam">+ Add team</button></aside><div class="space-settings-body"><div class="space-settings-heading"><div><span class="space-eyebrow">TEAM WORKSPACE</span><h3>${esc(team.name)}</h3><p>${agents.length} members · ${esc(agents.find(a=>a.id===team.lead)?.name)} leads</p></div><button type="button" class="secondary" id="spaceRemoveTeam">Remove team</button></div><nav class="space-section-tabs">${[['overview','Purpose'],['people','People'],['access','Tools & skills'],['quality','Verification'],['execution','Models & limits'],['tests','Tests']].map(([id,label])=>`<button type="button" data-settings-section="${id}" aria-pressed="${settingsSection===id}">${label}</button>`).join('')}</nav><form id="spaceTeamForm" novalidate><section data-settings-page="overview"><div class="space-grid"><label>Team name<input name="name" value="${esc(team.name)}" required></label><label>Accountable lead<select name="lead">${agents.map(a => `<option value="${a.id}" ${a.id === team.lead ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></label></div>
+      <label>Team purpose<textarea name="purpose" rows="2" placeholder="What does this team own, and what does success look like?">${esc(team.purpose)}</textarea></label><label>Working instructions<textarea name="instructions" rows="5" placeholder="Purpose, process, tone, source requirements and boundaries for this team.">${esc(team.instructions)}</textarea></label>
+      </section><section data-settings-page="quality"><label>Guardrails — one per line<textarea name="guardrails" rows="3" placeholder="Boundaries the lead must verify before approving work.">${esc(team.guardrails.join('\n'))}</textarea></label><label>Lead’s review criteria — one per line<textarea name="criteria" rows="4">${esc(team.criteria.join('\n'))}</textarea></label>
+      <h3>Automated acceptance checks</h3><p>These checks must pass even when the lead approves. Text matching ignores case.</p>
+      <div id="spaceCheckEditors">${team.checks.map((check, i) => `<details data-check-editor="${i}"><summary>${esc(check.label || 'Acceptance check')}</summary><label>Name<input data-check-label value="${esc(check.label)}" maxlength="160" required></label><div class="space-grid"><label>Rule<select data-check-type>${[['contains','Must contain'],['not_contains','Must not contain'],['min_length','Minimum characters'],['max_length','Maximum characters']].map(([type, label])=>`<option value="${type}" ${check.type===type?'selected':''}>${label}</option>`).join('')}</select></label><label>Value<input data-check-value value="${esc(check.value)}" ${check.type.includes('length')?'type="number" min="1" max="100000" step="1"':'maxlength="1000"'} required></label></div><button type="button" class="secondary" data-remove-check="${i}">Remove check</button></details>`).join('')}</div><button type="button" class="secondary" id="spaceAddCheck">Add check</button>
+      <label class="space-check"><input type="checkbox" name="requireHumanApproval" ${team.requireHumanApproval ? 'checked' : ''}>Require my approval after the lead passes the work</label></section><section data-settings-page="execution"><p>The lead chooses each worker’s model and effort from the task complexity. Set the planning and independent review models here; see the actual selections in every task.</p><div class="space-grid"><label>Planning model<select name="planningModel">${models(team.planningModel)}</select></label><label>Review model<select name="reviewModel">${models(team.reviewModel)}</select></label>
+      <div class="space-grid">${[['concurrency','Concurrent workers',1,4],['maxSubtasks','Maximum subtasks',1,8],['maxRevisions','Rework rounds',0,3],['maxCalls','Call budget',3,40],['maxTokens','Reported token budget',5000,200000]].map(([name,label,min,max])=>`<label>${label}<input type="number" name="${name}" min="${min}" max="${max}" value="${team[name]}"></label>`).join('')}</div>
+      </section><section data-settings-page="access"><h3>Shared skills</h3><div class="space-tool-picks">${skillChoices(team.skills,'teamskill') || 'Create reusable instructions in Manage → Skills.'}</div>
+      <h3>Team tools</h3><p>Only assigned tools are available. Worker roles can inherit these tools or use a smaller selection.</p><div class="space-tool-picks">${toolChoices(team.tools,'teamtool') || 'Add connectors in Tools & MCPs.'}</div>
+      </section><section data-settings-page="people"><p>Choose a person to edit their responsibilities, model preference and tool access. The lead uses this roster when planning new work.</p><h3>People</h3><div class="space-agent-editors">${agents.map(a => `<details data-agent-editor="${a.id}"><summary><span class="space-avatar">${esc(a.name.slice(0,1))}</span><span><b>${esc(a.name)}</b><small>${a.id === team.lead ? 'Team lead · Plans and verifies' : esc(a.role)}</small></span><span class="space-person-edit">Edit ↗</span></summary><div class="space-grid"><label>Name<input data-field="name" value="${esc(a.name)}" required></label><label>Role<input data-field="role" value="${esc(a.role)}" required></label></div><label>Responsibilities<textarea data-field="does">${esc(a.does)}</textarea></label><label>Role instructions<textarea data-field="brief" rows="3">${esc(a.brief)}</textarea></label><h3>Additional skills</h3><div class="space-tool-picks">${skillChoices(a.skills,'agentskill')}</div><label>Preferred model (lead can adapt per task)<select data-field="model">${models(a.model)}</select></label><label>Effort override<select data-field="effort">${['','low','medium','high','xhigh','max'].map(e=>`<option value="${e}" ${e===(a.effort||'')?'selected':''}>${e || 'Let the lead choose'}</option>`).join('')}</select></label><label class="space-check"><input type="checkbox" data-field="inheritTools" ${a.inheritTools !== false ? 'checked' : ''}>Inherit the team’s tools</label><div class="space-tool-picks">${toolChoices(a.tools,'agenttool')}</div><button class="secondary" type="button" data-remove-agent="${a.id}">Remove agent</button></details>`).join('')}</div>
+      <button type="button" class="secondary" id="spaceAddAgent">Add agent</button>
+      </section><section data-settings-page="tests"><h3>Team tests</h3><p>Check the full planning, work and review process against known inputs. Tests run without external tools.</p>
+      <div id="spaceTestEditors">${team.tests.map(test=>`<details data-test-editor="${esc(test.id)}"><summary>${esc(test.name || 'New test')}</summary><label>Name<input data-test-name value="${esc(test.name)}" required></label><label>Task and supplied facts<textarea data-test-prompt rows="3" required>${esc(test.prompt)}</textarea></label><label>Required text — one per line<textarea data-test-required rows="2">${esc(test.requiredText.join('\n'))}</textarea></label><div class="space-actions"><button type="button" class="secondary" data-run-test="${esc(test.id)}">Run saved test</button><button type="button" class="secondary" data-remove-test="${esc(test.id)}">Remove test</button></div></details>`).join('')}</div>
+      <button type="button" class="secondary" id="spaceAddTest">Add test</button>
+      </section><div class="space-settings-save"><span id="spaceSaveState">Changes apply when saved</span><button type="submit">Save changes</button><button type="button" class="secondary" id="spaceRunTests" ${team.tests.length ? '' : 'disabled'}>Run all saved tests</button></div></form></div></div>`;
+    content.querySelectorAll('[data-settings-page]').forEach(el=>el.hidden=el.dataset.settingsPage!==settingsSection);
+    content.querySelectorAll('[data-settings-section]').forEach(b=>b.onclick=()=>{collectTeam();settingsSection=b.dataset.settingsSection;renderTeam();});
+    content.querySelectorAll('[data-agent-editor]').forEach(el=>el.addEventListener('toggle',()=>{if(el.open)content.querySelectorAll('[data-agent-editor]').forEach(other=>{if(other!==el)other.open=false;});}));
+    $('spaceTeamForm').oninput=()=>{$('spaceSaveState').textContent='Unsaved changes';};
+    $('spaceAddTeam').onclick=()=>{collectTeam();if(settingsDraft.teams.length>=12)return feedback('An office supports up to 12 teams.',true);const id='team-'+crypto.randomUUID().slice(0,8),lead=id+'-lead';const template=structuredClone(config.teams[0]);settingsDraft.teams.push({...template,id,name:'New team',lead,purpose:'',instructions:'',guardrails:[],tools:[],skills:[],tests:[],checks:[]});settingsDraft.agents.push({id:lead,department:id,name:'Team lead',role:'Team coordinator',does:'Plan, delegate and verify the work of the current specialists.',brief:'',model:'sonnet',effort:'',tools:[],skills:[],inheritTools:true},{id:id+'-specialist',department:id,name:'Specialist',role:'Specialist',does:'',brief:'',model:'sonnet',effort:'',tools:[],skills:[],inheritTools:true});settingsTeam=id;settingsSection='overview';renderTeam();feedback('Name your team and define its purpose, then configure People and save.');};
+    $('spaceRemoveTeam').onclick=()=>{collectTeam();if(settingsDraft.teams.length<=1)return feedback('Keep at least one team.',true);if(!confirm('Remove '+team.name+' and its roster when you save? Past tasks and shared memory are retained. Unfinished work must first be finished or cancelled.'))return;settingsDraft.teams=settingsDraft.teams.filter(t=>t.id!==team.id);settingsDraft.agents=settingsDraft.agents.filter(a=>a.department!==team.id);settingsTeam=settingsDraft.teams[0].id;renderTeam();feedback('Team removal is staged. Save to apply it, or close to discard.');};
+    content.querySelectorAll('[data-team]').forEach(b => b.onclick = () => { collectTeam(); settingsTeam = b.dataset.team; renderTeam(); });
+    $('spaceAddCheck').onclick = () => { collectTeam(); if(team.checks.length >= 20)return feedback('A team supports up to 20 automated checks.',true); team.checks.push({type:'contains',label:'New acceptance check',value:''});renderTeam();$('spaceCheckEditors').lastElementChild.open=true; };
+    content.querySelectorAll('[data-remove-check]').forEach(button=>button.onclick=()=>{collectTeam();team.checks.splice(Number(button.dataset.removeCheck),1);renderTeam();});
+    content.querySelectorAll('[data-check-type]').forEach(select=>select.onchange=()=>{
+      const input=select.closest('[data-check-editor]').querySelector('[data-check-value]');
+      input.type=select.value.includes('length')?'number':'text';input.min='1';input.max='100000';input.step='1';input.maxLength=1000;
+    });
+    $('spaceAddAgent').onclick = () => { collectTeam(); if (agents.length >= 12) return feedback('Each team supports up to 12 agents.', true); settingsDraft.agents.push({ id: 'agent-' + crypto.randomUUID().slice(0,8), department: team.id, name: 'New agent', role: 'Specialist', does: '', brief: '', model: 'sonnet', tools: [], inheritTools: true, skills:[] }); renderTeam();content.querySelector('.space-agent-editors').lastElementChild.open=true; };
+    content.querySelectorAll('[data-remove-agent]').forEach(b => b.onclick = () => {
+      collectTeam(); if (agents.length <= 2) return feedback('Keep a lead and at least one worker.', true);
+      settingsDraft.agents = settingsDraft.agents.filter(a => a.id !== b.dataset.removeAgent);
+      if (team.lead === b.dataset.removeAgent) team.lead = settingsDraft.agents.find(a => a.department === team.id).id;
+      renderTeam();
+    });
+    $('spaceTeamForm').onsubmit = async event => { event.preventDefault(); collectTeam(); try { const layoutChanged=JSON.stringify(config.agents)!==JSON.stringify(settingsDraft.agents)||JSON.stringify(config.teams.map(t=>[t.id,t.name]))!==JSON.stringify(settingsDraft.teams.map(t=>[t.id,t.name]));config = await api('/office','PUT',settingsDraft);settingsDraft=structuredClone(config);if(layoutChanged){feedback('Saved. Updating the office layout…');setTimeout(()=>location.reload(),600);}else{renderTeam();feedback('Team configuration saved.');} } catch(error) { feedback(error.message,true); } };
+    $('spaceAddTest').onclick=()=>{collectTeam();if(team.tests.length>=12)return feedback('A team supports up to 12 tests.',true);team.tests.push({id:'test-'+crypto.randomUUID().slice(0,8),name:'New test',prompt:'',requiredText:[]});renderTeam();$('spaceTestEditors').lastElementChild.open=true;};
+    content.querySelectorAll('[data-remove-test]').forEach(button=>button.onclick=()=>{collectTeam();team.tests=team.tests.filter(t=>t.id!==button.dataset.removeTest);renderTeam();});
+    const testSaved=()=>{collectTeam();const saved=config.teams.find(t=>t.id===team.id);if(JSON.stringify({...saved,checks:saved.checks.map(({type,label,value})=>({type,label,value}))})!==JSON.stringify({...team,checks:team.checks.map(({type,label,value})=>({type,label,value}))}) || JSON.stringify(config.agents)!==JSON.stringify(settingsDraft.agents)){feedback('Save the team changes before running tests.',true);return false;}return true;};
+    content.querySelectorAll('[data-run-test]').forEach(button=>button.onclick=async()=>{if(!testSaved())return;button.disabled=true;try{const job=await api(`/teams/${team.id}/test`,'POST',{testId:button.dataset.runTest});await refresh();await showTask(job.id);}catch(error){feedback(error.message,true);button.disabled=false;}});
+    $('spaceRunTests').onclick=async event=>{if(!testSaved())return;event.target.disabled=true;try{const suite=await api(`/teams/${team.id}/tests`,'POST',{});await refresh();await showReports();feedback(`${suite.jobs.length} tests queued. Results update as the lead verifies each one.`);}catch(error){feedback(error.message,true);event.target.disabled=false;}};
+  }
+  async function showSkills(editId = null) {
+    try {
+      config = await api('/office');open('skills','Reusable skills');
+      const skill = config.skills.find(s=>s.id===editId);
+      content.innerHTML = `<p>Save a repeatable method once, then assign it to teams or individual agents. Tasks retain the skill versions they started with.</p><div class="space-skills-list">${config.skills.map(s=>`<button class="space-note" data-edit-skill="${esc(s.id)}"><b>${esc(s.name)} <small>v${s.revision}</small></b><span>${esc(s.description || 'Reusable working instructions')}</span></button>`).join('') || '<p>No skills yet.</p>'}</div><h3>${skill ? 'Edit skill' : 'Create a skill'}</h3><form id="spaceSkillForm"><label>Name<input name="name" value="${esc(skill?.name || '')}" required maxlength="100"></label><label>When to use it<input name="description" value="${esc(skill?.description || '')}" maxlength="500"></label><label>Method and output requirements<textarea name="instructions" rows="8" required maxlength="10000">${esc(skill?.instructions || '')}</textarea></label><div class="space-actions"><button type="submit">Save skill</button>${skill ? '<button class="secondary" type="button" id="spaceNewSkill">New skill</button><button class="secondary" type="button" id="spaceDeleteSkill">Remove & unassign</button>' : ''}</div></form>`;
+      content.querySelectorAll('[data-edit-skill]').forEach(button=>button.onclick=()=>showSkills(button.dataset.editSkill));
+      $('spaceSkillForm').onsubmit=async event=>{event.preventDefault();const values=Object.fromEntries(new FormData(event.target));const updated={...values,id:skill?.id || 'skill-'+crypto.randomUUID().slice(0,8)};config.skills=skill?config.skills.map(s=>s.id===skill.id?updated:s):[...config.skills,updated];try{await api('/office','PUT',config);await showSkills(updated.id);feedback('Saved. Assign this skill in Teams.');}catch(error){feedback(error.message,true);}};
+      if(skill){$('spaceNewSkill').onclick=()=>showSkills();$('spaceDeleteSkill').onclick=async()=>{config.skills=config.skills.filter(s=>s.id!==skill.id);for(const team of config.teams)team.skills=team.skills.filter(id=>id!==skill.id);for(const agent of config.agents)agent.skills=agent.skills.filter(id=>id!==skill.id);try{await api('/office','PUT',config);await showSkills();feedback('Skill removed from the library and assignments. Existing tasks retain their saved version.');}catch(error){feedback(error.message,true);}};}
+    }catch(error){feedback(error.message,true);}
+  }
+  async function showReports(reveal = true) {
+    const request = ++reportFetchCounter;
+    try {
+      const expanded = [...content.querySelectorAll('[data-report-detail][open]')].map(el=>el.dataset.reportDetail);
+      const report = await api('/reports?days='+reportDays);
+      if(request!==reportFetchCounter || (!reveal && (!dialog.open || modalKind!=='reports')))return;
+      if(reveal)open('reports','Team reports');
+      const number=value=>value.toLocaleString();
+      const cycle=ms=>ms===null?'—':ms<60000?Math.round(ms/1000)+'s':ms<3600000?Math.round(ms/60000)+'m':(ms/3600000).toFixed(1)+'h';
+      content.innerHTML=`<div class="space-actions"><label>Tasks created<select id="spaceReportPeriod">${[[7,'Past 7 days'],[30,'Past 30 days'],[90,'Past 90 days'],[0,'All time']].map(([days,label])=>`<option value="${days}" ${days===reportDays?'selected':''}>${label}</option>`).join('')}</select></label><button class="secondary" id="spaceExportReport">Export report</button></div>
+        <div class="space-report-stats">${[['Approved',report.summary.approved],['In progress',report.summary.active],['Your review',report.summary.waiting],['Blocked',report.summary.blocked]].map(([label,value])=>`<div><b>${number(value)}</b><span>${label}</span></div>`).join('')}</div>
+        <p>${number(report.summary.calls)} model calls · ${number(report.summary.tokens)} reported tokens · ${report.summary.rework} tasks required rework. Tests are counted separately.</p>
+        <div class="space-report-table"><table><thead><tr><th>Team</th><th>Approved</th><th>Active</th><th>Blocked</th><th>Calls</th><th>Tokens</th><th>Median cycle</th></tr></thead><tbody>${report.teams.map(t=>`<tr><td>${esc(t.name)}</td><td>${t.approved}</td><td>${t.active}</td><td>${t.blocked}</td><td>${number(t.calls)}</td><td>${number(t.tokens)}</td><td>${cycle(t.medianCycleMs)}</td></tr>`).join('')}</tbody></table></div><p class="space-footnote">Cycle time runs from task creation to approval, including time waiting for review. Counts come from recorded tasks; a dash means no completed sample.</p>
+        <h3>Needs attention</h3>${report.attention.map(j=>`<button class="space-note" data-report-job="${j.id}"><b>${esc(j.title)}</b><span>${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)} · ${labels[j.state]} · ${esc(j.reason)}</span></button>`).join('')||'<p>No blocked tasks or pending owner reviews in this period.</p>'}
+        <h3>Team detail</h3>${report.teams.map(t=>`<details data-report-detail="team-${t.id}"><summary>${esc(t.name)} · Lead: ${esc(t.lead)}</summary><p>Per-task limits: ${t.limits.callsPerTask} calls, ${number(t.limits.tokensPerTask)} reported tokens. Up to ${t.limits.concurrentWorkers} concurrent workers.</p>${t.agents.map(a=>`<p><b>${esc(a.name)}</b> · ${a.submitted} submissions · ${a.active} active subtasks · ${a.reviews} lead reviews</p>`).join('')}</details>`).join('')}
+        <h3>Test results</h3><p>${report.tests.approved}/${report.tests.total} tests passed · ${report.tests.active} running or queued · ${report.tests.blocked} blocked · ${number(report.tests.calls)} calls · ${number(report.tests.tokens)} reported tokens.</p>${report.suites.map(suite=>`<details data-report-detail="suite-${suite.id}"><summary>${esc(DEPTS[suite.dept]?.name)} · ${when(suite.createdAt)} · configuration v${suite.officeRevision}</summary>${suite.jobs.map(j=>`<button class="space-note" data-report-job="${j.id}"><b>${esc(j.name)}</b><span>${j.state==='done'?'Passed':labels[j.state]}${j.error?' · '+esc(j.error):''}</span></button>`).join('')}</details>`).join('')}
+        <h3>Approved deliverables</h3>${report.completed.map(j=>`<button class="space-note" data-report-job="${j.id}"><b>${esc(j.title)}</b><span>${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)} · ${when(j.doneAt)}</span></button>`).join('')||'<p>No approved deliverables in this period.</p>'}`;
+      content.querySelectorAll('[data-report-detail]').forEach(el=>el.open=expanded.includes(el.dataset.reportDetail));
+      $('spaceReportPeriod').onchange=event=>{reportDays=Number(event.target.value);showReports(false);};content.querySelectorAll('[data-report-job]').forEach(button=>button.onclick=()=>showTask(button.dataset.reportJob));
+      $('spaceExportReport').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='talkchief-team-report-'+new Date(report.generatedAt).toISOString().slice(0,10)+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+    }catch(error){feedback(error.message,true);}
+  }
+  function renderTools(editing = null) {
+    content.innerHTML = `<div class="space-settings-heading"><div><span class="space-eyebrow">CAPABILITIES</span><h3>Tools for your teams</h3><p>Available connections are separate from permission to use them.</p></div><button id="spaceNewTool" type="button">+ Add MCP server</button></div><div class="space-tools">${tools.map(t=>`<article><div><b>${esc(t.name)}</b><span>${esc(t.origin || t.type)}</span><span class="space-tool-access ${t.assignedTeams?.length ? 'enabled' : ''}">${t.assignedTeams?.length ? 'Enabled for '+t.assignedTeams.map(a=>esc(a.name)).join(', ') : 'Not enabled in this office'}</span><small>${t.type==='builtin' ? 'No sign-in needed · Public web research' : 'Provider status: '+esc(t.status)}</small></div><div class="space-actions"><button type="button" data-tool-assign="${t.id}" class="secondary">Team access</button>${t.type !== 'builtin' ? `<button type="button" data-tool-login="${t.id}" class="secondary">Authenticate</button>` : ''}${t.managed ? `<button type="button" data-tool-edit="${t.id}" class="secondary">Edit</button><button type="button" data-tool-remove="${t.id}" class="secondary">Remove</button>` : ''}</div></article>`).join('')}</div>
+      <button class="secondary" id="spaceRefreshTools">Check connections</button><section id="spaceToolEditor" ${editing ? '' : 'hidden'}><h3>${editing ? 'Edit server' : 'Add MCP server'}</h3><p>Save the connection, authenticate if needed, then choose the teams that can use it.</p>
+      <form id="spaceToolForm"><div class="space-grid"><label>Name<input name="name" value="${esc(editing?.name || '')}" ${editing ? 'readonly' : ''} required pattern="[A-Za-z][A-Za-z0-9_-]*"></label><label>Connection type<select name="type">${['http','sse','stdio'].map(type=>`<option value="${type}" ${type === editing?.type ? 'selected' : ''}>${type === 'stdio' ? 'Local command' : type.toUpperCase()}</option>`).join('')}</select></label></div>
+      <div id="spaceRemoteTool"><label>MCP endpoint URL<input name="url" type="url" placeholder="https://example.com/mcp" value="${esc(editing?.url || '')}"></label><label>Bearer token, if required<input name="token" type="password" autocomplete="off" placeholder="${editing?.hasToken ? 'Stored token retained when blank' : 'Optional; OAuth servers use Authenticate'}"></label><label class="space-check"><input type="checkbox" name="clearToken">Remove stored bearer token</label></div>
+      <div id="spaceLocalTool" hidden><label>Executable<input name="command" value="${esc(editing?.command || '')}" placeholder="npx"></label><label>Arguments — one per line<textarea name="args">${esc((editing?.args || []).join('\n'))}</textarea></label><label>Environment variables — NAME=value, one per line<textarea name="env" placeholder="API_KEY=your-value"></textarea></label><p>Existing secret values are retained unless replaced. Stored names: ${esc(editing?.envKeys?.join(', ') || 'none')}.</p></div>
+      <button type="submit">${editing ? 'Update connection' : 'Add connection'}</button><button type="button" class="secondary" id="spaceCancelTool">Cancel</button></form></section>`;
+    $('spaceNewTool').onclick=()=>{$('spaceToolEditor').hidden=false;$('spaceToolForm').elements.name.focus();$('spaceToolEditor').scrollIntoView({block:'start',behavior:'smooth'});};
+    $('spaceCancelTool').onclick=()=>renderTools();
+    content.querySelectorAll('[data-tool-assign]').forEach(b=>b.onclick=()=>assignTool(b.dataset.toolAssign));
+    const form=$('spaceToolForm'), toggle=()=>{ $('spaceLocalTool').hidden=form.elements.type.value!=='stdio'; $('spaceRemoteTool').hidden=form.elements.type.value==='stdio'; }; form.elements.type.onchange=toggle; toggle();
+    form.onsubmit=async event=>{ event.preventDefault(); const button=form.querySelector('button[type=submit]'); button.disabled=true;
+      try { const input=Object.fromEntries(new FormData(form)); input.clearToken=form.elements.clearToken.checked; input.args=lines(input.args); input.env=Object.fromEntries(lines(input.env).map(line=>{const i=line.indexOf('=');if(i<1)throw new Error('Enter environment variables as NAME=value.');return [line.slice(0,i).trim(),line.slice(i+1)];})); tools=await api('/tools','POST',input); feedback('Connection saved. Assign it to teams to enable it.'); renderTools(); }
+      catch(error){feedback(error.message,true);button.disabled=false;} };
+    $('spaceRefreshTools').onclick=async()=>{try{tools=await api('/tools?refresh=1');renderTools();}catch(error){feedback(error.message,true);}};
+    content.querySelectorAll('[data-tool-edit]').forEach(b=>b.onclick=()=>renderTools(tools.find(t=>t.id===b.dataset.toolEdit)));
+    content.querySelectorAll('[data-tool-remove]').forEach(b=>b.onclick=async()=>{try{tools=await api('/tools/'+b.dataset.toolRemove,'DELETE');renderTools();feedback('Removed the connector and its team assignments.');}catch(error){feedback(error.message,true);}});
+    content.querySelectorAll('[data-tool-login]').forEach(b=>b.onclick=()=>loginTool(b.dataset.toolLogin));
+  }
+  async function assignTool(id) {
+    try {
+      config=await api('/office');const tool=tools.find(t=>t.id===id);
+      content.innerHTML=`<button type="button" class="secondary" id="spaceBackTools">← All tools</button><div class="space-settings-heading"><div><span class="space-eyebrow">TEAM ACCESS</span><h3>${esc(tool.name)}</h3><p>${esc(tool.origin)}. Only selected teams can use this tool; individual agents can have a smaller selection.</p></div></div><form id="spaceToolAccess"><div class="space-access-cards">${config.teams.map(t=>`<label class="space-check"><input type="checkbox" value="${t.id}" ${t.tools.includes(id)?'checked':''}><span><b>${esc(t.name)}</b><small>${esc(t.purpose || 'Team workspace')}</small></span></label>`).join('')}</div><div class="space-actions"><button type="submit">Save team access</button></div></form>`;
+      $('spaceBackTools').onclick=()=>renderTools();
+      $('spaceToolAccess').onsubmit=async e=>{e.preventDefault();const selected=[...e.target.querySelectorAll('input:checked')].map(el=>el.value);for(const team of config.teams)team.tools=[...team.tools.filter(t=>t!==id),...(selected.includes(team.id)?[id]:[])];try{await api('/office','PUT',config);tools=await api('/tools');renderTools();feedback('Team access saved. New model calls use these permissions. Calls already running retain their initial permissions until they return.');}catch(error){feedback(error.message,true);}};
+    }catch(error){feedback(error.message,true);}
+  }
+  async function loginTool(id) {
+    try {
+      let login=await api(`/tools/${id}/login`,'POST',{});
+      content.innerHTML='<p id="mcpMessage">Preparing sign-in…</p><a id="mcpLink" target="_blank" rel="noopener noreferrer" hidden>Open provider sign-in ↗</a><form id="mcpCodeForm"><label>Paste the callback URL or code shown after authorization<input id="mcpCode" type="password" autocomplete="off" required></label><button type="submit">Finish connection</button></form><button class="secondary" id="mcpCancel">Cancel</button>';
+      const update=async()=>{login=await api(`/tools/${id}/auth`);$('mcpMessage').textContent=login.message||login.state;if(login.url){$('mcpLink').href=login.url;$('mcpLink').hidden=false;}if(['connected','error','cancelled','expired'].includes(login.state)){clearInterval(toolPoll);toolPoll=null;if(login.state==='connected'){tools=await api('/tools?refresh=1');renderTools();feedback('MCP server authenticated.');}}};
+      $('mcpCodeForm').onsubmit=async e=>{e.preventDefault();const code=$('mcpCode').value;$('mcpCode').value='';try{await api(`/tools/${id}/code`,'POST',{id:login.id,code});await update();}catch(error){feedback(error.message,true);}};
+      $('mcpCancel').onclick=async()=>{await api(`/tools/${id}/cancel`,'POST',{});clearInterval(toolPoll);toolPoll=null;renderTools();};
+      toolPoll=setInterval(()=>update().catch(e=>feedback(e.message,true)),1500);await update();
+    }catch(error){feedback(error.message,true);}
+  }
+  async function showKnowledge() {
+    try {
+      const notes=await api('/knowledge');open('brain','Brain — shared memory');
+      content.innerHTML=`<p>One shared memory across every team. Planning, specialist work and verification retrieve relevant past notes and answers. Approved tasks and projects are saved with their sources; conversations are labelled unreviewed. Time-sensitive facts must be checked again.</p><div class="space-actions"><button id="spacePurpose">Define office purpose</button><button class="secondary" id="spaceNewNote">Add note</button><button class="secondary" id="spaceGraph">View knowledge graph</button></div><label>Find a note<input id="spaceFindNote" type="search" placeholder="Search titles and content previews"></label><div id="spaceKnowledgeList"></div>`;
+      const list=()=>{const query=$('spaceFindNote').value.toLowerCase();$('spaceKnowledgeList').innerHTML=notes.filter(n=>(n.title+' '+n.preview).toLowerCase().includes(query)).map(n=>`<button class="space-note" data-note="${esc(n.id)}"><b>${esc(n.title)}</b><span>${n.kind==='deliverable'?'Approved deliverable':n.kind==='conversation'?'Conversation · unreviewed':'Shared knowledge'} · ${when(n.updatedAt)}</span><p>${esc(n.preview)}</p></button>`).join('')||'<div class="space-empty">No notes yet. Start with the office purpose, then add the facts your teams need.</div>';$('spaceKnowledgeList').querySelectorAll('[data-note]').forEach(b=>b.onclick=()=>viewNote(b.dataset.note));};
+      $('spaceFindNote').oninput=list;list();$('spaceNewNote').onclick=()=>editNote();$('spacePurpose').onclick=()=>editNote('Knowledge/office-purpose.md',true);$('spaceGraph').onclick=()=>{close();ctx.brain.toggle();};
+    }catch(error){feedback(error.message,true);}
+  }
+  async function viewNote(id) {
+    try{const note=await api('/knowledge/note?id='+encodeURIComponent(id));content.innerHTML=`<div class="space-actions"><button class="secondary" id="spaceBackMemory">← Shared memory</button><button class="secondary" id="spaceEditMemory">Edit note</button></div><p class="space-footnote">${esc(id)} · Updated ${when(note.updatedAt)}</p><article class="space-document">${renderDocument(note.content,'memory').html}</article>`;$('spaceBackMemory').onclick=showKnowledge;$('spaceEditMemory').onclick=()=>editNote(id);}catch(error){feedback(error.message,true);}
+  }
+  async function editNote(id, purpose=false) {
+    let note={content:'',id};
+    try{if(id)note=await api('/knowledge/note?id='+encodeURIComponent(id));}catch(error){if(!purpose)return feedback(error.message,true);}
+    content.innerHTML=`<button class="secondary" id="spaceBackKnowledge">← Knowledge library</button><h3>${purpose?'Office purpose':id?'Edit note':'New note'}</h3><form id="spaceNoteForm"><label>Title<input name="title" value="${esc(purpose?'Office purpose':note.content.match(/^#\s+(.+)$/m)?.[1]||'')}" required></label><label>${purpose?'Describe the business, who you serve, what teams should achieve, and important constraints.':'Markdown content'}<textarea name="content" rows="16" required>${esc(note.content)}</textarea></label><div class="space-actions"><button type="submit">Save knowledge</button>${id && note.updatedAt ? '<button type="button" class="secondary" id="spaceArchiveNote">Archive note</button>':''}</div></form>`;
+    $('spaceBackKnowledge').onclick=showKnowledge;
+    $('spaceNoteForm').onsubmit=async event=>{event.preventDefault();try{const form=event.target;await api('/knowledge','POST',{id:note.id,title:form.elements.title.value,content:'# '+form.elements.title.value.trim()+'\n\n'+form.elements.content.value.replace(/^#\s+.*(?:\r?\n)?/, '').trim(),updatedAt:note.updatedAt});await syncBrain();await showKnowledge();feedback('Saved. The next task can use this knowledge.');}catch(error){feedback(error.message,true);}};
+    if($('spaceArchiveNote'))$('spaceArchiveNote').onclick=async()=>{try{await api('/knowledge/note?id='+encodeURIComponent(id),'DELETE');await syncBrain();await showKnowledge();feedback('Archived. This note is no longer supplied to agents.');}catch(error){feedback(error.message,true);}};
+  }
+  const rowHTML = key => { const list = jobs.filter(j => j.dept === key); return `<div class="b-tasks"><span>ACTIVE<b data-tk="${key}-doing">${list.filter(j => ['planning','working','reviewing'].includes(j.state)).length}</b></span><span>QUEUED<b data-tk="${key}-next">${list.filter(j=>j.state==='queued').length}</b></span><span>APPROVED<b data-tk="${key}-done">${list.filter(j=>j.state==='done').length}</b></span></div>`; };
+  for(const key of DEPT_KEYS)deptRT[key].apprRow.insertAdjacentHTML('beforebegin',rowHTML(key));
+  officeReady.then(async()=>{setInterval(refresh,2000);try{const health=await api('/health');onLive?.(health);await syncBrain();await refresh();const usage=await api('/usage');onUsage?.(usage);}catch(error){$('spaceHint').textContent=error.message;}});
+  const noop=()=>{};
+  return { get tasks(){return jobs.flatMap(j=>[...j.subtasks.filter(s=>s.agent).map(s=>({...s,agent:s.agent,state:s.state==='working'?'doing':s.state})),...(['planning','reviewing'].includes(j.state)?[{agent:j.agent,state:'doing'}]:[])]);},
+    projectActivity:()=>projectUI.activity(),openProjects:()=>projectUI.open(),agentActivity:id=>activityByAgent.get(id),tick:noop,panelWidth:()=>panel.offsetWidth,onFocusChange:key=>{if(DEPTS[key]&&key!=='brain'){selectedTeam=key;$('spaceDept').innerHTML=`<i style="background:${DEPTS[key].chip}"></i><span>${esc(DEPTS[key].name)}</span><span class="space-chevron">⌄</span>`;}render();},rowHTML,
+    isLive:()=>true,isOpen:()=>dialog.open,open:()=>{open('board','Office work');content.innerHTML=jobs.map(j=>`<button class="space-note" data-job="${j.id}"><b>${esc(j.title)}</b><span>${labels[j.state]} · ${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)}</span></button>`).join('')||'<p>No tasks yet.</p>';content.querySelectorAll('[data-job]').forEach(b=>b.onclick=()=>showTask(b.dataset.job));},
+    toggle(){dialog.open?close():this.open();},close,openFor(){this.open();},openTask:showTask,refresh,renderAgent,railFor:id=>{agentOpen=id;const el=$('mRt');el.hidden=true;},syncPills:noop,
+    onStuck:noop,onResolve:noop,pendingReject:()=>false,rejectLive:noop,resolveLive:noop,revise:()=>false,addTask:()=>null,routines:[],
+    handleChat:async(id,text)=>{const match=text.match(/^\s*(?:add\s+(?:a\s+)?task|task|todo)\s*:\s*(.+)$/is);if(match){try{const job=await api('/tasks','POST',{dept:R[id].a.dept,text:match[1]});await refresh();return `Task received by the team lead: ${job.title}. Open Work to follow the plan and verification.`;}catch(error){return error.message;}}return null;},
+  };
+}

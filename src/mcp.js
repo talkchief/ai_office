@@ -720,7 +720,7 @@ export function initMcp({ scene, hud, LAYOUT, DEPTS, FR, R, connectors = null })
 
       // steady exchange: a random connector and a random desk trade packets both ways —
       // the constant "connectors helping the agents" energy AJ asked for
-      if (now > dk.nextAmbient && dk.seats.length) {
+      if (n > 0 && now > dk.nextAmbient && dk.seats.length) {
         const item = byDept[dept][Math.floor(Math.random() * n)];
         const seat = dk.seats[Math.floor(Math.random() * dk.seats.length)];
         const outFirst = Math.random() < 0.5;

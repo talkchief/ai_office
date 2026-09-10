@@ -90,11 +90,14 @@ export function makeDeskScreenTexture(chip) {
   const c = document.createElement('canvas');
   c.width = 256; c.height = 160;
   const x = c.getContext('2d');
-  const draw = (lines) => {
+  const draw = (lines, status = 'working', now = 0) => {
     // live cream screen (v1 rule: wood desks with live cream/mint screens)
-    x.fillStyle = '#FDFFF8'; x.fillRect(0, 0, 256, 160);
-    x.fillStyle = chip; x.fillRect(0, 0, 256, 26);
-    x.fillStyle = '#151414'; x.font = 'bold 15px Menlo, monospace'; x.fillText('● working', 10, 18);
+    const colors={idle:'#FDFFF8',working:'#BBE8FF',planning:'#FFE6A0',verifying:'#D9C4FF',submitted:'#DAECDC',done:'#63DBA2'};
+    x.fillStyle = colors[status] || '#FDFFF8'; x.fillRect(0, 0, 256, 160);
+    x.fillStyle = status==='idle' ? '#E5E8E1' : colors[status] || chip; x.fillRect(0, 0, 256, 26);
+    x.fillStyle = '#151414'; x.font = 'bold 15px Menlo, monospace'; x.fillText((status === 'idle' ? '○ ' : status==='done'||status==='submitted'?'✓ ':'● ') + status, 10, 18);
+    if(['working','planning','verifying'].includes(status)){x.strokeStyle='#285568';x.lineWidth=6;x.beginPath();x.arc(128,125,17,now/240,now/240+4.7);x.stroke();}
+    if(status==='done'){x.fillStyle='#12633E';x.font='bold 55px sans-serif';x.fillText('✓',108,142);}
     x.font = '13px Menlo, monospace';
     lines.forEach((l, i) => {
       x.fillStyle = i === lines.length - 1 ? '#1E9070' : 'rgba(21,20,20,.78)';
@@ -107,11 +110,23 @@ export function makeDeskScreenTexture(chip) {
   return { tex, canvas: c, ctx: x, draw };
 }
 
-export function makeDesk(chip) {
+export function makeDesk(chip, { lead = false } = {}) {
   const g = new THREE.Group();
-  const top = rbox(5.2, 2.6, 0.22, '#DCC29A', 0.18); top.position.y = 2.1; g.add(top);
-  const ped1 = rbox(0.9, 2.2, 1.9, WHITE, 0.12); ped1.position.set(-2.0, 0.1, 0); g.add(ped1);
-  const ped2 = rbox(0.9, 2.2, 1.9, WHITE, 0.12); ped2.position.set(2.0, 0.1, 0); g.add(ped2);
+  const width = lead ? 7.2 : 5.2;
+  // A generous rounded executive surface with a short side return.
+  const top = rbox(width, lead ? 3.0 : 2.6, 0.22, lead ? '#B99A70' : '#DCC29A', lead ? 0.65 : 0.18); top.position.y = 2.1; g.add(top);
+  const ped1 = rbox(lead ? 1.3 : 0.9, 2.2, 1.9, WHITE, 0.12); ped1.position.set(lead ? -2.7 : -2, 0.1, 0); g.add(ped1);
+  const ped2 = rbox(lead ? 1.3 : 0.9, 2.2, 1.9, WHITE, 0.12); ped2.position.set(lead ? 2.7 : 2, 0.1, 0); g.add(ped2);
+  if (lead) {
+    const side = rbox(1.6, 2.6, 0.22, '#B99A70', 0.45); side.position.set(2.8, 2.1, 1.2); g.add(side);
+    const trim = rbox(7.0, 0.045, 0.055, mat('#B69857', {metal:0.5,rough:0.4}), 0.02); trim.position.set(0, 2.27, -1.47); g.add(trim);
+    const blotter = rbox(2.0, 1.25, 0.025, '#475A50', 0.12); blotter.position.set(-2.2, 2.33, 0); g.add(blotter);
+    const plaque = rbox(1.75, 0.22, 0.42, '#B69857', 0.06); plaque.position.set(1.85, 2.33, -0.88); g.add(plaque);
+    const label = document.createElement('canvas'); label.width=256;label.height=64;const pen=label.getContext('2d');pen.fillStyle='#B69857';pen.fillRect(0,0,256,64);pen.fillStyle='#30291E';pen.font='600 29px sans-serif';pen.textAlign='center';pen.fillText('TEAM LEAD',128,43);
+    const texture=new THREE.CanvasTexture(label);texture.colorSpace=THREE.SRGBColorSpace;
+    const face=new THREE.Mesh(new THREE.PlaneGeometry(1.65,0.38),new THREE.MeshBasicMaterial({map:texture}));face.position.set(1.85,2.55,-0.755);g.add(face);
+  }
+  g.userData.leadDesk = lead;
   // monitor
   const screenSet = makeDeskScreenTexture(chip);
   // rbox extrudes UP from its position — bezel base sits just above the desk top
@@ -126,7 +141,9 @@ export function makeDesk(chip) {
   const kb = rbox(1.5, 0.5, 0.07, '#EFEFEA', 0.06); kb.position.set(0, 2.22, 0.35); g.add(kb);
   const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.14, 0.3, 12), mat(chip));
   mug.position.set(1.9, 2.36, 0.4); mug.castShadow = true; g.add(mug);
-  return { group: g, screenSet };
+  const activity = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 0.55), new THREE.MeshBasicMaterial({color:chip,transparent:true,opacity:0,depthWrite:false}));
+  activity.rotation.x=-Math.PI/2;activity.position.set(0,2.335,-0.42);g.add(activity);
+  return { group: g, screenSet, activity };
 }
 
 export function makeChair() {
@@ -198,6 +215,9 @@ export function poseWork(g, mode, t, dt) {
   // standK 0 = seated at desk, 1 = standing beside it (position lerp happens in main).
   const tg = { shLx: -1.05, shLz: 0.25, shRx: -1.05, shRz: -0.25, headRx: 0.04, headRy: 0, torsoRx: 0, posY: 0.55, standK: 0 };
   switch (mode) {
+    case 'idle':
+      tg.shLx=-0.2;tg.shLz=-0.12;tg.shRx=-0.2;tg.shRz=0.12;tg.torsoRx=-0.06;tg.headRx=-0.03;tg.headRy=Math.sin(t/2800)*0.07;
+      break;
     case 'type':
       tg.shLx = -1.05 + Math.sin(t / 170) * 0.12;
       tg.shRx = -1.05 + Math.sin(t / 140 + 1.3) * 0.14;
@@ -254,7 +274,7 @@ export function poseWork(g, mode, t, dt) {
   u.headG.rotation.x = u.cur.headRx; u.headG.rotation.y = u.cur.headRy;
   u.torso.rotation.x = u.cur.torsoRx;
   u.legs.visible = u.cur.standK > 0.4;
-  g.position.y = u.cur.posY + Math.sin(t / 460) * 0.02;
+  g.position.y = u.cur.posY + Math.sin(t / (mode === 'idle' ? 1500 : 460)) * (mode === 'idle' ? 0.008 : 0.02);
 }
 
 export function posePerson(g, pose, t = 0) {

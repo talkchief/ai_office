@@ -1,4 +1,43 @@
-# Agents Office v3 (Beta)
+# Talkchief AI Space
+
+This deployment adds persistent team workflows to the original 3D office. Open
+**Manage** for Teams, Skills, Reports, Tools & MCPs, Brain, and Claude authentication.
+
+- Reusable skills have versioned instructions and team/agent assignments.
+- Teams have an explicit purpose and guardrails checked during lead review, plus editable agents, a designated lead, instructions, review criteria,
+  deterministic acceptance checks, multiple saved tests and execution budgets. Run an entire test suite and inspect each outcome in Reports.
+- Reports aggregate recorded task outcomes, review delays, model calls, token usage,
+  worker submissions and blockers. Test results remain separate; export as JSON.
+- LangGraph runs planning, worker subtasks and independent lead review with SQLite
+  checkpoints. Failed or interrupted work stays blocked until retried. Optional
+  owner approval survives a server restart.
+- Save an idea without starting agents, edit its brief and priority, then release it
+  to the queue. High-priority tasks run first as capacity becomes available.
+- Task and agent views show recorded plans, dependencies, deliverables, tools used,
+  supplied knowledge and review history. Public draft text appears while a worker
+  writes; drafts are explicitly unreviewed. Call/token use appears against the task
+  limits. Connection loss clears work animations until live updates resume.
+  The live office does not simulate tasks.
+- Completed tasks open on a readable result document with headings, lists, tables,
+  source links, rich-text copy and Markdown download. Team work and Review have
+  separate tabs. The feed groups attention, running work, ready results, ideas and
+  collapsed closed tasks. Background polling preserves reading position and selection.
+- Automated checks are editable in Teams: required text, prohibited text, minimum
+  length and maximum length. A failed check vetoes completion even if the lead approves.
+- MCP servers support HTTP/SSE or local commands, bearer credentials and the official
+  Claude CLI OAuth flow. Assign or unassign connectors in team settings; agents can
+  inherit the team selection or use a subset. Credentials stay on the server.
+- Brain manages the office purpose and Markdown knowledge, including editing and
+  archiving. Reviewed deliverables return to the knowledge library. The production
+  vault is `data/knowledge`; bundled sample notes remain in `brain` for reference.
+
+Run `npm test` for the workflow/authentication/connector checks and `npm run build`
+for the UI. See [deployment notes](deploy/README.md) for operation and backups.
+The [verification record](deploy/verification.md) maps the requested capabilities
+to automated tests, browser checks and actual Claude runs, with operational limits.
+The original demo documentation below describes upstream features; its simulated
+activity applies to the offline demo, not this deployed workflow.
+
 
 ![Agents Office — six department pods around the Brain, with the Task Status panel](assets/readme-hero.jpg)
 

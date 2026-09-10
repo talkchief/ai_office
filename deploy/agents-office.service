@@ -1,0 +1,26 @@
+[Unit]
+Description=Agents Office
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agents-office
+Group=agents-office
+WorkingDirectory=/opt/agents-office
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=4520
+Environment=PATH=/opt/agents-office-runtime/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-/etc/agents-office.env
+ExecStart=/opt/agents-office-runtime/bin/node /opt/agents-office/serve.mjs
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

@@ -3,6 +3,7 @@
 // the `connectors` object initMcp() draws. Opened as a file: null → the demo list plays.
 import { MCP_LOGOS } from './mcplogos.js';
 import { DEPT_KEYS } from './data.js';
+import { officeReady } from './auth.js';
 
 // brand inks for shared looms (a shared connector is wired to four or more pods)
 const INK = { notion: '#151414', gmail: '#EA4335', slack: '#4A154B', zapier: '#FF4F00', claude_ai_Google_Drive: '#1FA463', googledrive: '#1FA463' };
@@ -48,12 +49,13 @@ export function fromSummary(m, agents) {
 
 export async function loadConnectors({ timeout = 25000 } = {}) {
   if (!location.protocol.startsWith('http')) return null;
+  await officeReady;
   try {
     const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), timeout);
     const [m, a] = await Promise.all([fetch('/api/mcp', { signal: ctl.signal }).then(r => r.ok ? r.json() : null),
                                       fetch('/api/agents', { signal: ctl.signal }).then(r => r.ok ? r.json() : null).catch(() => null)]);
     clearTimeout(t);
-    if (!m) return null;
+    if (!m) return fromSummary({ servers: [] });
     return fromSummary(m, a && a.agents);
-  } catch { return null; }
+  } catch { return fromSummary({ servers: [] }); }
 }
