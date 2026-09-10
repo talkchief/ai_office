@@ -268,7 +268,7 @@ test('agents search the Brain, the brief is seeded with matching notes, and the 
   const f = fixture({ knowledgeIndex, specialist, settings: { knowledgeSeedNotes: 3 }, pm: context => { if (context.last.type === 'human') heard.push(context.last.text); return defaultPm(context); } });
   try {
     const id = start(f, { text: 'Write the price list.' }); const done = await until(f.engine, id, ['done']);
-    assert.match(heard[0], /Brain notes that may be relevant[\s\S]*Company\/prices\.md › Ticket prices: Adult tickets cost 45 euros\./);
+    assert.match(heard[0], /Brain notes that match this brief[\s\S]*Company\/prices\.md › Ticket prices: Adult tickets cost 45 euros\./);
     assert.deepEqual(searches[0], ['Write the price list.', 3]); assert.ok(searches.some(([q]) => q === 'ticket prices'));
     assert.deepEqual(done.sources, ['Company/prices.md']); assert.deepEqual(done.runs.find(r => r.role === 'specialist').sources, ['Company/prices.md']);
   } finally { await f.close(); }

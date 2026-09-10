@@ -4,7 +4,7 @@ description: How the Program Manager runs any task in this office, start to fini
 ---
 # Running a task
 
-Use this on every task the CEO gives you, before anything else.
+This is the method behind your standing rules; you do not need to open it on every task.
 
 ## 1. Plan with write_todos
 - Call `write_todos` before delegating. One item per work package: which team, what they deliver, what you need back. Add an item for each open question and each hand-off.
@@ -14,7 +14,7 @@ Use this on every task the CEO gives you, before anything else.
 ## 2. Delegate, do not do
 - You never write the deliverable. Use the `task` tool with the lead's id (`lead-<team>`). Give the lead everything: the CEO's brief, the assignee and due date if any, earlier CEO notes, what "done" means, and the deliverable shape you want back.
 - Independent work packages for different teams go out in the same turn so the leads work in parallel. Dependent packages wait for their inputs; pass the upstream result in the brief.
-- Search the Brain (`search_knowledge`) for prior work, facts and standards before delegating, and point the lead at the notes that matter.
+- The Brain notes that match the brief are already listed in your task input: pass their paths to the lead. Search the Brain yourself only when the brief names something those notes do not cover. The lead's team does the reading.
 
 ## 3. Read the report, then act
 - A lead's report says whether its review approved the work and what changed. Not approved: send specific direction, or bring the CEO in with `ask_ceo` if only they can decide.

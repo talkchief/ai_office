@@ -182,7 +182,7 @@ export class OfficeEngine {
   seedNotes(text) {
     const n = Number(this.settings().knowledgeSeedNotes ?? 6); if (!this.knowledgeIndex || !n) return '';
     let hits = []; try { hits = this.knowledgeIndex.search(text, { k: n }); } catch { return ''; }
-    return hits.length ? 'Brain notes that may be relevant (read them under /knowledge/ before relying on them):\n' + hits.map(h => `- ${h.path}${h.heading ? ' › ' + h.heading : ''}: ${h.snippet}`).join('\n') : '';
+    return hits.length ? 'Brain notes that match this brief. Pass the paths to the leads; their teams read them. Read one yourself only to decide who does the work:\n' + hits.map(h => `- ${h.path}${h.heading ? ' › ' + h.heading : ''}: ${h.snippet}`).join('\n') : '';
   }
   inputFrom(next, job) {
     if (!next) return { messages: [new HumanMessage(this.brief(job))] };
