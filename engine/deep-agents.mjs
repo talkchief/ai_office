@@ -21,7 +21,7 @@ import { exportPdfTool, exportPptxTool, listWorkspaceFiles, workspaceFile } from
 export const PROVIDERS_WITHOUT_GENERAL_WORKER = ['anthropic', 'openai', 'google'];
 for (const provider of PROVIDERS_WITHOUT_GENERAL_WORKER) registerHarnessProfile(provider, { generalPurposeSubagent: { enabled: false } });
 import { checkOutput, coveredCriteria } from './checks.mjs';
-import { RunTracker } from './stream.mjs';
+import { RunTracker, toolOutputText, parseTaskInput } from './stream.mjs';
 import { Notifications } from '../notifications.mjs';
 import { Threads } from '../threads.mjs';
 
@@ -378,12 +378,12 @@ export class OfficeEngine {
       const { model, provider } = await make('lead', lead, team);
       const spotChecks = this.toolHub ? this.toolHub.toolsFor({ agent: lead, team, provider, evaluation, readOnly: true }).tools : [];
       const graph = this.agentFactory({ name: leadName(team.id), model, systemPrompt: leadPrompt({ office, team, lead, specialists, reworkRounds: reworkRounds(team), toolLabels }),
-        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), ...spotChecks], subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware(), this.loopGuard(job.id, lead.id)] });
+        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), ...spotChecks], subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware(), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
       leads.push({ name: leadName(team.id), description: `${team.name} team, led by ${lead.name}.${team.purpose ? ' ' + team.purpose : ''}`.slice(0, 600), runnable: graph });
     }
     const { model } = await make('pm', null, null);
     const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams, toolLabels }),
-      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.loopGuard(job.id, 'pm')],
+      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm')],
       checkpointer: this.saver, interruptOn: job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {} });
     return { pm, models };
   }
@@ -398,6 +398,35 @@ export class OfficeEngine {
       if (repeats <= LIMIT) return handler(request);
       this.event(jobId, 'loop_stopped', agentId, `${call.name} was called with the same arguments ${repeats} times; the call was refused.`);
       return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `Refused: this is the same call for the ${repeats}th time. Whatever you are waiting for will not appear in this run: nobody else writes into your workspace while you wait. Do the work with what you have, or reply now to whoever assigned this with exactly what is missing.` });
+    } });
+  }
+  // A subagent whose model replies with nothing (no text, no tool call: a provider hiccup) is sent the assignment once more; if it
+  // happens twice the caller is told plainly. Deep Agents would otherwise report "Task completed" and the caller would believe it.
+  emptyReplyGuard(jobId, who) {
+    const said = result => { const text = toolOutputText(result).trim(); return text && text !== 'Task completed' ? text : ''; };
+    return createMiddleware({ name: `empty_reply_${who.replace(/[^a-zA-Z0-9_]/g, '_')}`, wrapToolCall: async (request, handler) => {
+      if (request.toolCall.name !== 'task') return handler(request);
+      let result = await handler(request); if (said(result)) return result;
+      const target = parseTaskInput(request.toolCall.args).subagent || 'the agent';
+      this.event(jobId, 'empty_reply', who, `${target} returned an empty reply; the assignment was sent once more.`);
+      result = await handler(request); if (said(result)) return result;
+      this.event(jobId, 'empty_reply', who, `${target} returned an empty reply twice.`);
+      return new ToolMessage({ tool_call_id: request.toolCall.id, name: 'task', content: `${target} returned nothing twice (an empty reply: no work, no report). This is not done. Delegate the assignment again later in this task, or report it to the Program Manager or the CEO.` });
+    } });
+  }
+  // A lead reads to brief and to review, not to research: before its first delegation in a run it may open three files or
+  // searches; the next one is refused and it is told to delegate, since the specialist reads the same notes for the work itself.
+  // Once a specialist has been delegated to, the lead reads freely (that is the review).
+  readGuard(jobId, team, leadId) {
+    const READS = new Set(['read_file', 'search_knowledge', 'grep', 'glob', 'ls']), LIMIT = 3, counts = new Map();
+    return createMiddleware({ name: `read_guard_${leadId.replace(/[^a-zA-Z0-9_]/g, '_')}`, wrapToolCall: async (request, handler) => {
+      const call = request.toolCall; if (!READS.has(call.name)) return handler(request);
+      const job = this.get(jobId), mine = job.runs.filter(r => r.agent === leadId), since = mine.length ? Math.max(...mine.map(r => r.startedAt || 0)) : 0;
+      if (job.runs.some(r => r.dept === team.id && r.role === 'specialist' && (r.startedAt || 0) >= since)) return handler(request);
+      const n = (counts.get(since) || 0) + 1; counts.set(since, n);
+      if (n <= LIMIT) return handler(request);
+      this.event(jobId, 'reads_capped', leadId, `${call.name} refused: the lead had already opened ${LIMIT} things before delegating.`);
+      return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `Refused: you have already opened ${LIMIT} files or searches before delegating. Delegate now with the task tool and name the notes the specialist should read; the specialist does the reading. You can read again when their work comes back for review.` });
     } });
   }
   // The Program Manager delegates only after it has written a plan: a task call before write_todos is refused, not run.

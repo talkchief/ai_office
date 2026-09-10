@@ -247,6 +247,33 @@ test('a review that names a file that does not exist is not approved, and says w
   } finally { await f.close(); }
 });
 
+test('a specialist that replies with nothing is asked once more, and the second answer counts', async () => {
+  let n = 0;
+  const f = fixture({ specialist: () => n++ === 0 ? { text: '' } : { text: 'Verified result and evidence.' } });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done']);
+    assert.equal(done.events.filter(e => e.type === 'empty_reply').length, 1);
+    assert.equal(done.review.approved, true); assert.match(done.result, /Verified result/);
+  } finally { await f.close(); }
+});
+
+test('a lead may open three things before it delegates; the next reads are refused and it delegates', async () => {
+  let n = 0;
+  const lead = workers => { const worker = workers[0]; return ({ last, system, messages }) => {
+    if (n < 5) { n++; return { calls: [call('read_file', { file_path: `/knowledge/note-${n}.md` })] }; }
+    if (n === 5) { n++; return { calls: [call('task', { subagent_type: worker, description: 'Write the report; read note-1 and note-2 first' })] }; }
+    if (last.type === 'tool' && REVIEW.test(last.text)) return { text: /APPROVED/.test(last.text) ? 'Review approved.' : 'Not approved: ' + last.text };
+    if (last.type === 'tool') return { calls: [call('record_review', { approved: true, summary: 'Checked.', criteria: criteria(system).map(id => ({ id, passed: true, evidence: 'Present.' })), deliverable: 'Final: ' + toolTexts(messages).join('\n') })] };
+    return { text: 'ok' };
+  }; };
+  const f = fixture({ lead });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done']);
+    assert.equal(done.events.filter(e => e.type === 'reads_capped').length, 2, 'the fourth and fifth reads before delegating are refused');
+    assert.equal(done.review.approved, true);
+  } finally { await f.close(); }
+});
+
 test('a task that runs past the time limit is blocked with a plain reason', async () => {
   const f = fixture({ settings: { runTimeoutMinutes: 0.002 }, specialist: () => ({ text: 'Slow.', wait: 1500 }) });
   try { const id = start(f); const job = await until(f.engine, id, ['blocked']); assert.match(job.error, /no progress/); assert.equal(f.engine.notifications.list()[0].kind, 'blocked'); }
