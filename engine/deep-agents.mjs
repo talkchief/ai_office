@@ -453,6 +453,9 @@ export class OfficeEngine {
       const job = this.get(id), other = others.find(t => t.id === target); if (!job || job.state === 'cancelled') return 'The task is closed.';
       if (!other) return `Unknown team. Choose one of: ${others.map(t => t.id).join(', ')}.`;
       const text = clean(request).slice(0, 2000); if (!text) return 'Say what the other team should deliver.';
+      // After a resume, a lead can mistake the other team's package in its brief for its own: the other team already has it.
+      const busy = job.runs.find(r => r.role === 'lead' && r.dept === other.id && r.state === 'working');
+      if (busy) { this.event(id, 'handoff_declined', team.lead, `${team.name} tried to hand work to ${other.name}, which already has its own package.`); return `Not recorded: ${other.name} already has its package from the Program Manager (working since ${new Date(busy.startedAt).toISOString().slice(11, 16)} UTC). Nothing of theirs is yours to hand off. Carry on with your own part only, and do not put a HAND-OFF line in your report.`; }
       const handoff = { id: randomUUID(), from: team.id, team: other.id, request: text, at: Date.now() };
       this.update(id, j => { j.handoffs = [...(j.handoffs || []), handoff]; if (!j.autoRoute && !(j.depts || []).includes(other.id)) j.depts = [...(j.depts || [j.dept]), other.id]; });
       this.event(id, 'handoff_requested', team.lead, `${team.name} asked ${other.name} for: ${text.slice(0, 200)}`, { team: other.id, role: 'lead' });

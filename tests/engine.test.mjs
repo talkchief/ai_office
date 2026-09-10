@@ -274,6 +274,20 @@ test('a lead may open three things before it delegates; the next reads are refus
   } finally { await f.close(); }
 });
 
+test('a hand-off to a team that is already working on the task is declined and not recorded', async () => {
+  const f = fixture();
+  try {
+    const job = f.engine.create({ dept: 'sales', text: 'Validate the ICP.', autoStart: false });
+    f.engine.update(job.id, j => { j.runs.push({ id: 'r-m', agent: f.office.team('marketing').lead, role: 'lead', dept: 'marketing', state: 'working', startedAt: Date.now() }); });
+    const reply = await f.engine.handoffTool(job.id, f.office.team('sales'), f.office.get()).invoke({ team: 'marketing', request: 'Research the competitors.' });
+    assert.match(reply, /MARKETING already has its package/);
+    assert.equal((f.engine.get(job.id).handoffs || []).length, 0);
+    assert.ok(f.engine.events(job.id).some(e => e.type === 'handoff_declined'));
+    const recorded = await f.engine.handoffTool(job.id, f.office.team('sales'), f.office.get()).invoke({ team: 'emails', request: 'Research the competitors on the web.' });
+    assert.match(recorded, /Recorded/); assert.equal(f.engine.get(job.id).handoffs.length, 1, 'a hand-off to a team that is not working on the task is recorded');
+  } finally { await f.close(); }
+});
+
 test('a task that runs past the time limit is blocked with a plain reason', async () => {
   const f = fixture({ settings: { runTimeoutMinutes: 0.002 }, specialist: () => ({ text: 'Slow.', wait: 1500 }) });
   try { const id = start(f); const job = await until(f.engine, id, ['blocked']); assert.match(job.error, /no progress/); assert.equal(f.engine.notifications.list()[0].kind, 'blocked'); }
