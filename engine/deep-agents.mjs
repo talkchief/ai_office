@@ -5,7 +5,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Command } from '@langchain/langgraph';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
-import { HumanMessage } from '@langchain/core/messages';
+import { HumanMessage, ToolMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { createMiddleware } from 'langchain';
 import { createDeepAgent } from 'deepagents';
@@ -342,9 +342,17 @@ export class OfficeEngine {
     }
     const { model } = await make('pm', null, null);
     const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams }),
-      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend, permissions: FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills),
+      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend, permissions: FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [this.planFirst(job.id)],
       checkpointer: this.saver, interruptOn: job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {} });
     return { pm, models };
+  }
+  // The Program Manager delegates only after it has written a plan: a task call before write_todos is refused, not run.
+  planFirst(jobId) {
+    return createMiddleware({ name: 'plan_first', wrapToolCall: async (request, handler) => {
+      const call = request.toolCall; if (call?.name !== 'task' || (this.get(jobId)?.todos || []).length) return handler(request);
+      this.event(jobId, 'delegation_refused', 'pm', 'Delegation before a plan: write_todos first.');
+      return new ToolMessage({ tool_call_id: call.id, name: 'task', content: 'Refused: plan first. Call write_todos with one item per work package (team, deliverable, what you need back), then delegate with task.' });
+    } });
   }
   /* ---------- office tools ---------- */
   // A lead whose assignment needs another team's expertise hands that part to the Program Manager and keeps working on its own part.

@@ -17,8 +17,9 @@ const toolTexts = messages => messages.slice(lastAi(messages) + 1).filter(m => t
 const criteria = system => [...new Set([...system.matchAll(/criterion-\d+/g)].map(m => m[0]))];
 const COMPLETE = /^(Task completed|Refused|Saving the result failed|The task was cancelled)/, REVIEW = /^Review recorded/;
 
+export const plan = () => call('write_todos', { todos: [{ content: 'Deliver through the lead', status: 'in_progress' }] });
 export const defaultPm = ({ last }) => {
-  if (last.type === 'human') return { calls: [call('task', { subagent_type: 'lead-marketing', description: 'Deliver: ' + last.text.slice(0, 160) })] };
+  if (last.type === 'human') return { calls: [plan(), call('task', { subagent_type: 'lead-marketing', description: 'Deliver: ' + last.text.slice(0, 160) })] };
   if (last.type === 'tool' && COMPLETE.test(last.text)) return { text: last.text.startsWith('Task completed') ? 'Done.' : 'Waiting for the review.' };
   if (last.type === 'tool') return { calls: [call('complete_task', { summary: 'Delivered the report.' })] };
   return { text: 'Done.' };
@@ -273,7 +274,7 @@ test('agents search the Brain, the brief is seeded with matching notes, and the 
 });
 
 test('the Program Manager can choose the team itself; only the lead it involved must approve', async () => {
-  const pm = context => context.last.type === 'human' ? { calls: [call('task', { subagent_type: 'lead-sales', description: 'Deliver: ' + context.last.text })] } : defaultPm(context);
+  const pm = context => context.last.type === 'human' ? { calls: [plan(), call('task', { subagent_type: 'lead-sales', description: 'Deliver: ' + context.last.text })] } : defaultPm(context);
   const lead = () => context => {
     const specialist = /Specialists on your team:\n- ([a-z0-9_-]+):/i.exec(context.system)?.[1];
     return context.last.type === 'human' ? { calls: [call('task', { subagent_type: specialist, description: 'Write it' })] } : defaultLead(specialist)(context);
@@ -390,7 +391,7 @@ test('a connector enabled for one team is usable there and absent for another te
     (replies[who] ||= []).push(last.text); return { text: 'Done: ' + last.text.slice(0, 60) };
   };
   const lead = () => context => { const sp = /Specialists on your team:\n- ([a-z0-9_-]+):/i.exec(context.system)?.[1]; return context.last.type === 'human' ? { calls: [call('task', { subagent_type: sp, description: 'Look it up' })] } : defaultLead(sp)(context); };
-  const pm = context => context.last.type === 'human' ? { calls: [call('task', { subagent_type: /for (SALES|Sales)/.test(context.last.text) ? 'lead-sales' : 'lead-marketing', description: 'Deliver: ' + context.last.text.slice(0, 120) })] } : defaultPm(context);
+  const pm = context => context.last.type === 'human' ? { calls: [plan(), call('task', { subagent_type: /for (SALES|Sales)/.test(context.last.text) ? 'lead-sales' : 'lead-marketing', description: 'Deliver: ' + context.last.text.slice(0, 120) })] } : defaultPm(context);
   const f = fixture({ pm, lead, specialist, hub, configure: config => { config.teams.find(t => t.id === 'marketing').tools = ['crm']; config.teams.find(t => t.id === 'sales').tools = []; } });
   try {
     const m = start(f); const marketing = await until(f.engine, m, ['done'], 15000);
@@ -408,9 +409,11 @@ test('a connector enabled for one team is usable there and absent for another te
 
 test('the Program Manager plans with write_todos, sees its project-management skills, and the plan shows on the task', async () => {
   let system = '';
+  let refused = false;
   const pm = context => {
     system = context.system;
-    if (context.last.type === 'human') return { calls: [call('write_todos', { todos: [{ content: 'Marketing: write the launch report', status: 'in_progress' }, { content: 'Close after the lead approves', status: 'pending' }] })] };
+    if (context.last.type === 'human') return { calls: [call('task', { subagent_type: 'lead-marketing', description: 'Deliver the launch report' })] };
+    if (context.last.type === 'tool' && /^Refused: plan first/.test(context.last.text)) { refused = true; return { calls: [call('write_todos', { todos: [{ content: 'Marketing: write the launch report', status: 'in_progress' }, { content: 'Close after the lead approves', status: 'pending' }] })] }; }
     if (context.last.type === 'tool' && /todo/i.test(context.last.text) && !/Task completed|Review/.test(context.last.text)) return { calls: [call('task', { subagent_type: 'lead-marketing', description: 'Deliver the launch report' })] };
     return defaultPm(context);
   };
@@ -421,5 +424,7 @@ test('the Program Manager plans with write_todos, sees its project-management sk
     assert.match(system, /running-a-task/); assert.match(system, /cross-team-handoff/); assert.match(system, /project-shepherd/);
     assert.match(system, /\/skills\/agency\//, 'skills are read from the mounted folder');
     assert.equal(done.todos.length, 2); assert.equal(done.todos[0].content, 'Marketing: write the launch report');
+    assert.ok(refused, 'a delegation before the plan was refused'); assert.ok(f.engine.events(id).some(e => e.type === 'delegation_refused'));
+    assert.equal(done.runs.filter(r => r.role === 'lead').length, 1, 'the refused delegation never ran');
   } finally { await f.close(); }
 });

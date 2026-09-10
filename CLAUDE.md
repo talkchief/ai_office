@@ -35,7 +35,7 @@ For a running office, read `GET /api/office`, change what the owner asked for, a
 
 The office ships 260+ ready-made personas under `agency/` (from github.com/msitarzewski/agency-agents, MIT). When the owner wants a new kind of specialist ("I need an SEO person", "add a security reviewer to Delivery"), look in the catalogue first: `GET /api/agency?q=seo`, then `POST /api/agency/<id>/hire { dept }` adds the persona to that team with its role, job, standing instructions and its full method as a skill (`{ lead: true }` gives the team's lead that role instead). `POST /api/agency/<id>/skill { teams, agents }` adds only the method. Say which persona you chose and why. A team holds a lead and up to six specialists.
 
-The Program Manager's own skills (project management methods, plus `running-a-task` and `cross-team-handoff`) live in `agency/pm-skills/<name>/SKILL.md`; the owner's additions go in `<brain>/Agents Office/pm-skills/<name>/SKILL.md` (Agent Skills shape: front matter `name` and `description`, then the method). The Program Manager reads them on demand with Deep Agents' skills middleware and plans every task with `write_todos`.
+The Program Manager's own skills (project management methods, plus `running-a-task` and `cross-team-handoff`) live in `agency/pm-skills/<name>/SKILL.md`; the owner's additions go in `<brain>/Agents Office/pm-skills/<name>/SKILL.md` (Agent Skills shape: front matter `name` and `description`, then the method). The Program Manager reads them on demand with Deep Agents' skills middleware and plans every task with `write_todos`; a delegation before the plan exists is refused.
 
 ## Teaching how a task is done (skills)
 
