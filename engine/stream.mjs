@@ -37,6 +37,9 @@ export class RunTracker {
   activeRun(job, agent) { return job.runs.find(r => r.agent === agent && r.state === 'working') || null; }
   handle(event) {
     const { event: type, name } = event;
+    // The same tool call and the same model call can surface twice from the stream (once from the middleware that wraps the
+    // tool, once from the tool node); a run id is seen once.
+    if (['on_tool_start', 'on_chat_model_start'].includes(type) && event.run_id) { this.seen ||= new Set(); const key = type + ':' + event.run_id; if (this.seen.has(key)) return; this.seen.add(key); if (this.seen.size > 5000) this.seen = new Set([...this.seen].slice(-2500)); }
     if (name === 'task' && type === 'on_tool_start') return this.startRun(event);
     if (name === 'task' && (type === 'on_tool_end' || type === 'on_tool_error')) return this.endRun(event, type === 'on_tool_error');
     if (type === 'on_tool_start') return this.toolStart(event);
@@ -86,7 +89,9 @@ export class RunTracker {
       const r = this.activeRun(j, agent); if (r && !r.tools.includes(event.name)) r.tools.push(event.name);
       if (j.liveCalls?.[agent]) j.liveCalls[agent].tool = event.name;
     });
-    engine.event(this.id, 'tool_started', agent, `Using ${event.name}.`, { tool: event.name });
+    // The CEO sees what the tool was pointed at: a path, a query, an address, a source file; never a whole payload.
+    const args = argsOf(event.data?.input), target = String(args.file_path ?? args.path ?? args.query ?? args.url ?? args.source ?? args.pattern ?? args.command ?? (typeof args === 'string' ? args : '') ?? '').replace(/\s+/g, ' ').trim().slice(0, 90);
+    engine.event(this.id, 'tool_started', agent, target ? `Using ${event.name}: ${target}` : `Using ${event.name}.`, { tool: event.name, target });
     if (engine.get(this.id).state === 'executing') this.executing.add(`${agent}:${event.name}`);
   }
   toolEnd(event) { if (this.executing.delete(`${this.agentOf(event)}:${event.name}`) && this.engine.get(this.id).state === 'executing') this.engine.setState(this.id, 'working'); }
@@ -110,6 +115,9 @@ export class RunTracker {
     const calls = output?.tool_calls || output?.kwargs?.tool_calls || [];
     for (const c of calls) if (c?.name === 'write_todos' && agent === 'pm' && Array.isArray(c.args?.todos)) { const todos = c.args.todos.slice(0, 30).map(t => ({ content: String(t.content || '').slice(0, 300), status: String(t.status || 'pending') })); this.engine.update(this.id, j => { j.todos = todos; }); this.engine.event(this.id, 'todos_updated', 'pm', `${todos.filter(t => t.status === 'completed').length}/${todos.length} planned steps done.`); }
     this.engine.update(this.id, j => { if (used) { j.tokens = (j.tokens || 0) + used; (j.tokensByModel ||= {})[model] = (j.tokensByModel[model] || 0) + used; } if (j.liveCalls?.[agent]) { j.liveCalls[agent].state = 'returned'; j.liveCalls[agent].lastEventAt = Date.now(); j.liveCalls[agent].preview = this.previews.get(agent) || j.liveCalls[agent].preview; } });
+    // Past the budget, the run is stopped where it is; the task blocks with the reason and a Retry continues it.
+    const budget = Number(this.engine.settings?.()?.tokenBudgetPerTask) || 0, total = this.engine.get(this.id)?.tokens || 0;
+    if (budget && total > budget && !this.budgetHit) { this.budgetHit = true; this.engine.running.get(this.id)?.controller.abort(Object.assign(new Error(`This task used more than ${budget.toLocaleString('en-GB')} tokens and was stopped to protect your spend. Retry to continue from where it stopped, or raise the budget under Settings → Office.`), { budget: true })); }
   }
   flush() {
     this.lastWrite = Date.now(); if (!this.previews.size) return;

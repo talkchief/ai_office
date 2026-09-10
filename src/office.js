@@ -39,7 +39,7 @@ export function initOfficeWork(ctx) {
     <div class="space-now-head"><span class="space-h2">Right now</span><span class="tp-mode live" id="spaceNowMode">LIVE</span></div>
     <div id="spaceNow" class="space-now"></div>
     <div class="space-feed-head"><h2>Work & results</h2><span class="tp-mode" hidden></span></div>
-    <div id="spaceFilters" class="space-filters"></div><div id="spaceOffline" class="space-offline" hidden></div><div id="spaceJobs" class="space-jobs"></div>`;
+    <div id="spaceFilters" class="space-filters"></div><div id="spaceOffline" class="space-offline" hidden></div><div id="spaceProvider" class="space-offline space-provider" hidden></div><div id="spaceJobs" class="space-jobs"></div>`;
   const dialog = document.createElement('dialog'); dialog.id = 'spaceDialog';
   dialog.innerHTML = '<header><h2 id="spaceTitle"></h2><button type="button" id="spaceClose" aria-label="Close">×</button></header><p id="spaceMessage" role="status"></p><div id="spaceContent"></div>';
   document.body.appendChild(dialog);
@@ -63,7 +63,7 @@ export function initOfficeWork(ctx) {
     activity: () => { const j = jobs.find(j => j.autoRoute && ['planning', 'working', 'reviewing'].includes(j.state)); return j ? { state: 'running', title: j.title } : null; },
   };
   const inbox = initInbox({ api, openTask: id => showTask(id), openNote: id => settings.openNote(id), retryTask: id => api(`/tasks/${id}/retry`, 'POST', {}) });
-  let rosterChanged = false, projectsOpen = [];
+  let rosterChanged = false, projectsOpen = [], providerHealth = null;
   // Open projects for the task form; refreshed with the board.
   const fillProjects = () => { const sel = $('spaceProject'); if (!sel) return; const current = sel.value; sel.innerHTML = '<option value="">None</option>' + projectsOpen.map(p => `<option value="${esc(p.id)}">${esc(p.name)}${p.status === 'paused' ? ' (paused)' : ''}</option>`).join(''); if (projectsOpen.some(p => p.id === current)) sel.value = current; };
   const reloadForRoster = () => { if (!rosterChanged || settings.isOpen() || dialog.open || taskDirty) return; rosterChanged = false; $('spaceHint').textContent = 'The roster changed. Refreshing the office…'; setTimeout(() => location.reload(), 600); };
@@ -123,6 +123,7 @@ export function initOfficeWork(ctx) {
     const ago = lastRefreshAt ? Math.max(0, Math.round((Date.now() - lastRefreshAt) / 1000)) : null;
     $('spaceNowMode').textContent = connectionStale ? 'RECONNECTING' : ago == null ? 'LIVE' : `LIVE · UPDATED ${ago < 3 ? 'JUST NOW' : ago + 'S AGO'}`;
     $('spaceNowMode').classList.toggle('live', !connectionStale);
+    const prov = $('spaceProvider'); if (prov) { const n = providerHealth?.lastHour || 0; prov.hidden = !n; if (n) prov.textContent = `The model provider failed ${n} time${n === 1 ? '' : 's'} in the last hour${providerHealth.last ? ' (last: ' + providerHealth.last.reason.slice(0, 80) + ')' : ''}. Tasks retry on their own; if it keeps happening, change the model under Manage → Models & keys.`; }
     const off = $('spaceOffline'); if (off) { off.hidden = !connectionStale; if (connectionStale) off.textContent = `Lost the server${ago != null ? ' ' + ago + 's ago' : ''}. Showing the last known state; work animations paused until it’s back.`; }
   }
   setInterval(renderNow, 1500);
@@ -199,7 +200,7 @@ export function initOfficeWork(ctx) {
   async function refresh() {
     if (refreshing) return; refreshing = true;
     try {
-      const before = jobs.filter(j => j.state === 'done').length; jobs = (await api('/tasks')).map(uiJob); try { projectsOpen = await api('/projects/open'); fillProjects(); } catch {} lastRefreshAt = Date.now(); if(connectionStale){$('spaceHint').textContent='Connection restored.';connectionStale=false;} for (const j of jobs) for (const a of (j.agents || [])) AGENT_NAMES[a.id] = a.name; render(); if (jobs.filter(j => j.state === 'done').length !== before) await syncBrain();
+      const before = jobs.filter(j => j.state === 'done').length; jobs = (await api('/tasks')).map(uiJob); try { projectsOpen = await api('/projects/open'); fillProjects(); } catch {} try { providerHealth = (await api('/health')).provider || null; } catch {} lastRefreshAt = Date.now(); if(connectionStale){$('spaceHint').textContent='Connection restored.';connectionStale=false;} for (const j of jobs) for (const a of (j.agents || [])) AGENT_NAMES[a.id] = a.name; render(); if (jobs.filter(j => j.state === 'done').length !== before) await syncBrain();
       await projectUI.refresh();
       if (agentOpen) renderAgent(agentOpen);
       if (dialog.open && modalKind === 'reports' && document.activeElement?.id !== 'spaceReportPeriod') await showReports(false);

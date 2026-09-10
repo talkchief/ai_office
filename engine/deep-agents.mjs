@@ -77,7 +77,7 @@ export class OfficeEngine {
     // Long-term memory shares the task database; null when the office runs without it (tests, older set-ups).
     this.memory = memoryFactory ? memoryFactory(this.db) : null;
     this.notifications = new Notifications({ db: this.db, bus }); this.threads = new Threads({ db: this.db, bus });
-    this.running = new Map(); this.waiting = []; this.followUps = new Map(); this.gates = new Map(); this.closed = false;
+    this.running = new Map(); this.waiting = []; this.followUps = new Map(); this.gates = new Map(); this.closed = false; this.providerTrouble = [];
   }
   settings() { return { ...DEFAULT_SETTINGS, ...(this.settingsFn() || {}) }; }
   /* ---------- records ---------- */
@@ -105,6 +105,11 @@ export class OfficeEngine {
     const job = this.update(id, j => { from = j.state; if (from !== to) { j.state = to; j.stateSince = Date.now(); } Object.assign(j, extra); });
     if (from !== to) { this.event(id, 'state_changed', null, `${from} → ${to}`, { from, to }); this.bus?.publish('task.state', { id, from, to }); }
     return job;
+  }
+  // What the board shows when the model provider is failing: failures in the last hour and day, and the last reason.
+  providerHealth(now = Date.now()) {
+    const hour = this.providerTrouble.filter(t => now - t.at < 3600000), day = this.providerTrouble.filter(t => now - t.at < 86400000);
+    return { lastHour: hour.length, lastDay: day.length, last: day.at(-1) || null };
   }
   activeAgents() {
     const office = this.office.get();
@@ -226,6 +231,7 @@ export class OfficeEngine {
         const job = this.get(id);
         if (this.closed || !job || TERMINAL.has(job.state)) return this.detail(id);
         const reason = timer.aborted ? `The task ran longer than ${minutes} minutes and was stopped. Retry to continue from where it stopped, or raise the time limit in Settings.` : clean(error?.message) || 'The task stopped unexpectedly.';
+        if (!timer.aborted && (isTransientProviderError(error) || isProviderError(error))) { this.providerTrouble.push({ at: Date.now(), reason: reason.slice(0, 160), task: job.title }); if (this.providerTrouble.length > 200) this.providerTrouble.splice(0, 100); }
         if (!timer.aborted && isTransientProviderError(error) && (job.autoRetries || 0) < 2) {
           // Twice, quietly, with a longer pause the second time: the CEO hears about it only if the third attempt fails too.
           const attempt = (job.autoRetries || 0) + 1, delay = attempt === 1 ? 30000 : 90000;
