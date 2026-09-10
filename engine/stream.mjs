@@ -106,6 +106,9 @@ export class RunTracker {
   modelEnd(event) {
     const output = event.data?.output, usage = output?.usage_metadata || output?.kwargs?.usage_metadata || output?.generations?.[0]?.[0]?.message?.usage_metadata;
     const agent = this.agentOf(event), model = this.models[agent] || 'unknown', used = (usage?.input_tokens || 0) + (usage?.output_tokens || 0);
+    // The planning tool runs inside the agent's middleware and emits no tool events, so the plan is read from the model's own reply.
+    const calls = output?.tool_calls || output?.kwargs?.tool_calls || [];
+    for (const c of calls) if (c?.name === 'write_todos' && agent === 'pm' && Array.isArray(c.args?.todos)) { const todos = c.args.todos.slice(0, 30).map(t => ({ content: String(t.content || '').slice(0, 300), status: String(t.status || 'pending') })); this.engine.update(this.id, j => { j.todos = todos; }); this.engine.event(this.id, 'todos_updated', 'pm', `${todos.filter(t => t.status === 'completed').length}/${todos.length} planned steps done.`); }
     this.engine.update(this.id, j => { if (used) { j.tokens = (j.tokens || 0) + used; (j.tokensByModel ||= {})[model] = (j.tokensByModel[model] || 0) + used; } if (j.liveCalls?.[agent]) { j.liveCalls[agent].state = 'returned'; j.liveCalls[agent].lastEventAt = Date.now(); j.liveCalls[agent].preview = this.previews.get(agent) || j.liveCalls[agent].preview; } });
   }
   flush() {

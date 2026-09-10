@@ -21,7 +21,7 @@ const push = process.argv.includes('--push');
 const OUT = path.join(ROOT, 'dist', 'release');
 
 // Every top-level module ships, so a new backend file can never be left out of a release.
-const FILES = ['src', 'engine', 'server', 'deploy', 'assets/mcp/tiles', 'assets/mcp/bake.py', 'assets/mcp/rebake.py', 'brain', 'scripts/release.mjs',
+const FILES = ['src', 'engine', 'server', 'deploy', 'agency', 'assets/mcp/tiles', 'assets/mcp/bake.py', 'assets/mcp/rebake.py', 'brain', 'scripts/release.mjs',
   ...fs.readdirSync(ROOT).filter(f => f.endsWith('.mjs')), 'roster-defaults.json', 'setup', 'package.json', 'package-lock.json',
   'office.config.json', 'office.agents.json', 'skills', 'CLAUDE.md', 'README.md', 'SKILLS.md', 'CHANGELOG.md', 'LICENSE', 'assets/readme-hero.jpg'];
 

@@ -95,6 +95,11 @@ export function registerApi(router, ctx) {
   router.on('POST', '/api/knowledge', async ({ req }) => knowledge.save(await body(req, 512 * 1024)));
   router.on('GET', '/api/knowledge/note', ({ url }) => knowledge.read(url.searchParams.get('id')));
   router.on('DELETE', '/api/knowledge/note', ({ url }) => knowledge.archive(url.searchParams.get('id')));
+  /* ---------- the Agency: ready-made people and methods ---------- */
+  router.on('GET', '/api/agency', ({ url }) => ({ divisions: ctx.agency.divisions(), personas: ctx.agency.list({ q: url.searchParams.get('q') || '', division: url.searchParams.get('division') || '' }) }));
+  router.on('GET', '/api/agency/:id', ({ params }) => { const { body, ...p } = ctx.agency.get(params.id); return { ...p, body: body.slice(0, 20000) }; });
+  router.on('POST', '/api/agency/:id/hire', async ({ req, params }) => { const input = await body(req); return audited('office', `Hired ${params.id} from the Agency into ${input.dept}`, () => { const r = ctx.agency.hire(office, params.id, { dept: input.dept, name: input.name, lead: !!input.lead, busy: engine.activeAgents() }); bus.publish('office.updated', { area: 'office' }); return r; }); });
+  router.on('POST', '/api/agency/:id/skill', async ({ req, params }) => { const input = await body(req); return audited('office', `Added the ${params.id} method from the Agency as a skill`, () => { const r = ctx.agency.addSkill(office, params.id, { teams: input.teams || [], agents: input.agents || [], busy: engine.activeAgents() }); bus.publish('office.updated', { area: 'office' }); return r; }); });
   router.on('GET', '/api/routines', () => routines.out());
   router.on('POST', '/api/routines', async ({ req }) => { const r = await routines.make(await body(req)); return r.error ? { $status: 400, body: r } : r; });
   router.on('DELETE', '/api/routines/:id', ({ params }) => routines.remove(params.id));

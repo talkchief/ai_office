@@ -31,7 +31,7 @@ export function initOfficeWork(ctx) {
   const activityByAgent = new Map();
   let settingsDraft = null, settingsTeam = selectedTeam, settingsSection = 'overview', toolPoll = null;
   const panel = document.getElementById('tpanel');
-  panel.innerHTML = `<form class="space-command">
+  panel.innerHTML = `<button type="button" id="tpanelHandle" aria-label="Expand or collapse the work panel"></button><form class="space-command">
     <div class="space-team-picker"><button id="spaceDept" type="button" aria-expanded="false" aria-controls="spaceTeamMenu"><i style="background:${teamChip(selectedTeam).chip}"></i><span>${esc(teamChip(selectedTeam).name)}</span><span class="space-chevron">⌄</span></button><div id="spaceTeamMenu" hidden><button type="button" data-pick-team="auto"><i style="background:#465B70"></i>Let the Program Manager choose</button>${DEPT_KEYS.map(k => `<button type="button" data-pick-team="${k}"><i style="background:${DEPTS[k].chip}"></i>${esc(DEPTS[k].name)}</button>`).join('')}</div></div>
     <textarea id="spaceBrief" rows="2" aria-label="Task brief" placeholder="What needs to get done?" required></textarea>
     <details class="space-options" id="spaceOptions"><summary>Assign · due date · more teams · documents</summary><div class="space-options-grid"><label>For<select id="spaceAssignee"></select></label><label>Due<input type="datetime-local" id="spaceDue"></label><label>Priority<select id="spacePriority"><option value="1">Normal</option><option value="2">High</option><option value="0">Low</option></select></label><label>Documents<input type="file" id="spaceFiles" multiple accept=".pdf,.docx,.txt,.md,.csv"></label><div class="space-involve" id="spaceInvolve"></div></div></details>
@@ -44,6 +44,7 @@ export function initOfficeWork(ctx) {
   dialog.innerHTML = '<header><h2 id="spaceTitle"></h2><button type="button" id="spaceClose" aria-label="Close">×</button></header><p id="spaceMessage" role="status"></p><div id="spaceContent"></div>';
   document.body.appendChild(dialog);
   const $ = id => document.getElementById(id), content = $('spaceContent');
+  $('tpanelHandle').onclick = () => panel.classList.toggle('tall');
   for(const event of ['input','change'])content.addEventListener(event,e=>{if(modalKind==='task'&&e.target.matches('input,textarea,select')){taskDirty=true;if(e.target.id)taskInputDraft[e.target.id]=e.target.value;}});
   const feedback = (text, error = false) => { $('spaceMessage').textContent = text; $('spaceMessage').classList.toggle('error', error); };
   function open(kind, title) { modalKind = kind; dialog.dataset.view = kind; $('spaceTitle').textContent = title; feedback(''); if (!dialog.open) dialog.showModal(); requestAnimationFrame(()=>{dialog.scrollTop=0;content.scrollTop=0;}); }

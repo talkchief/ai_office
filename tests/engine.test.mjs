@@ -405,3 +405,21 @@ test('a connector enabled for one team is usable there and absent for another te
     assert.deepEqual(used(again), [], 'the opted-out person no longer has it');
   } finally { await hub.close(); await f.close(); }
 });
+
+test('the Program Manager plans with write_todos, sees its project-management skills, and the plan shows on the task', async () => {
+  let system = '';
+  const pm = context => {
+    system = context.system;
+    if (context.last.type === 'human') return { calls: [call('write_todos', { todos: [{ content: 'Marketing: write the launch report', status: 'in_progress' }, { content: 'Close after the lead approves', status: 'pending' }] })] };
+    if (context.last.type === 'tool' && /todo/i.test(context.last.text) && !/Task completed|Review/.test(context.last.text)) return { calls: [call('task', { subagent_type: 'lead-marketing', description: 'Deliver the launch report' })] };
+    return defaultPm(context);
+  };
+  const f = fixture({ pm });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done']);
+    assert.match(system, /write_todos/, 'the planning tool is part of the PM harness');
+    assert.match(system, /running-a-task/); assert.match(system, /cross-team-handoff/); assert.match(system, /project-shepherd/);
+    assert.match(system, /\/skills\/agency\//, 'skills are read from the mounted folder');
+    assert.equal(done.todos.length, 2); assert.equal(done.todos[0].content, 'Marketing: write the launch report');
+  } finally { await f.close(); }
+});

@@ -51,11 +51,21 @@ Without `./setup`: `npm install && node build.mjs && npm start`. Then open **Man
 - **Teams & people** — add, rename and remove teams (up to 10; a team is a lead and up to six specialists), each person's job, standing instructions and model, the team's purpose, review criteria, automated checks, tools, pace, standing rules, and tests.
 - **Models & keys** — provider keys, then the models you activate from each provider's own list (nothing is built in), and who runs on what (office default, Program Manager, leads, specialists, reviews, chat).
 - **Tools & connectors** — MCP servers by URL or local command, sign-in in a new window, which teams may use each, and approval rules per tool.
-- **Skills** — reusable methods you give to teams or people. See [SKILLS.md](SKILLS.md).
+- **Skills** — reusable methods you give to teams or people, typed by you or added from the Agency. See [SKILLS.md](SKILLS.md).
 - **Routines** — tasks the office starts on its own clock, for any team.
 - **Reports & KPIs** — throughput, cycle time, review wait, your response time, rework, overdue work, tokens by model.
 - **Brain** — upload documents (PDF, Word, text, Markdown, CSV), search everything, edit notes, rebuild the search index.
 - **Audit log** — every configuration change, who made it and what changed.
+
+## The Agency: ready-made people and methods
+
+The office ships the open-source Agency catalogue ([msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents), MIT): 260+ specialist personas across engineering, marketing, sales, design, security, finance, product, project management and more. In **Teams & people → People → Hire from the Agency**, search the catalogue and hire a persona onto a team: they arrive with a role, a job description, standing instructions and their full method as a skill. "Hire as the lead" gives the team's lead that persona's job instead. In **Skills → Add a method from the Agency** you take just the method and give it to teams or people you already have. `node scripts/agency-sync.mjs <clone>` refreshes the catalogue.
+
+## How the Program Manager works
+
+The Program Manager runs on LangChain Deep Agents: it plans every task with the built-in task list (the CEO sees the plan on the task page), delegates to department leads with the delegation tool, and reads its skills on demand. Its skills are the project-management methods from the Agency (project shepherd, senior project manager, studio producer and operations, meeting notes, experiment tracker, Jira workflow steward) plus the office's own *running-a-task* and *cross-team-handoff* methods, under `agency/pm-skills/`. Put your own under `<brain>/Agents Office/pm-skills/<name>/SKILL.md`.
+
+When a lead's assignment needs another team's expertise, the lead hands that part to the Program Manager and keeps working on its own part. The Program Manager delegates it to the other lead, and the task cannot close until both leads have approved their work.
 
 ## Routines
 
@@ -94,6 +104,7 @@ CHECK_LIVE=1 npm run check   # … plus one real task through your model provide
 | `src/scene/` | The 3D office on React Three Fiber: `index.jsx` mounts it; `office.jsx` the building and rooms; `person.js` the figures; `sim.js` their life and the walk-and-talk hand-overs; `nav.js` walking; `screens.js` wall screens; `overlays.js` pills and speech bubbles; `rig.js` the camera |
 | `serve.mjs` · `server/` | The server and its API ([docs/api.md](docs/api.md)) |
 | `engine/` | The Program Manager → leads → specialists harness on Deep Agents: prompts, tools, approvals, reviews, live progress |
+| `agency/` · `agency.mjs` | The Agency catalogue (personas, MIT), the Program Manager's skills, and the importer |
 | `models.mjs` | Providers, models and who runs on what |
 | `notifications.mjs` · `threads.mjs` · `sse.mjs` | The inbox, conversations, live events |
 | `scheduler.mjs` · `routines.mjs` | Overdue notices, reminders, the daily digest, retention; routines |

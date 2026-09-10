@@ -93,6 +93,7 @@ export function renderTaskWorkspace(job, tab, actions = '') {
   };
   const work = () => `<details data-detail-key="brief" class="space-task-brief"><summary>Original brief</summary>${prose(job.text,'brief')}</details>
     <div class="space-work-intro"><h3>${total ? 'The team’s plan' : job.state === 'backlog' ? 'Shape the brief' : 'Planning'}</h3><p>${esc(job.plan || (job.state === 'backlog' ? 'This idea is saved. Edit the brief and start it below.' : job.state === 'cancelled' ? 'No plan was completed.' : 'The lead will define the assignments and acceptance criteria.'))}</p>${total ? `<span class="space-footnote">${submitted} of ${total} assignments submitted${job.review?.approved ? ' · Lead review passed' : ' · Lead verification required'}</span>` : ''}</div>
+    ${(job.todos || []).length ? `<div class="task-plan"><b>The Program Manager’s plan</b><ul>${job.todos.map(t => `<li class="${esc(t.status)}">${esc(t.content)}</li>`).join('')}</ul></div>` : ''}
     <div class="space-steps">${job.subtasks.map((step, i) => {
       const live = step.state === 'working' ? job.liveCalls?.[step.agent] : null;
       const preview = live?.preview;

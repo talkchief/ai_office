@@ -31,6 +31,12 @@ For a running office, read `GET /api/office`, change what the owner asked for, a
 
 **First start only:** a brand-new office seeds its people from `office.agents.json` → `<brain>/Agents Office/agents.json` → `office.agents.local.json` (later wins), 35 seats in six departments. After the first start these files are not read again, so edits to them do nothing for a running office.
 
+## Hiring from the Agency
+
+The office ships 260+ ready-made personas under `agency/` (from github.com/msitarzewski/agency-agents, MIT). When the owner wants a new kind of specialist ("I need an SEO person", "add a security reviewer to Delivery"), look in the catalogue first: `GET /api/agency?q=seo`, then `POST /api/agency/<id>/hire { dept }` adds the persona to that team with its role, job, standing instructions and its full method as a skill (`{ lead: true }` gives the team's lead that role instead). `POST /api/agency/<id>/skill { teams, agents }` adds only the method. Say which persona you chose and why. A team holds a lead and up to six specialists.
+
+The Program Manager's own skills (project management methods, plus `running-a-task` and `cross-team-handoff`) live in `agency/pm-skills/<name>/SKILL.md`; the owner's additions go in `<brain>/Agents Office/pm-skills/<name>/SKILL.md` (Agent Skills shape: front matter `name` and `description`, then the method). The Program Manager reads them on demand with Deep Agents' skills middleware and plans every task with `write_todos`.
+
 ## Teaching how a task is done (skills)
 
 When the owner says "this is how we do X", shares an SOP, a template or an example they liked, or asks why results are generic, the answer is a **skill**: a named method with steps, the shape of the result and rules. Create it in Settings → Skills (or add it to `skills` in `office.json` through `PUT /api/office`), then give it to a team or a person. Tasks keep the skill version they started with.

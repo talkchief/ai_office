@@ -27,6 +27,7 @@ import { OfficeEngine } from './engine/deep-agents.mjs';
 import { chatPrompt, pmChatPrompt } from './engine/prompts.mjs';
 import { runMigrations } from './migrations.mjs';
 import { KnowledgeIndex } from './knowledge-index.mjs';
+import { Agency } from './agency.mjs';
 import { AuditLog } from './audit.mjs';
 import { Scheduler } from './scheduler.mjs';
 import { listShape } from './server/shape.mjs';
@@ -186,7 +187,7 @@ async function chat({ agent: agentId, text, taskId, kind, refs = [], remember = 
 
 /* ---------- http ---------- */
 const router = new Router();
-registerApi(router, { office, engine, models, settings, toolStore, hub, knowledge, index, bus, audit, routines: routineApi, chat, version, name: cfg.name, graph: () => graph, discover: () => mcp.discover({ timeout: 15000 }) });
+registerApi(router, { office, engine, models, settings, toolStore, hub, knowledge, index, bus, audit, routines: routineApi, chat, version, name: cfg.name, graph: () => graph, discover: () => mcp.discover({ timeout: 15000 }), agency: new Agency() });
 const oauthPage = (title, text) => `<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font:15px system-ui;padding:40px;max-width:520px"><h1 style="font-size:20px">${title}</h1><p>${text}</p><p><a href="/">Back to the office</a></p><script>setTimeout(()=>{if(window.opener){window.opener.postMessage('connector-signed-in','*');window.close();}},1200)</script>`;
 
 const server = http.createServer(async (req, res) => {

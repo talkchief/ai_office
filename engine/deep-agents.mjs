@@ -10,7 +10,8 @@ import { tool } from '@langchain/core/tools';
 import { createMiddleware } from 'langchain';
 import { createDeepAgent } from 'deepagents';
 import { z } from 'zod';
-import { officeBackend, FILE_PERMISSIONS } from './backend.mjs';
+import { officeBackend, FILE_PERMISSIONS, SKILL_SOURCES } from './backend.mjs';
+import { ROOT } from '../config.mjs';
 import { programManagerPrompt, leadPrompt, specialistPrompt, leadName } from './prompts.mjs';
 import { checkOutput, coveredCriteria } from './checks.mjs';
 import { RunTracker } from './stream.mjs';
@@ -52,13 +53,13 @@ export function isProviderError(error) {
 }
 
 export class OfficeEngine {
-  constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent }) {
+  constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent, pmSkillsDir = null }) {
     fs.mkdirSync(dataDir, { recursive: true });
     this.workspaces = path.join(dataDir, 'workspaces'); this.knowledgeDir = knowledgeDir || path.join(dataDir, 'knowledge');
     this.saver = SqliteSaver.fromConnString(path.join(dataDir, 'workflows.sqlite')); this.db = this.saver.db;
     this.db.pragma('journal_mode = WAL'); this.db.pragma('busy_timeout = 5000');
     this.db.exec('CREATE TABLE IF NOT EXISTS office_jobs (id TEXT PRIMARY KEY, body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS office_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL, body TEXT NOT NULL); CREATE INDEX IF NOT EXISTS office_events_job ON office_events(job_id, seq);');
-    Object.assign(this, { office, models, toolHub, knowledgeIndex, bus, settingsFn: settings, onComplete, onChange, name, agentFactory });
+    Object.assign(this, { office, models, toolHub, knowledgeIndex, bus, settingsFn: settings, onComplete, onChange, name, agentFactory, pmSkillsDir });
     this.notifications = new Notifications({ db: this.db, bus }); this.threads = new Threads({ db: this.db, bus });
     this.running = new Map(); this.waiting = []; this.followUps = new Map(); this.gates = new Map(); this.closed = false;
   }
@@ -320,7 +321,9 @@ export class OfficeEngine {
       const providerId = this.models.model?.(spec.model)?.provider;
       return { model: await this.models.instance({ model: spec.model, effort: spec.effort }), provider: providerId ? this.models.provider?.(providerId)?.type : undefined };
     };
-    const backend = officeBackend({ workspaceDir: path.join(this.workspaces, job.id), knowledgeDir: this.knowledgeDir });
+    // The Program Manager's skills: the shipped programme/project-management methods, and the owner's own under the Brain.
+    const pmSkills = { agency: this.pmSkillsDir || path.join(ROOT, 'agency', 'pm-skills'), office: path.join(this.knowledgeDir, 'Agents Office', 'pm-skills') };
+    const backend = officeBackend({ workspaceDir: path.join(this.workspaces, job.id), knowledgeDir: this.knowledgeDir, skillDirs: pmSkills });
     const evaluation = job.kind === 'evaluation', leads = [];
     for (const team of teams) {
       const lead = office.agents.find(a => a.id === team.lead), specialists = office.agents.filter(a => a.department === team.id && a.id !== team.lead);
@@ -339,7 +342,7 @@ export class OfficeEngine {
     }
     const { model } = await make('pm', null, null);
     const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams }),
-      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend, permissions: FILE_PERMISSIONS,
+      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend, permissions: FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills),
       checkpointer: this.saver, interruptOn: job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {} });
     return { pm, models };
   }

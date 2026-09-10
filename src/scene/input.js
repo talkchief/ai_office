@@ -21,9 +21,27 @@ export function bindInput(canvas, { clickTargets, personTargets, onPerson, onDep
   };
   canvas.addEventListener('wheel', onWheel, { passive: false });
   let drag = null;
+  // Touch: two fingers pinch to zoom around their midpoint; while pinching, no drag or click.
+  const touches = new Map(); let pinch = null;
+  const pinchOf = () => { const [a, b] = [...touches.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; };
   canvas.addEventListener('contextmenu', e => e.preventDefault());
-  canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, moved: false, rotate: e.button === 2 || e.shiftKey || e.altKey }; });
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') { touches.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (touches.size === 2) { pinch = pinchOf(); drag = null; return; } }
+    drag = { x: e.clientX, y: e.clientY, moved: false, rotate: e.button === 2 || e.shiftKey || e.altKey };
+  });
+  const endTouch = e => { touches.delete(e.pointerId); if (touches.size < 2) pinch = null; };
+  addEventListener('pointercancel', endTouch);
   addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && touches.size === 2) {
+        const now = pinchOf(), [nx, ny] = [(now.x / rig.size.w) * 2 - 1, -(now.y / rig.size.h) * 2 + 1];
+        const before = worldAt(nx, ny);
+        rig.tween = null; rig.view.zoom = clamp(rig.view.zoom * (now.d / Math.max(1, pinch.d)), Math.min(rig.minZoom, rig.overview.zoom), rig.maxZoom); applyCamera();
+        const after = worldAt(nx, ny); if (before && after) rig.view.target.add(before.sub(after));
+        pinch = now; onZoomChange && onZoomChange(rig.view.zoom); return;
+      }
+    }
     if (!drag) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
@@ -41,6 +59,8 @@ export function bindInput(canvas, { clickTargets, personTargets, onPerson, onDep
     }
   });
   addEventListener('pointerup', (e) => {
+    const wasPinch = e.pointerType === 'touch' && (pinch || touches.size >= 2); if (e.pointerType === 'touch') endTouch(e);
+    if (wasPinch) { drag = null; return; }
     const wasDrag = drag && drag.moved;
     const wasRotate = drag && drag.rotate;
     drag = null;
