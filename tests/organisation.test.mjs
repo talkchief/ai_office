@@ -6,7 +6,7 @@ import path from 'node:path';
 import { OfficeStore } from '../office-store.mjs';
 import { loadRoster } from '../roster.mjs';
 import { Agency } from '../agency.mjs';
-import { webFetchTool } from '../engine/tools.mjs';
+import { webFetchTool, FETCH_DEFAULT_CHARS, FETCH_MAX_CHARS } from '../engine/tools.mjs';
 import { PROVIDERS_WITHOUT_GENERAL_WORKER, isTransientProviderError } from '../engine/deep-agents.mjs';
 
 const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'talkchief-org-'));
@@ -67,4 +67,16 @@ test('a roster save is refused only for people with work in progress; ids that a
 test('a provider hiccup is retried automatically; a wrong key, no credit or a bad model name is not', () => {
   for (const e of [{ status: 500, message: '500 Internal Server Error' }, { message: 'Bad Gateway' }, { status: 429, message: 'Too Many Requests' }, { message: 'fetch failed', cause: { code: 'ECONNRESET' } }, { message: 'The model is overloaded' }, { message: 'Request timed out' }, { message: 'Connection error.' }, { message: 'connect ECONNREFUSED 1.2.3.4:443' }]) assert.ok(isTransientProviderError(e), e.message);
   for (const e of [{ status: 401, message: 'Invalid API key' }, { status: 402, message: 'Insufficient credit' }, { status: 404, message: 'model does not exist' }, { message: 'quota exceeded' }, { message: 'Task cancelled' }]) assert.ok(!isTransientProviderError(e), e.message);
+});
+
+test('a fetched page is trimmed by default and says so; a longer read is explicit and capped', async () => {
+  const lookup = async () => [{ address: '93.184.216.34' }];
+  const big = '<p>' + 'word '.repeat(20000) + '</p>';
+  const t = webFetchTool({ fetchImpl: async () => ({ status: 200, ok: true, headers: new Headers({ 'content-type': 'text/html' }), text: async () => big }), lookup });
+  const short = await t.invoke({ url: 'https://big.example/' });
+  assert.ok(short.length < FETCH_DEFAULT_CHARS + 400 && short.includes('more characters not shown'), `default read is trimmed (${short.length})`);
+  const longer = await t.invoke({ url: 'https://big.example/', maxChars: 30000 });
+  assert.ok(longer.length > 29000 && longer.length < 30400);
+  const capped = await t.invoke({ url: 'https://big.example/', maxChars: 999999 });
+  assert.ok(capped.length <= FETCH_MAX_CHARS + 400, 'never more than the cap');
 });

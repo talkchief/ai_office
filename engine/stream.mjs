@@ -39,7 +39,7 @@ export class RunTracker {
     const { event: type, name } = event;
     // The same tool call and the same model call can surface twice from the stream (once from the middleware that wraps the
     // tool, once from the tool node); a run id is seen once.
-    if (['on_tool_start', 'on_chat_model_start'].includes(type) && event.run_id) { this.seen ||= new Set(); const key = type + ':' + event.run_id; if (this.seen.has(key)) return; this.seen.add(key); if (this.seen.size > 5000) this.seen = new Set([...this.seen].slice(-2500)); }
+    if (['on_tool_start', 'on_tool_end', 'on_tool_error', 'on_chat_model_start', 'on_chat_model_end'].includes(type) && event.run_id) { this.seen ||= new Set(); const key = type + ':' + event.run_id; if (this.seen.has(key)) return; this.seen.add(key); if (this.seen.size > 5000) this.seen = new Set([...this.seen].slice(-2500)); }
     if (name === 'task' && type === 'on_tool_start') return this.startRun(event);
     if (name === 'task' && (type === 'on_tool_end' || type === 'on_tool_error')) return this.endRun(event, type === 'on_tool_error');
     if (type === 'on_tool_start') return this.toolStart(event);

@@ -49,8 +49,12 @@ const toText = html => html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/
 
 // A page that cannot be fetched is a result the agent reads and works around, never an error that ends the run.
 const fetchReason = error => error?.name === 'TimeoutError' || error?.name === 'AbortError' ? 'no reply within 20 seconds' : error?.cause?.code || error?.cause?.message || error?.message || 'network error';
+// A page comes back trimmed: what an agent keeps in its context is re-sent on every later call, so a long page costs many times
+// its own size. The default is enough for an article; a longer read is asked for explicitly.
+export const FETCH_DEFAULT_CHARS = 12000, FETCH_MAX_CHARS = 40000;
 export function webFetchTool({ fetchImpl = globalThis.fetch, lookup } = {}) {
-  return tool(async ({ url }) => {
+  return tool(async ({ url, maxChars }) => {
+    const limit = Math.min(FETCH_MAX_CHARS, Math.max(2000, Number(maxChars) || FETCH_DEFAULT_CHARS));
     let target; try { target = await assertPublicUrl(url, lookup); } catch (error) { return `Could not fetch ${url}: ${error.message}`; }
     let res; try { res = await fetchImpl(target, { redirect: 'manual', signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'TalkchiefAISpace/1.0 (+research)' } }); }
     catch (error) { return `Could not fetch ${target.href}: ${fetchReason(error)}. Try another address or another source.`; }
@@ -59,8 +63,11 @@ export function webFetchTool({ fetchImpl = globalThis.fetch, lookup } = {}) {
     const type = res.headers.get('content-type') || '';
     if (!/text|json|xml|html/.test(type)) return `The page is ${type || 'binary'} and cannot be read as text.`;
     let body; try { body = (await res.text()).slice(0, 400000); } catch (error) { return `Could not read ${target.href}: ${fetchReason(error)}.`; }
-    return (/html/.test(type) ? toText(body) : body).slice(0, 40000) || 'The page had no readable text.';
-  }, { name: 'web_fetch', description: 'Fetch a public web page and return its readable text (first 40,000 characters). Use for sources the task needs; cite the URL. A page that cannot be fetched comes back as a short explanation.', schema: z.object({ url: z.string().describe('Public http(s) URL') }) });
+    const textOut = (/html/.test(type) ? toText(body) : body); const cut = textOut.slice(0, limit);
+    return (cut || 'The page had no readable text.') + (textOut.length > limit ? `
+
+[${textOut.length - limit} more characters not shown; write down what you need from this page, or call again with maxChars up to ${FETCH_MAX_CHARS} only if the rest matters.]` : '');
+  }, { name: 'web_fetch', description: `Fetch a public web page and return its readable text (the first ${FETCH_DEFAULT_CHARS.toLocaleString('en-GB')} characters by default). Use it for the sources the task needs and cite the URL. Write down what you learned from a page before fetching the next one; fetched text is expensive to keep. A page that cannot be fetched comes back as a short explanation.`, schema: z.object({ url: z.string().describe('Public http(s) URL'), maxChars: z.number().optional().describe(`How much of the page to return, up to ${FETCH_MAX_CHARS}; leave it out unless the rest of the page matters`) }) });
 }
 export const anthropicWebSearch = { type: 'web_search_20260209', name: 'web_search', max_uses: 8 };
 
