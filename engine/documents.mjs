@@ -309,6 +309,32 @@ function sourceOf(workspaceDir, source) {
   const markdown = fs.readFileSync(src.abs, 'utf8');
   return { src, markdown, heading: (markdown.match(/^#\s+(.+)$/m) || [])[1]?.trim() || '' };
 }
+// Combine several workspace files into one Markdown document, in order, each under its own heading with the part's own headings
+// demoted one level. Deterministic: no model copies thousands of words, and no "content from …" placeholders can slip in.
+export function assembleFiles(workspaceDir, { output, title, intro = '', parts = [] }) {
+  if (!Array.isArray(parts) || !parts.length) throw new Error('Name the files to combine, in order.');
+  const out = workspaceFile(workspaceDir, output); if (!/\.(md|markdown)$/i.test(out.rel)) throw new Error('The combined file must be Markdown, for example /work/launch-pack.md.');
+  const demote = text => text.replace(/^(#{1,5}) /gm, '#$1 ');
+  const sections = parts.map((p, i) => {
+    const spec = typeof p === 'string' ? { path: p } : p || {}; const file = workspaceFile(workspaceDir, spec.path);
+    if (!fs.existsSync(file.abs)) throw new Error(`There is no file at /work/${file.rel}.`);
+    let body = fs.readFileSync(file.abs, 'utf8').replace(/\r\n/g, '\n').trim();
+    const firstHeading = body.match(/^# (.+)$/m); let heading = String(spec.heading || '').trim();
+    if (!heading) heading = firstHeading ? firstHeading[1].trim() : file.rel.split('/').pop().replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
+    if (firstHeading && (!spec.heading || spec.heading.trim() === firstHeading[1].trim())) body = body.replace(firstHeading[0], '').trim();
+    return `## ${i + 1}. ${heading}\n\n${demote(body)}`;
+  });
+  const text = `# ${String(title || 'Combined document').trim()}\n\n${String(intro || '').trim()}${intro ? '\n\n' : ''}${sections.join('\n\n---\n\n')}\n`;
+  fs.mkdirSync(path.dirname(out.abs), { recursive: true }); fs.writeFileSync(out.abs, text);
+  return { file: out.rel, parts: parts.length, bytes: Buffer.byteLength(text) };
+}
+export function assembleFilesTool({ workspaceDir, onSaved = () => {} }) {
+  return tool(async input => {
+    try { const r = assembleFiles(workspaceDir, input); onSaved(r); return `Combined ${r.parts} files into /work/${r.file} (${r.bytes.toLocaleString('en-GB')} bytes), each part in full under its own heading. Read it once to check the order, then export_pdf it if the CEO asked for a PDF.`; }
+    catch (error) { return 'Could not combine the files: ' + error.message; }
+  }, { name: 'assemble_files', description: 'Combine several approved files from /work/ into one Markdown document, in the order given, each part in full under its own heading. Use this for a pack, a package or a report made of several teams’ parts; never write a combined document by hand and never leave "content from …" placeholders.',
+    schema: z.object({ output: z.string().describe('Where to write the combined document, e.g. /work/Growth-Plan-Launch-Pack.md'), title: z.string().describe('The document’s title'), intro: z.string().optional().describe('An optional opening paragraph before the parts'), parts: z.array(z.object({ path: z.string().describe('A file under /work/'), heading: z.string().optional().describe('The heading for this part; the file’s own title when left out') })).min(1).describe('The parts, in order') }) });
+}
 export function exportPdfTool({ workspaceDir, onSaved = () => {} }) {
   return tool(async ({ source, output, title }) => {
     try {

@@ -373,6 +373,22 @@ test('a lead proposes a Brain change; nothing is written until the CEO approves,
   } finally { await f.close(); }
 });
 
+test('a review whose deliverable is a set of placeholders is not approved, and the lead is told to assemble the files', async () => {
+  const lead = workers => { const worker = workers[0]; return ({ last, system }) => {
+    if (last.type === 'human') return { calls: [call('task', { subagent_type: worker, description: 'Write the report' })] };
+    if (last.type === 'tool' && REVIEW.test(last.text)) return { text: 'Review not approved: ' + last.text };
+    if (last.type === 'tool') return { calls: [call('record_review', { approved: true, summary: 'Looks complete.', criteria: criteria(system).map(id => ({ id, passed: true, evidence: 'Yes.' })), deliverable: '# Launch pack\n\n## Marketing\n\n(Content from /work/launch-pack/01-marketing.md)\n\n## Sales\n\n(Content from /work/launch-pack/02-sales.md)' })] };
+    return { text: 'ok' };
+  }; };
+  const f = fixture({ lead });
+  try {
+    const id = start(f); const job = await until(f.engine, id, ['done', 'blocked', 'escalated', 'awaiting_ceo']);
+    assert.equal(job.reviews[0].approved, false);
+    const said = job.runs.find(r => r.role === 'lead')?.output || '';
+    assert.match(said, /still holds placeholders \(\(Content from \/work\/launch-pack\/01-marketing\.md\)/); assert.match(said, /use assemble_files/);
+  } finally { await f.close(); }
+});
+
 test('a task that runs past the time limit is blocked with a plain reason', async () => {
   const f = fixture({ settings: { runTimeoutMinutes: 0.002 }, specialist: () => ({ text: 'Slow.', wait: 1500 }) });
   try { const id = start(f); const job = await until(f.engine, id, ['blocked']); assert.match(job.error, /no progress/); assert.equal(f.engine.notifications.list()[0].kind, 'blocked'); }

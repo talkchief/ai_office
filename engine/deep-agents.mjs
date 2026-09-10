@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { officeBackend, FILE_PERMISSIONS, PM_FILE_PERMISSIONS, SKILL_SOURCES } from './backend.mjs';
 import { ROOT } from '../config.mjs';
 import { programManagerPrompt, leadPrompt, specialistPrompt, leadName } from './prompts.mjs';
-import { exportPdfTool, exportPptxTool, listWorkspaceFiles, workspaceFile } from './documents.mjs';
+import { exportPdfTool, exportPptxTool, assembleFilesTool, listWorkspaceFiles, workspaceFile } from './documents.mjs';
 
 // Deep Agents gives every agent that has subagents a built-in "general-purpose" worker with the parent's own tools. In this
 // office every worker is a named person on a team, reviewed by a lead, so that worker is switched off for every provider
@@ -536,7 +536,7 @@ export class OfficeEngine {
   files(id) { return listWorkspaceFiles(this.workspaceDir(id)); }
   exportTools(id, agentId) {
     const workspaceDir = this.workspaceDir(id), saved = what => ({ file, pages, slides }) => this.event(id, 'file_saved', agentId, `Saved /work/${file} (${what === 'pdf' ? `${pages} page${pages === 1 ? '' : 's'}` : `${slides} slides`}).`, { file });
-    return [exportPdfTool({ workspaceDir, onSaved: saved('pdf') }), exportPptxTool({ workspaceDir, onSaved: saved('pptx') })];
+    return [assembleFilesTool({ workspaceDir, onSaved: r => this.event(id, 'file_saved', agentId, `Combined ${r.parts} files into /work/${r.file}.`) }), exportPdfTool({ workspaceDir, onSaved: saved('pdf') }), exportPptxTool({ workspaceDir, onSaved: saved('pptx') })];
   }
   progressTool(id, agentId) {
     return tool(async ({ text }) => { const line = clean(text).slice(0, 240); if (line) { this.update(id, j => { j.progressLine = line; }); this.event(id, 'progress', agentId, line); } return 'Noted.'; },
@@ -578,14 +578,16 @@ export class OfficeEngine {
       const list = [...current.criteria, ...(current.guardrails || [])];
       const checks = checkOutput(text, job.checks.filter(c => !c.team || c.team === team.id));
       const covered = coveredCriteria(list.length, criteria);
-      const ok = approved === true && covered.ok && text.length > 0 && checks.every(c => c.passed);
+      // A pack of "(content from …)" lines or a TODO is not a deliverable, whatever the lead says.
+      const placeholders = [...new Set((text.match(/\(content from \/work\/[^)]*\)|\[insert [^\]]*\]|\bTODO\b|\bTBD\b|lorem ipsum/gi) || []).map(p => p.slice(0, 60)))];
+      const ok = approved === true && covered.ok && text.length > 0 && checks.every(c => c.passed) && !placeholders.length;
       const rounds = (job.reworkRounds?.[team.id] || 0) + (ok ? 0 : 1);
       const review = { at: Date.now(), agent: current.lead, dept: team.id, approved: ok, summary: clean(summary).slice(0, 5000), criteria, checks, missing: covered.missing, file };
       this.update(id, j => { j.reviews.push(review); j.review = review; (j.reviewsByDept ||= {})[team.id] = review; (j.reworkRounds ||= {})[team.id] = rounds; if (ok) (j.deliverables ||= {})[team.id] = text.slice(0, 120000); if (text) j.result = text.slice(0, 120000); });
       this.event(id, 'review_recorded', current.lead, review.summary || (ok ? 'Approved.' : 'Changes required.'), { approved: ok, checks });
       if (this.get(id).state !== 'cancelled') this.setState(id, 'working');
       if (ok) return 'Review recorded as APPROVED. Report back to the Program Manager with a short summary.';
-      const reasons = [approved !== true ? 'you did not approve it' : '', covered.missing.length ? `criteria without passing evidence: ${covered.missing.join(', ')}` : '', !text ? (fileProblem ? 'deliverable file problem: ' + fileProblem : 'no final deliverable was included: give deliverablePath (the handed-over file under /work/), or the text when it is a few lines') : '', ...checks.filter(c => !c.passed).map(c => `automated check failed: ${c.label}`)].filter(Boolean);
+      const reasons = [approved !== true ? 'you did not approve it' : '', covered.missing.length ? `criteria without passing evidence: ${covered.missing.join(', ')}` : '', !text ? (fileProblem ? 'deliverable file problem: ' + fileProblem : 'no final deliverable was included: give deliverablePath (the handed-over file under /work/), or the text when it is a few lines') : '', ...checks.filter(c => !c.passed).map(c => `automated check failed: ${c.label}`), placeholders.length ? `the deliverable still holds placeholders (${placeholders.slice(0, 3).join(', ')}): a combined document must carry every part in full; use assemble_files` : ''].filter(Boolean);
       if (rounds > reworkRounds(current)) return `Review recorded as NOT approved (${reasons.join('; ')}). The rework limit is reached: report to the Program Manager that this needs the CEO’s direction.`;
       return `Review recorded as NOT approved (${reasons.join('; ')}). Send specific corrections to the specialist, then review again.`;
     }, { name: 'record_review', description: 'Record your review of the team’s actual work. Call once per review round, with evidence for every criterion and the final deliverable: deliverablePath, the handed-over file under /work/ (the office reads it), or deliverable, the text itself when it is a few lines.',
