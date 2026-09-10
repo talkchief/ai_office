@@ -373,7 +373,7 @@ export class OfficeEngine {
         const { model, provider } = await make('specialist', agent, team);
         const set = this.toolHub ? this.toolHub.toolsFor({ agent, team, provider, evaluation }) : { tools: [], interruptOn: {} };
         subagents.push({ name: agent.id, description: `${agent.name}, ${agent.role}. ${agent.does || ''}`.slice(0, 600), systemPrompt: specialistPrompt({ office, team, agent, leadAgent: lead, toolLabels }),
-          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id)], interruptOn: set.interruptOn, middleware: [this.pace(job.id, team, agent.id, signal), this.loopGuard(job.id, agent.id)] });
+          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id)], interruptOn: set.interruptOn, middleware: [this.pace(job.id, team, agent.id, signal), this.loopGuard(job.id, agent.id), this.specialistReadGuard(job.id, agent.id)] });
       }
       const { model, provider } = await make('lead', lead, team);
       const spotChecks = this.toolHub ? this.toolHub.toolsFor({ agent: lead, team, provider, evaluation, readOnly: true }).tools : [];
@@ -383,7 +383,7 @@ export class OfficeEngine {
     }
     const { model } = await make('pm', null, null);
     const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams, toolLabels }),
-      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm'), this.brainTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.subagentGuard(job.id, 'pm', leads.map(l => l.name), 'lead'), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm')],
+      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm'), this.brainTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.subagentGuard(job.id, 'pm', leads.map(l => l.name), 'lead'), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm'), this.pmReadGuard(job.id)],
       checkpointer: this.saver, interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...(job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {}) } });
     return { pm, models };
   }
@@ -500,6 +500,31 @@ export class OfficeEngine {
         ? `Refused: "${subagent}" is not a team lead. Delegate to one of: ${names.join(', ')}.`
         : `Refused: "${subagent}" is not one of your specialists. Your team: ${names.join(', ') || 'nobody but you'}. Delegate to one of them; if the work belongs to another team, call hand_to_program_manager and carry on with your own part.`;
       return new ToolMessage({ tool_call_id: request.toolCall.id, name: 'task', content });
+    } });
+  }
+  // The Program Manager's prompt already holds the company and the notes that match the brief; before its first delegation it may
+  // open four things (the project page and what it names), then it delegates and the teams read. On Gemini the PM opened 34 things
+  // for a one-team task and spent 645k tokens doing it.
+  pmReadGuard(jobId) {
+    const READS = new Set(['read_file', 'search_knowledge', 'grep', 'glob', 'ls']), LIMIT = 4; let reads = 0;
+    return createMiddleware({ name: 'pm_read_guard', wrapToolCall: async (request, handler) => {
+      const call = request.toolCall; if (!READS.has(call.name)) return handler(request);
+      if (this.get(jobId)?.runs.some(r => r.role === 'lead')) return handler(request);
+      if (++reads <= LIMIT) return handler(request);
+      this.event(jobId, 'reads_capped', 'pm', `${call.name} refused: the Program Manager had already opened ${LIMIT} things before delegating.`);
+      return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `Refused: you have opened ${LIMIT} things before delegating. Your prompt already holds the whole company and the Brain notes that match this brief; the teams do the reading. Write the plan and delegate now with task, naming the notes each lead should read.` });
+    } });
+  }
+  // A specialist reads what its step needs, once: a dozen files or searches in one run is the ceiling, then it writes with what it has.
+  specialistReadGuard(jobId, agentId, limit = 12) {
+    const READS = new Set(['read_file', 'search_knowledge', 'grep', 'glob', 'ls']), counts = new Map();
+    return createMiddleware({ name: `specialist_read_guard_${agentId.replace(/[^a-zA-Z0-9_]/g, '_')}`, wrapToolCall: async (request, handler) => {
+      const call = request.toolCall; if (!READS.has(call.name)) return handler(request);
+      const job = this.get(jobId), run = job?.runs.filter(r => r.agent === agentId).at(-1), key = run?.id || 'none';
+      const n = (counts.get(key) || 0) + 1; counts.set(key, n);
+      if (n <= limit) return handler(request);
+      this.event(jobId, 'reads_capped', agentId, `${call.name} refused: ${limit} files or searches already opened in this run.`);
+      return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `Refused: you have already opened ${limit} files or searches in this run; that is the ceiling. Write the deliverable with what you have read, state what you could not check, and hand it over.` });
     } });
   }
   // The Program Manager delegates only after it has written a plan: a task call before write_todos is refused, not run.

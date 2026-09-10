@@ -389,6 +389,31 @@ test('a review whose deliverable is a set of placeholders is not approved, and t
   } finally { await f.close(); }
 });
 
+test('the Program Manager may open four things before delegating; the fifth is refused and it delegates', async () => {
+  let n = 0;
+  const pm = ({ last }) => {
+    if (n < 6) { n++; return { calls: n === 1 ? [plan(), call('read_file', { file_path: '/knowledge/note-1.md' })] : [call('read_file', { file_path: `/knowledge/note-${n}.md` })] }; }
+    if (n === 6) { n++; return { calls: [call('task', { subagent_type: 'lead-marketing', description: 'Deliver the report; read note-1 first' })] }; }
+    return defaultPm({ last });
+  };
+  const f = fixture({ pm });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done']);
+    assert.equal(done.events.filter(e => e.type === 'reads_capped' && e.agent === 'pm').length, 2, 'the fifth and sixth reads before delegating are refused');
+    assert.equal(done.review.approved, true);
+  } finally { await f.close(); }
+});
+
+test('a specialist may open twelve things in one run; the thirteenth is refused and it writes with what it has', async () => {
+  let n = 0;
+  const f = fixture({ specialist: () => n++ < 14 ? { calls: [call('read_file', { file_path: `/knowledge/n${n}.md` })] } : { text: 'Verified result and evidence.' } });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done']);
+    assert.equal(done.events.filter(e => e.type === 'reads_capped' && e.agent === f.worker).length, 2);
+    assert.equal(done.review.approved, true);
+  } finally { await f.close(); }
+});
+
 test('a task that runs past the time limit is blocked with a plain reason', async () => {
   const f = fixture({ settings: { runTimeoutMinutes: 0.002 }, specialist: () => ({ text: 'Slow.', wait: 1500 }) });
   try { const id = start(f); const job = await until(f.engine, id, ['blocked']); assert.match(job.error, /no progress/); assert.equal(f.engine.notifications.list()[0].kind, 'blocked'); }
