@@ -10,7 +10,7 @@ import { tool } from '@langchain/core/tools';
 import { createMiddleware, todoListMiddleware } from 'langchain';
 import { createDeepAgent, registerHarnessProfile } from 'deepagents';
 import { z } from 'zod';
-import { officeBackend, FILE_PERMISSIONS, SKILL_SOURCES } from './backend.mjs';
+import { officeBackend, FILE_PERMISSIONS, PM_FILE_PERMISSIONS, SKILL_SOURCES } from './backend.mjs';
 import { ROOT } from '../config.mjs';
 import { programManagerPrompt, leadPrompt, specialistPrompt, leadName } from './prompts.mjs';
 import { exportPdfTool, exportPptxTool, listWorkspaceFiles, workspaceFile } from './documents.mjs';
@@ -383,7 +383,7 @@ export class OfficeEngine {
     }
     const { model } = await make('pm', null, null);
     const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams, toolLabels }),
-      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm')],
+      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm')],
       checkpointer: this.saver, interruptOn: job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {} });
     return { pm, models };
   }
@@ -434,6 +434,30 @@ export class OfficeEngine {
       if (n <= LIMIT) return handler(request);
       this.event(jobId, 'reads_capped', leadId, `${call.name} refused: the lead had already opened ${LIMIT} things before delegating.`);
       return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `Refused: you have already opened ${LIMIT} files or searches before delegating. Delegate now with the task tool and name the notes the specialist should read; the specialist does the reading. You can read again when their work comes back for review.` });
+    } });
+  }
+  // After an interruption (a restart, a provider failure, a stall) the Program Manager's graph replays the delegations that were in
+  // flight, with the same briefs. A package the team had already delivered and got approved is not run again: the PM hears what was
+  // delivered. A package that was mid-flight runs again, told what its team had already written so it does not start from nothing.
+  resumeCheck(jobId, toolCall) {
+    const job = this.get(jobId); if (!job || toolCall.name !== 'task') return null;
+    const { subagent, description } = parseTaskInput(toolCall.args), { isLead, dept } = this.target(subagent); if (!isLead || !dept) return null;
+    const title = description.slice(0, 300), prior = job.runs.filter(r => r.role === 'lead' && r.dept === dept && r.title === title && r.state !== 'working');
+    if (!prior.length) return null;
+    const first = Math.min(...prior.map(r => r.startedAt || 0)), review = job.reviewsByDept?.[dept];
+    const files = (() => { try { return listWorkspaceFiles(this.workspaceDir(jobId)).map(f => '/work/' + f.name); } catch { return []; } })();
+    if (review?.approved && review.at >= first) {
+      this.event(jobId, 'resume_skipped', 'pm', `${dept} had already delivered this package before the interruption; it was not run again.`);
+      return { skip: `Already done before the interruption: the ${dept} lead delivered this package and recorded an APPROVED review at ${new Date(review.at).toISOString().slice(11, 16)} UTC (${review.summary.slice(0, 300)}). Files in the workspace: ${files.join(', ') || 'none'}. Do not delegate it again; mark it done in the plan and carry on.` };
+    }
+    return { description: `Office note: this assignment was interrupted (a restart or a provider failure) and is being resumed. Your team may already have written files for it under /work/ (${files.join(', ') || 'none yet'}): read those first, reuse what is good, and do not repeat finished work.\n\n${description}` };
+  }
+  target(subagent) { const isLead = subagent.startsWith('lead-'); return { isLead, dept: isLead ? subagent.slice(5) : this.office.agents().find(a => a.id === subagent)?.department || null }; }
+  resumeGuard(jobId) {
+    return createMiddleware({ name: 'resume_guard', wrapToolCall: async (request, handler) => {
+      const check = this.resumeCheck(jobId, request.toolCall); if (!check) return handler(request);
+      if (check.skip) return new ToolMessage({ tool_call_id: request.toolCall.id, name: 'task', content: check.skip });
+      return handler({ ...request, toolCall: { ...request.toolCall, args: { ...request.toolCall.args, description: check.description } } });
     } });
   }
   // The Program Manager delegates only after it has written a plan: a task call before write_todos is refused, not run.

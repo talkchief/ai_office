@@ -288,6 +288,38 @@ test('a hand-off to a team that is already working on the task is declined and n
   } finally { await f.close(); }
 });
 
+test('the Program Manager cannot write into the workspace; it delegates instead', async () => {
+  let step = 0;
+  const pm = ({ last }) => {
+    if (step++ === 0) return { calls: [plan(), call('write_file', { file_path: '/work/pm-draft.md', content: 'The PM wrote this itself.' })] };
+    if (last.type === 'tool' && /permission denied/i.test(last.text)) return { calls: [call('task', { subagent_type: 'lead-marketing', description: 'Deliver the report' })] };
+    return defaultPm({ last });
+  };
+  const f = fixture({ pm });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done']);
+    assert.equal(fs.existsSync(path.join(f.engine.workspaceDir(id), 'pm-draft.md')), false, 'nothing was written by the PM');
+    assert.equal(done.review.approved, true);
+  } finally { await f.close(); }
+});
+
+test('a resumed task does not run an approved package again, and tells a mid-flight package what its team already wrote', async () => {
+  const f = fixture();
+  try {
+    const job = f.engine.create({ dept: 'marketing', text: 'Write the launch report.', autoStart: false });
+    const mlead = f.office.team('marketing').lead, title = 'MARKETING: write the launch announcement';
+    fs.mkdirSync(f.engine.workspaceDir(job.id), { recursive: true }); fs.writeFileSync(path.join(f.engine.workspaceDir(job.id), 'announcement.md'), '# Announcement');
+    f.engine.update(job.id, j => { j.runs.push({ id: 'r-1', agent: mlead, role: 'lead', dept: 'marketing', title, state: 'interrupted', startedAt: Date.now() - 60000 }); });
+    const mid = f.engine.resumeCheck(job.id, { name: 'task', args: { subagent_type: 'lead-marketing', description: title } });
+    assert.match(mid.description, /^Office note: this assignment was interrupted[\s\S]*\/work\/announcement\.md[\s\S]*MARKETING: write the launch announcement$/);
+    f.engine.update(job.id, j => { j.reviewsByDept = { marketing: { approved: true, at: Date.now(), summary: 'Approved: the announcement is ready.' } }; });
+    const done = f.engine.resumeCheck(job.id, { name: 'task', args: { subagent_type: 'lead-marketing', description: title } });
+    assert.match(done.skip, /Already done before the interruption[\s\S]*APPROVED review[\s\S]*\/work\/announcement\.md/);
+    assert.ok(f.engine.events(job.id).some(e => e.type === 'resume_skipped'));
+    assert.equal(f.engine.resumeCheck(job.id, { name: 'task', args: { subagent_type: 'lead-marketing', description: 'A brand-new package' } }), null, 'a new brief is not a resume');
+  } finally { await f.close(); }
+});
+
 test('a task that runs past the time limit is blocked with a plain reason', async () => {
   const f = fixture({ settings: { runTimeoutMinutes: 0.002 }, specialist: () => ({ text: 'Slow.', wait: 1500 }) });
   try { const id = start(f); const job = await until(f.engine, id, ['blocked']); assert.match(job.error, /no progress/); assert.equal(f.engine.notifications.list()[0].kind, 'blocked'); }

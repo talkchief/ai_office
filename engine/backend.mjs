@@ -22,3 +22,5 @@ export const FILE_PERMISSIONS = [
   { operations: ['write'], paths: ['/skills/**'], mode: 'deny' },
   { operations: ['write'], paths: ['/memories/company/**', '/memories/team/**'], mode: 'deny' },
 ];
+// The Program Manager reads everything and writes nothing: assembling a document is a lead's package like any other.
+export const PM_FILE_PERMISSIONS = [...FILE_PERMISSIONS, { operations: ['write'], paths: ['/work/**'], mode: 'deny' }];
