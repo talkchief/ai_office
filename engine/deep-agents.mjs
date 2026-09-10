@@ -444,8 +444,8 @@ export class OfficeEngine {
     const { subagent, description } = parseTaskInput(toolCall.args), { isLead, dept } = this.target(subagent); if (!isLead || !dept) return null;
     // The PM re-words a brief when it continues, so a package is recognised by what it says, not by the exact text.
     const words = t => new Set(String(t || '').toLowerCase().slice(0, 300).split(/[^a-z0-9]+/).filter(w => w.length > 3));
-    const similar = (a, b) => { const A = words(a), B = words(b); if (!A.size || !B.size) return 0; let both = 0; for (const w of A) if (B.has(w)) both++; return both / (A.size + B.size - both); };
-    const prior = job.runs.filter(r => r.role === 'lead' && r.dept === dept && r.state !== 'working' && similar(r.title, description) >= 0.5);
+    const similar = (a, b) => { const A = words(a), B = words(b); if (A.size < 4 || !B.size) return 0; let both = 0; for (const w of A) if (B.has(w)) both++; return both / A.size; };
+    const prior = job.runs.filter(r => r.role === 'lead' && r.dept === dept && r.state !== 'working' && similar(r.title, description) >= 0.7);
     if (!prior.length) return null;
     const first = Math.min(...prior.map(r => r.startedAt || 0)), review = job.reviewsByDept?.[dept];
     const files = (() => { try { return listWorkspaceFiles(this.workspaceDir(jobId)).map(f => '/work/' + f.name); } catch { return []; } })();
