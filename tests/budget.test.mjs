@@ -64,7 +64,18 @@ test('a project task gets three times the budget, and the reason says so', () =>
   assert.equal(engine.controller.signal.aborted, false, '260k is under 300k');
   tracker.handle(modelEnd(50000));
   assert.equal(engine.controller.signal.aborted, true);
-  assert.match(engine.controller.signal.reason.message, /more than 300,000 tokens \(three times the per-task budget, as it belongs to a project\)/);
+  assert.match(engine.controller.signal.reason.message, /more than 300,000 tokens \(3 times the per-task budget: it belongs to a project\)/);
+});
+
+test('every team involved in a task adds one budget: six teams get six times it', () => {
+  const engine = fakeEngine({ budget: 100000, tokens: 550000 });
+  for (const dept of ['emails', 'sales', 'marketing', 'ops', 'fin', 'delivery']) engine.job.runs.push({ id: 'r-' + dept, agent: 'lead-' + dept, role: 'lead', dept, state: 'done' });
+  const tracker = new RunTracker(engine, 'job-1', { pm: 'test-model' });
+  tracker.handle(modelEnd(40000));
+  assert.equal(engine.controller.signal.aborted, false, '590k is under 600k');
+  tracker.handle(modelEnd(20000));
+  assert.equal(engine.controller.signal.aborted, true);
+  assert.match(engine.controller.signal.reason.message, /more than 600,000 tokens \(6 times the per-task budget: 6 teams are involved\)/);
 });
 
 test('no budget means no stop', () => {
