@@ -2,8 +2,33 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+export const FOLDERS = ['Company', 'Projects', 'Status', 'Departments', 'Digests'];
+const FOLDER = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,40}(\/[A-Za-z0-9][A-Za-z0-9 _-]{0,40}){0,2}$/;
 export class KnowledgeStore {
-  constructor(root, onChange = async () => {}) { this.root = path.resolve(root); this.onChange = onChange; fs.mkdirSync(this.root, { recursive: true }); }
+  constructor(root, onChange = async () => {}) { this.root = path.resolve(root); this.onChange = onChange; this.listeners = { write: [], remove: [] }; fs.mkdirSync(this.root, { recursive: true }); }
+  // The search index follows every write and removal.
+  on(event, listener) { this.listeners[event].push(listener); return this; }
+  emit(event, ...args) { for (const listener of this.listeners[event]) { try { listener(...args); } catch (error) { console.warn('knowledge index:', error.message); } } }
+  folders() { return [...new Set([...FOLDERS, ...this.list().map(n => n.id.split('/').slice(0, -1).join('/')).filter(Boolean)])].sort(); }
+  // Atomic write through the store, so the graph and the index stay consistent. Larger than notes typed by hand.
+  async writeNote(id, content, { max = 2_000_000 } = {}) {
+    if (typeof content !== 'string' || content.length > max) throw Object.assign(new Error(`Notes must be text under ${max.toLocaleString()} characters.`), { status: 400 });
+    const file = this.resolve(id);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file + '.tmp', content, { mode: 0o600 }); fs.renameSync(file + '.tmp', file);
+    this.emit('write', id, content); await this.onChange(); return this.read(id);
+  }
+  // A document's path is its identity: uploading to the same path replaces it and archives the previous copy.
+  async upload({ folder = 'Company', name, content }) {
+    const where = String(folder || 'Company').trim().replace(/^\/+|\/+$/g, '');
+    if (!FOLDER.test(where)) throw Object.assign(new Error('Choose a folder name of letters, numbers, spaces and dashes.'), { status: 400 });
+    const base = String(name || 'document').replace(/\.[a-z0-9]{1,5}$/i, '').replace(/[^A-Za-z0-9 _-]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 80) || 'document';
+    const id = `${where}/${base}.md`, file = this.resolve(id);
+    let replaced = null;
+    if (fs.existsSync(file)) { const trash = path.join(this.root, '.archive'); fs.mkdirSync(trash, { recursive: true }); replaced = path.join('.archive', `${Date.now()}-${path.basename(file)}`); fs.copyFileSync(file, path.join(this.root, replaced)); }
+    const note = await this.writeNote(id, `# ${base}\n\nSource file: ${String(name).slice(0, 200)} · Added ${new Date().toISOString()}\n\n${String(content || '').trim()}\n`);
+    return { ...note, replaced };
+  }
   resolve(id) {
     if (typeof id !== 'string' || !id.endsWith('.md') || id.includes('\0')) throw new Error('Choose a Markdown note.');
     const file = path.resolve(this.root, id);
@@ -46,14 +71,12 @@ export class KnowledgeStore {
     id ||= `Knowledge/${String(title || 'note').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60) || 'note'}-${randomUUID().slice(0, 8)}.md`;
     const file = this.resolve(id);
     if (fs.existsSync(file) && updatedAt !== undefined && fs.statSync(file).mtimeMs !== updatedAt) throw Object.assign(new Error('This note changed. Reload it before saving.'), { status: 409 });
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file + '.tmp', content, { mode: 0o600 }); fs.renameSync(file + '.tmp', file);
-    await this.onChange(); return this.read(id);
+    return this.writeNote(id, content, { max: 60000 });
   }
   async archive(id) {
     const file = this.resolve(id), trash = path.join(this.root, '.archive');
     fs.mkdirSync(trash, { recursive: true });
     fs.renameSync(file, path.join(trash, `${Date.now()}-${path.basename(file)}`));
-    await this.onChange(); return { ok: true };
+    this.emit('remove', id); await this.onChange(); return { ok: true };
   }
 }

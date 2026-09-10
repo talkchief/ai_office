@@ -1,10 +1,10 @@
-import {projectWorkspace} from './projects.js';
 import { DEPTS, DEPT_KEYS } from './data.js';
 import { officeReady } from './auth.js';
 import { renderTaskWorkspace, renderDocument } from './task-output.js';
+import { stateLabel, stepLabel } from './labels.js';
+import { agentActivity, unseenResult, ACTIVE_STATES, NEEDS_CEO } from './activity.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const labels = { backlog: 'Backlog', queued: 'Queued', planning: 'Planning', working: 'Working', reviewing: 'Lead review', saving: 'Saving deliverable', waiting: 'Your approval', blocked: 'Blocked', done: 'Approved', cancelled: 'Cancelled', pending: 'Pending', failed: 'Failed', interrupted: 'Interrupted' };
 const when = value => value ? new Date(value).toLocaleString() : '—';
 const lines = value => String(value || '').split('\n').map(s => s.trim()).filter(Boolean);
 async function api(path, method = 'GET', body) {
@@ -21,7 +21,8 @@ export function initOfficeWork(ctx) {
   let taskCurrent = null, taskTab = 'work', taskTabTouched = false, taskSignature = '';
   let taskExpanded = new Map(), taskScroll = {}, taskInputDraft = {};
   const activityByAgent = new Map();
-  let settingsDraft = null, settingsTeam = selectedTeam, settingsSection = 'overview', toolPoll = null;
+  let lastFeedHTML = '';
+  let settingsDraft = null, settingsTeam = selectedTeam, settingsSection = 'overview', toolPoll = null, providers = { models: [] };
   const panel = document.getElementById('tpanel');
   panel.innerHTML = `<form class="space-command">
     <div class="space-team-picker"><button id="spaceDept" type="button" aria-expanded="false" aria-controls="spaceTeamMenu"><i style="background:${DEPTS[selectedTeam].chip}"></i><span>${esc(DEPTS[selectedTeam].name)}</span><span class="space-chevron">⌄</span></button><div id="spaceTeamMenu" hidden>${DEPT_KEYS.map(k => `<button type="button" data-pick-team="${k}"><i style="background:${DEPTS[k].chip}"></i>${esc(DEPTS[k].name)}</button>`).join('')}</div></div>
@@ -38,14 +39,14 @@ export function initOfficeWork(ctx) {
   function open(kind, title) { modalKind = kind; dialog.dataset.view = kind; $('spaceTitle').textContent = title; feedback(''); if (!dialog.open) dialog.showModal(); requestAnimationFrame(()=>{dialog.scrollTop=0;content.scrollTop=0;}); }
   function close() { dialog.close(); modalKind = ''; if (toolPoll) { clearInterval(toolPoll); toolPoll = null; } }
   $('spaceClose').onclick = close; dialog.addEventListener('cancel', close); dialog.addEventListener('keydown', event => event.stopPropagation());
-  const projectUI=projectWorkspace({api,open,content,feedback,showTask,isOpen:()=>dialog.open&&modalKind==='projects'});
   const manage = document.createElement('div'); manage.className = 'space-manage';
-  manage.innerHTML = `<button id="spaceManage" type="button" aria-label="Manage office" aria-expanded="false" aria-controls="spaceManageMenu"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.5" fill="var(--cream)"/><circle cx="15" cy="17" r="2.5" fill="var(--cream)"/></svg><span>Manage</span></button><div id="spaceManageMenu" hidden><span class="space-menu-label">YOUR OFFICE</span><button id="spaceProjects" type="button">Projects <span>↗</span></button><button id="spaceTeams" type="button">Teams <span>↗</span></button><button id="spaceTools" type="button">Tools & MCPs <span>↗</span></button><button id="spaceSkills" type="button">Skills <span>↗</span></button><button id="spaceReports" type="button">Reports <span>↗</span></button><button id="spaceBrain" type="button">Brain <span>↗</span></button><div class="space-menu-divider"></div></div>`;
+  manage.innerHTML = `<button id="spaceManage" type="button" aria-label="Manage office" aria-expanded="false" aria-controls="spaceManageMenu"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.5" fill="var(--cream)"/><circle cx="15" cy="17" r="2.5" fill="var(--cream)"/></svg><span>Manage</span></button><div id="spaceManageMenu" hidden><span class="space-menu-label">YOUR OFFICE</span><button id="spaceModels" type="button">Models & keys <span>↗</span></button><button id="spaceTeams" type="button">Teams <span>↗</span></button><button id="spaceTools" type="button">Tools & MCPs <span>↗</span></button><button id="spaceSkills" type="button">Skills <span>↗</span></button><button id="spaceReports" type="button">Reports <span>↗</span></button><button id="spaceBrain" type="button">Brain <span>↗</span></button><div class="space-menu-divider"></div></div>`;
   $('claudeConnect').before(manage); $('spaceManageMenu').appendChild($('claudeConnect'));
   const toggleMenu = (button, menu, visible) => { $(menu).hidden = !visible; $(button).setAttribute('aria-expanded', String(visible)); };
   $('spaceManage').onclick = () => toggleMenu('spaceManage', 'spaceManageMenu', $('spaceManageMenu').hidden);
-  for (const [id, action] of [['spaceProjects',()=>projectUI.open()], ['spaceTeams', () => showSettings('teams')], ['spaceTools', () => showSettings('tools')], ['spaceSkills', showSkills], ['spaceReports', showReports], ['spaceBrain', showKnowledge]]) $(id).onclick = () => { toggleMenu('spaceManage','spaceManageMenu',false); action(); };
+  for (const [id, action] of [['spaceModels', () => showModels()], ['spaceTeams', () => showSettings('teams')], ['spaceTools', () => showSettings('tools')], ['spaceSkills', showSkills], ['spaceReports', showReports], ['spaceBrain', showKnowledge]]) $(id).onclick = () => { toggleMenu('spaceManage','spaceManageMenu',false); action(); };
   $('claudeConnect').addEventListener('click', () => toggleMenu('spaceManage','spaceManageMenu',false));
+  window.addEventListener('office:open', event => { if (event.detail === 'models') showModels(); });
   $('spaceDept').onclick = () => toggleMenu('spaceDept','spaceTeamMenu',$('spaceTeamMenu').hidden);
   $('spaceTeamMenu').querySelectorAll('[data-pick-team]').forEach(button => button.onclick = () => {
     selectedTeam = button.dataset.pickTeam;
@@ -63,43 +64,42 @@ export function initOfficeWork(ctx) {
       const job = await api('/tasks', 'POST', { dept: selectedTeam, text: $('spaceBrief').value, backlog: !!event.submitter.dataset.backlog });
       $('spaceBrief').value = ''; $('spaceHint').textContent = job.state === 'backlog' ? 'Idea saved. Start it when you are ready.' : 'Task received. The lead will create the plan.';
       await refresh(); await showTask(job.id);
-    } catch (error) { $('spaceHint').textContent = error.message; if (/Connect Claude/.test(error.message)) $('claudeConnect').click(); }
+    } catch (error) { $('spaceHint').textContent = error.message; if (/model key/.test(error.message)) showModels(); }
     finally { button.disabled = false; }
   };
   function scopedJobs() { const dept = getFocused(); return dept && dept !== 'brain' ? jobs.filter(j => j.dept === dept) : jobs; }
   function render() {
     activityByAgent.clear();
-    for (const job of [...jobs].reverse()) {
-      if (job.state === 'done') {
-        for (const id of [job.agent,...job.subtasks.map(s=>s.agent).filter(Boolean)]) activityByAgent.set(id,{phase:'done',title:job.title,jobId:job.id});
-      } else if (!['cancelled','backlog'].includes(job.state)) for(const step of job.subtasks) if(step.state==='done' && step.agent) activityByAgent.set(step.agent,{phase:'submitted',title:step.title,jobId:job.id});
-    }
-    for (const job of jobs) {
-      if (['planning','reviewing'].includes(job.state)) activityByAgent.set(job.agent,{phase:job.state,title:job.title,jobId:job.id});
-      if (!['cancelled','done'].includes(job.state)) for (const step of job.subtasks) if (step.state==='working'&&step.agent) activityByAgent.set(step.agent,{phase:'working',title:step.title,jobId:job.id});
-    }
+    for (const [id, work] of agentActivity(jobs)) activityByAgent.set(id, work);
     const scope = scopedJobs();
-    $('spaceFilters').innerHTML = [['all', 'All'], ['backlog', 'Ideas'], ['active', 'Active'], ['waiting', 'Review'], ['blocked', 'Blocked'], ['done', 'Results']].map(([id, name]) => {
-      const count = scope.filter(j => id === 'all' || (id === 'active' ? ['queued', 'planning', 'working', 'reviewing', 'saving'].includes(j.state) : j.state === id)).length;
+    const matches = (j, id) => id === 'all' || (id === 'active' ? ACTIVE_STATES.includes(j.state) : id === 'waiting' ? ['waiting', 'awaiting_ceo', 'escalated'].includes(j.state) : j.state === id);
+    $('spaceFilters').innerHTML = [['all', 'All'], ['backlog', 'Ideas'], ['active', 'Active'], ['waiting', 'Needs you'], ['blocked', 'Blocked'], ['done', 'Results']].map(([id, name]) => {
+      const count = scope.filter(j => matches(j, id)).length;
       return `<button class="${filter === id ? 'selected' : ''}" data-filter="${id}">${name} <b>${count}</b></button>`;
     }).join('');
     $('spaceFilters').querySelectorAll('button').forEach(b => b.onclick = () => { filter = b.dataset.filter; render(); });
-    const visible = scope.filter(j => filter === 'all' || (filter === 'active' ? ['queued', 'planning', 'working', 'reviewing', 'saving'].includes(j.state) : j.state === filter));
+    const visible = scope.filter(j => matches(j, filter));
     const historyOpen = $('spaceJobs').querySelector('[data-task-history]')?.open || false;
     const card = j => {
-      const terminal = ['done','cancelled'].includes(j.state);
-      const caption = j.state==='done' ? 'Lead verified · View result ↗' : j.state==='cancelled' ? 'Task closed' : j.state==='backlog' ? 'Saved for later' : j.subtasks.length ? `${j.completedSteps}/${j.subtasks.length} assignments submitted` : j.state==='blocked' ? 'Open to resolve the blocker' : 'Awaiting the lead’s plan';
-      return `<button class="space-job ${j.state}" data-job="${j.id}"><span class="space-card-top"><span class="space-state">${j.state==='done'?'Ready':labels[j.state] || esc(j.state)}${j.priority===2?' · Priority':''}${j.kind==='evaluation'?' · Test':''}</span><time>${new Date(j.doneAt || j.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</time></span><strong>${esc(j.title)}</strong>${j.resultPreview&&j.state==='done'?`<span class="space-result-excerpt">${esc(j.resultPreview)}</span>`:''}<span class="space-card-context">${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)} · ${caption}</span>${!terminal&&j.subtasks.length?`<progress value="${j.completedSteps}" max="${j.subtasks.length}" aria-label="Assignments submitted"></progress>`:''}</button>`;
+      const fresh = unseenResult(j), closed = j.state === 'cancelled' || (j.state === 'done' && !fresh);
+      const caption = fresh ? 'New result · Open to read ↗' : j.state==='done' ? 'Result reviewed' : j.state==='cancelled' ? 'Task closed' : j.state==='backlog' ? 'Saved for later' : ['waiting','awaiting_ceo'].includes(j.state) ? 'Waiting for your decision' : j.state==='escalated' ? 'The team needs your direction' : j.state==='blocked' ? 'Open to resolve the blocker' : j.state==='awaiting_lead_review' ? 'Waiting for the lead’s review' : j.subtasks.length ? `${j.completedSteps}/${j.subtasks.length} assignments handed to the lead` : 'Awaiting the lead’s plan';
+      return `<button class="space-job ${j.state}${closed?' seen':''}" data-job="${j.id}"><span class="space-card-top"><span class="space-state">${esc(stateLabel(j.state))}${j.priority===2?' · Priority':''}${j.kind==='evaluation'?' · Test':''}</span><time>${new Date(j.doneAt || j.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</time></span><strong>${esc(j.title)}</strong>${j.resultPreview&&fresh?`<span class="space-result-excerpt">${esc(j.resultPreview)}</span>`:j.progressLine&&ACTIVE_STATES.includes(j.state)?`<span class="space-result-excerpt">${esc(j.progressLine)}</span>`:''}<span class="space-card-context">${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)} · ${caption}</span>${ACTIVE_STATES.includes(j.state)&&j.subtasks.length?`<progress value="${j.completedSteps}" max="${j.subtasks.length}" aria-label="Assignments handed to the lead"></progress>`:''}</button>`;
     };
-    const groups = [['attention','Needs your attention',['waiting','blocked']],['active','In progress',['queued','planning','working','reviewing','saving']],['results','Ready results',['done']],['ideas','Ideas',['backlog']],['history','Closed tasks',['cancelled']]];
-    $('spaceJobs').innerHTML = groups.map(([id,title,states])=>{
-      const items=visible.filter(j=>states.includes(j.state)).sort((a,b)=>(b.doneAt||b.updatedAt||b.createdAt)-(a.doneAt||a.updatedAt||a.createdAt));
+    // A result stays in "New results" until the owner opens it; then it moves to Closed.
+    const groups = [['attention','Needs your attention',j=>NEEDS_CEO.includes(j.state)],['active','In progress',j=>ACTIVE_STATES.includes(j.state)],['results','New results',unseenResult],['ideas','Ideas',j=>j.state==='backlog'],['history','Closed tasks',j=>j.state==='cancelled'||(j.state==='done'&&!unseenResult(j))]];
+    const feedHTML = groups.map(([id,title,match])=>{
+      const items=visible.filter(match).sort((a,b)=>(b.doneAt||b.updatedAt||b.createdAt)-(a.doneAt||a.updatedAt||a.createdAt));
       if(!items.length)return '';
       const cards=items.map(card).join('');
       if(id==='history'&&filter==='all')return `<details class="space-closed-tasks" data-task-history ${historyOpen?'open':''}><summary>${title} <span>${items.length}</span></summary>${cards}</details>`;
       return `<section class="space-feed-group" aria-label="${title}">${filter==='all'?`<div class="space-group-heading">${title}<span>${items.length}</span></div>`:''}${cards}</section>`;
     }).join('') || '<div class="space-empty"><span class="space-empty-mark" aria-hidden="true">○</span><h3>A little room for your next idea.</h3><p>Add a task to put your team to work.</p></div>';
-    $('spaceJobs').querySelectorAll('[data-job]').forEach(b => b.onclick = () => showTask(b.dataset.job));
+    // Re-render only when something changed, and keep the reader's scroll position.
+    if (feedHTML !== lastFeedHTML) {
+      const box = $('spaceJobs'), top = box.scrollTop;
+      box.innerHTML = feedHTML; box.scrollTop = top; lastFeedHTML = feedHTML;
+      box.querySelectorAll('[data-job]').forEach(b => b.onclick = () => showTask(b.dataset.job));
+    }
     for (const key of DEPT_KEYS) {
       const list = jobs.filter(j => j.dept === key);
       const values = { doing: list.filter(j => ['planning', 'working', 'reviewing'].includes(j.state)).length, next: list.filter(j => j.state === 'queued').length, done: list.filter(j => j.state === 'done').length };
@@ -111,7 +111,6 @@ export function initOfficeWork(ctx) {
     if (refreshing) return; refreshing = true;
     try {
       const before = jobs.filter(j => j.state === 'done').length; jobs = await api('/tasks'); if(connectionStale){$('spaceHint').textContent='Connection restored.';connectionStale=false;} render(); if (jobs.filter(j => j.state === 'done').length !== before) await syncBrain();
-      await projectUI.refresh();
       if (agentOpen) renderAgent(agentOpen);
       if (dialog.open && modalKind === 'reports' && document.activeElement?.id !== 'spaceReportPeriod') await showReports(false);
       if (dialog.open && modalKind === 'task' && !taskDirty && !dialog.contains(document.activeElement?.closest('textarea,input,select'))) await showTask(modalTask, false);
@@ -119,11 +118,16 @@ export function initOfficeWork(ctx) {
     finally { refreshing = false; }
   }
   function taskActions(job) {
-    const queued=job.calls===0 && ['backlog','queued'].includes(job.state);
-    if(['done','cancelled','saving'].includes(job.state))return '';
+    const queued=!job.startedAt && !(job.calls>0) && !job.subtasks.length && ['backlog','queued'].includes(job.state);
+    if(['cancelled','saving'].includes(job.state))return '';
     if(queued)return `<label>Task brief<textarea id="spaceQueueBrief" rows="3">${esc(job.text)}</textarea></label><label>Queue priority<select id="spaceQueuePriority">${[[2,'High'],[1,'Normal'],[0,'Low']].map(([value,label])=>`<option value="${value}" ${value===(job.priority??1)?'selected':''}>${label}</option>`).join('')}</select></label><div class="space-actions"><button data-action="queue" data-queue-state="${job.state}">Save changes</button><button data-action="queue" data-queue-state="${job.state==='backlog'?'queued':'backlog'}">${job.state==='backlog'?'Start task':'Move to ideas'}</button><button class="space-text-action" data-action="cancel">Cancel task</button></div>`;
-    if(['waiting','blocked'].includes(job.state))return `${job.state==='waiting'&&job.review?.approved?'<div class="space-owner-approval"><p>The lead has verified this result. Your approval saves it to the Brain.</p><button data-action="approve">Approve completion</button></div>':''}<details data-detail-key="revision" ${job.state==='blocked'?'open':''}><summary>${job.state==='waiting'?'Request changes':'Resolve and retry'}</summary><label>Feedback for the team<textarea id="spaceRevision" placeholder="${job.state==='waiting'?'Describe what needs to change.':'Describe a correction, or leave blank to retry unfinished work.'}"></textarea></label><div class="space-actions"><button data-action="${job.state==='waiting'?'reject':'retry'}">${job.state==='waiting'?'Send for revision':'Retry task'}</button><button class="space-text-action" data-action="cancel">Cancel task</button></div></details>`;
-    return taskTab==='work'?'<button class="space-text-action" data-action="cancel">Cancel task</button>':'';
+    const cancel='<button class="space-text-action" data-action="cancel">Cancel task</button>';
+    const box=(key,summary,label,action,button,extra='')=>`<details data-detail-key="${key}" open><summary>${summary}</summary><label>${label}<textarea id="spaceRevision" rows="3"></textarea></label><div class="space-actions"><button data-action="${action}">${button}</button>${extra}</div></details>`;
+    if(job.state==='awaiting_ceo')return `<div class="space-owner-approval">${(job.pendingActions||[]).map(a=>`<div class="space-pending-action"><b>${esc(a.name==='complete_task'?'Close the task and file the result':'The team wants to run '+a.name)}</b>${a.name==='complete_task'?'':`<pre>${esc(JSON.stringify(a.args,null,2))}</pre>`}</div>`).join('')}<label>Note for the team (required to reject)<textarea id="spaceRevision" rows="2"></textarea></label><div class="space-actions"><button data-action="decide-approve">Approve</button><button class="secondary" data-action="decide-reject">Reject with note</button>${cancel}</div></div>`;
+    if(job.state==='escalated')return box('direction','Give the team direction','Your answer or direction','answer','Send to the team',cancel);
+    if(['blocked','waiting'].includes(job.state))return box('revision','Resolve and retry','Optional correction; leave blank to continue from where it stopped','retry','Retry task',cancel);
+    if(job.state==='done')return box('correction','Ask for changes','What should change? The lead reworks it and reviews it again.','message','Send correction');
+    return box('note','Add a note for the team','The team gets this at its next step.','message','Send note',cancel);
   }
   function rememberTaskView() {
     content.querySelectorAll('[data-detail-key]').forEach(el=>taskExpanded.set(el.dataset.detailKey,el.open));
@@ -161,7 +165,14 @@ export function initOfficeWork(ctx) {
     content.querySelectorAll('[data-action]').forEach(button=>button.onclick=async()=>{
       button.disabled=true;
       try{
-        await api(`/tasks/${job.id}/${button.dataset.action}`,'POST',button.dataset.action==='queue'?{text:$('spaceQueueBrief').value,priority:Number($('spaceQueuePriority').value),state:button.dataset.queueState}:{feedback:$('spaceRevision')?.value || ''});
+        const act=button.dataset.action, note=$('spaceRevision')?.value || '';
+        let path=act, payload={feedback:note};
+        if(act==='queue')payload={text:$('spaceQueueBrief').value,priority:Number($('spaceQueuePriority').value),state:button.dataset.queueState};
+        else if(act==='decide-approve'){path='decide';payload={decisions:(job.pendingActions||[]).map(()=>({type:'approve'}))};}
+        else if(act==='decide-reject'){if(!note.trim())throw new Error('Write a note for the team first.');path='decide';payload={decisions:(job.pendingActions||[]).map(()=>({type:'reject',message:note}))};}
+        else if(act==='message'){if(!note.trim())throw new Error('Write the message first.');payload={text:note,kind:job.state==='done'?'correction':'message'};}
+        else if(act==='answer'){if(!note.trim())throw new Error('Write your answer first.');payload={text:note};}
+        await api(`/tasks/${job.id}/${path}`,'POST',payload);
         taskDirty=false;taskInputDraft={};taskSignature='';await refresh();await showTask(job.id,false);
       }catch(error){feedback(error.message,true);button.disabled=false;}
     });
@@ -180,6 +191,8 @@ export function initOfficeWork(ctx) {
       if(taskCurrent)rememberTaskView();
       taskCurrent=job;taskSignature=signature;if(!taskTabTouched)taskTab=job.result?'result':'work';
       $('spaceTitle').textContent=job.title;renderTaskView();
+      // Opening a result, a blocker or a decision records that the owner has seen it.
+      if(reveal&&(unseenResult(job)||['blocked','waiting'].includes(job.state)))api(`/tasks/${id}/seen`,'POST',{}).then(()=>{const local=jobs.find(j=>j.id===id);if(local){local.seenAt=Date.now();render();}}).catch(()=>{});
     }catch(error){feedback(error.message,true);}
   }
   function renderAgent(id) {
@@ -187,12 +200,12 @@ export function initOfficeWork(ctx) {
     const assigned = jobs.filter(j => j.agent === id || j.subtasks.some(s => s.agent === id || s.eligible?.includes(id)));
     $('mNow').innerHTML = `<b>${assigned.some(j => ['working', 'planning', 'reviewing'].includes(j.state)) ? 'Assigned work' : 'Ready for your next task'}</b>`;
     $('mStats').innerHTML = ''; $('mChart').hidden = true;
-    $('mFeed').innerHTML = assigned.map(j => `<button class="space-agent-task" data-job="${j.id}"><b>${esc(j.title)}</b><span>${labels[j.state]} · ${j.completedSteps}/${j.subtasks.length} subtasks submitted</span>${j.subtasks.filter(s => s.agent === id || s.eligible?.includes(id)).map(s => `<span>${s.state === 'done' ? 'Submitted' : labels[s.state]}: ${esc(s.title)}</span>`).join('')}<span>Open plan, deliverables and verification →</span></button>`).join('') || '<p>No tasks assigned. Real plans and progress will appear here.</p>';
+    $('mFeed').innerHTML = assigned.map(j => `<button class="space-agent-task" data-job="${j.id}"><b>${esc(j.title)}</b><span>${stateLabel(j.state)} · ${j.completedSteps}/${j.subtasks.length} subtasks submitted</span>${j.subtasks.filter(s => s.agent === id || s.eligible?.includes(id)).map(s => `<span>${stepLabel(s.state)}: ${esc(s.title)}</span>`).join('')}<span>Open plan, deliverables and verification →</span></button>`).join('') || '<p>No tasks assigned. Real plans and progress will appear here.</p>';
     $('mFeed').querySelectorAll('[data-job]').forEach(b => b.onclick = () => showTask(b.dataset.job));
   }
   async function showSettings(tab) {
     try {
-      [config, tools] = await Promise.all([api('/office'), api('/tools')]); settingsDraft = structuredClone(config);
+      [config, tools, providers] = await Promise.all([api('/office'), api('/tools'), api('/providers')]); settingsDraft = structuredClone(config);
       open(tab, tab === 'tools' ? 'Tools & MCP servers' : 'Teams & working instructions');
       if (tab === 'tools') renderTools(); else { if(!settingsDraft.teams.some(t=>t.id===settingsTeam))settingsTeam=settingsDraft.teams[0].id;renderTeam(); }
     } catch (error) { feedback(error.message, true); }
@@ -201,10 +214,11 @@ export function initOfficeWork(ctx) {
   function collectTeam() {
     const form = $('spaceTeamForm'); if (!form) return;
     const team = settingsDraft.teams.find(t => t.id === settingsTeam);
-    for (const name of ['name', 'lead', 'purpose', 'instructions', 'planningModel', 'reviewModel']) team[name] = form.elements[name].value;
-    for (const name of ['concurrency', 'maxSubtasks', 'maxRevisions', 'maxCalls', 'maxTokens']) team[name] = Number(form.elements[name].value);
+    for (const name of ['name', 'lead', 'purpose', 'instructions']) team[name] = form.elements[name].value;
+    team.models = { lead: form.elements.modelLead.value, specialist: form.elements.modelSpecialist.value, review: form.elements.modelReview.value };
+    for (const name of ['maxParallelRuns', 'maxReworkRounds']) team[name] = Number(form.elements[name].value);
     team.guardrails = lines(form.elements.guardrails.value); team.skills = [...form.querySelectorAll('[data-teamskill]:checked')].map(el => el.dataset.teamskill);
-    team.requireHumanApproval = form.elements.requireHumanApproval.checked; team.criteria = lines(form.elements.criteria.value);
+    team.completionApproval = form.elements.completionApproval.checked; delete team.requireHumanApproval; team.criteria = lines(form.elements.criteria.value);
     team.checks = [...form.querySelectorAll('[data-check-editor]')].map(field => {
       const type = field.querySelector('[data-check-type]').value, value = field.querySelector('[data-check-value]').value;
       return { type, label: field.querySelector('[data-check-label]').value, value: type.includes('length') ? Number(value) : value };
@@ -222,17 +236,17 @@ export function initOfficeWork(ctx) {
   const skillChoices = (selected = [], prefix) => settingsDraft.skills.map(skill => `<label class="space-check"><input type="checkbox" data-${prefix}="${esc(skill.id)}" ${selected.includes(skill.id) ? 'checked' : ''}>${esc(skill.name)} <small>v${skill.revision}</small></label>`).join('');
   function renderTeam() {
     const team = settingsDraft.teams.find(t => t.id === settingsTeam), agents = settingsDraft.agents.filter(a => a.department === team.id);
-    const models = selected => ['sonnet', 'opus', 'fable'].map(m => `<option ${m === selected ? 'selected' : ''}>${m}</option>`).join('');
-    content.innerHTML = `<div class="space-settings-layout"><aside class="space-settings-nav"><span class="space-eyebrow">FUNCTIONAL AREAS</span><nav class="space-tabs">${settingsDraft.teams.map(t => `<button data-team="${t.id}" class="${t.id === team.id ? 'selected' : ''}">${esc(t.name)}</button>`).join('')}</nav><button type="button" class="secondary" id="spaceAddTeam">+ Add team</button></aside><div class="space-settings-body"><div class="space-settings-heading"><div><span class="space-eyebrow">TEAM WORKSPACE</span><h3>${esc(team.name)}</h3><p>${agents.length} members · ${esc(agents.find(a=>a.id===team.lead)?.name)} leads</p></div><button type="button" class="secondary" id="spaceRemoveTeam">Remove team</button></div><nav class="space-section-tabs">${[['overview','Purpose'],['people','People'],['access','Tools & skills'],['quality','Verification'],['execution','Models & limits'],['tests','Tests']].map(([id,label])=>`<button type="button" data-settings-section="${id}" aria-pressed="${settingsSection===id}">${label}</button>`).join('')}</nav><form id="spaceTeamForm" novalidate><section data-settings-page="overview"><div class="space-grid"><label>Team name<input name="name" value="${esc(team.name)}" required></label><label>Accountable lead<select name="lead">${agents.map(a => `<option value="${a.id}" ${a.id === team.lead ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></label></div>
+    const models = (selected, inherit = 'Use the role default') => `<option value="">${inherit}</option>` + providers.models.filter(m => m.enabled !== false).map(m => `<option value="${esc(m.id)}" ${m.id === selected ? 'selected' : ''}>${esc(m.label)}</option>`).join('');
+    content.innerHTML = `<div class="space-settings-layout"><aside class="space-settings-nav"><span class="space-eyebrow">FUNCTIONAL AREAS</span><nav class="space-tabs">${settingsDraft.teams.map(t => `<button data-team="${t.id}" class="${t.id === team.id ? 'selected' : ''}">${esc(t.name)}</button>`).join('')}</nav><button type="button" class="secondary" id="spaceAddTeam">+ Add team</button></aside><div class="space-settings-body"><div class="space-settings-heading"><div><span class="space-eyebrow">TEAM WORKSPACE</span><h3>${esc(team.name)}</h3><p>${agents.length} members · ${esc(agents.find(a=>a.id===team.lead)?.name)} leads</p></div><button type="button" class="secondary" id="spaceRemoveTeam">Remove team</button></div><nav class="space-section-tabs">${[['overview','Purpose'],['people','People'],['access','Tools & skills'],['quality','Verification'],['execution','Models & pace'],['tests','Tests']].map(([id,label])=>`<button type="button" data-settings-section="${id}" aria-pressed="${settingsSection===id}">${label}</button>`).join('')}</nav><form id="spaceTeamForm" novalidate><section data-settings-page="overview"><div class="space-grid"><label>Team name<input name="name" value="${esc(team.name)}" required></label><label>Accountable lead<select name="lead">${agents.map(a => `<option value="${a.id}" ${a.id === team.lead ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></label></div>
       <label>Team purpose<textarea name="purpose" rows="2" placeholder="What does this team own, and what does success look like?">${esc(team.purpose)}</textarea></label><label>Working instructions<textarea name="instructions" rows="5" placeholder="Purpose, process, tone, source requirements and boundaries for this team.">${esc(team.instructions)}</textarea></label>
       </section><section data-settings-page="quality"><label>Guardrails — one per line<textarea name="guardrails" rows="3" placeholder="Boundaries the lead must verify before approving work.">${esc(team.guardrails.join('\n'))}</textarea></label><label>Lead’s review criteria — one per line<textarea name="criteria" rows="4">${esc(team.criteria.join('\n'))}</textarea></label>
       <h3>Automated acceptance checks</h3><p>These checks must pass even when the lead approves. Text matching ignores case.</p>
       <div id="spaceCheckEditors">${team.checks.map((check, i) => `<details data-check-editor="${i}"><summary>${esc(check.label || 'Acceptance check')}</summary><label>Name<input data-check-label value="${esc(check.label)}" maxlength="160" required></label><div class="space-grid"><label>Rule<select data-check-type>${[['contains','Must contain'],['not_contains','Must not contain'],['min_length','Minimum characters'],['max_length','Maximum characters']].map(([type, label])=>`<option value="${type}" ${check.type===type?'selected':''}>${label}</option>`).join('')}</select></label><label>Value<input data-check-value value="${esc(check.value)}" ${check.type.includes('length')?'type="number" min="1" max="100000" step="1"':'maxlength="1000"'} required></label></div><button type="button" class="secondary" data-remove-check="${i}">Remove check</button></details>`).join('')}</div><button type="button" class="secondary" id="spaceAddCheck">Add check</button>
-      <label class="space-check"><input type="checkbox" name="requireHumanApproval" ${team.requireHumanApproval ? 'checked' : ''}>Require my approval after the lead passes the work</label></section><section data-settings-page="execution"><p>The lead chooses each worker’s model and effort from the task complexity. Set the planning and independent review models here; see the actual selections in every task.</p><div class="space-grid"><label>Planning model<select name="planningModel">${models(team.planningModel)}</select></label><label>Review model<select name="reviewModel">${models(team.reviewModel)}</select></label>
-      <div class="space-grid">${[['concurrency','Concurrent workers',1,4],['maxSubtasks','Maximum subtasks',1,8],['maxRevisions','Rework rounds',0,3],['maxCalls','Call budget',3,40],['maxTokens','Reported token budget',5000,200000]].map(([name,label,min,max])=>`<label>${label}<input type="number" name="${name}" min="${min}" max="${max}" value="${team[name]}"></label>`).join('')}</div>
+      <label class="space-check"><input type="checkbox" name="completionApproval" ${team.completionApproval ? 'checked' : ''}>Require my approval after the lead passes the work</label></section><section data-settings-page="execution"><p>Choose models for this team, or leave the role defaults from Manage → Models & keys. A person’s own model wins over the team’s.</p><div class="space-grid"><label>Lead<select name="modelLead">${models(team.models?.lead)}</select></label><label>Specialists<select name="modelSpecialist">${models(team.models?.specialist)}</select></label><label>Reviews<select name="modelReview">${models(team.models?.review)}</select></label>
+      <div class="space-grid">${[['maxParallelRuns','Specialists working at once',1,4],['maxReworkRounds','Rework rounds before it needs you',0,5]].map(([name,label,min,max])=>`<label>${label}<input type="number" name="${name}" min="${min}" max="${max}" value="${team[name]}"></label>`).join('')}</div>
       </section><section data-settings-page="access"><h3>Shared skills</h3><div class="space-tool-picks">${skillChoices(team.skills,'teamskill') || 'Create reusable instructions in Manage → Skills.'}</div>
       <h3>Team tools</h3><p>Only assigned tools are available. Worker roles can inherit these tools or use a smaller selection.</p><div class="space-tool-picks">${toolChoices(team.tools,'teamtool') || 'Add connectors in Tools & MCPs.'}</div>
-      </section><section data-settings-page="people"><p>Choose a person to edit their responsibilities, model preference and tool access. The lead uses this roster when planning new work.</p><h3>People</h3><div class="space-agent-editors">${agents.map(a => `<details data-agent-editor="${a.id}"><summary><span class="space-avatar">${esc(a.name.slice(0,1))}</span><span><b>${esc(a.name)}</b><small>${a.id === team.lead ? 'Team lead · Plans and verifies' : esc(a.role)}</small></span><span class="space-person-edit">Edit ↗</span></summary><div class="space-grid"><label>Name<input data-field="name" value="${esc(a.name)}" required></label><label>Role<input data-field="role" value="${esc(a.role)}" required></label></div><label>Responsibilities<textarea data-field="does">${esc(a.does)}</textarea></label><label>Role instructions<textarea data-field="brief" rows="3">${esc(a.brief)}</textarea></label><h3>Additional skills</h3><div class="space-tool-picks">${skillChoices(a.skills,'agentskill')}</div><label>Preferred model (lead can adapt per task)<select data-field="model">${models(a.model)}</select></label><label>Effort override<select data-field="effort">${['','low','medium','high','xhigh','max'].map(e=>`<option value="${e}" ${e===(a.effort||'')?'selected':''}>${e || 'Let the lead choose'}</option>`).join('')}</select></label><label class="space-check"><input type="checkbox" data-field="inheritTools" ${a.inheritTools !== false ? 'checked' : ''}>Inherit the team’s tools</label><div class="space-tool-picks">${toolChoices(a.tools,'agenttool')}</div><button class="secondary" type="button" data-remove-agent="${a.id}">Remove agent</button></details>`).join('')}</div>
+      </section><section data-settings-page="people"><p>Choose a person to edit their responsibilities, model preference and tool access. The lead uses this roster when planning new work.</p><h3>People</h3><div class="space-agent-editors">${agents.map(a => `<details data-agent-editor="${a.id}"><summary><span class="space-avatar">${esc(a.name.slice(0,1))}</span><span><b>${esc(a.name)}</b><small>${a.id === team.lead ? 'Team lead · Plans and verifies' : esc(a.role)}</small></span><span class="space-person-edit">Edit ↗</span></summary><div class="space-grid"><label>Name<input data-field="name" value="${esc(a.name)}" required></label><label>Role<input data-field="role" value="${esc(a.role)}" required></label></div><label>Responsibilities<textarea data-field="does">${esc(a.does)}</textarea></label><label>Role instructions<textarea data-field="brief" rows="3">${esc(a.brief)}</textarea></label><h3>Additional skills</h3><div class="space-tool-picks">${skillChoices(a.skills,'agentskill')}</div><label>Model for this person<select data-field="model">${models(a.model, 'Use the team or role default')}</select></label><label>Effort override<select data-field="effort">${['','low','medium','high','xhigh','max'].map(e=>`<option value="${e}" ${e===(a.effort||'')?'selected':''}>${e || 'Let the lead choose'}</option>`).join('')}</select></label><label class="space-check"><input type="checkbox" data-field="inheritTools" ${a.inheritTools !== false ? 'checked' : ''}>Inherit the team’s tools</label><div class="space-tool-picks">${toolChoices(a.tools,'agenttool')}</div><button class="secondary" type="button" data-remove-agent="${a.id}">Remove agent</button></details>`).join('')}</div>
       <button type="button" class="secondary" id="spaceAddAgent">Add agent</button>
       </section><section data-settings-page="tests"><h3>Team tests</h3><p>Check the full planning, work and review process against known inputs. Tests run without external tools.</p>
       <div id="spaceTestEditors">${team.tests.map(test=>`<details data-test-editor="${esc(test.id)}"><summary>${esc(test.name || 'New test')}</summary><label>Name<input data-test-name value="${esc(test.name)}" required></label><label>Task and supplied facts<textarea data-test-prompt rows="3" required>${esc(test.prompt)}</textarea></label><label>Required text — one per line<textarea data-test-required rows="2">${esc(test.requiredText.join('\n'))}</textarea></label><div class="space-actions"><button type="button" class="secondary" data-run-test="${esc(test.id)}">Run saved test</button><button type="button" class="secondary" data-remove-test="${esc(test.id)}">Remove test</button></div></details>`).join('')}</div>
@@ -265,6 +279,29 @@ export function initOfficeWork(ctx) {
     content.querySelectorAll('[data-run-test]').forEach(button=>button.onclick=async()=>{if(!testSaved())return;button.disabled=true;try{const job=await api(`/teams/${team.id}/test`,'POST',{testId:button.dataset.runTest});await refresh();await showTask(job.id);}catch(error){feedback(error.message,true);button.disabled=false;}});
     $('spaceRunTests').onclick=async event=>{if(!testSaved())return;event.target.disabled=true;try{const suite=await api(`/teams/${team.id}/tests`,'POST',{});await refresh();await showReports();feedback(`${suite.jobs.length} tests queued. Results update as the lead verifies each one.`);}catch(error){feedback(error.message,true);event.target.disabled=false;}};
   }
+  async function showModels() {
+    try {
+      const reg = await api('/providers'); open('models', 'Models & keys');
+      const providerName = id => reg.providers.find(p => p.id === id)?.label || id;
+      const options = selected => reg.models.filter(m => m.enabled !== false).map(m => `<option value="${esc(m.id)}" ${m.id === selected ? 'selected' : ''}>${esc(m.label)} · ${esc(providerName(m.provider))}</option>`).join('');
+      const modelRow = m => `<div class="space-grid" data-model-row><label>Model id<input data-field="id" value="${esc(m.id)}" placeholder="z-ai/glm-4.6"></label><label>Provider<select data-field="provider">${reg.providers.map(p => `<option value="${esc(p.id)}" ${p.id === m.provider ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select></label><label>Label<input data-field="label" value="${esc(m.label || '')}"></label><label class="space-check"><input type="checkbox" data-field="effort" ${m.supports?.effort || m.supports?.reasoning ? 'checked' : ''}>Supports effort</label></div>`;
+      const roles = [['pm', 'Program Manager'], ['lead', 'Department leads'], ['specialist', 'Specialists'], ['review', 'Reviews'], ['chat', 'Chat with agents']];
+      content.innerHTML = `<p>The office runs on API keys from any provider. Add at least one, then choose the model for each role. Keys stay on the server and are never shown again.</p><form id="spaceModelsForm"><h3>Providers</h3>${reg.providers.map(p => `<fieldset data-provider="${esc(p.id)}"><legend>${esc(p.label)} <small>${p.hasKey ? 'Key stored' + (p.keySource === 'env' ? ' in the server environment' : '') : 'No key yet'}</small></legend>${p.type === 'openai-compatible' ? `<label>Base URL<input data-field="baseURL" value="${esc(p.baseURL || '')}"></label>` : ''}<label>API key<input data-field="apiKey" type="password" autocomplete="off" placeholder="${p.hasKey ? 'Leave blank to keep the stored key' : 'Paste the key'}"></label><div class="space-actions"><label class="space-check"><input type="checkbox" data-field="enabled" ${p.enabled !== false ? 'checked' : ''}>Enabled</label>${p.hasKey && p.keySource === 'file' ? '<label class="space-check"><input type="checkbox" data-field="clearKey">Remove stored key</label>' : ''}<button type="button" class="secondary" data-test-provider="${esc(p.id)}">Test connection</button></div></fieldset>`).join('')}
+        <h3>Models</h3><p>Add any model your provider offers by its id, for example <code>z-ai/glm-4.6</code> or <code>moonshotai/kimi-k2</code> on OpenRouter.</p><div id="spaceModelRows">${reg.models.map(modelRow).join('')}</div><button type="button" class="secondary" id="spaceAddModel">Add model</button>
+        <h3>Who runs on what</h3><div class="space-grid">${roles.map(([role, label]) => `<label>${label}<select data-role="${role}">${options(reg.roleDefaults[role])}</select></label>`).join('')}</div>
+        <div class="space-settings-save"><span>${reg.ready ? 'Ready: the teams can work.' : 'Add a key to start work.'}</span><button type="submit">Save</button></div></form>`;
+      $('spaceAddModel').onclick = () => $('spaceModelRows').insertAdjacentHTML('beforeend', modelRow({ id: '', provider: 'openrouter', label: '' }));
+      content.querySelectorAll('[data-test-provider]').forEach(button => button.onclick = async () => { button.disabled = true; try { const r = await api(`/providers/${button.dataset.testProvider}/test`, 'POST', {}); feedback(r.ok ? `${providerName(button.dataset.testProvider)} answered in ${r.ms} ms using ${r.model}.` : `${providerName(button.dataset.testProvider)}: ${r.error}`, !r.ok); } catch (error) { feedback(error.message, true); } finally { button.disabled = false; } });
+      $('spaceModelsForm').onsubmit = async event => {
+        event.preventDefault();
+        const providers = reg.providers.map(({ hasKey, keySource, usable, ...p }) => { const box = content.querySelector(`[data-provider="${p.id}"]`), field = name => box.querySelector(`[data-field="${name}"]`);
+          return { ...p, apiKey: field('apiKey').value, enabled: field('enabled').checked, clearKey: !!field('clearKey')?.checked, ...(field('baseURL') ? { baseURL: field('baseURL').value } : {}) }; });
+        const models = [...content.querySelectorAll('[data-model-row]')].map(row => { const v = name => row.querySelector(`[data-field="${name}"]`); const provider = v('provider').value, type = reg.providers.find(p => p.id === provider)?.type; return { id: v('id').value.trim(), provider, label: v('label').value.trim(), supports: { effort: v('effort').checked && type === 'anthropic', reasoning: v('effort').checked && type !== 'anthropic' } }; }).filter(m => m.id);
+        const roleDefaults = Object.fromEntries([...content.querySelectorAll('[data-role]')].map(select => [select.dataset.role, select.value]));
+        try { await api('/providers', 'PUT', { providers, models, roleDefaults: { ...reg.roleDefaults, ...roleDefaults }, roleEfforts: reg.roleEfforts, embeddings: reg.embeddings }); await showModels(); feedback('Saved. New work uses these models.'); } catch (error) { feedback(error.message, true); }
+      };
+    } catch (error) { feedback(error.message, true); }
+  }
   async function showSkills(editId = null) {
     try {
       config = await api('/office');open('skills','Reusable skills');
@@ -285,12 +322,12 @@ export function initOfficeWork(ctx) {
       const number=value=>value.toLocaleString();
       const cycle=ms=>ms===null?'—':ms<60000?Math.round(ms/1000)+'s':ms<3600000?Math.round(ms/60000)+'m':(ms/3600000).toFixed(1)+'h';
       content.innerHTML=`<div class="space-actions"><label>Tasks created<select id="spaceReportPeriod">${[[7,'Past 7 days'],[30,'Past 30 days'],[90,'Past 90 days'],[0,'All time']].map(([days,label])=>`<option value="${days}" ${days===reportDays?'selected':''}>${label}</option>`).join('')}</select></label><button class="secondary" id="spaceExportReport">Export report</button></div>
-        <div class="space-report-stats">${[['Approved',report.summary.approved],['In progress',report.summary.active],['Your review',report.summary.waiting],['Blocked',report.summary.blocked]].map(([label,value])=>`<div><b>${number(value)}</b><span>${label}</span></div>`).join('')}</div>
+        <div class="space-report-stats">${[['Approved',report.summary.approved],['In progress',report.summary.active],['Needs you',report.summary.waiting],['Blocked',report.summary.blocked]].map(([label,value])=>`<div><b>${number(value)}</b><span>${label}</span></div>`).join('')}</div>
         <p>${number(report.summary.calls)} model calls · ${number(report.summary.tokens)} reported tokens · ${report.summary.rework} tasks required rework. Tests are counted separately.</p>
         <div class="space-report-table"><table><thead><tr><th>Team</th><th>Approved</th><th>Active</th><th>Blocked</th><th>Calls</th><th>Tokens</th><th>Median cycle</th></tr></thead><tbody>${report.teams.map(t=>`<tr><td>${esc(t.name)}</td><td>${t.approved}</td><td>${t.active}</td><td>${t.blocked}</td><td>${number(t.calls)}</td><td>${number(t.tokens)}</td><td>${cycle(t.medianCycleMs)}</td></tr>`).join('')}</tbody></table></div><p class="space-footnote">Cycle time runs from task creation to approval, including time waiting for review. Counts come from recorded tasks; a dash means no completed sample.</p>
-        <h3>Needs attention</h3>${report.attention.map(j=>`<button class="space-note" data-report-job="${j.id}"><b>${esc(j.title)}</b><span>${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)} · ${labels[j.state]} · ${esc(j.reason)}</span></button>`).join('')||'<p>No blocked tasks or pending owner reviews in this period.</p>'}
-        <h3>Team detail</h3>${report.teams.map(t=>`<details data-report-detail="team-${t.id}"><summary>${esc(t.name)} · Lead: ${esc(t.lead)}</summary><p>Per-task limits: ${t.limits.callsPerTask} calls, ${number(t.limits.tokensPerTask)} reported tokens. Up to ${t.limits.concurrentWorkers} concurrent workers.</p>${t.agents.map(a=>`<p><b>${esc(a.name)}</b> · ${a.submitted} submissions · ${a.active} active subtasks · ${a.reviews} lead reviews</p>`).join('')}</details>`).join('')}
-        <h3>Test results</h3><p>${report.tests.approved}/${report.tests.total} tests passed · ${report.tests.active} running or queued · ${report.tests.blocked} blocked · ${number(report.tests.calls)} calls · ${number(report.tests.tokens)} reported tokens.</p>${report.suites.map(suite=>`<details data-report-detail="suite-${suite.id}"><summary>${esc(DEPTS[suite.dept]?.name)} · ${when(suite.createdAt)} · configuration v${suite.officeRevision}</summary>${suite.jobs.map(j=>`<button class="space-note" data-report-job="${j.id}"><b>${esc(j.name)}</b><span>${j.state==='done'?'Passed':labels[j.state]}${j.error?' · '+esc(j.error):''}</span></button>`).join('')}</details>`).join('')}
+        <h3>Needs attention</h3>${report.attention.map(j=>`<button class="space-note" data-report-job="${j.id}"><b>${esc(j.title)}</b><span>${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)} · ${stateLabel(j.state)} · ${esc(j.reason)}</span></button>`).join('')||'<p>No blocked tasks or pending owner reviews in this period.</p>'}
+        <h3>Team detail</h3>${report.teams.map(t=>`<details data-report-detail="team-${t.id}"><summary>${esc(t.name)} · Lead: ${esc(t.lead)}</summary><p>Up to ${t.limits.parallelRuns} specialists working at once · ${t.limits.reworkRounds} rework rounds before it needs you.</p>${t.agents.map(a=>`<p><b>${esc(a.name)}</b> · ${a.submitted} submissions · ${a.active} active subtasks · ${a.reviews} lead reviews</p>`).join('')}</details>`).join('')}
+        <h3>Test results</h3><p>${report.tests.approved}/${report.tests.total} tests passed · ${report.tests.active} running or queued · ${report.tests.blocked} blocked · ${number(report.tests.calls)} calls · ${number(report.tests.tokens)} reported tokens.</p>${report.suites.map(suite=>`<details data-report-detail="suite-${suite.id}"><summary>${esc(DEPTS[suite.dept]?.name)} · ${when(suite.createdAt)} · configuration v${suite.officeRevision}</summary>${suite.jobs.map(j=>`<button class="space-note" data-report-job="${j.id}"><b>${esc(j.name)}</b><span>${j.state==='done'?'Passed':stateLabel(j.state)}${j.error?' · '+esc(j.error):''}</span></button>`).join('')}</details>`).join('')}
         <h3>Approved deliverables</h3>${report.completed.map(j=>`<button class="space-note" data-report-job="${j.id}"><b>${esc(j.title)}</b><span>${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)} · ${when(j.doneAt)}</span></button>`).join('')||'<p>No approved deliverables in this period.</p>'}`;
       content.querySelectorAll('[data-report-detail]').forEach(el=>el.open=expanded.includes(el.dataset.reportDetail));
       $('spaceReportPeriod').onchange=event=>{reportDays=Number(event.target.value);showReports(false);};content.querySelectorAll('[data-report-job]').forEach(button=>button.onclick=()=>showTask(button.dataset.reportJob));
@@ -355,11 +392,11 @@ export function initOfficeWork(ctx) {
   }
   const rowHTML = key => { const list = jobs.filter(j => j.dept === key); return `<div class="b-tasks"><span>ACTIVE<b data-tk="${key}-doing">${list.filter(j => ['planning','working','reviewing'].includes(j.state)).length}</b></span><span>QUEUED<b data-tk="${key}-next">${list.filter(j=>j.state==='queued').length}</b></span><span>APPROVED<b data-tk="${key}-done">${list.filter(j=>j.state==='done').length}</b></span></div>`; };
   for(const key of DEPT_KEYS)deptRT[key].apprRow.insertAdjacentHTML('beforebegin',rowHTML(key));
-  officeReady.then(async()=>{setInterval(refresh,2000);try{const health=await api('/health');onLive?.(health);await syncBrain();await refresh();const usage=await api('/usage');onUsage?.(usage);}catch(error){$('spaceHint').textContent=error.message;}});
+  officeReady.then(async()=>{setInterval(refresh,2000);try{const health=await api('/health');onLive?.(health);await syncBrain();await refresh();}catch(error){$('spaceHint').textContent=error.message;}});
   const noop=()=>{};
   return { get tasks(){return jobs.flatMap(j=>[...j.subtasks.filter(s=>s.agent).map(s=>({...s,agent:s.agent,state:s.state==='working'?'doing':s.state})),...(['planning','reviewing'].includes(j.state)?[{agent:j.agent,state:'doing'}]:[])]);},
-    projectActivity:()=>projectUI.activity(),openProjects:()=>projectUI.open(),agentActivity:id=>activityByAgent.get(id),tick:noop,panelWidth:()=>panel.offsetWidth,onFocusChange:key=>{if(DEPTS[key]&&key!=='brain'){selectedTeam=key;$('spaceDept').innerHTML=`<i style="background:${DEPTS[key].chip}"></i><span>${esc(DEPTS[key].name)}</span><span class="space-chevron">⌄</span>`;}render();},rowHTML,
-    isLive:()=>true,isOpen:()=>dialog.open,open:()=>{open('board','Office work');content.innerHTML=jobs.map(j=>`<button class="space-note" data-job="${j.id}"><b>${esc(j.title)}</b><span>${labels[j.state]} · ${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)}</span></button>`).join('')||'<p>No tasks yet.</p>';content.querySelectorAll('[data-job]').forEach(b=>b.onclick=()=>showTask(b.dataset.job));},
+    projectActivity:()=>{const j=jobs.find(j=>ACTIVE_STATES.includes(j.state)&&j.state!=='queued');return j?{state:'running',title:j.title}:null;},openProjects:()=>{},agentActivity:id=>activityByAgent.get(id),tick:noop,panelWidth:()=>panel.offsetWidth,onFocusChange:key=>{if(DEPTS[key]&&key!=='brain'){selectedTeam=key;$('spaceDept').innerHTML=`<i style="background:${DEPTS[key].chip}"></i><span>${esc(DEPTS[key].name)}</span><span class="space-chevron">⌄</span>`;}render();},rowHTML,
+    isLive:()=>true,isOpen:()=>dialog.open,open:()=>{open('board','Office work');content.innerHTML=jobs.map(j=>`<button class="space-note" data-job="${j.id}"><b>${esc(j.title)}</b><span>${stateLabel(j.state)} · ${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)}</span></button>`).join('')||'<p>No tasks yet.</p>';content.querySelectorAll('[data-job]').forEach(b=>b.onclick=()=>showTask(b.dataset.job));},
     toggle(){dialog.open?close():this.open();},close,openFor(){this.open();},openTask:showTask,refresh,renderAgent,railFor:id=>{agentOpen=id;const el=$('mRt');el.hidden=true;},syncPills:noop,
     onStuck:noop,onResolve:noop,pendingReject:()=>false,rejectLive:noop,resolveLive:noop,revise:()=>false,addTask:()=>null,routines:[],
     handleChat:async(id,text)=>{const match=text.match(/^\s*(?:add\s+(?:a\s+)?task|task|todo)\s*:\s*(.+)$/is);if(match){try{const job=await api('/tasks','POST',{dept:R[id].a.dept,text:match[1]});await refresh();return `Task received by the team lead: ${job.title}. Open Work to follow the plan and verification.`;}catch(error){return error.message;}}return null;},

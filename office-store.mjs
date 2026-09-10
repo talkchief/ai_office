@@ -5,6 +5,10 @@ import { DEPTS, DEPT_KEYS } from './src/data.js';
 
 const text = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
 const fail = message => { throw Object.assign(new Error(message), { status: 400 }); };
+// Model ids come from Settings → Models. Older files forced "sonnet" on everyone; there it means "inherit".
+const modelOf = (value, legacy) => { const v = text(value, 120); return !v || (legacy && v === 'sonnet') ? '' : v; };
+// Standing rules: the CEO's own words, kept verbatim, newest last.
+const rulesOf = list => (Array.isArray(list) ? list : []).map(r => ({ text: text(typeof r === 'string' ? r : r?.text, 300), at: Number(r?.at) || Date.now(), task: text(r?.task, 80) })).filter(r => r.text).slice(-50);
 export const DEFAULT_CRITERIA = [
   'The deliverable addresses every part of the requested task.',
   'Factual claims are supported by the supplied material or cited sources; uncertainty is stated.',
@@ -16,10 +20,10 @@ export class OfficeStore {
     this.file = path.join(dataDir, 'office.json');
     if (fs.existsSync(this.file)) this.value = this.validate(JSON.parse(fs.readFileSync(this.file, 'utf8')));
     else {
-      this.value = { version: 1, revision: 1, agents: initialAgents.map(a => ({ ...a, skills: [], model: a.model || 'sonnet' })),
+      this.value = { version: 1, schema: 2, revision: 1, agents: initialAgents.map(a => ({ ...a, skills: [], model: a.model || '' })),
         teams: DEPT_KEYS.map(id => ({ id, name: DEPTS[id].name, lead: initialAgents.find(a => a.department === id && a.lead)?.id,
-          instructions: '', criteria: [...DEFAULT_CRITERIA], checks: [], tools: [], concurrency: 2, maxSubtasks: 4, maxRevisions: 2, maxCalls: 16, maxTokens: 60000,
-          planningModel: 'sonnet', reviewModel: 'sonnet', requireHumanApproval: false, tests: [] })) };
+          instructions: '', criteria: [...DEFAULT_CRITERIA], checks: [], tools: [], maxParallelRuns: 2, maxReworkRounds: 3,
+           requireHumanApproval: false, tests: [] })) };
       this.value = this.validate(this.value); this.persist();
     }
   }
@@ -44,6 +48,7 @@ export class OfficeStore {
       if (values.some(id => !skillIds.has(id))) fail('Unassign a deleted skill from teams and agents before saving.');
       return values;
     };
+    const legacy = input.schema !== 2;
     const ids = new Set();
     const agents = input.agents.map(a => {
       if (!/^[a-z][a-z0-9_-]{0,47}$/.test(a.id || '') || ids.has(a.id)) fail('Each agent needs a unique ID.');
@@ -51,8 +56,8 @@ export class OfficeStore {
       if (!teamIds.has(a.department)) fail('Choose an existing functional area.');
       if (!text(a.name, 48) || !text(a.role, 120)) fail('Each agent needs a name and role.');
       return { id: a.id, department: a.department, name: text(a.name, 48), role: text(a.role, 120), does: text(a.does, 1200), brief: text(a.brief, 6000),
-        model: ['sonnet', 'opus', 'fable'].includes(a.model) ? a.model : 'sonnet', effort: ['', 'low', 'medium', 'high', 'xhigh', 'max'].includes(a.effort || '') ? a.effort || '' : '',
-        skills: skillRefs(a.skills), tools: Array.isArray(a.tools) ? a.tools.map(t => text(t, 80)).filter(Boolean).slice(0, 20) : [], inheritTools: a.inheritTools !== false, lead: false };
+        model: modelOf(a.model, legacy), effort: ['', 'low', 'medium', 'high', 'xhigh', 'max'].includes(a.effort || '') ? a.effort || '' : '',
+        skills: skillRefs(a.skills), tools: Array.isArray(a.tools) ? a.tools.map(t => text(t, 80)).filter(Boolean).slice(0, 20) : [], inheritTools: a.inheritTools !== false, rules: rulesOf(a.rules), lead: false };
     });
     const seen = new Set();
     const teams = input.teams.map(t => {
@@ -77,14 +82,15 @@ export class OfficeStore {
       const range = (value, fallback, min, max) => Math.max(min, Math.min(max, Number.isInteger(+value) ? +value : fallback));
       return { id: t.id, name: text(t.name, 48) || DEPTS[t.id]?.name || t.id, lead: t.lead, purpose: text(t.purpose,3000), guardrails: (Array.isArray(t.guardrails) ? t.guardrails : []).map(rule => text(rule,1000)).filter(Boolean).slice(0,12), skills: skillRefs(t.skills), instructions: text(t.instructions, 12000), criteria, checks,
         tools: (Array.isArray(t.tools) ? t.tools : []).map(v => text(v, 80)).filter(Boolean).slice(0, 20),
-        concurrency: range(t.concurrency, 2, 1, 4), maxSubtasks: range(t.maxSubtasks, 4, 1, 8), maxRevisions: range(t.maxRevisions, 2, 0, 3),
-        maxCalls: range(t.maxCalls, 16, 3, 40), maxTokens: range(t.maxTokens, 60000, 5000, 200000),
-        planningModel: ['sonnet', 'opus', 'fable'].includes(t.planningModel) ? t.planningModel : 'sonnet',
-        reviewModel: ['sonnet', 'opus', 'fable'].includes(t.reviewModel) ? t.reviewModel : 'sonnet', requireHumanApproval: !!t.requireHumanApproval,
+        // Parallelism only queues work; there are no call or token budgets. Older files used concurrency/maxRevisions.
+        maxParallelRuns: range(t.maxParallelRuns ?? t.concurrency, 2, 1, 4), maxReworkRounds: range(t.maxReworkRounds ?? t.maxRevisions, 3, 0, 5),
+        models: { lead: modelOf(t.models?.lead ?? t.planningModel, true), specialist: modelOf(t.models?.specialist, false), review: modelOf(t.models?.review ?? t.reviewModel, true) },
+        // CEO approval to close a task (outbound actions always pause regardless).
+        completionApproval: !!(t.completionApproval ?? t.requireHumanApproval), rules: rulesOf(t.rules),
         tests: (Array.isArray(t.tests) ? t.tests : []).slice(0, 12).map(test => ({ id: /^[a-zA-Z0-9_-]+$/.test(test.id || '') ? test.id : randomUUID(), name: text(test.name, 100) || 'Team test', prompt: text(test.prompt, 6000), requiredText: (Array.isArray(test.requiredText) ? test.requiredText : []).map(s => text(s, 300)).filter(Boolean).slice(0, 12) })).filter(t => t.prompt) };
     });
 
-    return { version: 1, revision: Number(input.revision) || 1, agents, teams, skills };
+    return { version: 1, schema: 2, revision: Number(input.revision) || 1, agents, teams, skills };
   }
   update(input, busyAgentIds = new Set()) {
     if (input.revision !== this.value.revision) throw Object.assign(new Error('The office changed in another tab. Reload before saving.'), { status: 409 });

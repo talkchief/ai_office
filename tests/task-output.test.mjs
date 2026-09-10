@@ -42,8 +42,19 @@ test('a passing lead review does not label a blocked, waiting or cancelled task 
   assert.equal(resultState({state:'done'}).tone,'approved');
 });
 
-test('result view leads with the deliverable and review view names the actual requirement', () => {
-  const job={id:'task',state:'done',title:'Brief',team:{name:'Marketing',lead:'lead',criteria:['Cite supplied facts.'],guardrails:[],maxCalls:8,maxTokens:30000},agents:[{id:'lead',name:'Lead'}],subtasks:[],events:[],reviews:[{agent:'lead',approved:true,criteria:[{id:'criterion-1',passed:true,evidence:'Uses supplied facts.'}],checks:[]}],review:{approved:true},result:'## Recommended action\n\nRun the pilot.',calls:3,tokens:2000,officeRevision:1};
-  const result=renderTaskWorkspace(job,'result');assert.match(result, /space-deliverable/);assert.match(result, /<h2[^>]*>Recommended action/);assert.doesNotMatch(result, /Activity timeline|criterion-1|model calls/);
-  const review=renderTaskWorkspace(job,'review');assert.match(review,/Cite supplied facts/);assert.doesNotMatch(review,/Run the pilot/);assert.match(review,/3\/8 model calls/);
+test('the task page puts actions first, then the chosen result version, then how it was done', () => {
+  const job = { id: 'task', state: 'done', title: 'Brief', team: { name: 'Marketing', lead: 'lead', criteria: ['Cite supplied facts.'], guardrails: [] }, agents: [{ id: 'lead', name: 'Lead' }, { id: 'w', name: 'Writer' }],
+    runs: [{ id: 'r1', agent: 'w', role: 'specialist', title: 'Draft the brief', state: 'done', output: 'Draft text', startedAt: 1, finishedAt: 2, sources: ['Company/prices.md'], tools: [] }],
+    reviews: [{ agent: 'lead', approved: true, at: 3, summary: 'Checked.', criteria: [{ id: 'criterion-1', passed: true, evidence: 'Uses supplied facts.' }], checks: [] }],
+    messages: [{ role: 'ceo', kind: 'message', text: 'Write the brief.', at: 0 }, { role: 'ceo', kind: 'correction', text: 'Shorten it.', at: 4 }],
+    decisions: [{ at: 4.5, action: 'mcp__gmail__send', type: 'reject', message: 'Not yet.' }],
+    resultVersions: [{ n: 1, at: 3, result: '## Recommended action\n\nRun the pilot.', summary: 'First.' }, { n: 2, at: 5, result: '## Revised\n\nShorter.', summary: 'Second.', correction: { text: 'Shorten it.' } }],
+    result: '## Revised\n\nShorter.', sources: ['Company/prices.md'], calls: 3, tokens: 2000, tokensByModel: { 'z-ai/glm-4.6': 2000 } };
+  const page = renderTaskWorkspace(job, { actions: '<button data-action="message">Send correction</button>' });
+  assert.ok(page.indexOf('task-actions') < page.indexOf('space-deliverable')); assert.ok(page.indexOf('space-deliverable') < page.indexOf('How it was done'));
+  assert.match(page, /Shorter\./); assert.doesNotMatch(page, /Run the pilot/); assert.match(page, /data-version="1"/); assert.match(page, /answers your correction: “Shorten it\.”/);
+  assert.match(page, /Cite supplied facts\./); assert.match(page, /Uses supplied facts\./); assert.match(page, /Draft text/); assert.match(page, /Write the brief\./);
+  assert.match(page, /Rejected mcp__gmail__send: “Not yet\.”/); assert.match(page, /data-note="Company\/prices\.md"/); assert.match(page, /3 model calls · 2,000 tokens \(z-ai\/glm-4\.6 2,000\)/);
+  assert.match(renderTaskWorkspace(job, { version: 1 }), /Run the pilot/);
+  assert.ok(page.indexOf('Write the brief.') < page.indexOf('Draft the brief'), 'the story reads in order');
 });

@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — the CEO-run office (branch 001-ceo-run-office)
+
+- **A Program Manager runs the work.** Every task goes to the Program Manager, who hands it to one or more department leads; leads hand assignments to their specialists and review the result against the team's criteria before anything is filed. Built on LangChain Deep Agents. The PM can choose the teams itself.
+- **Any model provider.** Anthropic, OpenAI, OpenRouter (GLM, Kimi and others) or any OpenAI-compatible endpoint, on API keys. A model per role (Program Manager, leads, specialists, reviews, chat), per team and per person. Keys stay on the server. The Claude Code login is no longer used.
+- **Real states, real waiting.** "Waiting for the lead's review" is a state the lead is actually told about. A task that needs you says so, reminds you again after an hour, and clears when you act. Results are marked seen when you open them.
+- **You approve outbound actions.** Anything that sends, posts, pays, deletes or changes something outside the office waits for your approval, then runs exactly once. Per team, you can also ask to approve completion.
+- **Corrections through the lead.** Ask, correct or add a note on any task. A correction reopens it, gets a fresh review and files version 2. "Remember this" keeps it as a standing rule in your own words.
+- **An inbox.** Decisions, questions, blocked work, overdue work and a daily digest, with desktop alerts when the page is in the background. Live updates over a server event stream.
+- **The Brain is searchable.** Upload PDF, Word, text, Markdown or CSV into folders. Agents search it with full-text search (Zvec, with a SQLite fallback) and cite the notes they used.
+- **Company processes.** Due dates and assignees, overdue notices, routines for every team, an audit log of every configuration change, and KPIs (throughput, cycle time, review wait, your response time, rework, tokens by model).
+- **Retention.** Scratch workspaces and resumable checkpoints of tasks finished more than 30 days ago are cleared daily; records, results and history stay.
+- **Removed.** Demo mode, team budgets, the Claude CLI execution path, and the three-department limit on routines.
+- `npm run check` builds, validates the configuration, runs the whole test suite and smoke-tests the API on throwaway data. Browser checks move with the interface rebuild.
+
 ## 3.6.1-beta.1 — 9 Sep 2026
 
 - **A bigger task box.** The bar is two rows now: the department and the text on top, the model menu, REPEAT and ADD underneath, so the text runs the width of the panel. The box grows as you type, up to six lines, then scrolls. Enter adds; Shift+Enter is a new line.

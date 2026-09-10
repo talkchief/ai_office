@@ -11,13 +11,42 @@ Installed configuration:
 
 - `/etc/systemd/system/agents-office.service`
 - `/etc/nginx/conf.d/agents-office.conf`
-- `/etc/agents-office.env` (root-owned, mode 0600; office access key)
+- `/etc/agents-office.env` (root-owned, mode 0600; office access key and optional model keys)
 - `office.config.local.json` (deployment name and knowledge path)
 
-The access key is exchanged for a signed HttpOnly session cookie. Claude uses its
-official browser/code login via **Manage → Claude**. Credentials belong to the
-service account and are not returned to the browser. Changing `AO_ACCESS_KEY` and
+The access key is exchanged for a signed HttpOnly session cookie. Changing `AO_ACCESS_KEY` and
 restarting invalidates existing office sessions. Do not place credentials in git.
+
+### Models and keys
+
+The office calls models through API keys; it does not use a Claude Code login. Add keys in
+**Manage → Models & keys** (stored in `data/providers.json`, mode 0600, never sent to the browser)
+or in `/etc/agents-office.env`:
+
+```sh
+ANTHROPIC_API_KEY=...     # Claude models
+OPENAI_API_KEY=...        # OpenAI models
+OPENROUTER_API_KEY=...    # GLM, Kimi, DeepSeek and others through OpenRouter
+```
+
+A key in the environment is used when the office file has none. The same page chooses the model for
+the Program Manager, department leads, specialists, reviews and chat; a team, an agent, a routine or a
+task can override it. Until a key is set, ideas can be saved but no work starts.
+
+### Connectors
+
+Connectors live in `data/tools.json` (mode 0600). Servers found by `claude mcp list` on this host show
+as “Found in Claude Code”; import them to keep their existing team assignments. Connectors that need a
+sign-in (Gmail, Calendar, Drive and similar) must be signed in again from **Manage → Tools** after the
+upgrade: the office runs its own OAuth sign-in and callback at
+`https://<host>/api/tools/<id>/oauth/callback`. Tools that send, post, pay, delete or change data pause
+for the CEO’s approval before they run.
+
+### Live updates
+
+The browser receives updates over Server-Sent Events at `/api/events`, with a 25-second heartbeat.
+The nginx site already disables proxy buffering and allows 360 seconds of read inactivity, which the
+heartbeat keeps well within. If updates stop, the page falls back to polling.
 
 ## Operations
 
@@ -38,63 +67,51 @@ staging; test records must never enter the production task list.
 
 ## State and recovery
 
-Back up `data/`, `office.config.local.json`, and the service user's Claude
-configuration securely. Stop the service for a filesystem backup of the SQLite
-files, or use SQLite's online backup facility. `workflows.sqlite` stores jobs,
-events and LangGraph checkpoints. `office.json` stores team settings;
-`tools.json` contains private connector configuration; `knowledge/` contains
-purpose, notes and approved deliverables. Archived notes remain under `.archive`.
+Retention: once a day the scheduler clears the scratch workspace and resumable checkpoints of tasks finished or cancelled more than 30 days ago. Task records, results, reviews, threads and the Brain are kept; a later correction on such a task restarts the conversation from the brief and the latest result.
 
-Tasks interrupted during a restart become blocked with their completed subtasks
-preserved. Retry resumes unfinished work. Owner approvals wait durably. Older
-tasks are imported once as blocked records requiring the new lead verification;
-the original `tasks.json` remains intact.
+Back up `data/` and `office.config.local.json`. Stop the service for a filesystem backup of the SQLite
+files, or use SQLite's online backup facility. `workflows.sqlite` holds tasks, events, conversation
+threads, the inbox and the agents' checkpoints. `office.json` holds teams and people; `providers.json`
+holds model keys; `tools.json` holds connectors and their sign-in tokens; `settings.json` holds office
+settings; `workspaces/` holds each task's working files. The Brain folder (`knowledge/` here) holds
+purpose, notes and filed results; archived notes stay under `.archive`.
 
-Ideas stay in the backlog without using Claude. Starting one captures the current
-team and skill configuration. Queue priority changes scheduling at the next free
-slot; it does not interrupt running work. Briefs and priority can be edited until
-the first model call. Retry respects the global job limit.
+On the first start after the upgrade, older tasks are converted once: finished results and reviews are
+kept, and unfinished ones become Blocked with a note to retry them on the new harness.
 
-Task details update every two seconds and show public draft text (up to 16,000
-characters), model phase, tool names, and reported budget usage. Private reasoning
-and raw tool payloads are excluded from progress previews. Connection failures
-show a stale-data notice and stop work animations until updates resume.
-Cancellation stops running and waiting workers. After all approvals pass, a short
-`saving` phase commits the deliverable and cannot be cancelled; interrupted saves
-become blocked for explicit retry. Deliverable files are replaced atomically.
+A task that was running during a restart becomes Blocked; Retry continues from where it stopped.
+A task waiting for the CEO's decision stays waiting across restarts and resumes when decided. Notes
+sent while a task works are kept and delivered at its next step.
+
+Ideas stay in the backlog without calling any model. Queue priority changes scheduling at the next
+free slot. Cancellation stops running work. The short `saving` step that files a result cannot be
+cancelled.
 
 ## Scope
 
-The six functional areas each support 2–12 agents, including one independent
-reviewer. Team settings support up to 12 named tests, individual runs and whole-suite runs.
-Evaluations keep their results in the task history without entering shared business
-knowledge. The skill library supports up to 50 reusable methods, with task-level
-version snapshots. Reports separate test usage from business tasks. Workflow limits cap concurrent workers, calls, reported tokens and
-review rounds. A token limit is checked between calls, so an individual call can
-cross it, including calls already running concurrently. Plain planning and review calls disable MCP/customizations to reduce
-context and isolate tools. Worker tools are restricted to team/agent assignments.
+Up to 12 teams of 2–12 people, each with one lead. The Program Manager delegates to the leads of the
+teams a task involves; leads delegate to their specialists and must record an approved review before
+the Program Manager can complete the task. There are no call or token budgets. Settings limit how many
+tasks run at once, how many specialists of a team work at once, how many rework rounds happen before
+the CEO is asked, and how long a run may take.
 
-This is a single-owner application. Lead review verifies returned deliverables
-and configured checks; it is not proof of an external action. Workflows are
-instructed to prepare deliverables without sending, publishing, paying or deleting.
-Approving completion saves the reviewed work; it does not execute an outbound
-transaction. MCP servers may expose write tools: only connect and assign servers
-you intend this office to use. The API-key backend does not implement MCP tools;
-the deployed Claude CLI account is the integration backend.
+Anything that sends, posts, pays, deletes or changes data outside the office pauses for the CEO. The
+CEO approves, edits or rejects the exact action; approval runs it once. Team tests never receive such
+tools. This is a single-owner application: the office access code is the only login.
 
-Authenticated configuration requests accept up to 16 MiB for the office, 4 MiB for
-MCP definitions and 512 KiB for knowledge notes. Ordinary requests remain limited
-to 64 KiB. Field-level and roster limits still apply.
+Authenticated configuration requests accept up to 16 MiB for the office, 4 MiB for connector
+definitions and 512 KiB for knowledge notes. Ordinary requests are limited to 64 KiB.
 
 ## Validation
 
-`npm test` covers access cookies, login state, independent lead review, failed
-acceptance checks, checkpoint approval after restart, retries, roster validation,
-MCP configuration redaction/rollback/unassignment, and knowledge paths/graphs.
-It also covers backlog scheduling, queue priority, call-budget enforcement with
-parallel workers, cancellation during work or completion, draft bounds, UTF-8
-request handling, and downstream rework after an upstream rejection.
-Browser checks cover live Claude session stability, team zoom and counters,
-management menus and Brain editing. A real Claude task was run in isolated state
-through worker submission and lead verification, with an approved deliverable.
-`npm run check` is the upstream offline-demo checker and retains demo assumptions.
+`npm run check` builds, validates the configuration, runs the whole test suite and smoke-tests the API on a temporary copy of the data and Brain folders, so it is safe to run next to a live office. `CHECK_LIVE=1 npm run check` also runs one real task through the configured provider.
+
+`npm test` covers the provider registry (key privacy, precedence, effort mapping), the inbox, threads,
+live events, the Office Engine with scripted models (delegation, enforced lead review, re-prompt and
+escalation, approvals that pause and survive a restart, rejected and edited actions, completion
+approval, rework limits, corrections, mid-run notes, team pacing, cancellation, time limits, provider
+errors and team tests), connector storage and sign-in, outbound tool classification, the web fetch
+address guard, the upgrade of older tasks, and office and Brain storage.
+
+Staging runs use isolated `AO_DATA`, `AO_BRAIN` and `AO_HTML` on a loopback port. `npm run check` is
+the upstream offline-demo checker and still carries demo assumptions until it is rewritten.

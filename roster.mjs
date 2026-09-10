@@ -9,7 +9,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, loadConfig } from './config.mjs';
 import { AGENTS, DEPTS } from './src/data.js';
-import { V1 } from './src/v1data.js';
+// Default role and one-line job for each shipped seat (from the original roster).
+const V1 = JSON.parse(fs.readFileSync(new URL('./roster-defaults.json', import.meta.url), 'utf8')).map(p => ({ id: p.id, role: p.role, tagline: p.does }));
 
 export const FILE = path.join(ROOT, 'office.agents.json');
 export const LOCAL = path.join(ROOT, 'office.agents.local.json');

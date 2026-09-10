@@ -1,18 +1,14 @@
 // Agents Office v2 — Three.js isometric office with zoom-driven LOD
 // Far: clean pods + agent counts (Image 1 read). Near: diorama with 3D people + holo screens (Image 2 read).
 import * as THREE from 'three';
-import { TOKENS, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, WORKLINES, APPROVAL_ASKS, APPROVAL_BY_AGENT } from './data.js';
-import { V1, FILE_GEN, STATS, KPIS, P, rnd, ri, person, money } from './v1data.js';
+import { TOKENS, DEPTS, DEPT_KEYS, AGENTS, LAYOUT } from './data.js';
 import {
-  PLINTH_H, mat, rbox, makePlinth, makeFloorTitle, makeDesk, makeChair,
-  makePerson, posePerson, poseWork, makePlant, makeServerRack, makeMeetingTable, makeWalkway, makeWarnSprite,
+  PLINTH_H, mat, rbox, makePlinth, makeDesk, makeChair,
+  makePerson, posePerson, poseWork, makePlant, makeWalkway, makeWarnSprite,
 } from './builders.js';
-import { initMcp } from './mcp.js';
-import { loadConnectors } from './connectors.js';
-import { initTasks } from './tasks.js';
 import { initOfficeWork } from './office.js';
 import { initBrain } from './brain.js';
-const DEMO = location.protocol === 'file:';
+import { initMeetings } from './meetings.js';
 let tasks = null; // V3 task boards — initialised after the rail constants exist
 
 /* ---------- renderer / scene / camera ---------- */
@@ -126,7 +122,7 @@ const R = {};              // runtime per agent
 const deptRT = {};         // runtime per dept
 const screenSets = [];
 
-for (const [key_, L] of Object.entries(LAYOUT).filter(([k])=>k==='brain'||DEPT_KEYS.includes(k))) {
+for (const [key_, L] of Object.entries(LAYOUT).filter(([k])=>k==='pm'||DEPT_KEYS.includes(k))) {
   const dept = DEPTS[key_];
   const g = new THREE.Group();
   g.position.set(L.pos[0], 0, L.pos[1]);
@@ -144,39 +140,12 @@ for (const [key_, L] of Object.entries(LAYOUT).filter(([k])=>k==='brain'||DEPT_K
 // is etched into the pod floor (src/brain.js); reads glint, writes add notes, G opens the full graph.
 let brain;
 {
-  const bg = deptRT.brain.group;
-  brain = initBrain({ scene, brainGroup: bg, getR: () => R, esc: (t) => esc(t), hud, toScreen: (p) => toScreen(p), getCamera: () => camera });
-  if (!DEMO) brain.setQuiet(true);
-  const plant = makePlant(); plant.position.set(6.2, 0.12, -5.8); bg.add(plant);
-}
-
-/* the thinking sweep (M4, D): a soft comet orbits the brain; as it passes each dept's
-   azimuth that dept "lights up" — brain particles lean toward its chip colour (handled in
-   makeNeuralBrain) and its billboard gets a chip-coloured glow. Ref: AJ's galaxy video,
-   departments highlighted one at a time. */
-const SWEEP_PERIOD = 16000; // ms per full orbit
-const DEPT_AZ = {};
-for (const k of DEPT_KEYS)
-  DEPT_AZ[k] = Math.atan2(LAYOUT[k].pos[1], LAYOUT[k].pos[0]);
-function tickSweep(now) {
-  // the sweep is overview theatre — it bows out while a dept is focused
-  const on = (!focused || focused === 'brain') ? 1 : 1 - focusDim;
-  const theta = (now % SWEEP_PERIOD) / SWEEP_PERIOD * Math.PI * 2;
-  let domDept = null, domS = 0;
-  for (const [k, az] of Object.entries(DEPT_AZ)) {
-    const d = Math.atan2(Math.sin(theta - az), Math.cos(theta - az));
-    let s = Math.max(0, 1 - Math.abs(d) / 0.7);
-    s = s * s * (3 - 2 * s) * on;
-    if (s > domS) { domS = s; domDept = k; }
-    const b = deptRT[k].badge;
-    if (s > 0.55 && !b.classList.contains('sweepglow')) {
-      b.style.setProperty('--sw', DEPTS[k].chip);
-      b.classList.add('sweepglow');
-    } else if (s <= 0.35 && b.classList.contains('sweepglow')) b.classList.remove('sweepglow');
-  }
-  // (the M4 orbiting comet is retired per AJ — the sweep now shows only as the badge glow
-  //  + the brain particles leaning toward the visiting dept's colour)
-  return { theta, strength: domS, col: domDept ? DEPTS[domDept].chip : '#FFFFFF' };
+  brain = initBrain({ scene, brainGroup: new THREE.Group(), getR: () => R, esc: (t) => esc(t), hud, toScreen: (p) => toScreen(p), getCamera: () => camera });
+  brain.setQuiet(true);
+  const plant = makePlant(); plant.position.set(6.2, 0.12, -5.8); deptRT.pm.group.add(plant);
+  const brainBtn = document.createElement('button'); brainBtn.id = 'brainBtn'; brainBtn.type = 'button'; brainBtn.title = 'The Brain: your company knowledge (G)';
+  brainBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="6" cy="7" r="2.2"/><circle cx="18" cy="6" r="2.2"/><circle cx="12" cy="13" r="2.4"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="18" r="2"/><path d="M7.8 8.3 10.3 11.5M16.3 7.4 13.7 11.3M10.4 14.7 7.4 17.6M13.6 14.8 16.5 16.9"/></svg><span>Brain</span><b>0</b>';
+  brainBtn.onclick = () => brain.open(); document.body.appendChild(brainBtn);
 }
 
 // walkways dept -> brain
@@ -193,29 +162,35 @@ for (const k of DEPT_KEYS) {
 }
 // tag remaining brain furnishings (plinth, plant) for the focus-dim pass — these DO go
 // dark in galaxy mode, unlike the 'brainCore' nebula tagged above
-deptRT.brain.group.traverse(o => { if ((o.isMesh || o.isSprite) && !o.userData.dept) o.userData.dept = 'brain'; });
+deptRT.pm.group.traverse(o => { if ((o.isMesh || o.isSprite) && !o.userData.dept) o.userData.dept = 'pm'; });
 
 /* (M5.3 per AJ: the bridge cables are gone — the walkways alone carry the connection;
    the brain↔dept relationship shows through the badge sweep + meetings.) */
 
-// A separate project office: one standing Program Manager, above team coordination.
-let programPerson=null,programPill=null;
-if (!DEMO) {
-  const floor=makePlinth(15,13,'#EEE7D5');floor.position.set(-28,0,0);
-  floor.traverse(o=>{if(o.isMesh){o.userData.dept='program';clickTargets.push(o);}});scene.add(floor);
-  programPerson=makePerson({hair:'#303038',skin:'#D7A37D',chip:'#465B70',lead:true});programPerson.position.set(-28,.12,0);programPerson.rotation.y=Math.PI/4;
-  programPerson.traverse(o=>{if(o.isMesh){o.userData.agentId='program-manager';personTargets.push(o);}});scene.add(programPerson);
-  const plant=makePlant();plant.position.set(-33,.12,-3);scene.add(plant);
-  programPill=document.createElement('div');programPill.className='pill program-manager-pill';programPill.innerHTML='<span class="star">◆</span> PROGRAM MANAGER';programPill.onclick=()=>tasks?.openProjects();hud.appendChild(programPill);
+// The CEO's desk at the front of the office. The Program Manager walks here when it needs you.
+const CEO_AT = new THREE.Vector3(13, 0.12, 0);
+let ceoPill = null, ceoScreen = null;
+{
+  const floor = makePlinth(8, 7, '#F1EBDD'); floor.position.set(CEO_AT.x, 0, CEO_AT.z);
+  floor.traverse(o => { if (o.isMesh) { o.userData.dept = 'ceo'; clickTargets.push(o); } }); scene.add(floor);
+  const station = new THREE.Group(); station.position.copy(CEO_AT); station.rotation.y = Math.PI / 4;
+  const { group: desk, screenSet } = makeDesk('#2F3B4C', { lead: true }); station.add(desk); ceoScreen = screenSet;
+  screenSet.draw(['Inbox', 'All clear'], 'idle'); screenSet.tex.needsUpdate = true;
+  const chair = makeChair(); chair.position.set(0, 0, 1.75); station.add(chair);
+  station.traverse(o => { if (o.isMesh) { o.userData.dept = 'ceo'; clickTargets.push(o); } }); scene.add(station);
+  ceoPill = document.createElement('div'); ceoPill.className = 'pill ceo-pill';
+  ceoPill.innerHTML = '<span class="pill-name">YOUR DESK</span><span class="pill-chip" hidden></span>';
+  ceoPill.onclick = () => tasks?.openInbox(); hud.appendChild(ceoPill);
 }
+const PM_AGENT = { id: 'pm', name: 'PROGRAM MANAGER', dept: 'pm', lead: true, role: 'Program Manager', does: 'Plans the work, brings in the right team leads and closes tasks once they approve.', grid: [0.5, 1.15], hair: '#303038', skin: '#D7A37D' };
 
 /* desks + people per dept */
 const COLS = { emails: 2, sales: 2, marketing: 2, ops: 2, fin: 2, delivery: 2 };
-for (const a of AGENTS) {
+for (const a of [...AGENTS, PM_AGENT]) {
   const dRT = deptRT[a.dept];
   const dept = DEPTS[a.dept];
   const L = dRT.L;
-  const cols = !DEMO && AGENTS.filter(x => x.dept === a.dept).length > 8 ? 3 : (COLS[a.dept] || 2);
+  const cols = AGENTS.filter(x => x.dept === a.dept).length > 8 ? 3 : (COLS[a.dept] || 2);
   const gx = (a.grid[0] - (cols - 1) / 2) * 8.6;
   const gz = (a.grid[1] - 1) * 6.4 - 1;
   const base = new THREE.Vector3(L.pos[0] + gx, 0.12, L.pos[1] + gz);
@@ -228,7 +203,7 @@ for (const a of AGENTS) {
   station.position.copy(base);
   station.rotation.y = ANG;
   const { group: desk, screenSet, activity } = makeDesk(dept.chip, { lead: !!a.lead });
-  if (!DEMO) { screenSet.draw(['Ready when you are'], 'idle'); screenSet.tex.needsUpdate = true; }
+  screenSet.draw(['Ready when you are'], 'idle'); screenSet.tex.needsUpdate = true;
   station.add(desk);
   screenSets.push({ screenSet, dept: a.dept });
   const chair = makeChair();
@@ -250,15 +225,15 @@ for (const a of AGENTS) {
   // name pill (HTML) — clickable, same as clicking the agent
   const pill = document.createElement('div');
   pill.className = 'pill';
-  pill.innerHTML = (a.lead ? '<span class="star">★</span>' : '') + esc(a.name);
-  pill.addEventListener('click', () => openAgent(a.id, DEMO ? 'chat' : 'activity'));
+  pill.innerHTML = `<span class="pill-name">${a.lead ? '<span class="star">★</span>' : ''}${esc(a.name)}</span><span class="pill-chip" hidden></span>`;
+  pill.addEventListener('click', () => openAgent(a.id, a.lead ? 'chat' : 'activity'));
   hud.appendChild(pill);
 
   R[a.id] = {
     a, person, warn, pill, desk, screenSet, activity, seat: person.position.clone(), seatRot: ANG + Math.PI,
     stand: person.position.clone().add(rot(new THREE.Vector3(1.5, 0, 0.15))),
     state: 'working', bob: Math.random() * 10, path: null, pathI: 0, speed: 9.5, ask: null,
-    v1: V1.find(x => x.id === a.id) || { role: a.role || a.name, tagline: a.does || '', greeting: 'Ready for your task.', chips: [], stats: [], chart: [], tasks: [] }, feed: [],
+    persona: { role: a.role || a.name, tagline: a.does || '', greeting: '', chips: [] }, feed: [],
   };
 }
 
@@ -266,20 +241,7 @@ for (const a of AGENTS) {
    V3.1: served, the list is the user's REAL MCP servers (GET /api/mcp) — the strip waits for it.
    Opened as a file the demo list plays at once. `mcp` is a thin proxy so the rest of the office
    never cares which it got. */
-let mcpImpl = null, mcpDark = false;
-const mcp = {
-  sprites: [],
-  tick: (...a) => mcpImpl && mcpImpl.tick(...a),
-  onAgentEvent: (...a) => mcpImpl && mcpImpl.onAgentEvent(...a),
-  onToolsUsed: (...a) => mcpImpl && mcpImpl.onToolsUsed(...a),
-  showTip: (...a) => mcpImpl && mcpImpl.showTip(...a),
-  startReveal: (...a) => mcpImpl && mcpImpl.startReveal(...a),
-  setDark: on => { mcpDark = on; if (mcpImpl) mcpImpl.setDark(on); },
-  setUsage: u => { mcpUsage = u; if (mcpImpl) mcpImpl.setUsage(u); }, // V3.6: the plan's gauge; kept until the strip exists
-  isLive: () => !!(mcpImpl && mcpImpl.live),
-};
-let mcpUsage = null;
-if (DEMO) loadConnectors().then(c => { mcpImpl = initMcp({ scene, hud, LAYOUT, DEPTS, FR, R, connectors: c }); if (mcpDark) mcpImpl.setDark(true); if (mcpUsage) mcpImpl.setUsage(mcpUsage); });
+const mcp = { sprites: [], tick() {}, onToolsUsed() {}, showTip() {}, setDark() {} }; // connectors live in Settings → Tools
 
 // plants on outer corners
 for (const k of DEPT_KEYS) {
@@ -327,33 +289,10 @@ function tickDim(dt) {
 }
 
 /* ---------- department billboards — v1's exact agreed metric rows + amber approval row ---------- */
-const kv = id => KPIS.find(k => k.id === id).val;
 let brainNotes = brain.state.notes;
-const BB_ROWS = {
-  emails: [
-    ['EMAILS SENT', () => STATS.emailsSent],
-    ['REPLIES DRAFTED', () => STATS.drafts]],
-  delivery: [
-    ['REPORTS SENT', () => STATS.reports],
-    ['ON TRACK', () => STATS.onTrack + ' / ' + STATS.projects]],
-  sales: [
-    ['CALLS S·A·J', () => STATS.spencer + '·' + STATS.arwin + '·' + STATS.jack],
-    ['NEW MANAGERS', () => STATS.managers],
-    ['AUTO-ONBOARDED', () => STATS.autoOnb]],
-  marketing: [
-    ['NEW INSIGHTS', () => STATS.insMkt],
-    ['COST PER USER', () => '$' + Math.round(STATS.cpa)]],
-  ops: [
-    ['PROPOSALS MADE', () => Math.round(kv('proposals'))],
-    ['NEW INSIGHTS', () => STATS.insOps]],
-  fin: [
-    ['INVOICES ISSUED', () => Math.round(kv('invoices'))],
-    ['BILLS PAID', () => STATS.billsPaid]],
-  brain: [
-    ['NOTES INDEXED', () => brainNotes.toLocaleString('en-NZ')]],
-};
-if (!DEMO) { document.body.classList.add('live-office'); for (const k of DEPT_KEYS) BB_ROWS[k] = []; }
-for (const k of [...DEPT_KEYS, 'brain']) {
+const BB_ROWS = Object.fromEntries([...DEPT_KEYS, 'pm'].map(k => [k, []]));
+document.body.classList.add('live-office');
+for (const k of [...DEPT_KEYS, 'pm']) {
   const dept = DEPTS[k];
   const n = AGENTS.filter(a => a.dept === k).length;
   const b = document.createElement('div');
@@ -364,18 +303,12 @@ for (const k of [...DEPT_KEYS, 'brain']) {
     <div class="b-metrics">${BB_ROWS[k].map((row, i) => `
       <div class="m-row"><span class="m-lab">${row[0]}</span><span class="m-val" data-m="${k}-${i}">${row[1]()}</span></div>`).join('')}
     </div>
-    <div class="b-appr" style="display:none">⚠ <span class="ap-n">1</span> WAITING APPROVAL</div>`;
+    <div class="b-appr" style="display:none"><span class="ap-n">1</span> NEED YOU</div>`;
   b.addEventListener('click', (e) => {
     if (e.target.closest('.b-appr')) { zoomToApproval(k); e.stopPropagation(); }
-    else if (DEMO && e.target.closest('.b-tasks') && tasks) { tasks.openFor(k); e.stopPropagation(); }
     else zoomToDept(k);
   });
-  if (k === 'brain') { // V3.6: a small tag names the etched floor and opens the graph (the big card stays retired)
-    b.className = 'badge brainTag';
-    b.innerHTML = `<div class="b-name"><span class="dot" style="background:${dept.chip}"></span>THE BRAIN<b>${brain.state.notes.toLocaleString('en-NZ')}</b>NOTES</div>`;
-    b.onclick = (e) => { e.stopPropagation(); brain.open(); };
-    b.title = 'open the Brain (G)';
-  }
+  if (k === 'pm') { b.className = 'badge pmTag'; b.innerHTML = `<div class="b-name"><span class="dot" style="background:${dept.chip}"></span>PROGRAM MANAGER</div>`; b.title = 'Talk to the Program Manager'; }
   hud.appendChild(b);
   deptRT[k].badge = b;
   deptRT[k].vals = BB_ROWS[k].map(row => String(row[1]()));
@@ -395,9 +328,9 @@ for (const k of [...DEPT_KEYS, 'brain']) {
     sales:     [48, 8.6, -32],     // over the pod's right corner — past the DELIVERY pod's desks and the Sales Lead pill
     ops:       [-13.5, 4, 54],     // side LEFT
     fin:       [43.5, 4, 17],      // side RIGHT
-    brain:     [-5.5, 3.2, -5.5],  // just above the pod's back corner
+    pm:        [-5.5, 3.2, -5.5],  // just above the pod's back corner
   };
-  deptRT[k].badgeAnchor = new THREE.Vector3(...((DEPT_KEYS.length>6 && k!=='brain') || !ANCHOR[k] ? [LAYOUT[k].pos[0],9,LAYOUT[k].pos[1]-LAYOUT[k].d/2-2] : ANCHOR[k]));
+  deptRT[k].badgeAnchor = new THREE.Vector3(...((DEPT_KEYS.length>6 && k!=='pm') || !ANCHOR[k] ? [LAYOUT[k].pos[0],9,LAYOUT[k].pos[1]-LAYOUT[k].d/2-2] : ANCHOR[k]));
   if (k === 'fin' && DEPT_KEYS.length<=6) deptRT[k].sideBadge = true;
   if (k === 'ops' && DEPT_KEYS.length<=6) { deptRT[k].sideBadge = true; deptRT[k].sideLeft = true; }
 }
@@ -421,22 +354,6 @@ function updateBillboards() {
   }
 }
 
-/* ---------- meeting bubble ---------- */
-const bubble = makeBubbleSprite();
-bubble.position.set(2, 5.4, 2); // meetings happen beneath the floating brain
-bubble.visible = false;
-scene.add(bubble);
-function makeBubbleSprite() {
-  const c = document.createElement('canvas'); c.width = c.height = 128;
-  const x = c.getContext('2d');
-  x.font = '96px serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillText('💬', 64, 70);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false }));
-  s.scale.set(4, 4, 1);
-  return s;
-}
-
 /* ---------- controls: wheel zoom-to-cursor, drag pan, click to fly ---------- */
 const ray = new THREE.Raycaster();
 const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -449,7 +366,9 @@ function worldAt(nx, ny) {
 let focused = null; // dept key when zoomed into a dept
 
 addEventListener('wheel', (e) => {
-  if (e.target.closest && e.target.closest('#rail')) return; // let the rail scroll
+  // Only the scene zooms. Wheel over the task panel, the rail, dialogs or settings scrolls them instead.
+  const overScene = e.target === canvas || (e.target.closest && e.target.closest('#hud'));
+  if (!overScene) return;
   e.preventDefault();
   tween = null;
   view.arc = 0;
@@ -496,14 +415,13 @@ addEventListener('pointerup', (e) => {
   const pHits = ray.intersectObjects(personTargets, false);
   if (pHits.length) {
     // clicking an agent opens its rail — a stuck agent opens straight to Chat (v1 rule)
-    if(pHits[0].object.userData.agentId==='program-manager'){tasks?.openProjects();return;}
-    openAgent(pHits[0].object.userData.agentId, DEMO ? 'chat' : 'activity');
+    { const id = pHits[0].object.userData.agentId; openAgent(id, R[id]?.a.lead ? 'chat' : 'activity'); }
     return;
   }
   const hits = ray.intersectObjects(clickTargets, false);
   if (hits.length) {
     const dk = hits[0].object.userData.dept;
-    if(dk==='program'){tasks?.openProjects();return;}
+    if (dk === 'ceo') { tasks?.openInbox(); return; }
     if (dk === 'brain') { brain.open(); return; } // V3.6: the Brain opens as the graph
     if (dk !== focused) enterFocus(dk);
   }
@@ -516,7 +434,7 @@ addEventListener('keydown', (e) => {
   else if (e.key === '+' || e.key === '=') zoomStep(1.5);
   else if (e.key === '-' || e.key === '_') zoomStep(1 / 1.5);
   else if (e.key === '0') zoomOut();
-  else if (e.key === 'x' || e.key === 'X') { if (!meeting) planMeeting(performance.now()); }
+  else if (e.key === 'i' || e.key === 'I') tasks?.openInbox();
   else if (e.key >= '1' && e.key <= '6') { // jump straight to a department
     const dept = ['marketing', 'emails', 'sales', 'ops', 'fin', 'delivery'][+e.key - 1];
     if (focused !== dept) enterFocus(dept);
@@ -529,7 +447,6 @@ addEventListener('keydown', (e) => {
   }
   else if (e.key === 'v' || e.key === 'V') setCam(!document.body.classList.contains('cam'));
   else if (e.key === 'd' || e.key === 'D') setDark(!darkOn);
-  else if (DEMO && (e.key === 'w' || e.key === 'W')) requestApproval('apay'); // demo cue: Accounts Payable asks for approval
 });
 
 // camera mode: mid-tone backdrop for filming the screen (#cam=1 / V toggles)
@@ -549,7 +466,7 @@ function setDark(on) {
     const m = o.material; if (!m.userData.base) m.userData.base = m.color.clone();
     if (o.userData.part === 'plinth') m.color.set(darkOn ? DARK.plinth : m.userData.base);
     else if (o.userData.part === 'walkway') m.color.set(darkOn ? DARK.walkway : m.userData.base);
-    else if (o.userData.part === 'floor') m.color.copy(darkOn ? mix(o.userData.chip, '#1b1c1a', o.userData.dept === 'brain' ? 0.07 : 0.22) : m.userData.base); // the Brain's pale sage needs a lighter touch
+    else if (o.userData.part === 'floor') m.color.copy(darkOn ? mix(o.userData.chip, '#1b1c1a', o.userData.dept === 'pm' ? 0.07 : 0.22) : m.userData.base); // the Brain's pale sage needs a lighter touch
   });
   hemi.color.set(darkOn ? 0x8e95a3 : 0xfdfff8); hemi.groundColor.set(darkOn ? 0x14151a : 0xd8d4c8); hemi.intensity = darkOn ? 0.75 : 0.85;
   key.color.set(darkOn ? 0xe4e9f2 : 0xfff1dd); key.intensity = darkOn ? 1.5 : 2.2;
@@ -598,17 +515,17 @@ const vignette = document.getElementById('vignette');
 const mMsgs = document.getElementById('mMsgs');
 let modalOpen = null, modalTab = 'chat'; // modalOpen = agent id open in the rail slide-over
 // V3.3: the rail docks LEFT for every department — the task panel has the right side
-const RAIL_SIDE = Object.fromEntries(DEPT_KEYS.map(k=>[k,'left']));
+const RAIL_SIDE = Object.fromEntries([...DEPT_KEYS, 'pm'].map(k=>[k,'left']));
 const SCREEN_RIGHT = new THREE.Vector3(1, 0, -1).normalize();
 
 function ensureChat(id) {
   if (chatHist[id]) return;
-  const v = R[id].v1;
-  chatHist[id] = [
-    { who: 'agent', text: DEMO ? v.greeting : (R[id].a.lead ? `I coordinate ${DEPTS[R[id].a.dept].name}. My team includes ${Object.values(R).filter(r=>r.a.dept===R[id].a.dept&&!r.a.lead).map(r=>r.a.name).join(', ')}. Send a request and I’ll plan, delegate and verify the work.` : `I’m ${R[id].a.name}. ${R[id].a.does || R[id].a.role || ''}`) },
-    { who: 'work', i: '⏺', text: DEMO ? 'Demo activity' : 'Only your real tasks and results appear here.' },
-  ];
-  if (FILE_GEN[id] && DEMO) chatHist[id].push({ who: 'file', ...FILE_GEN[id]() }); // demo-only sample file; a live office shows real deliverables
+  const r = R[id];
+  const greeting = id === 'pm' ? 'I coordinate every team. Tell me what you need and I will bring in the right leads, or ask me about any task.'
+    : r.a.lead ? `I lead ${DEPTS[r.a.dept].name}. Tell me what you need and I will plan it, delegate it and review the result. Type @ to pick a task to correct or ask about.`
+    : `I am ${r.a.name}. Ask me about my work. Corrections to a task go through my team lead.`;
+  chatHist[id] = [{ who: 'agent', text: greeting }];
+  tasks?.loadHistory?.(id).then(messages => { if (messages?.length) { chatHist[id].push(...messages); if (modalOpen === id && modalTab === 'chat') renderChat(id); } }).catch(() => {});
 }
 function chatPush(id, msg) {
   ensureChat(id);
@@ -619,8 +536,8 @@ function chatPush(id, msg) {
 function renderChat(id) {
   const r = R[id];
   mMsgs.innerHTML = chatHist[id].map((m, i) => {
-    if (m.who === 'agent') return `<div class="m-agent">${esc(m.text)}${m.taskId ? `<button class="space-chat-task" data-chat-task="${esc(m.taskId)}">Open plan, progress & result ↗</button>` : ''}</div>`;
-    if (m.who === 'user') return `<div class="m-user">${esc(m.text)}</div>`;
+    if (m.who === 'agent') return `<div class="m-agent">${esc(m.text)}${m.taskId ? `<button class="space-chat-task" data-chat-task="${esc(m.taskId)}">Open the task ↗</button>` : ''}${m.suggestedTask ? `<div class="chat-suggest"><button type="button" data-make-task="${i}">Make this a task</button><button type="button" class="secondary" data-ask-lead="${i}">Send to my lead</button></div>` : ''}</div>`;
+    if (m.who === 'user') return `<div class="m-user">${m.about ? `<span class="chat-about">${esc(m.about)}</span>` : ''}${esc(m.text)}</div>`;
     if (m.who === 'work') return `<div class="m-work"><span class="wi">${m.i || '▸'}</span>${esc(m.text)}</div>`;
     if (m.who === 'file') return `
       <div class="m-file" data-i="${i}">
@@ -641,29 +558,11 @@ function renderChat(id) {
   mMsgs.querySelectorAll('[data-chat-task]').forEach(el=>el.onclick=()=>tasks.openTask(el.dataset.chatTask));
   mMsgs.querySelectorAll('.m-file').forEach(el =>
     el.addEventListener('click', () => el.classList.toggle('exp')));
-  mMsgs.querySelectorAll('.m-appr .a-yes').forEach(el =>
-    el.addEventListener('click', () => resolveApproval(id, true)));
-  mMsgs.querySelectorAll('.m-appr .a-no').forEach(el =>
-    el.addEventListener('click', () => resolveApproval(id, false)));
+  mMsgs.querySelectorAll('[data-make-task]').forEach(el => el.onclick = () => tasks.makeTaskFrom(chatHist[id][+el.dataset.makeTask].suggestedTask));
+  mMsgs.querySelectorAll('[data-ask-lead]').forEach(el => el.onclick = () => { const s = chatHist[id][+el.dataset.askLead].suggestedTask, lead = AGENTS.find(x => x.dept === s.dept && x.lead); if (lead) { openAgent(lead.id, 'chat'); setTimeout(() => { const box = document.getElementById('mIn'); box.value = s.text; box.focus(); }, 700); } });
   mMsgs.scrollTop = mMsgs.scrollHeight;
 }
-function renderActivity(id) {
-  if (!DEMO && tasks?.renderAgent) { tasks.renderAgent(id); return; }
-  const r = R[id], v = r.v1;
-  const task = DEMO ? rnd(v.tasks || ['Working through the queue'])
-    .replace('{co}', rnd(P.co)).replace('{person}', person()).replace('{count}', ri(3, 9)) : (tasks?.tasks.find(t => t.agent === id && t.state === 'doing')?.title || 'Ready for your next task');
-  document.getElementById('mNow').innerHTML = `NOW &nbsp;<b>${esc(task)}</b>`;
-  document.getElementById('mStats').innerHTML = (DEMO ? v.stats || [] : []).map(([l, val]) => `
-    <div class="st"><div class="st-l">${esc(l)}</div><div class="st-v">${esc(String(typeof val === 'function' ? val() : val))}</div></div>`).join('');
-  const chip = DEPTS[r.a.dept].chip;
-  document.getElementById('mChart').hidden = !DEMO;
-  const mx = Math.max(...(v.chart || [1]));
-  document.querySelector('#mChart .ch-lbl').textContent = v.chartLbl || '';
-  document.querySelector('#mChart .ch-bars').innerHTML = (v.chart || []).map(n =>
-    `<i style="height:${Math.round(n / mx * 100)}%;background:${chip}"></i>`).join('');
-  document.getElementById('mFeed').innerHTML = r.feed.map(f => `
-    <div class="fe"><span class="fi">${f.i}</span><span>${esc(f.text)}</span><span class="ft">${ago(f.ts)}</span></div>`).join('');
-}
+function renderActivity(id) { tasks.renderAgent(id); }
 /* camera target offset so the pod sits beside the rail, not behind it */
 function focusTarget(k, atPos) {
   const base = atPos ? [atPos.x, 0, atPos.z] : [LAYOUT[k].pos[0], 0, LAYOUT[k].pos[1] + 1];
@@ -701,8 +600,8 @@ function enterFocus(k, pendingAgentId) {
   rail.style.display = 'block';
   // V3.4: the rail IS the chat — it opens on the department lead (or first agent) at once
   // (after the className reset above, which would otherwise drop the agentOpen state)
-  const first = pendingAgentId || (AGENTS.find(x => x.dept === k && x.lead) || AGENTS.find(x => x.dept === k)).id;
-  openAgentRail(first, pendingAgentId ? pendingTab : (DEMO ? 'chat' : 'activity'), false);
+  const first = pendingAgentId || (k === 'pm' ? 'pm' : (AGENTS.find(x => x.dept === k && x.lead) || AGENTS.find(x => x.dept === k)).id);
+  openAgentRail(first, pendingAgentId ? pendingTab : 'chat', false);
   document.getElementById('overviewBtn').classList.toggle('right', RAIL_SIDE[k] === 'left');
   requestAnimationFrame(() => requestAnimationFrame(() => {
     rail.classList.add('open');
@@ -728,21 +627,19 @@ function exitFocus(flyOut = true) {
 }
 function buildDeptRail(k) {
   const dept = DEPTS[k];
-  const n = AGENTS.filter(a => a.dept === k).length;
+  const n = k === 'pm' ? DEPT_KEYS.length : AGENTS.filter(a => a.dept === k).length;
   const rh = document.getElementById('railHeader');
   rh.classList.remove('show');
   rh.innerHTML = `
     <div class="b-name"><span class="dot" style="background:${dept.chip}"></span>${esc(dept.name)}<span class="live"></span></div>
-    <div class="b-count"><span class="b-num">${n}</span><span class="b-lab">AGENTS</span></div>
+    <div class="b-count"><span class="b-num">${n}</span><span class="b-lab">${k === 'pm' ? 'TEAMS' : 'AGENTS'}</span></div>
     <div class="b-metrics">${BB_ROWS[k].map((row, i) => `
       <div class="m-row"><span class="m-lab">${row[0]}</span><span class="m-val" data-rm="${k}-${i}">${row[1]()}</span></div>`).join('')}</div>
     ${tasks ? tasks.rowHTML(k) : ''}
-    <div class="b-appr" style="display:${stuckIn(k).length ? 'flex' : 'none'}">⚠ <span class="ap-n">${stuckIn(k).length}</span> WAITING APPROVAL</div>`;
-  const trow = rh.querySelector('.b-tasks');
-  if (trow && DEMO) trow.addEventListener('click', () => tasks.toggle());
+    <div class="b-appr" style="display:${stuckIn(k).length ? 'flex' : 'none'}"><span class="ap-n">${stuckIn(k).length}</span> NEED YOU</div>`;
   rh.querySelector('.b-appr').addEventListener('click', () => {
     const s = stuckIn(k)[0];
-    if (s) openAgentRail(s.a.id);
+    if (s) openAgentRail(s.a.id, 'activity');
   });
   // V3.7 (AJ, 6 Sep): the agent-chip strip is gone — click an agent in the scene to talk to them
 }
@@ -783,9 +680,10 @@ function openAgentRail(id, tab = 'chat', fly = true) {
   document.querySelector('#railAgent .mh-dot').style.background = dept.chip;
   document.querySelector('#railAgent .mh-name').innerHTML =
     (r.a.lead ? '<span class="star">★ </span>' : '') + r.a.name;
-  document.querySelector('#railAgent .mh-role').textContent = `${r.v1.role} · ${dept.name}`;
-  document.querySelector('#railAgent .mh-tag').textContent = r.v1.tagline;
-  document.getElementById('mChips').innerHTML = (r.v1.chips || []).map(c =>
+  document.querySelector('#railAgent .mh-role').textContent = `${r.persona.role} · ${dept.name}`;
+  document.querySelector('#railAgent .mh-tag').textContent = r.persona.tagline;
+  tasks?.chatContext?.(id, true);
+  document.getElementById('mChips').innerHTML = (r.persona.chips || []).map(c =>
     `<button>${esc(c)}</button>`).join('');
   document.getElementById('mChips').querySelectorAll('button').forEach(b =>
     b.addEventListener('click', () => sendChat(b.textContent)));
@@ -802,7 +700,7 @@ function reframe() {
 }
 function railBack() { // V3.4: "back" = back to the pod view, chat stays on the lead
   if (!focused || focused === 'brain') return;
-  const lead = AGENTS.find(x => x.dept === focused && x.lead) || AGENTS.find(x => x.dept === focused);
+  const lead = focused === 'pm' ? R.pm.a : AGENTS.find(x => x.dept === focused && x.lead) || AGENTS.find(x => x.dept === focused);
   openAgentRail(lead.id, 'chat', false);
   const t = focusTarget(focused);
   flyTo(t.pos, t.zoom, 500);
@@ -810,7 +708,7 @@ function railBack() { // V3.4: "back" = back to the pod view, chat stays on the 
 document.getElementById('railBack').addEventListener('click', railBack);
 let pendingTab = 'chat';
 // compat entry point (person clicks, pills, CC export): route through focus mode
-function openAgent(id, tab = DEMO ? 'chat' : 'activity') {
+function openAgent(id, tab = 'activity') {
   const dept = R[id].a.dept;
   if (focused === dept) { openAgentRail(id, tab); return; }
   pendingTab = tab;
@@ -829,261 +727,51 @@ document.querySelectorAll('#rail .mtabs button').forEach(b =>
 function sendChat(text) {
   const id = modalOpen;
   if (!id || !text.trim()) return;
-  const r = R[id];
-  chatPush(id, { who: 'user', text });
+  const r = R[id], context = tasks.chatContext(id);
+  chatPush(id, { who: 'user', text, about: context.about });
   document.getElementById('mIn').value = '';
-  const low = text.toLowerCase();
-  setTimeout(async () => {
-    if (tasks && tasks.pendingReject(id)) { tasks.rejectLive(id, text); return; } // V3.5: the line after REJECT is the note the agent reworks with
-    if (r.state === 'stuck' && /\b(approve|reject)\b/.test(low)) {
-      resolveApproval(id, /approve/.test(low));
-      return;
-    }
-    const rv = tasks && tasks.isLive() && text.match(/^\s*revise\s*[:\-–]\s*(.+)$/i); // LIVE: "revise: …" re-runs the last deliverable
-    if (rv && tasks.revise(id, rv[1].trim())) { chatPush(id, { who: 'agent', text: 'On it — revising now. It will land here when it is ready.' }); return; }
-    const tr = tasks && await tasks.handleChat(id, text); // "add task: …" / "what's on the board"
-    if (tr) { chatPush(id, { who: 'agent', text: tr }); return; }
-    if (tasks && tasks.isLive()) { // LIVE: a real conversation with the agent, grounded in the brain
-      chatPush(id, { who: 'work', i: '…', text: `${r.a.name} is thinking` });
-      fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ agent: id, text, history: chatHist[id].filter(m => m.who === 'user' || m.who === 'agent').slice(-8) }) })
-        .then(async res => { if (!res.ok) throw new Error((await res.json()).error || res.statusText); return res.json(); })
-        .then(j => {
-          const h = chatHist[id]; const k = h.findIndex(m => m.who === 'work' && m.text === `${r.a.name} is thinking`); if (k >= 0) h.splice(k, 1);
-          chatPush(id, { who: 'agent', text: j.reply, taskId:j.taskId });
-          if(j.taskId)tasks.refresh();
-          if (j.routines && tasks.refresh) tasks.refresh(); // a routine was set, paused, run or deleted in chat
-          if (j.read) for (const n of j.read.slice(0, 2)) brain.readNote(id, n);
-          if (j.tools && j.tools.length) mcp.onToolsUsed(id, j.tools);
-        })
-        .catch(e => chatPush(id, { who: 'agent', text: `I couldn't reach Claude (${e.message}).` }));
-      return;
-    }
-    const hit = (r.v1.chat || []).find(c => c.k.some(k => low.includes(k)));
-    const reply = hit ? rnd(hit.r) : rnd(r.v1.fallback || ['On it.']);
-    chatPush(id, { who: 'agent', text: reply });
-  }, 450 + Math.random() * 500);
+  const thinking = `${r.a.name} is thinking`;
+  const clear = () => { const h = chatHist[id], k = h.findIndex(m => m.who === 'work' && m.text === thinking); if (k >= 0) h.splice(k, 1); };
+  (async () => {
+    if (!context.taskId) { const handled = await tasks.handleChat(id, text); if (handled) { chatPush(id, { who: 'agent', text: handled }); return; } }
+    chatPush(id, { who: 'work', i: '…', text: thinking });
+    try {
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ agent: id, text, taskId: context.taskId, refs: context.refs, kind: context.kind, remember: context.remember }) });
+      const j = await res.json(); if (!res.ok) throw new Error(j.error || res.statusText);
+      clear(); chatPush(id, { who: 'agent', text: j.reply, taskId: j.taskId, suggestedTask: j.suggestedTask });
+      tasks.chatSent(id);
+      if (j.taskId || j.routines) tasks.refresh();
+      if (j.read) for (const n of j.read.slice(0, 2)) brain.readNote(id, n);
+    } catch (e) { clear(); chatPush(id, { who: 'agent', text: `I could not answer that: ${e.message}` }); }
+  })();
 }
 document.getElementById('mSend').addEventListener('click', () =>
   sendChat(document.getElementById('mIn').value));
 document.getElementById('mIn').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') sendChat(e.target.value);
   e.stopPropagation();
+  if (tasks?.chatPickerKey?.(e)) return; // the @ task picker takes arrows and Enter while it is open
+  if (e.key === 'Enter') sendChat(e.target.value);
 });
+document.getElementById('mIn').addEventListener('input', (e) => tasks?.chatInput?.(modalOpen, e.target));
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function ago(ts) {
   const m = Math.round((Date.now() - ts) / 60000);
   return m < 1 ? 'now' : m < 60 ? m + 'm ago' : Math.round(m / 60) + 'h ago';
 }
 
-/* ---------- approval mockups — show AJ exactly what he's approving ---------- */
-function mockupFor(id) {
-  const chip = DEPTS[R[id].a.dept].chip;
-  switch (id) {
-    case 'apay': return `<div class="mk mk-doc">
-      <div class="d-brand">INVOICE AUDIT — #218</div>
-      <div class="d-title">Design contractor</div>
-      <div class="d-line"><span>Invoiced</span><b>14 hrs × $110 = $1,540</b></div>
-      <div class="d-line"><span>Contract rate</span><b>$85/hr (signed 12 Mar)</b></div>
-      <div class="d-line"><span>Variance</span><b>+$350 ⚠</b></div>
-      <div class="d-line"><span>Scope</span><b>matches the brief ✓</b></div>
-      <div class="d-p">Hours and scope check out — only the rate is off, and there's no signed variation covering it. Recommend holding payment and querying the rate before it's paid.</div></div>`;
-    case 'piper': return `<div class="mk mk-doc">
-      <div class="d-brand">AGENTS OFFICE — PROPOSAL</div>
-      <div class="d-title">Ridgeline Property Group</div>
-      <div class="d-line"><span>Seats</span><b>12</b></div>
-      <div class="d-line"><span>Plan</span><b>Growth</b></div>
-      <div class="d-line"><span>Price</span><b>$1,080/mo · 12-mo lock</b></div>
-      <div class="d-p">Proof point: Auckland roofing co — 0 → 40 tracked calls/week in 14 days. Sign-online link included.</div></div>`;
-    case 'bill': return `<div class="mk mk-doc">
-      <div class="d-brand">REFUND VERIFICATION</div>
-      <div class="d-title">Harbour City Roofing — $680</div>
-      <div class="d-line"><span>Reason</span><b>double payment, two cards</b></div>
-      <div class="d-line"><span>Txn #1 / #2</span><b>verified ✓ / duplicate ✓</b></div>
-      <div class="d-line"><span>Account</span><b>14 months, good standing</b></div>
-      <div class="d-p">Legit case. Above my $500 limit — releases the moment you approve.</div></div>`;
-    case 'iggy': return `<div class="mk-phone">
-      <div class="ph-handle"></div>
-      <div class="ph-hook">“calls before 10am are a trap”</div>
-      <div class="ph-sub">connect rates nearly double 10:00–11:30am — across 40,000 dials</div>
-      <div class="ph-ui"><span>♥ 2.4k</span><span>💬 118</span><span>↗ share</span></div></div>`;
-    case 'ada': return `<div class="mk mk-ad">
-      <div class="ad-head"><div class="ad-av"></div><div><div class="ad-who">sahni.ai</div><div class="ad-sp">Sponsored</div></div></div>
-      <div class="ad-text">Cold call anxiety? Your first 5 dials decide your whole day…</div>
-      <div class="ad-media" style="background:linear-gradient(135deg, ${chip}55, ${chip}22)">“the 10am rule — call when they answer”</div>
-      <div class="ad-foot"><span class="ad-hl">Start your free trial</span><span class="ad-cta">SIGN UP</span></div>
-      <div class="ad-stat">CPA $29 · best performer · scaling to $180/day</div></div>`;
-    case 'newt': return `<div class="mk mk-mail">
-      <div class="ml-lab">SUBJECT A</div><div class="ml-sub">calls before 10am are a trap</div>
-      <div class="ml-lab">SUBJECT B</div><div class="ml-sub">we looked at 40,000 calls — call at this time</div>
-      <div class="ml-body">  before 10am ...... 11% connect
-  10:00–11:30 ...... 21% connect
-  after 4pm ........ 9% connect
-
-→ 3,400 subscribers · CTA: reply "10AM"</div></div>`;
-    case 'scout': return `<div class="mk mk-doc">
-      <div class="d-brand">OPPORTUNITY MEMO</div>
-      <div class="d-title">CallForge +8% price rise</div>
-      <div class="d-line"><span>Window</span><b>2–3 weeks</b></div>
-      <div class="d-line"><span>Play</span><b>comparison page + retargeting</b></div>
-      <div class="d-line"><span>Briefed</span><b>META ADS · PROPOSALS</b></div>
-      <div class="d-p">Their G2 reviews already flag value-for-money. Talk-track: 12-month price lock.</div></div>`;
-    case 'enzo': return `<div class="mk mk-doc">
-      <div class="d-brand">PURCHASE ORDER</div>
-      <div class="d-title">FullEnrich — 500 credits</div>
-      <div class="d-line"><span>Cost</span><b>$250 ($0.50/credit)</b></div>
-      <div class="d-line"><span>Current balance</span><b>38 credits — out tomorrow</b></div>
-      <div class="d-line"><span>Burn rate</span><b>~90/week</b></div>
-      <div class="d-p">Same card as last month. Without credits, enrichment stops and the Sales Lead runs dry.</div></div>`;
-    default: {
-      // generic: render the agent's own deliverable in a document frame
-      if (!FILE_GEN[id]) return '';
-      const f = FILE_GEN[id]();
-      return `<div class="mk mk-doc">
-        <div class="d-brand">${esc(f.name)}</div>
-        <div class="ml-body" style="border:0;margin:0;padding:6px 0 0">${esc(f.content.split('\n').slice(0, 9).join('\n'))}</div></div>`;
-    }
-  }
-}
-
-/* ---------- approvals: agent STUCK → amber billboard row → chat approval message ---------- */
-function requestApproval(id, ask) {
-  if (!DEMO) return;
-  const r = R[id];
-  if (!r || r.state !== 'working') return;
-  r.state = 'stuck';
-  r.ask = ask || APPROVAL_BY_AGENT[id] || sample(APPROVAL_ASKS[r.a.dept], 1)[0];
-  r.warn.visible = true;
-  const hadChat = !!chatHist[id]; // fresh chats already seed the deliverable card
-  chatPush(id, { who: 'appr', text: r.ask, pending: true, mock: mockupFor(id) });
-  if (FILE_GEN[id] && hadChat) chatPush(id, { who: 'file', ...FILE_GEN[id]() });
-  if (tasks) tasks.onStuck(id, r.ask);
-  syncApprovals();
-}
-// V3.5: a routine's draft is waiting for the owner's OK — the agent stands and waves like any approval; the chat already holds the draft card
-function setStuckLive(id, ask, sid) {
-  const r = R[id]; if (!r) return;
-  r.state = 'stuck'; r.ask = ask; r.liveSid = sid; r.warn.visible = true;
-  syncApprovals();
-}
-function resolveApproval(id, approved) {
-  const r = R[id];
-  if (!r || r.state !== 'stuck') return;
-  r.state = 'working';
-  r.ask = null;
-  r.warn.visible = false;
-  const msg = chatHist[id] && [...chatHist[id]].reverse().find(m => m.who === 'appr' && m.pending);
-  if (msg) { msg.pending = false; msg.approved = approved; }
-  // visible reaction in the scene: cheer + ✅, or slump + ❌
-  const now = performance.now();
-  if (approved) r.cheerUntil = now + 2400; else r.slumpUntil = now + 2600;
-  spawnEmote(r, approved ? '✅' : '❌');
-  if (r.liveSid) { r.liveSid = null; if (tasks) tasks.resolveLive(id, approved); syncApprovals(); return; } // live: APPROVE sends, REJECT asks for the note
-  if (tasks) tasks.onResolve(id, approved);
-  chatPush(id, {
-    who: 'agent',
-    text: approved ? '✓ Approved — actioning it now. I\'ll log the result in my activity.'
-                   : '✗ Understood — parked. I\'ll adjust and come back with a better version.',
-  });
-  syncApprovals();
-}
-function stuckIn(dept) { return Object.values(R).filter(r => r.state === 'stuck' && r.a.dept === dept); }
+/* ---------- needs you: people waiting on the CEO show on their team's card ---------- */
+function stuckIn(dept) { return Object.values(R).filter(r => r.a.dept === dept && r.livePhase === 'needs'); }
 function syncApprovals() {
-  let total = 0;
-  for (const k of DEPT_KEYS) {
-    const n = stuckIn(k).length; total += n;
-    deptRT[k].apprRow.style.display = n ? 'flex' : 'none';
-    deptRT[k].apprN.textContent = n;
-  }
-  const top = document.getElementById('topAppr');
-  top.style.display = total ? 'inline-flex' : 'none';
-  top.querySelector('span').textContent = total;
-  // mirror into the docked rail header + row status tags
-  if (focused && focused !== 'brain') {
-    const n = stuckIn(focused).length;
-    const rh = document.getElementById('railHeader');
-    const ap = rh.querySelector('.b-appr');
-    if (ap) { ap.style.display = n ? 'flex' : 'none'; ap.querySelector('.ap-n').textContent = n; }
-  }
+  for (const k of DEPT_KEYS) { const n = stuckIn(k).length; if (deptRT[k].apprRow) { deptRT[k].apprRow.style.display = n ? 'flex' : 'none'; deptRT[k].apprN.textContent = n; } }
+  if (focused && focused !== 'brain') { const ap = document.querySelector('#railHeader .b-appr'); if (ap) { const n = stuckIn(focused).length; ap.style.display = n ? 'flex' : 'none'; ap.querySelector('.ap-n').textContent = n; } }
 }
 function zoomToApproval(dept) {
   const s = stuckIn(dept)[0];
   if (!s) { enterFocus(dept); return; }
-  if (focused === dept) openAgentRail(s.a.id);
-  else enterFocus(dept, s.a.id);
+  if (focused === dept) openAgentRail(s.a.id, 'activity'); else { pendingTab = 'activity'; enterFocus(dept, s.a.id); }
 }
-document.getElementById('topAppr').addEventListener('click', () => {
-  const s = Object.values(R).find(r => r.state === 'stuck');
-  if (s) zoomToApproval(s.a.dept);
-});
-
-/* ---------- event engine: weighted v1 templates → feed + chat + billboards ---------- */
-function weightedEv(evs) {
-  const tot = evs.reduce((s, e) => s + (e.p || 1), 0);
-  let x = Math.random() * tot;
-  for (const e of evs) { x -= (e.p || 1); if (x <= 0) return e; }
-  return evs[0];
-}
-function fireAgentEvent(seedTs) {
-  if (!DEMO) return;
-  const ids = Object.keys(R).filter(id => R[id].v1 && R[id].v1.ev && R[id].state !== 'stuck');
-  const r = R[ids[Math.floor(Math.random() * ids.length)]];
-  const ev = weightedEv(r.v1.ev);
-  const text = ev.t();
-  r.feed.unshift({ i: ev.i, text, ts: seedTs || Date.now() });
-  if (r.feed.length > 30) r.feed.pop();
-  if (!seedTs) {
-    spawnEmote(r, ev.i); // real work events pop their icon over the desk
-    mcp.onAgentEvent(r.a.id, r.a.dept, r.seat, performance.now()); // tool tile pulses + packet beam
-    if (focused === r.a.dept) { // live-update the rail activity row
-      const line = document.querySelector(`[data-line="${r.a.id}"]`);
-      if (line) line.textContent = ev.i + ' ' + text;
-    }
-    if (chatHist[r.a.id]) chatPush(r.a.id, { who: 'work', i: ev.i, text });
-    if (ev.kpi) { const k = KPIS.find(x => x.id === ev.kpi.id); if (k) k.val += ev.kpi.n; }
-    const d = r.a.dept, roll = Math.random();
-    if (d === 'emails') { if (roll < 0.45) STATS.emailsSent++; else if (roll < 0.7) STATS.drafts++; }
-    else if (d === 'delivery' && roll < 0.2) STATS.reports++;
-    else if (d === 'sales') {
-      if (roll < 0.4) STATS[rnd(['spencer', 'arwin', 'jack'])]++;
-      else if (roll < 0.5) STATS.autoOnb++;
-      else if (roll < 0.56) STATS.managers++;
-    }
-    else if (d === 'marketing') {
-      if (roll < 0.18) STATS.insMkt++;
-      else if (roll < 0.5) STATS.cpa = Math.max(25, STATS.cpa + (Math.random() - 0.55) * 1.2);
-    }
-    else if (d === 'ops' && roll < 0.22) STATS.insOps++;
-    else if (d === 'fin' && roll < 0.3) STATS.billsPaid++;
-    if (ev.brain || Math.random() < 0.12) { brainNotes++; brain.read(r.a.id); } // the Brain shows the read
-    updateBillboards();
-    if (modalOpen === r.a.id && modalTab === 'activity') renderActivity(r.a.id);
-  }
-}
-// seed a believable history so Activity isn't empty at boot
-for (let i = 0; i < 170; i++) fireAgentEvent(Date.now() - ri(2, 200) * 60000);
-for (const r of Object.values(R)) r.feed.sort((a, b) => b.ts - a.ts);
 
 /* ---------- minimal sim: work bobs, screen updates, brain meetings ---------- */
-let meeting = null; // Brain meetings fire ONLY on the X hotkey (AJ's call — demo cue, not ambient)
-let nextApprovalAt = performance.now() + 20000;
-let nextMetricAt = performance.now() + 3000;
-let nextEmoteAt = performance.now() + 2000;
-
-function planMeeting(now) {
-  const ids = Object.keys(R).filter(id => R[id].state === 'working');
-  const a = R[ids[Math.floor(Math.random() * ids.length)]];
-  let b = a;
-  while (b.a.dept === a.a.dept) b = R[ids[Math.floor(Math.random() * ids.length)]];
-  for (const [i, r] of [a, b].entries()) {
-    const d = deptRT[r.a.dept];
-    const stand = new THREE.Vector3(2 + (i ? 3.4 : -3.4), 0.12, 2 + 2.6);
-    r.path = [r.seat.clone(), d.gate.clone().setY(0.12), d.brainGate.clone().setY(0.12), stand];
-    r.pathI = 0; r.state = 'walking';
-  }
-  meeting = { a, b, phase: 'gather', endAt: 0 };
-}
-
 function walkStep(r, dt) {
   const cur = r.person.position, tgt = r.path[r.pathI];
   const d = new THREE.Vector3().subVectors(tgt, cur); d.y = 0;
@@ -1101,26 +789,6 @@ function walkStep(r, dt) {
   return false;
 }
 
-// desk-life variety: each agent cycles through work modes on its own clock
-// no 'stretch' — AJ found the stand-up stretches annoying (1 Aug). Last entry = pick fallback.
-const WORK_MODES = [
-  ['type', 0.30, 4000, 7500], ['read', 0.18, 3500, 6500], ['phone', 0.16, 4000, 8000],
-  ['glance', 0.17, 2000, 3500], ['sip', 0.11, 2500, 4000], ['spin', 0.08, 1400, 2000],
-];
-function pickWorkMode(r, now) {
-  let x = Math.random();
-  for (const [mode, w, dMin, dMax] of WORK_MODES) {
-    x -= w;
-    if (x <= 0 || mode === WORK_MODES[WORK_MODES.length - 1][0]) {
-      r.workMode = mode;
-      r.modeStart = now;
-      r.modeUntil = now + dMin + Math.random() * (dMax - dMin);
-      if (mode === 'glance')
-        r.person.userData.glanceDir = (Math.random() < 0.5 ? -1 : 1) * (0.45 + Math.random() * 0.25);
-      return;
-    }
-  }
-}
 // standing modes drift the agent from the chair to a spot beside the desk, and can re-face the camera
 const FACE_CAM = Math.PI / 4;
 function applyStandAndFacing(r, mode, now, dt) {
@@ -1180,40 +848,32 @@ function tickEmotes(now, dt) {
   }
 }
 function tickSim(now, dt) {
-  if(programPerson){posePerson(programPerson,'stand',now);const p=tasks?.projectActivity();const phase=p?.state;programPill.classList.toggle('is-working',!!p);programPill.classList.toggle('is-supervising',['planning','verifying'].includes(phase));programPill.dataset.workState=phase==='running'?'Coordinating teams':phase || '';programPill.title=p?p.title:'Projects · Scope, team delivery & reporting';}
 
   for (const r of Object.values(R)) {
     if (r.state === 'working') {
-      if (!DEMO) {
+      {
         const work = tasks?.agentActivity(r.a.id);
-        const active = !!work && !['done','submitted'].includes(work.phase);
-        const phase = work?.phase || 'idle';
-        const motion = active ? (phase === 'reviewing' || phase === 'planning' ? 'read' : 'type') : 'idle';
+        const phase = work?.phase || 'idle', active = ['working', 'planning', 'reviewing'].includes(phase);
+        const motion = phase === 'needs' ? 'wave' : active ? (phase === 'reviewing' || phase === 'planning' ? 'read' : 'type') : 'idle';
         poseWork(r.person, motion, now + r.bob * 500, dt);
         applyStandAndFacing(r, motion, now, dt);
-        r.activity.material.color.set(phase==='done'?'#36C98B':phase==='reviewing'?'#B491ED':phase==='planning'?'#E5B54A':'#62BCEA');
-        r.activity.material.opacity = active ? 0.38 + 0.18 * Math.sin(now / 500 + r.bob) : phase==='done' ? 0.32 : 0;
+        r.activity.material.color.set(phase==='done'?'#36C98B':phase==='reviewing'?'#B491ED':phase==='needs'?'#F0A43A':'#62BCEA');
+        r.activity.material.opacity = active || phase === 'needs' ? 0.38 + 0.18 * Math.sin(now / 500 + r.bob) : phase==='done' ? 0.32 : 0;
         const screenKey = phase + (work?.title || '') + (active ? Math.floor(now/400) : '');
         if (r.screenKey !== screenKey) {
+          const changed = r.livePhase !== phase;
           r.screenKey = screenKey; r.livePhase = phase;
-          const status = phase === 'reviewing' ? 'verifying' : phase === 'planning' ? 'planning' : phase==='done' ? 'done' : phase==='submitted' ? 'submitted' : active ? 'working' : 'idle';
-          r.screenSet.draw(work ? [work.title.slice(0,26),work.title.slice(26,52)] : ['Ready when you are'], status, now);r.screenSet.tex.needsUpdate=true;
-          r.pill.classList.toggle('is-working',active);r.pill.classList.toggle('is-supervising',phase==='planning'||phase==='reviewing');r.pill.classList.toggle('is-complete',phase==='done');r.pill.classList.toggle('is-submitted',phase==='submitted');r.pill.dataset.workState=status==='done'?'✓ Verified':status==='submitted'?'✓ Submitted · awaiting review':status==='working'?'In progress':status;r.pill.title=active ? `${status}: ${work.title}` : 'Idle · ready for a task';
+          const status = phase === 'reviewing' ? 'verifying' : phase === 'planning' ? 'planning' : phase === 'done' ? 'done' : phase === 'needs' ? 'needs' : active ? 'working' : 'idle';
+          r.screenSet.draw(work ? [work.title.slice(0,26), work.title.slice(26,52)] : ['Ready when you are'], status, now); r.screenSet.tex.needsUpdate = true;
+          // One short chip: Working, Reviewing, Needs you or Done. Nothing when idle.
+          const chip = { working: 'Working', planning: 'Working', reviewing: 'Reviewing', needs: 'Needs you', done: 'Done' }[phase] || '';
+          const el = r.pill.querySelector('.pill-chip'); if (el) { el.hidden = !chip; el.textContent = chip; el.dataset.state = phase; }
+          r.pill.dataset.state = chip ? phase : 'idle';
+          r.pill.title = work ? `${chip || 'Ready'}: ${work.title}` : 'Ready for a task';
+          if (changed) syncApprovals();
         }
         continue;
       }
-      let mode;
-      if (r.cheerUntil && now < r.cheerUntil) mode = 'cheer';
-      else if (r.slumpUntil && now < r.slumpUntil) mode = 'slump';
-      else {
-        if (!r.modeUntil) { // first pick: desync everyone so the room never moves in lockstep
-          pickWorkMode(r, now);
-          r.modeUntil = now + 400 + Math.random() * 4000;
-        } else if (now > r.modeUntil) pickWorkMode(r, now);
-        mode = r.workMode;
-      }
-      poseWork(r.person, mode, now + r.bob * 500, dt);
-      applyStandAndFacing(r, mode, now, dt);
     } else if (r.state === 'walking' || r.state === 'returning') {
       posePerson(r.person, 'walk', now);
       if (walkStep(r, dt)) {
@@ -1230,71 +890,19 @@ function tickSim(now, dt) {
       posePerson(r.person, 'stand', now);
     }
   }
-  if (meeting) {
-    const { a, b } = meeting;
-    if (meeting.phase === 'gather' && a.state === 'atBrain' && b.state === 'atBrain') {
-      meeting.phase = 'talk';
-      meeting.endAt = now + 8000 + Math.random() * 6000;
-      bubble.visible = true;
-    }
-    if (meeting.phase === 'talk') {
-      bubble.scale.setScalar(4 + Math.sin(now / 300) * 0.3);
-      if (now > meeting.endAt) {
-        bubble.visible = false;
-        for (const r of [a, b]) {
-          r.path = [...r.path].reverse(); r.path[r.path.length - 1] = r.seat.clone();
-          r.pathI = 0; r.state = 'returning';
-        }
-        meeting = null;
-      }
-    }
-  }
-  // stuck agents STAND, face the camera and WAVE under their pulsing ⚠ (AJ's spec)
-  for (const r of Object.values(R)) {
-    if (r.state === 'stuck') {
-      poseWork(r.person, 'wave', now + r.bob * 500, dt);
-      applyStandAndFacing(r, 'wave', now, dt);
-      const p = r.person.position;
-      r.warn.position.set(p.x, p.y + 5.9, p.z);
-      const k = 2.6 + Math.sin(now / 240) * 0.5;
-      r.warn.scale.set(k, k, 1);
-    }
-  }
-  // ambient emoji work-bubbles pop over random desks every beat or two
-  if (DEMO && now > nextEmoteAt) {
-    const ids = Object.keys(R).filter(id => R[id].state === 'working');
-    if (ids.length) spawnEmote(R[ids[Math.floor(Math.random() * ids.length)]],
-      rnd(['💬', '✉️', '📈', '💡', '✓', '📞', '🔍', '📎']));
-    nextEmoteAt = now + 1200 + Math.random() * 1800;
-  }
   tickEmotes(now, dt);
-  if (DEMO) tickSweep(now);
-  else for (const k of DEPT_KEYS) { const active=Object.values(R).some(r=>r.a.dept===k&&['working','planning','reviewing'].includes(r.livePhase));deptRT[k].badge.classList.toggle('team-working',active); }
+  for (const k of DEPT_KEYS) { const active = Object.values(R).some(r => r.a.dept === k && ['working', 'planning', 'reviewing'].includes(r.livePhase)); deptRT[k].badge.classList.toggle('team-working', active); }
   brain.tick(now);
-  // schedule a new approval request now and then — capped so a long unattended demo
-  // never ends up with half the office stuck waving (v1 demo-safety rule)
-  if (DEMO && now > nextApprovalAt) { // V3.5: a live office's approvals are real (routine drafts) — no theatre ones
-    const pending = Object.values(R).filter(r => r.state === 'stuck').length;
-    if (pending < 2) {
-      const ids = Object.keys(R).filter(id => R[id].state === 'working' && !R[id].a.lead);
-      if (ids.length) requestApproval(ids[Math.floor(Math.random() * ids.length)]);
-    }
-    nextApprovalAt = now + 50000 + Math.random() * 40000;
-  }
-  // agent events drive everything — feed, chat streams, billboard metrics (nothing is static)
-  if (DEMO && now > nextMetricAt) {
-    fireAgentEvent();
-    nextMetricAt = now + 2600 + Math.random() * 3800;
-  }
-  // rotate desk screen content — a couple of screens refresh every beat so the room reads busy
-  if (DEMO && Math.floor(now / 1800) !== Math.floor((now - dt * 1000) / 1800)) {
-    const n = 1 + (Math.random() < 0.5 ? 1 : 0);
-    for (let i = 0; i < n; i++) {
-      const ss = screenSets[Math.floor(Math.random() * screenSets.length)];
-      ss.screenSet.draw(sample(WORKLINES[ss.dept], 3).map(l => l.slice(0, 28)));
-      ss.screenSet.tex.needsUpdate = true;
-    }
-  }
+  meetings.tick(now);
+  tickCeo(now);
+}
+// The CEO desk's screen and pill show how many things wait on you.
+let ceoTick = 0;
+function tickCeo(now) {
+  if (now - ceoTick < 1000) return; ceoTick = now;
+  const n = tasks?.needsYouCount?.() || 0, chip = ceoPill.querySelector('.pill-chip');
+  chip.hidden = !n; chip.textContent = n === 1 ? '1 needs you' : `${n} need you`; chip.dataset.state = 'needs'; ceoPill.dataset.state = n ? 'needs' : 'idle';
+  const key = String(n); if (ceoScreen.key !== key) { ceoScreen.key = key; ceoScreen.draw(['Inbox', n ? `${n} waiting on you` : 'All clear'], n ? 'needs' : 'idle', now); ceoScreen.tex.needsUpdate = true; }
 }
 
 /* ---------- zoom LOD + HTML overlay projection ---------- */
@@ -1306,7 +914,7 @@ function toScreen(p) {
 function smooth(a, b, x) { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
 
 function tickLOD() {
-  if(programPill){programPill.style.display='block';const [x,y]=toScreen(new THREE.Vector3(-28,4,0));programPill.style.transform=`translate(${x}px,${y}px) translate(-50%,-100%)`;programPill.style.opacity=focused?0.35:1;}
+  { const [x, y] = toScreen(new THREE.Vector3(CEO_AT.x, 5.4, CEO_AT.z)); ceoPill.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%) scale(${0.62 + 0.38 * smooth(1.2, 2.4, view.zoom)})`; ceoPill.style.opacity = focused ? 0.35 : 1; }
 
   const z = view.zoom;
   const detail = smooth(1.75, 2.5, z);
@@ -1378,23 +986,24 @@ function applyRoster(agents) {
   for (const a of agents) {
     const r = R[a.id]; if (!r) continue;
     r.a.name = a.name;
-    r.pill.innerHTML = (r.a.lead ? '<span class="star">★</span>' : '') + esc(a.name);
-    r.v1 = r.v1 || {};
-    r.v1.role = a.role || r.v1.role || ''; r.v1.tagline = a.does || r.v1.tagline || '';
-    r.v1.greeting = a.lead ? `I coordinate ${DEPTS[r.a.dept].name}. My current specialists: ${agents.filter(x=>x.department===a.department&&!x.lead).map(x=>x.name).join(', ')}. Send a request and I’ll plan, delegate and verify it.` : `${a.does || 'I am '+a.name+'.'} Add a task for the team lead to plan and verify, or ask me something here.`;
-    r.v1.chips = ['What are you working on?', 'What can you do for me?', 'What tools can you use?'];
-    if (chatHist[a.id] && chatHist[a.id][0] && chatHist[a.id][0].who === 'agent') chatHist[a.id][0].text = r.v1.greeting;
+    r.pill.querySelector('.pill-name').innerHTML = (r.a.lead ? '<span class="star">★</span>' : '') + esc(a.name);
+    r.persona.role = a.role || r.persona.role; r.persona.tagline = a.does || r.persona.tagline;
+    r.persona.chips = a.lead ? ['What is the team working on?', 'What needs my attention?'] : ['What are you working on?', 'What can you do for me?'];
     if (modalOpen === a.id) openAgentRail(a.id, modalTab, false);
   }
-  if (tasks && tasks.syncPills) tasks.syncPills(); // the pills were rebuilt — put the clock chips back
 }
-tasks = (DEMO ? initTasks : initOfficeWork)({
+// Hand-overs animate: people walk to whoever they need, say a line, and go back.
+const walkGates = Object.fromEntries(DEPT_KEYS.map(k => [k, { edge: deptRT[k].gate.clone(), centre: deptRT[k].brainGate.clone() }]));
+walkGates.pm = { edge: new THREE.Vector3(0, 0.12, 6.5), centre: new THREE.Vector3(0, 0.12, 6.5) };
+const meetings = initMeetings({ R, hud, toScreen: p => toScreen(p), points: { gates: walkGates, ceo: CEO_AT.clone().add(new THREE.Vector3(-2.4, 0, 2.4)) }, reducedMotion: () => matchMedia('(prefers-reduced-motion: reduce)').matches });
+const lookupJob = Object.assign(id => tasks?.job?.(id), { leadOf: agentId => { const a = AGENTS.find(x => x.id === agentId); return a ? AGENTS.find(x => x.dept === a.dept && x.lead)?.id : null; } });
+tasks = initOfficeWork({
   hud, R, deptRT, RAIL_SIDE, spawnEmote, chatPush, chatHist, feedPush, zoomToApproval, enterFocus, openAgent, esc,
   brainWrite: (id, title) => brain.write(id, title), brain,
-  onLive: (h) => { document.querySelector('#topbar .brand .ver').textContent = ''; document.title = h.name; brainNotes = h.notes; brain.setOwner(h.name); brain.setQuiet(true); applyRoster(h.agents); },
-  onTools: (agentId, keys) => mcp.onToolsUsed(agentId, keys),
-  requestApproval, setStuck: setStuckLive,
-  onUsage: (u) => { if (mcp && mcp.setUsage) mcp.setUsage(u); }, // V3.6: the plan's gauge in the top bar
+  onLive: (h) => { document.querySelector('#topbar .brand .ver').textContent = ''; document.title = h.name; brainNotes = h.notes; document.querySelector('#brainBtn b').textContent = h.notes; brain.setOwner(h.name); brain.setQuiet(true); applyRoster(h.agents); },
+  onTaskEvent: event => meetings.onTaskEvent(event, lookupJob),
+  onTaskState: change => { if (['awaiting_ceo', 'escalated'].includes(change.from) && !['awaiting_ceo', 'escalated'].includes(change.to)) meetings.release(change.id); },
+  onBrainNotes: n => { brainNotes = n; document.querySelector('#brainBtn b').textContent = n; },
   getFocused: () => focused, getZoom: () => view.zoom, getFocusDim: () => focusDim,
   toScreen: (p) => toScreen(p), reframe,
 });
@@ -1413,7 +1022,6 @@ resize();
 {
   const h = new URLSearchParams(location.hash.slice(1));
   if (h.get('zoom')) view.zoom = parseFloat(h.get('zoom')) || 1;
-  if (h.get('appr')) requestApproval(h.get('appr') === '1' ? 'apay' : h.get('appr'));
   if (h.get('view') && LAYOUT[h.get('view')]) enterFocus(h.get('view'));
   if (h.get('cam')) setCam(h.get('cam') === '1');
   if (h.get('dark') === '1' || document.body.classList.contains('dark')) setDark(true);
@@ -1421,18 +1029,17 @@ resize();
   addEventListener('hashchange', () => { const d = new URLSearchParams(location.hash.slice(1)).get('dark'); if (d === '1') setDark(true); else if (d === '0') setDark(false); });
   if (h.get('board')) { // #board=1 → company board · #board=marketing → that dept's board
     const b = h.get('board');
-    if (LAYOUT[b] && b !== 'brain') tasks.openFor(b); else tasks.open();
+    tasks.open();
   }
   syncOverviewBtn();
 }
-window.CC = { flyTo, zoomToDept, zoomOut, zoomToApproval, requestApproval, openAgent, view, applyCamera, R, emotes,
-  setCam, setDark, brain, connectorReveal: () => mcp.startReveal(performance.now()),
-  toggleBoard: () => tasks.toggle(), addTask: (agentId, title) => tasks.addTask(agentId, title), tasks, routines: () => tasks.routines };
+window.CC = { flyTo, zoomToDept, zoomOut, zoomToApproval, openAgent, view, applyCamera, R, emotes, setCam, setDark, brain, meetings, toggleBoard: () => tasks.toggle(), tasks };
 
 let last = performance.now();
 function loop(now) {
   if (now - last < 1000 / 30) { requestAnimationFrame(loop); return; }
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (document.body.dataset.view === 'settings') { requestAnimationFrame(loop); return; } // the scene rests while settings are open
   tickTween(now);
   applyCamera();
   tickDim(dt);

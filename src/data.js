@@ -24,6 +24,8 @@ export const DEPTS = {
   ops:       { name: 'OPERATIONS',       short: 'OPERATIONS', chip: '#BFA2E3', ink: '#7449A9', floor: '#F2ECFA' },
   brain:     { name: 'THE BRAIN',        short: 'THE BRAIN', chip: '#D1DECD', ink: '#4C7A57', floor: '#E9EFE4' },
 };
+// The Program Manager's office sits at the centre, where the Brain pod used to be.
+DEPTS.pm = { ...DEPTS.brain, name: 'Program Manager', short: 'PROGRAM MANAGER', chip: '#465B70', ink: '#2F3B4C', floor: '#EEE7D5' };
 
 // 35 agents (V3.4, 7 Sep 2026: every department has a lead). grid = [col,row] desk slot on the department plinth.
 const DEFAULT_AGENTS = [
@@ -72,7 +74,7 @@ const DEFAULT_AGENTS = [
 
 // Plinth placement in world XZ. Brain central; departments well separated (AJ: not too close at zoom-out).
 export const LAYOUT = {
-  brain:     { pos: [0, 0],     w: 16, d: 16 },
+  pm:        { pos: [0, 0],     w: 16, d: 16 },
   emails:    { pos: [-30, -23], w: 20, d: 26 },
   delivery:  { pos: [0, -48],   w: 20, d: 30 },   // 6th pod mirrors ops on the top axis
   sales:     { pos: [30, -23],  w: 20, d: 30 },
@@ -84,7 +86,7 @@ export const LAYOUT = {
 // The live roster comes from the saved office; standalone files retain their sample roster.
 const boot = typeof window !== 'undefined' ? window.__OFFICE_BOOT__ : null;
 if (boot?.teams) {
-  const palette = Object.values(DEPTS).filter(d => d !== DEPTS.brain);
+  const palette = Object.values(DEPTS).filter(d => d !== DEPTS.brain && d !== DEPTS.pm);
   DEPT_KEYS.splice(0, DEPT_KEYS.length, ...boot.teams.map(t => t.id));
   boot.teams.forEach((team, i) => {
     DEPTS[team.id] = { ...(DEPTS[team.id] || palette[i % palette.length]), name: team.name, short: team.name };

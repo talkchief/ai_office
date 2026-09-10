@@ -18,7 +18,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, nextRun, valid } from './src/when.js';
 
-export const ALLOWED = ['emails', 'fin', 'sales'];
 export const NAMES = { emails: 'Emails', fin: 'Accounting', sales: 'Sales', marketing: 'Marketing', ops: 'Operations', delivery: 'Delivery' };
 export const file = brainPath => path.join(brainPath, 'Agents Office', 'routines.json');
 export const stateFile = dataDir => path.join(dataDir, 'routines.json');
@@ -27,18 +26,13 @@ export const LATE_AFTER = 90 * 1000; // a run more than 90 s past its minute was
 const slug = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
 const readJSON = (p, fallback) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; } };
 
-/** "Routines come to Marketing in a later release. This release: Emails, Accounting, Sales." */
-export function refusal(dept) {
-  return `Routines come to ${NAMES[dept] || dept} in a later release. This release: Emails, Accounting and Sales.`;
-}
-
 /** Normalise + check one routine against the roster. Returns { routine, problems }. Fixed fields are kept as given; bad ones are named. */
 export function validate(r, agents, existing = []) {
   const problems = [];
   const out = {};
   const a = agents.find(x => x.id === r.agent);
   out.dept = r.dept || (a && a.department);
-  if (!ALLOWED.includes(out.dept)) problems.push(`${r.id || r.title || 'routine'}: ${refusal(out.dept)}`);
+  if (!out.dept) problems.push(`${r.id || r.title || 'routine'}: no team`);
   if (!a) problems.push(`${r.id || r.title || 'routine'}: no agent called "${r.agent}"`);
   else if (a.department !== out.dept) problems.push(`${r.id || r.title || 'routine'}: ${a.name} is in ${NAMES[a.department] || a.department}, not ${NAMES[out.dept] || out.dept}`);
   out.agent = r.agent;
@@ -52,7 +46,7 @@ export function validate(r, agents, existing = []) {
   out.needsOk = r.needsOk !== false;
   out.paused = r.paused === true;
   if (Array.isArray(r.plan)) out.plan = r.plan.slice(0, 4).map(String);
-  if (r.model !== undefined && r.model !== '' && r.model !== null) { const m = String(r.model).toLowerCase().trim(); if (['sonnet', 'opus', 'fable'].includes(m)) out.model = m; else problems.push(`${out.id}: model must be sonnet, opus or fable (got "${r.model}")`); }
+  if (r.model !== undefined && r.model !== '' && r.model !== null) out.model = String(r.model).trim().slice(0, 120); // any model configured in Settings → Models
   if (r.effort !== undefined && r.effort !== '' && r.effort !== null) { const e = String(r.effort).toLowerCase().trim(); if (['low', 'medium', 'high', 'xhigh', 'max'].includes(e)) out.effort = e; else problems.push(`${out.id}: effort must be low, medium, high, xhigh or max (got "${r.effort}")`); }
   return { routine: out, problems };
 }
@@ -129,11 +123,11 @@ export function askLine(task) {
 }
 
 /** The "routines" list a lead reads back in chat. */
-export function listText(list, dept, agents) {
+export function listText(list, dept, agents, teamName = '') {
   const mine = list.filter(r => r.dept === dept);
-  if (!mine.length) return `Nothing on the ${NAMES[dept]} timetable yet. Give me one with a time in it — "every weekday at 8am, …" — and I will put it on.`;
+  if (!mine.length) return `Nothing on the ${teamName || NAMES[dept] || dept} timetable yet. Give me one with a time in it — "every weekday at 8am, …" — and I will put it on.`;
   const name = id => agents.find(a => a.id === id)?.name || id;
-  return `${NAMES[dept]} routines:\n` + mine.map(r => `• ${r.title} — ${r.desc} · ${name(r.agent)}${r.paused ? ' · PAUSED' : ''}${r.needsOk ? ' · waits for your OK' : ' · read-only'}`).join('\n') +
+  return `${teamName || NAMES[dept] || dept} routines:\n` + mine.map(r => `• ${r.title} — ${r.desc} · ${name(r.agent)}${r.paused ? ' · PAUSED' : ''}${r.needsOk ? ' · waits for your OK' : ' · read-only'}`).join('\n') +
     `\n\nSay "pause …", "resume …", "run … now" or "delete …" with a few words from the name.`;
 }
 

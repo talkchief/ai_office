@@ -1,0 +1,177 @@
+[
+ {
+  "id": "enzo",
+  "role": "Prospect Enrichment Agent",
+  "does": "Enriches every signup via FullEnrich — role, company size, mobile, LinkedIn."
+ },
+ {
+  "id": "lexi",
+  "role": "Sales Team Lead Agent",
+  "does": "Runs the sales team — five agents report to it — and it owns the reps’ call lists."
+ },
+ {
+  "id": "ona",
+  "role": "Onboarding Concierge (High-Usage)",
+  "does": "Texts high-usage new users and gets them set up like a human would."
+ },
+ {
+  "id": "pros",
+  "role": "Outbound Prospecting Agent",
+  "does": "Builds fresh outbound lead lists to ICP spec — verified before anyone dials."
+ },
+ {
+  "id": "folo",
+  "role": "Second-Touch & Revival Agent",
+  "does": "Chases everything that went quiet — unanswered calls, post-demo silence, stalled deals."
+ },
+ {
+  "id": "riley",
+  "role": "Daily Research Agent",
+  "does": "Scans the sales-tech industry and competitors every morning at 6am."
+ },
+ {
+  "id": "newt",
+  "role": "Newsletter Creator Agent",
+  "does": "Writes the monthly newsletter your signups actually open."
+ },
+ {
+  "id": "ada",
+  "role": "Meta Ads Agent",
+  "does": "Watches every campaign hourly; flags what to scale, kill or fix."
+ },
+ {
+  "id": "iggy",
+  "role": "Instagram Organic Content Agent",
+  "does": "Runs the IG content engine — hooks, reels, carousels. Nothing posts without AJ."
+ },
+ {
+  "id": "vid",
+  "role": "Video Editing Agent",
+  "does": "Cuts every video marketing ships — reels, ads, demos — rendered frame-perfect on HyperFrames."
+ },
+ {
+  "id": "gfx",
+  "role": "Marketing Design Agent",
+  "does": "Designs everything marketing ships — ads, carousels, decks — on one brand kit."
+ },
+ {
+  "id": "piper",
+  "role": "Proposal Agent",
+  "does": "Turns a deal brief into a proposal + send-ready email in minutes."
+ },
+ {
+  "id": "scout",
+  "role": "Competitor & Industry Analysis Agent",
+  "does": "Turns Research’s raw findings into “here’s what we should do about it.”"
+ },
+ {
+  "id": "legal",
+  "role": "Agreement Review Agent",
+  "does": "Reads every agreement before it goes out and gives it a second lens."
+ },
+ {
+  "id": "comply",
+  "role": "Regulatory Watch Agent",
+  "does": "Watches government and regulator sites daily and reports what changed."
+ },
+ {
+  "id": "report",
+  "role": "Company Reporting Agent",
+  "does": "Builds the reports and keeps every company dashboard current."
+ },
+ {
+  "id": "alead",
+  "role": "Accounting Lead Agent",
+  "does": "Runs the accounting team: Invoicing, Payables, Reconciliation report to it."
+ },
+ {
+  "id": "invo",
+  "role": "Invoicing Agent",
+  "does": "Raises every invoice, chases every overdue — politely and relentlessly."
+ },
+ {
+  "id": "apay",
+  "role": "Accounts Payable Agent",
+  "does": "Audits every card charge and contractor invoice against what we actually agreed to pay."
+ },
+ {
+  "id": "recon",
+  "role": "Accounts Reconciliation Agent",
+  "does": "Matches every bank line to an invoice or bill. Unmatched = investigated."
+ },
+ {
+  "id": "elead",
+  "role": "Inbox Lead",
+  "does": "Runs the whole inbox: routes every email to the right desk, checks tone, and escalates only what needs AJ."
+ },
+ {
+  "id": "cmail",
+  "role": "Client Email Agent",
+  "does": "Answers every client email from the Brain — scope, timelines, results — and never lets one sit past an hour."
+ },
+ {
+  "id": "imail",
+  "role": "Internal Email Agent",
+  "does": "Keeps the team inbox moving — triage, summaries of long threads, calendar holds, and the weekly numbers circulated."
+ },
+ {
+  "id": "vmail",
+  "role": "Vendor Email Agent",
+  "does": "Handles every supplier thread — quotes, renewals, SLAs, outages — and flags anything that changes what we pay."
+ },
+ {
+  "id": "kmail",
+  "role": "Contractor Email Agent",
+  "does": "Talks to the freelancers — briefs out, hours in, invoice questions answered against the contract."
+ },
+ {
+  "id": "ilm",
+  "role": "Inbound Leads Manager",
+  "does": "Owns every lead that comes to us — qualifies it within the hour, routes the hot ones to a rep, books the calls."
+ },
+ {
+  "id": "dash",
+  "role": "Dashboards Agent",
+  "does": "Builds and keeps the internal dashboards honest — every tile traces to a number in the Brain, refreshed on schedule."
+ },
+ {
+  "id": "mlead",
+  "role": "Marketing Lead",
+  "does": "Runs the marketing team — six agents report to it — owns the content calendar and the ad budget, and reports what worked to AJ weekly."
+ },
+ {
+  "id": "olead",
+  "role": "Operations Lead",
+  "does": "Runs operations — five agents report to it — keeps contracts, compliance, intel and reporting moving, and escalates only what needs AJ."
+ },
+ {
+  "id": "dlead",
+  "role": "Delivery Lead",
+  "does": "Owns every live project end to end — risk, timelines, staffing, handovers — and reports the state of play to AJ weekly."
+ },
+ {
+  "id": "pco",
+  "role": "Project Co-ordinator",
+  "does": "Keeps every project plan true — milestones, sign-offs, hours — and moves things before they become late."
+ },
+ {
+  "id": "qa",
+  "role": "QA Checker",
+  "does": "Nothing reaches a client until it passes: links, spelling, brand rules, numbers, the flows a client will actually click."
+ },
+ {
+  "id": "crep",
+  "role": "Client Reports Agent",
+  "does": "Writes every client status and results report from the numbers in the Brain — same format, every month, on time."
+ },
+ {
+  "id": "cass",
+  "role": "Client Assets Agent",
+  "does": "Every logo, file, export and final lives in the right place, named right, synced to the client portal."
+ },
+ {
+  "id": "dasst",
+  "role": "Designer Assistant",
+  "does": "Takes the routine design work off the designer — templates, resizes, mockups, brand sheets — on brand, every time."
+ }
+]

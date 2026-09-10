@@ -1,4 +1,5 @@
 import MarkdownIt from 'markdown-it';
+import { stateLabel, stepLabel } from './labels.js';
 
 export const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 const md = new MarkdownIt({ html: false, linkify: true, breaks: false });
@@ -53,59 +54,64 @@ export function outputExcerpt(value, limit = 160) {
 }
 
 export function resultState(job) {
-  if (job.state === 'done') return { label: 'Approved result', tone: 'approved', note: 'Lead verification complete' };
-  if (job.state === 'waiting' && job.review?.approved) return { label: 'Ready for your review', tone: 'waiting', note: 'Lead verified · awaiting your approval' };
+  if (job.state === 'done') return { label: 'Done', tone: 'approved', note: 'Approved by the team lead' };
+  if (['waiting', 'awaiting_ceo'].includes(job.state)) return { label: 'Needs you', tone: 'waiting', note: 'Waiting for your decision' };
+  if (job.state === 'escalated') return { label: 'Needs your direction', tone: 'blocked', note: 'The team is waiting for you' };
   if (job.state === 'cancelled') return { label: 'Cancelled', tone: 'muted', note: 'This task is closed' };
-  if (job.state === 'blocked') return { label: 'Needs attention', tone: 'blocked', note: 'Completion is blocked' };
-  if (job.state === 'saving') return { label: 'Saving result', tone: 'waiting', note: 'Verification complete · saving to the Brain' };
-  return { label: job.state === 'backlog' ? 'Saved idea' : 'In progress', tone: 'muted', note: job.state === 'backlog' ? 'Agents have not started' : 'Work is in progress · not yet approved' };
+  if (job.state === 'blocked') return { label: 'Blocked', tone: 'blocked', note: 'Retry when the cause is fixed' };
+  if (job.state === 'saving') return { label: 'Saving result', tone: 'waiting', note: 'Approved · filing to the Brain' };
+  if (job.state === 'backlog') return { label: 'Idea', tone: 'muted', note: 'Not started' };
+  return { label: stateLabel(job.state), tone: 'muted', note: 'Work in progress · not yet approved' };
 }
 
 const esc = escapeHTML;
-const labels = { backlog:'Saved idea', queued:'Queued', planning:'Planning', working:'Working', reviewing:'Lead review', waiting:'Awaiting approval', saving:'Saving', blocked:'Blocked', done:'Submitted', pending:'Pending', failed:'Failed', interrupted:'Interrupted', cancelled:'Cancelled' };
-const when = date => date ? new Date(date).toLocaleString() : '—';
+const when = date => date ? new Date(date).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 const prose = (text, prefix) => `<div class="space-document">${renderDocument(text, prefix).html}</div>`;
 const empty = (title, text) => `<div class="space-output-empty"><span aria-hidden="true">○</span><h3>${esc(title)}</h3><p>${esc(text)}</p></div>`;
+const KIND = { question: 'question', correction: 'correction', note: 'note', answer: 'answer' };
 
-export function renderTaskWorkspace(job, tab, actions = '') {
-  const name = id => job.agents.find(a => a.id === id)?.name || id || 'Unassigned';
-  const status = resultState(job);
-  const total = job.subtasks.length, submitted = job.subtasks.filter(s => s.state === 'done').length;
+// One page per task: what you can do now, then the result, then how it was done.
+export function renderTaskWorkspace(job, { actions = '', version = null } = {}) {
+  const name = id => id === 'pm' ? 'Program Manager' : job.agents?.find(a => a.id === id)?.name || id || 'Unassigned';
+  const status = resultState(job), versions = job.resultVersions || [];
+  const selected = version && versions[version - 1] ? version : versions.length;
+  const chosen = versions[selected - 1], text = chosen?.result || job.result;
+  const teams = job.autoRoute ? ['Program Manager', ...new Set((job.runs || []).filter(r => r.role === 'lead').map(r => r.dept))] : [job.team?.name || job.dept];
+  const meta = [teams.filter(Boolean).join(' · '), job.assignee ? `For ${name(job.assignee)}` : '', job.dueAt ? `Due ${when(job.dueAt)}` : '', versions.length ? `Version ${selected} of ${versions.length}` : ''].filter(Boolean).join(' · ');
   const result = () => {
-    if (!job.result) return empty(job.state === 'cancelled' ? 'No result was produced' : 'The result will appear here', job.state === 'backlog' ? 'Refine the brief in Team work, then start the task when you are ready.' : job.state === 'blocked' ? 'Check the blocker and the team’s work before retrying.' : job.state === 'cancelled' ? 'The task was cancelled before a deliverable was assembled.' : 'Follow individual drafts in Team work. The lead will assemble and verify the final deliverable.');
-    const document = renderDocument(job.result, 'result');
-    const topLevel = Math.min(...document.sections.map(s => s.level));
-    const contents = document.sections.filter(s => s.level <= Math.max(2, topLevel) && !(s.level === 1 && document.sections.some(other => other.level === 2))).slice(0, 12);
-    return `<div class="space-result-toolbar"><span>${job.state === 'done' ? 'Final deliverable' : 'Draft deliverable · not approved for completion'}</span><div><button class="space-text-action" id="spaceCopyResult" type="button">Copy</button><button class="space-text-action" id="spaceDownloadResult" type="button">Download .md</button></div></div>
-      ${contents.length >= 3 ? `<details class="space-document-outline" data-detail-key="outline"><summary>In this result <small>${contents.length} sections</small></summary><nav aria-label="In this result">${contents.map(s=>`<a href="#${s.id}" data-output-anchor="${s.id}">${esc(s.title)}</a>`).join('')}</nav></details>` : ''}
-      <article class="space-document space-deliverable" aria-label="${job.state === 'done' ? 'Approved' : 'Draft'} deliverable">${document.html}</article>
-      <footer class="space-result-provenance"><span>${esc(status.note)}</span><span>${esc(name(job.team.lead))}${job.review?.at ? ' · ' + esc(when(job.review.at)) : ''}</span></footer>`;
+    if (!text) return empty(job.state === 'cancelled' ? 'No result was produced' : 'The result will appear here', job.state === 'backlog' ? 'Start the task when you are ready.' : job.state === 'cancelled' ? 'The task was cancelled before a result was filed.' : 'The lead assembles and reviews the result before it is filed.');
+    const doc = renderDocument(text, 'result'), top = Math.min(...doc.sections.map(s => s.level));
+    const outline = doc.sections.filter(s => s.level <= Math.max(2, top) && !(s.level === 1 && doc.sections.some(o => o.level === 2))).slice(0, 12);
+    return `${versions.length > 1 ? `<div class="task-versions" role="group" aria-label="Result versions"><span>Versions</span>${versions.map(v => `<button type="button" data-version="${v.n}" aria-pressed="${v.n === selected}">v${v.n}</button>`).join('')}</div>` : ''}
+      ${chosen?.correction?.text ? `<p class="task-version-note">Version ${selected} answers your correction: “${esc(chosen.correction.text.slice(0, 300))}”${chosen.summary ? ` · ${esc(chosen.summary.slice(0, 300))}` : ''}</p>` : ''}
+      <div class="space-result-toolbar"><span>${job.state === 'done' ? 'Final result' : 'Draft · not approved yet'}</span><div><button class="space-text-action" id="spaceCopyResult" type="button">Copy</button><button class="space-text-action" id="spaceDownloadResult" type="button">Download .md</button></div></div>
+      ${outline.length >= 3 ? `<details class="space-document-outline" data-detail-key="outline"><summary>In this result <small>${outline.length} sections</small></summary><nav aria-label="In this result">${outline.map(s => `<a href="#${s.id}" data-output-anchor="${s.id}">${esc(s.title)}</a>`).join('')}</nav></details>` : ''}
+      <article class="space-document space-deliverable" aria-label="${job.state === 'done' ? 'Approved' : 'Draft'} result">${doc.html}</article>`;
   };
-  const work = () => `<details data-detail-key="brief" class="space-task-brief"><summary>Original brief</summary>${prose(job.text,'brief')}</details>
-    <div class="space-work-intro"><h3>${total ? 'The team’s plan' : job.state === 'backlog' ? 'Shape the brief' : 'Planning'}</h3><p>${esc(job.plan || (job.state === 'backlog' ? 'This idea is saved. Edit the brief and start it below.' : job.state === 'cancelled' ? 'No plan was completed.' : 'The lead will define the assignments and acceptance criteria.'))}</p>${total ? `<span class="space-footnote">${submitted} of ${total} assignments submitted${job.review?.approved ? ' · Lead review passed' : ' · Lead verification required'}</span>` : ''}</div>
-    <div class="space-steps">${job.subtasks.map((step, i) => {
-      const live = step.state === 'working' ? job.liveCalls?.[step.agent] : null;
-      const preview = live?.preview;
-      return `<details data-step-id="${step.id}" data-detail-key="step-${step.id}" ${step.state === 'working' ? 'open' : ''}><summary><span class="space-step-number">${String(i + 1).padStart(2,'0')}</span><span class="space-step-title">${esc(step.title)}<small>${esc(name(step.agent || step.eligible[0]))}</small></span><span class="space-state">${labels[step.state] || esc(step.state)}</span></summary><div class="space-execution-choice"><b>${esc(step.modelUsed || job.model || step.model || 'Configured model')} · ${esc(step.effortUsed || step.effort || 'default')} effort</b><span>${esc(step.complexity || '')} · ${esc(step.routingReason || 'Saved execution settings')}</span><span>Selected tools: ${(step.requiredTools || []).map(esc).join(', ') || 'None'}</span></div><p>${esc(step.instructions)}</p>
-        <div class="space-step-requirements"><b>Acceptance</b><ul>${step.acceptance.map(c=>`<li>${esc(c)}</li>`).join('')}</ul></div>
-        ${step.dependencies.length ? `<p class="space-footnote">Depends on: ${step.dependencies.map(id=>esc(job.subtasks.find(s=>s.id===id)?.title || id)).join(' · ')}</p>` : ''}
-        ${step.feedback ? `<aside class="space-review-note"><b>Requested changes</b><p>${esc(step.feedback)}</p></aside>` : ''}
-        ${step.error && ['failed','interrupted'].includes(step.state) ? `<p class="error">${esc(step.error)}</p>` : ''}
-        ${preview ? `<p class="space-draft-label">Live draft · not yet reviewed</p><div class="space-live-draft">${prose(preview,'draft-'+i)}</div>` : step.output ? `<p class="space-draft-label">${step.state === 'done' ? 'Worker submission' : 'Previous submission'}</p>${prose(step.output,'submission-'+i)}` : '<p class="space-footnote">No submission yet.</p>'}
-        ${live?.state === 'running' ? `<p class="space-footnote">${live.tool ? esc(live.tool)+' · ' : ''}Last update ${esc(when(live.lastEventAt))}</p>` : ''}
-        ${step.notes?.length || step.tools?.length ? `<details data-detail-key="sources-${step.id}"><summary>Sources & tools</summary>${step.notes?.length ? `<p>Knowledge: ${step.notes.map(esc).join(' · ')}</p>` : ''}${step.tools?.length ? `<p>Tools used: ${step.tools.map(esc).join(' · ')}</p>` : ''}</details>` : ''}</details>`;
-    }).join('')}</div>
-    <details data-detail-key="timeline"><summary>Activity timeline <small>${job.events.length} recorded events</small></summary><ol class="space-history">${job.events.map(e=>`<li><time>${esc(when(e.at))}</time><div><b>${esc(e.agent ? name(e.agent) : 'Office')}</b><span>${esc(e.message)}</span></div></li>`).join('')}</ol></details>`;
-  const review = () => {
-    const criteria = [...job.team.criteria, ...(job.team.guardrails || [])];
-    return `<div class="space-work-intro"><h3>Lead verification</h3><p>${job.review?.approved ? 'The lead checked the assembled deliverable against the team’s requirements.' : 'Submissions must pass the lead’s review and every automated check before completion.'}</p></div>
-      ${job.reviews.length ? job.reviews.map((r,i)=>`<details data-review-id="review-${i}" data-detail-key="review-${i}" ${i===job.reviews.length-1?'open':''}><summary>Review ${i+1} · ${r.approved ? 'Passed' : 'Changes required'}<small>${esc(name(r.agent))} · ${esc(when(r.at))}</small></summary><p>${esc(r.summary)}</p><div class="space-review-checks">${[...(r.criteria || []).filter(c=>c&&typeof c==='object').map(c=>({...c,label:criteria[Number(String(c.id || '').replace('criterion-',''))-1] || c.id})),...(r.checks || [])].map(c=>`<div class="space-review-check ${c.passed?'passed':'failed'}"><span aria-label="${c.passed?'Passed':'Failed'}">${c.passed?'✓':'×'}</span><div><b>${esc(c.label)}</b><p>${esc(c.evidence)}</p></div></div>`).join('')}</div></details>`).join('') : empty('Review has not started', 'The lead will review the actual submissions once the team has finished its work.')}
-      ${job.requireHumanApproval ? `<p class="space-approval-record">${job.humanApproved ? '✓ Owner approval recorded' : 'Owner approval is required before completion.'}</p>` : ''}
-      <details data-detail-key="run-details"><summary>Run details</summary><div class="space-task-meta"><span>${job.calls}/${job.team.maxCalls} model calls</span><span>${job.tokens.toLocaleString()}/${job.team.maxTokens.toLocaleString()} reported tokens</span><span>Team configuration v${job.officeRevision}</span>${job.skills?.length ? `<span>Skills: ${job.skills.map(s=>esc(s.name)+' v'+s.revision).join(' · ')}</span>` : ''}</div></details>`;
-  };
-  return `${['planning','reviewing'].includes(job.state)?`<div class="space-phase-banner ${job.state}"><i class="space-spinner"></i><div><b>${job.state==='planning'?'Planning the work':'Verifying the deliverable'}</b><span>${esc(name(job.team.lead))} · ${esc(job.liveCalls?.[job.team.lead]?.model || job.model || (job.state==='planning'?job.team.planningModel:job.team.reviewModel))} · ${esc(job.liveCalls?.[job.team.lead]?.effort || 'high')} effort</span></div></div>`:''}<div class="space-task-summary"><span class="space-result-state ${status.tone}">${esc(status.label)}</span><span>${esc(job.team.name)} · ${esc(name(job.team.lead))}</span></div>
-    ${job.state === 'blocked' && job.error ? `<aside class="space-task-blocker"><b>What needs attention</b><p>${esc(job.error)}</p></aside>` : ''}
-    <nav class="space-task-tabs" role="tablist" aria-label="Task views">${[['result','Result'],['work','Team work'],['review','Review']].map(([id,label])=>`<button type="button" role="tab" id="spaceTaskTab-${id}" data-task-tab="${id}" aria-selected="${tab===id}" aria-controls="spaceTaskPanel-${id}" tabindex="${tab===id?'0':'-1'}">${label}${id==='work'&&total?` <span>${submitted}/${total}</span>`:''}</button>`).join('')}</nav>
-    ${['result','work','review'].map(id=>`<section class="space-task-section" role="tabpanel" id="spaceTaskPanel-${id}" aria-labelledby="spaceTaskTab-${id}" tabindex="0" ${tab!==id?'hidden':''}>${tab!==id?'':id==='result'?result():id==='work'?work():review()}</section>`).join('')}
-    ${actions ? `<div class="space-task-controls">${actions}</div>` : ''}`;
+  const criteriaText = [...(job.team?.criteria || []), ...(job.team?.guardrails || [])];
+  const story = [];
+  for (const m of job.messages || []) story.push({ at: m.at, cls: m.role === 'ceo' ? 'ceo' : 'agent', who: m.role === 'ceo' ? 'You' : name(m.agent), kind: KIND[m.kind] || '', html: `<p>${esc(m.text)}</p>` });
+  for (const r of job.runs || []) {
+    const live = r.state === 'working' ? job.liveCalls?.[r.agent]?.preview : '';
+    story.push({ at: r.startedAt || 0, cls: 'run', who: name(r.agent), kind: r.role === 'lead' ? 'lead' : '', html: `<details data-detail-key="run-${esc(r.id)}" ${r.state === 'working' ? 'open' : ''}><summary>${esc(r.title)} <span class="space-state">${esc(stepLabel(r.state))}</span></summary>
+      ${live ? `<p class="space-draft-label">Live draft · not reviewed yet</p><div class="space-live-draft">${prose(live, 'live-' + r.id)}</div>` : r.output ? prose(r.output.slice(0, 20000), 'run-' + r.id) : '<p class="space-footnote">Nothing handed over yet.</p>'}
+      ${r.sources?.length || r.tools?.length ? `<p class="space-footnote">${r.sources?.length ? 'Brain notes: ' + r.sources.map(esc).join(' · ') : ''}${r.sources?.length && r.tools?.length ? ' — ' : ''}${r.tools?.length ? 'Tools: ' + r.tools.map(esc).join(' · ') : ''}</p>` : ''}${r.error ? `<p class="error">${esc(r.error)}</p>` : ''}</details>` });
+  }
+  for (const v of job.reviews || []) {
+    const checks = [...(v.criteria || []).filter(c => c && typeof c === 'object').map(c => ({ ...c, label: criteriaText[Number(String(c.id || '').replace('criterion-', '')) - 1] || c.id })), ...(v.checks || [])];
+    story.push({ at: v.at, cls: `review ${v.approved ? 'pass' : 'fail'}`, who: `${name(v.agent)} · review`, kind: v.approved ? 'approved' : 'changes needed', html: `${v.summary ? `<p>${esc(v.summary)}</p>` : ''}${checks.length ? `<div class="space-review-checks">${checks.map(c => `<div class="space-review-check ${c.passed ? 'passed' : 'failed'}"><span aria-label="${c.passed ? 'Passed' : 'Failed'}">${c.passed ? '✓' : '×'}</span><div><b>${esc(c.label)}</b><p>${esc(c.evidence)}</p></div></div>`).join('')}</div>` : ''}` });
+  }
+  for (const d of job.decisions || []) story.push({ at: d.at, cls: 'ceo', who: 'You', kind: 'decision', html: `<p>${esc(d.type === 'approve' ? 'Approved' : d.type === 'edit' ? 'Edited and approved' : 'Rejected')} ${esc(d.action === 'complete_task' ? 'closing the task' : d.action)}${d.message ? `: “${esc(d.message)}”` : ''}</p>` });
+  story.sort((a, b) => (a.at || 0) - (b.at || 0));
+  const plan = (job.todos || []).length ? `<div class="task-plan"><b>The Program Manager’s plan</b><ul>${job.todos.map(t => `<li class="${esc(t.status)}">${esc(t.content)}</li>`).join('')}</ul></div>` : '';
+  const usage = `<p class="space-footnote">${job.calls || 0} model calls · ${(job.tokens || 0).toLocaleString()} tokens${Object.keys(job.tokensByModel || {}).length ? ' (' + Object.entries(job.tokensByModel).map(([m, n]) => `${esc(m)} ${n.toLocaleString()}`).join(', ') + ')' : ''}</p>`;
+  return `<div class="task-head"><span class="space-result-state ${status.tone}">${esc(status.label)}</span><span class="task-meta">${esc(meta)}</span></div>
+    ${job.progressLine && !['done', 'cancelled'].includes(job.state) ? `<p class="task-progress">${esc(job.progressLine)}</p>` : ''}
+    ${['blocked', 'escalated'].includes(job.state) && job.error ? `<aside class="space-task-blocker"><b>${job.state === 'escalated' ? 'What the team needs from you' : 'What stopped the work'}</b><p>${esc(job.error)}</p></aside>` : ''}
+    ${actions ? `<div class="task-actions">${actions}</div>` : ''}
+    <section class="task-result" aria-label="Result">${result()}</section>
+    ${(job.sources || []).length ? `<div class="task-sources"><b>Brain notes the team used:</b> ${job.sources.map(p => `<button type="button" data-note="${esc(p)}">${esc(p)}</button>`).join('')}</div>` : ''}
+    <details class="task-story" data-detail-key="story" ${job.state === 'done' ? '' : 'open'}><summary>How it was done <small>${story.length} steps</small></summary>${plan}
+      <details data-detail-key="brief" class="space-task-brief"><summary>Your original brief</summary>${prose(job.text, 'brief')}</details>
+      <ol class="task-story-list">${story.map(item => `<li class="story-item ${item.cls}"><time>${esc(when(item.at))}</time><div><span class="who">${esc(item.who)}</span>${item.kind ? `<span class="kind">${esc(item.kind)}</span>` : ''}<div class="what">${item.html}</div></div></li>`).join('')}</ol>${usage}</details>`;
 }
