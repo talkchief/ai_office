@@ -6,6 +6,7 @@ import { readJsonBody as body } from '../http-body.mjs';
 import { listShape, detailShape } from './shape.mjs';
 import { httpError } from './routes.mjs';
 import { officeReport, kpis } from '../reporting.mjs';
+import { collectArtifacts, filterArtifacts, ARTIFACT_KINDS } from './artifacts.mjs';
 import { extractDocument } from '../documents.mjs';
 
 export function registerApi(router, ctx) {
@@ -25,6 +26,8 @@ export function registerApi(router, ctx) {
   router.on('POST', '/api/tasks', async ({ req }) => { const input = await body(req); if (!String(input.text || '').trim()) throw httpError('Describe the task first.', 400); if (!input.backlog) ready(); return accepted(engine.create({ ...input, kind: 'task', testId: undefined })); });
   router.on('GET', '/api/tasks/:id', ({ params }) => { task(params.id); return { ...detailShape(engine.detail(params.id), office.get()), files: engine.files(params.id) }; });
   // A file from the task's workspace (a PDF the team exported, a CSV it wrote), streamed as a download. Paths never leave /work/.
+  // Every file every task produced, filtered by kind, date and words; newest first.
+  router.on('GET', '/api/artifacts', ({ url }) => { const q = url.searchParams; const rows = filterArtifacts(collectArtifacts({ jobs: engine.list(), filesFor: id => engine.files(id), office: office.get() }), { kind: q.get('kind') || '', from: q.get('from') || '', to: q.get('to') || '', q: q.get('q') || '' }); return { kinds: ARTIFACT_KINDS, total: rows.length, artifacts: rows.slice(0, 500) }; });
   router.on('GET', '/api/tasks/:id/file', ({ params, url, res }) => {
     task(params.id);
     let file; try { file = workspaceFile(engine.workspaceDir(params.id), url.searchParams.get('path') || ''); } catch (error) { return { $status: 400, body: { error: error.message } }; }

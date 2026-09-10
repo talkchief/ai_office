@@ -8,7 +8,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;
 const when = value => value ? new Date(value).toLocaleString() : '—';
 const lines = value => String(value || '').split('\n').map(s => s.trim()).filter(Boolean);
 const duration = ms => ms == null ? '—' : ms < 60000 ? Math.round(ms / 1000) + 's' : ms < 3600000 ? Math.round(ms / 60000) + ' min' : (ms / 3600000).toFixed(1) + ' h';
-const SECTIONS = [['office', 'Office'], ['teams', 'Teams & people'], ['models', 'Models & keys'], ['tools', 'Tools & connectors'], ['skills', 'Skills'], ['projects', 'Projects'], ['routines', 'Routines'], ['reports', 'Reports & KPIs'], ['brain', 'Brain'], ['audit', 'Audit log']];
+const SECTIONS = [['office', 'Office'], ['teams', 'Teams & people'], ['models', 'Models & keys'], ['tools', 'Tools & connectors'], ['skills', 'Skills'], ['projects', 'Projects'], ['artifacts', 'Office Artifacts'], ['routines', 'Routines'], ['reports', 'Reports & KPIs'], ['brain', 'Brain'], ['audit', 'Audit log']];
 const readFile = file => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(',')[1]); r.onerror = reject; r.readAsDataURL(file); });
 
 export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }) {
@@ -23,7 +23,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   content.addEventListener('input', event => { if (event.target.closest('form[data-dirty]') && !event.target.closest('.agency-picker')) dirty = true; });
   page.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Escape' && !event.target.closest('input,textarea,select')) close(); });
   $('settingsBack').onclick = event => { event.preventDefault(); close(); };
-  const RENDER = { office: showOffice, teams: showTeams, models: showModels, tools: showTools, skills: showSkills, projects: showProjects, routines: showRoutines, reports: showReports, brain: showBrain, audit: showAudit };
+  const RENDER = { office: showOffice, teams: showTeams, models: showModels, tools: showTools, skills: showSkills, projects: showProjects, artifacts: showArtifacts, routines: showRoutines, reports: showReports, brain: showBrain, audit: showAudit };
 
   function route() {
     const match = location.hash.match(/^#\/settings(?:\/([\w-]+))?/);
@@ -403,6 +403,26 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   }
 
   /* ---------- Skills ---------- */
+  // Office Artifacts: every file every task produced, filtered by kind, date and words.
+  const artFilter = { kind: '', from: '', to: '', q: '' };
+  async function showArtifacts() {
+    try {
+      const params = new URLSearchParams(Object.entries(artFilter).filter(([, v]) => v)).toString();
+      const data = await api('/artifacts' + (params ? '?' + params : ''));
+      if (section !== 'artifacts') return;
+      const size = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : b >= 1024 ? Math.round(b / 1024) + ' KB' : b + ' B';
+      const kindLabel = Object.fromEntries(data.kinds.map(k => [k.id, k.label]));
+      content.innerHTML = `<p>Every file the teams produced, across every task: drafts, exports, data. Download one, or open the task it came from.</p>
+        <div class="space-actions"><label>Type<select id="artKind"><option value="">All types</option>${data.kinds.map(k => `<option value="${k.id}"${artFilter.kind === k.id ? ' selected' : ''}>${esc(k.label)}</option>`).join('')}</select></label>
+        <label>From<input type="date" id="artFrom" value="${esc(artFilter.from)}"></label><label>To<input type="date" id="artTo" value="${esc(artFilter.to)}"></label>
+        <label>Search<input type="search" id="artQ" placeholder="file, task or team" value="${esc(artFilter.q)}"></label><span class="space-count">${data.total} file${data.total === 1 ? '' : 's'}</span></div>
+        ${data.artifacts.length ? data.artifacts.map(r => `<div class="audit-item art-item"><time>${when(r.modifiedAt)}</time><span class="art-kind">${esc(kindLabel[r.kind] || r.kind)}</span> <b><a href="${esc(r.url)}" download>${esc(r.name.split('/').pop())}</a></b> <small>${esc(size(r.bytes))}${r.name.includes('/') ? ' · ' + esc(r.name.slice(0, r.name.lastIndexOf('/'))) : ''}</small><div class="art-task"><button type="button" class="space-link" data-open-task="${esc(r.taskId)}">${esc(r.taskTitle.slice(0, 90))}</button> <small>${esc(r.teams.join(', ') || 'Program Manager')}${r.projectId ? ' · project ' + esc(r.projectId) : ''} · ${esc(r.taskState)}</small></div></div>`).join('') : '<div class="space-empty"><h3>No files match.</h3><p>Loosen a filter, or give the teams a task that produces a document.</p></div>'}`;
+      const apply = () => { artFilter.kind = $('artKind').value; artFilter.from = $('artFrom').value; artFilter.to = $('artTo').value; artFilter.q = $('artQ').value.trim(); showArtifacts(); };
+      $('artKind').onchange = apply; $('artFrom').onchange = apply; $('artTo').onchange = apply;
+      let timer = null; $('artQ').oninput = () => { clearTimeout(timer); timer = setTimeout(apply, 350); };
+      content.querySelectorAll('[data-open-task]').forEach(b => b.onclick = () => openTask(b.dataset.openTask));
+    } catch (error) { feedback(error.message, true); }
+  }
   async function showSkills(editId = null) {
     try {
       config = await api('/office');
