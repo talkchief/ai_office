@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { silenceGuard, CALL_TIMEOUT_MS } from '../models.mjs';
+import { silenceGuard, fetchWithRetries, CALL_TIMEOUT_MS } from '../models.mjs';
 import { isTransientProviderError } from '../engine/deep-agents.mjs';
 
 const enc = new TextEncoder();
@@ -40,4 +40,20 @@ test('error responses and bodiless responses are handed back as they are', async
   assert.equal(res.status, 500); assert.equal(await res.text(), '{"error":"nope"}');
   const empty = silenceGuard(async () => new Response(null, { status: 204 }), 60);
   assert.equal((await empty('https://provider.example/x', {})).status, 204);
+});
+
+test('a request that fails before any answer is retried on a fresh connection, and a body that cannot be resent is not', async () => {
+  let calls = 0;
+  const flaky = async () => { calls++; if (calls < 3) { const e = new TypeError('fetch failed'); e.cause = new Error('self-signed certificate in certificate chain'); throw e; } return new Response('{"ok":true}', { status: 200 }); };
+  const res = await fetchWithRetries(flaky, 'https://provider.example/v1/chat/completions', { method: 'POST', body: '{"model":"x"}' }, { pause: 1 });
+  assert.equal(res.status, 200); assert.equal(calls, 3);
+  calls = 0;
+  await assert.rejects(() => fetchWithRetries(flaky, 'https://provider.example/v1/x', { method: 'POST', body: new ReadableStream() }, { pause: 1 }), /fetch failed/);
+  assert.equal(calls, 1, 'a stream body is sent once');
+  calls = 0;
+  const notNetwork = async () => { calls++; throw new Error('Invalid API key'); };
+  await assert.rejects(() => fetchWithRetries(notNetwork, 'https://provider.example/v1/x', {}, { pause: 1 }), /Invalid API key/);
+  assert.equal(calls, 1, 'only network failures are retried');
+  const guarded = silenceGuard(flaky, 60); calls = 0;
+  assert.equal((await guarded('https://provider.example/v1/chat/completions', { method: 'POST', body: '{}' })).status, 200, 'the guard retries too');
 });

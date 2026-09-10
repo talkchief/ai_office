@@ -40,9 +40,25 @@ export const CALL_TIMEOUT_MS = 5 * 60 * 1000;
 
 // The SDKs' timeout covers the wait for the response headers only; once a stream is open, a provider that stops sending would hold
 // the call forever. This wraps fetch so that a body with no data for `ms` fails the call with a message the retry rule treats as transient.
+// A request that fails before any answer comes back (a reset socket, a certificate that a web filter swapped in on this one
+// connection) is tried again on a fresh connection, up to three times, when the body can be sent again.
+const RETRY_NETWORK = /fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|socket hang up|certificate|TLS|EPIPE/i;
+const canResend = body => body == null || typeof body === 'string' || body instanceof Uint8Array || body instanceof ArrayBuffer || (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams);
+export async function fetchWithRetries(fetchImpl, url, init, { attempts = 3, pause = 400 } = {}) {
+  let last;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try { return await fetchImpl(url, init); }
+    catch (error) {
+      last = error; const text = String(error?.cause?.message || error?.message || '');
+      if (attempt === attempts || !RETRY_NETWORK.test(text) || !canResend(init?.body) || init?.signal?.aborted) throw error;
+      await new Promise(r => setTimeout(r, pause * attempt));
+    }
+  }
+  throw last;
+}
 export function silenceGuard(fetchImpl, ms = CALL_TIMEOUT_MS) {
   return async (url, init) => {
-    const res = await fetchImpl(url, init);
+    const res = await fetchWithRetries(fetchImpl, url, init);
     if (!res.ok || !res.body) return res;
     const reader = res.body.getReader();
     let timer = null;
@@ -169,7 +185,7 @@ export class ModelRegistry {
     // while the next connection is fine, so the list is asked for up to four times, on fresh connections, before giving up with the reason.
     let res, last;
     for (let attempt = 0; attempt < 4 && !res; attempt++) {
-      try { res = await this.fetch(base + '/models' + (attempt ? '?office=' + Date.now() : ''), { headers, signal: AbortSignal.timeout(15000) }); }
+      try { res = await fetchWithRetries(this.fetch, base + '/models' + (attempt ? '?office=' + Date.now() : ''), { headers, signal: AbortSignal.timeout(15000) }, { attempts: 1 }); }
       catch (error) { last = error; }
     }
     if (!res) fail(`Could not fetch ${provider.label}’s model list (${last?.cause?.message || last?.message || 'no answer'}). Type the model id instead; it is used as typed.`, 502);
