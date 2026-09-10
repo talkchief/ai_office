@@ -165,7 +165,14 @@ export class ModelRegistry {
     const { key } = this.keyFor(provider);
     const base = provider.type === 'anthropic' ? (provider.baseURL || 'https://api.anthropic.com') + '/v1' : provider.type === 'openai' ? (provider.baseURL || 'https://api.openai.com/v1') : provider.baseURL;
     const headers = provider.type === 'anthropic' ? { 'x-api-key': key, 'anthropic-version': '2023-06-01' } : { ...(key ? { authorization: 'Bearer ' + key } : {}), ...(provider.headers || {}) };
-    const res = await this.fetch(base + '/models', { headers, signal: AbortSignal.timeout(15000) });
+    // Some machines intercept this exact address (a web filter answering with its own certificate) while every other address on the
+    // same host works; the same request with a query string gets through, so it is tried that way before giving up with the reason.
+    let res;
+    try { res = await this.fetch(base + '/models', { headers, signal: AbortSignal.timeout(15000) }); }
+    catch (first) {
+      try { res = await this.fetch(base + '/models?office=' + Date.now(), { headers, signal: AbortSignal.timeout(15000) }); }
+      catch (second) { fail(`Could not fetch ${provider.label}’s model list (${second?.cause?.message || second?.message || first?.message}). Type the model id instead; it is used as typed.`, 502); }
+    }
     if (!res.ok) fail(`${provider.label} returned ${res.status} when listing models.`, 502);
     const body = await res.json();
     const list = (body.data || []).map(m => ({ id: m.id, label: m.display_name || m.name || m.id, supports: { effort: provider.type === 'anthropic' && /claude-(opus|sonnet|fable)-(4\.[6-9]|[5-9])/.test(m.id), reasoning: provider.type !== 'anthropic' && (Array.isArray(m.supported_parameters) ? m.supported_parameters.includes('reasoning') : /o[1-9]|gpt-5|reasoning|thinking|glm-[5-9]|kimi-k[3-9]|deepseek-r/i.test(m.id)) } })).sort((a, b) => a.id.localeCompare(b.id)).slice(0, 2000);

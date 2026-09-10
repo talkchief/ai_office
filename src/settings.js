@@ -213,13 +213,13 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         const withKey = reg.providers.filter(p => p.usable);
         box.innerHTML = withKey.length ? withKey.map(p => { const mine = active.filter(m => m.provider === p.id), list = modelLists[p.id];
           return `<fieldset data-models="${esc(p.id)}"><legend>${esc(p.label)}<small>${list ? `${list.length} models offered` : list === null ? 'could not load the model list' : 'loading the model list…'}</small></legend>
-            <div class="model-pick"><label>Add a model<input list="spaceList-${esc(p.id)}" data-pick="${esc(p.id)}" placeholder="${list ? 'Type to search the provider’s models' : 'Loading…'}" autocomplete="off"><datalist id="spaceList-${esc(p.id)}">${(list || []).map(m => `<option value="${esc(m.id)}">${esc(m.label !== m.id ? m.label : '')}</option>`).join('')}</datalist></label><button type="button" data-activate="${esc(p.id)}">Activate</button></div>
+            <div class="model-pick"><label>Add a model<input list="spaceList-${esc(p.id)}" data-pick="${esc(p.id)}" placeholder="${Array.isArray(list) ? 'Type to search the provider’s models' : list?.error ? 'Type the model id (the list could not be loaded)' : 'Loading…'}" autocomplete="off"><datalist id="spaceList-${esc(p.id)}">${(Array.isArray(list) ? list : []).map(m => `<option value="${esc(m.id)}">${esc(m.label !== m.id ? m.label : '')}</option>`).join('')}</datalist></label><button type="button" data-activate="${esc(p.id)}">Activate</button></div>${list?.error ? `<p class="space-note">${esc(list.error)}</p>` : ''}
             ${mine.length ? `<ul class="model-list">${mine.map(m => `<li><b>${esc(m.label || m.id)}</b><small>${esc(m.id)}${m.supports?.effort ? ' · effort' : m.supports?.reasoning ? ' · reasoning' : ''}</small><button type="button" class="space-text-action" data-deactivate="${esc(m.id)}">Remove</button></li>`).join('')}</ul>` : '<p class="space-footnote">No models activated from this provider yet.</p>'}</fieldset>`; }).join('')
           : '<p>Add and save a provider key first; the models come from the provider.</p>';
         box.querySelectorAll('[data-activate]').forEach(b => b.onclick = () => {
           const pid = b.dataset.activate, input = box.querySelector(`[data-pick="${pid}"]`), id = input.value.trim(); if (!id) return feedback('Type or pick a model id first.', true);
           if (active.some(m => m.id === id)) return feedback('That model is already active.', true);
-          const found = (modelLists[pid] || []).find(m => m.id === id);
+          const found = (Array.isArray(modelLists[pid]) ? modelLists[pid] : []).find(m => m.id === id);
           active.push({ id, provider: pid, label: found?.label || id, supports: found?.supports || { effort: false, reasoning: false } }); if (!roles.office) roles.office = id; dirty = true; renderModels(); renderRoles();
           if (!found) feedback(`“${id}” is not in ${providerName(pid)}’s list; it is activated as typed.`);
         });
@@ -227,7 +227,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         box.querySelectorAll('[data-deactivate]').forEach(b => b.onclick = () => { const id = b.dataset.deactivate; active.splice(active.findIndex(m => m.id === id), 1); for (const r of Object.keys(roles)) if (roles[r] === id) roles[r] = ''; dirty = true; renderModels(); renderRoles(); });
       };
       renderModels(); renderRoles();
-      for (const p of reg.providers.filter(p => p.usable && !modelLists[p.id])) api(`/providers/${p.id}/models`).then(list => { modelLists[p.id] = list; if (section === 'models') renderModels(); }).catch(error => { modelLists[p.id] = null; if (section === 'models') { renderModels(); feedback(`${p.label}: ${error.message}`, true); } });
+      for (const p of reg.providers.filter(p => p.usable && !modelLists[p.id])) api(`/providers/${p.id}/models`).then(list => { modelLists[p.id] = list; if (section === 'models') renderModels(); }).catch(error => { modelLists[p.id] = { error: error.message }; if (section === 'models') { renderModels(); feedback(`${p.label}: ${error.message}`, true); } });
       $('spaceSaveModels').onclick = async () => { if (active.length && !roles.office) return feedback('Choose the office default model.', true); try { await save('Saved. New work uses these models.'); } catch (error) { feedback(error.message, true); } };
     } catch (error) { feedback(error.message, true); }
   }
