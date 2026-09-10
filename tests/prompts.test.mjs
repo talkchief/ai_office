@@ -26,7 +26,8 @@ test('the Program Manager sees the whole company: every team, its people, its pu
   for (const team of office.teams) assert.ok(prompt.includes(team.purpose.slice(0, 40)), `carries the purpose of ${team.name}`);
   assert.ok(prompt.includes('RESEARCH, Daily Research Agent'), 'names a marketing specialist with their role');
   assert.match(prompt, /EMAILS[\s\S]*Tools: Web search & fetch, Google Calendar/, 'EMAILS shows web and the calendar');
-  assert.match(prompt, /MARKETING[\s\S]*Tools: Google Calendar\n/, 'MARKETING shows only the calendar');
+  assert.match(prompt, /MARKETING[\s\S]*Tools: Google Calendar \(no web access: cannot research the internet\)\n/, 'MARKETING shows only the calendar, and that it cannot reach the web');
+  assert.match(prompt, /EMAILS[\s\S]*Tools: Web search & fetch, Google Calendar\n/, 'a team with web access carries no such note');
   assert.match(prompt, /SALES[\s\S]*Tools: none besides the Brain/, 'a team without connectors is told so');
   assert.ok(prompt.includes('a tool only another team has'), 'hand-offs cover missing tools, not just expertise');
   assert.ok(prompt.includes('leads only see their own team, you see all of it'));

@@ -119,8 +119,8 @@ export class RunTracker {
     this.engine.update(this.id, j => { if (used) { j.tokens = (j.tokens || 0) + used; (j.tokensByModel ||= {})[model] = (j.tokensByModel[model] || 0) + used; const own = j.runs.find(r => r.agent === agent && r.state === 'working'); if (own) own.tokens = (own.tokens || 0) + used; } if (j.liveCalls?.[agent]) { j.liveCalls[agent].state = 'returned'; j.liveCalls[agent].lastEventAt = Date.now(); j.liveCalls[agent].preview = this.previews.get(agent) || j.liveCalls[agent].preview; } });
     // Past the budget, the run is stopped where it is; the task blocks with the reason and a Retry continues it. The budget counts
     // from the last time the CEO continued the task, so that Retry gets a fresh budget instead of stopping again at once.
-    const budget = Number(this.engine.settings?.()?.tokenBudgetPerTask) || 0, after = this.engine.get(this.id), total = (after?.tokens || 0) - (after?.budgetBase || 0);
-    if (budget && total > budget && !this.budgetHit) { this.budgetHit = true; this.engine.running.get(this.id)?.controller.abort(Object.assign(new Error(`This task used more than ${budget.toLocaleString('en-GB')} tokens and was stopped to protect your spend. Retry to continue from where it stopped, or raise the budget under Settings → Office.`), { budget: true })); }
+    const after = this.engine.get(this.id), budget = (Number(this.engine.settings?.()?.tokenBudgetPerTask) || 0) * (after?.projectId ? 3 : 1), total = (after?.tokens || 0) - (after?.budgetBase || 0);
+    if (budget && total > budget && !this.budgetHit) { this.budgetHit = true; this.engine.running.get(this.id)?.controller.abort(Object.assign(new Error(`This task used more than ${budget.toLocaleString('en-GB')} tokens${after?.projectId ? ' (three times the per-task budget, as it belongs to a project)' : ''} and was stopped to protect your spend. Retry to continue from where it stopped, or raise the budget under Settings → Office.`), { budget: true })); }
   }
   flush() {
     this.lastWrite = Date.now(); if (!this.previews.size) return;

@@ -56,6 +56,17 @@ test('tokens and calls are attributed to the run that spent them', () => {
   assert.equal(engine.job.runs[0].tokens, 1500); assert.equal(engine.job.runs[0].calls, 1); assert.equal(engine.job.tokens, 1500);
 });
 
+test('a project task gets three times the budget, and the reason says so', () => {
+  const engine = fakeEngine({ budget: 100000, tokens: 250000 });
+  engine.job.projectId = 'client-portal-launch';
+  const tracker = new RunTracker(engine, 'job-1', { pm: 'test-model' });
+  tracker.handle(modelEnd(10000));
+  assert.equal(engine.controller.signal.aborted, false, '260k is under 300k');
+  tracker.handle(modelEnd(50000));
+  assert.equal(engine.controller.signal.aborted, true);
+  assert.match(engine.controller.signal.reason.message, /more than 300,000 tokens \(three times the per-task budget, as it belongs to a project\)/);
+});
+
 test('no budget means no stop', () => {
   const engine = fakeEngine({ budget: 0, tokens: 5000000 });
   new RunTracker(engine, 'job-1', { pm: 'test-model' }).handle(modelEnd(1000000));
