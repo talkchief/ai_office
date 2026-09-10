@@ -36,7 +36,7 @@ export function initOfficeWork(ctx) {
     <textarea id="spaceBrief" rows="2" aria-label="Task brief" placeholder="What needs to get done?" required></textarea>
     <details class="space-options" id="spaceOptions"><summary>Assign · due date · more teams · documents</summary><div class="space-options-grid"><label>For<select id="spaceAssignee"></select></label><label>Due<input type="datetime-local" id="spaceDue"></label><label>Priority<select id="spacePriority"><option value="1">Normal</option><option value="2">High</option><option value="0">Low</option></select></label><label>Documents<input type="file" id="spaceFiles" multiple accept=".pdf,.docx,.txt,.md,.csv"></label><label>Project<select id="spaceProject"><option value="">None</option></select></label><div class="space-involve" id="spaceInvolve"></div></div></details>
     <div class="space-command-actions"><span>Lead-reviewed work</span><button type="submit" class="space-save-draft" data-backlog="true" title="Save without starting agents">Save idea</button><button type="submit">Add task <span aria-hidden="true">↗</span></button></div><p id="spaceHint" role="status"></p></form>
-    <div class="space-now-head"><span class="space-h2">Right now</span><span class="tp-mode live" id="spaceNowMode">LIVE</span></div>
+    <div class="space-now-head"><span class="space-h2">Right now</span></div>
     <div id="spaceNow" class="space-now"></div>
     <div class="space-feed-head"><h2>Work & results</h2><span class="tp-mode" hidden></span></div>
     <div id="spaceFilters" class="space-filters"></div><div id="spaceOffline" class="space-offline" hidden></div><div id="spaceProvider" class="space-offline space-provider" hidden></div><div id="spaceJobs" class="space-jobs"></div>`;
@@ -121,8 +121,6 @@ export function initOfficeWork(ctx) {
     const html = rightNowHTML(rows);
     if (el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; el.querySelectorAll('[data-agent]').forEach(row => row.onclick = () => { const id = row.dataset.agent; if (id === 'program-manager') projectUI.open(); else ctx.openAgent && ctx.openAgent(id, 'activity'); }); }
     const ago = lastRefreshAt ? Math.max(0, Math.round((Date.now() - lastRefreshAt) / 1000)) : null;
-    $('spaceNowMode').textContent = connectionStale ? 'RECONNECTING' : ago == null ? 'LIVE' : `LIVE · UPDATED ${ago < 3 ? 'JUST NOW' : ago + 'S AGO'}`;
-    $('spaceNowMode').classList.toggle('live', !connectionStale);
     const prov = $('spaceProvider'); if (prov) { const n = providerHealth?.lastHour || 0; prov.hidden = !n; if (n) prov.textContent = `The model provider failed ${n} time${n === 1 ? '' : 's'} in the last hour${providerHealth.last ? ' (last: ' + providerHealth.last.reason.slice(0, 80) + ')' : ''}. Tasks retry on their own; if it keeps happening, change the model under Manage → Models & keys.`; }
     const off = $('spaceOffline'); if (off) { off.hidden = !connectionStale; if (connectionStale) off.textContent = `Lost the server${ago != null ? ' ' + ago + 's ago' : ''}. Showing the last known state; work animations paused until it’s back.`; }
   }
