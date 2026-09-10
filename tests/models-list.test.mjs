@@ -19,10 +19,11 @@ test('a model list blocked at the exact /models address is fetched once more wit
   const reg = setup(async url => { urls.push(url); if (url.endsWith('/models')) throw tlsFailure(); return ok({ data: [{ id: 'google/gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite' }] }); });
   const list = await reg.listModels('openrouter');
   assert.deepEqual(list.map(m => m.id), ['google/gemini-3.1-flash-lite']);
-  assert.equal(urls.length, 2); assert.match(urls[1], /\/models\?office=\d+$/);
+  assert.equal(urls.length, 2, 'the second, fresh connection succeeded'); assert.match(urls[1], /\/models\?office=\d+$/);
 });
 
-test('when the list cannot be fetched at all, the reason is given and typing a model id is suggested', async () => {
-  const reg = setup(async () => { throw tlsFailure(); });
-  await assert.rejects(() => reg.listModels('openrouter'), error => { assert.match(error.message, /Could not fetch OpenRouter’s model list \(self-signed certificate in certificate chain\)\. Type the model id instead/); assert.equal(error.status, 502); return true; });
+test('when the list cannot be fetched at all, four fresh connections are tried, then the reason is given and typing a model id is suggested', async () => {
+  let tries = 0;
+  const reg = setup(async () => { tries++; throw tlsFailure(); });
+  await assert.rejects(() => reg.listModels('openrouter'), error => { assert.match(error.message, /Could not fetch OpenRouter’s model list \(self-signed certificate in certificate chain\)\. Type the model id instead/); assert.equal(error.status, 502); assert.equal(tries, 4); return true; });
 });

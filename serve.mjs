@@ -255,7 +255,8 @@ const server = http.createServer(async (req, res) => {
   } catch (e) {
     if (res.headersSent) return;
     const status = e.status || 500; if (status >= 500) console.error(e);
-    json(res, status, { error: status >= 500 ? 'Something went wrong on the server. Try again; if it repeats, check the service log.' : e.message });
+    // A failure the code named on purpose (an upstream provider that would not answer, 502) keeps its message; an unexpected one stays generic.
+    json(res, status, { error: status >= 500 && !e.status ? 'Something went wrong on the server. Try again; if it repeats, check the service log.' : e.message });
   }
 });
 
