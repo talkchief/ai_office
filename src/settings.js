@@ -57,7 +57,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       const num = (name, label, min, max, step, help) => `<label>${label}<input type="number" name="${name}" min="${min}" max="${max}" step="${step}" value="${esc(s[name])}"><small>${help}</small></label>`;
       content.innerHTML = `<p>How the whole office runs. Choices for one team live under Teams & people.</p><form id="setOffice" data-dirty><div class="space-grid">
         ${num('maxConcurrentJobs', 'Tasks running at once', 1, 8, 1, 'Across all teams. Each team also has its own pace.')}
-        ${num('runTimeoutMinutes', 'Time limit per run (minutes)', 1, 480, 1, 'A run that takes longer stops and tells you.')}
+        ${num('runTimeoutMinutes', 'Stop a run after this long without progress (minutes)', 1, 480, 1, 'A run that makes no progress for this long stops and tells you. A long task that keeps working is never stopped by this; the token budget is the spend limit.')}
         ${num('tokenBudgetPerTask', 'Token budget per task', 50000, 50000000, 50000, 'A task that uses more stops and tells you; Retry continues it. Protects the spend if an agent loops.')}
         ${num('escalateAfterHours', 'Remind me again after (hours)', 0.25, 72, 0.25, 'When something needs you and you have not acted.')}
         ${num('knowledgeSeedNotes', 'Brain notes handed to planners', 0, 20, 1, 'Agents can always search the Brain for more.')}

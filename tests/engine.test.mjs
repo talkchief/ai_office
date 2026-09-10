@@ -45,7 +45,7 @@ function fixture({ dir = temp(), pm, lead, specialist, settings = {}, hub = null
   const engine = new OfficeEngine({ dataDir: dir, office, models, toolHub: hub, knowledgeDir: path.join(dir, 'knowledge'), knowledgeIndex, settings: () => settings, onComplete: async job => { completed.push(job.id); } });
   return { dir, office, engine, workers, worker: workers[0], meter, completed, close: async () => { await engine.close(); if (!keep) fs.rmSync(dir, { recursive: true, force: true }); } };
 }
-async function until(engine, id, states, ms = 8000) {
+async function until(engine, id, states, ms = 20000) {
   const end = Date.now() + ms;
   while (Date.now() < end) { const job = engine.get(id); if (states.includes(job.state) && !engine.running.has(id) && !engine.waiting.includes(id)) return engine.detail(id); await new Promise(r => setTimeout(r, 10)); }
   throw new Error(`Timed out waiting for ${states.join('/')}; the task is ${engine.get(id).state}. Events: ${engine.events(id).map(e => e.type).join(',')}`);
@@ -205,7 +205,7 @@ test('cancelling stops the work and nothing is filed', async () => {
 
 test('a task that runs past the time limit is blocked with a plain reason', async () => {
   const f = fixture({ settings: { runTimeoutMinutes: 0.002 }, specialist: () => ({ text: 'Slow.', wait: 1500 }) });
-  try { const id = start(f); const job = await until(f.engine, id, ['blocked']); assert.match(job.error, /longer than/); assert.equal(f.engine.notifications.list()[0].kind, 'blocked'); }
+  try { const id = start(f); const job = await until(f.engine, id, ['blocked']); assert.match(job.error, /no progress/); assert.equal(f.engine.notifications.list()[0].kind, 'blocked'); }
   finally { await f.close(); }
 });
 
@@ -215,7 +215,8 @@ test('a provider error blocks the task with the real reason, and retry continues
   try {
     const id = start(f); const blocked = await until(f.engine, id, ['blocked']);
     assert.equal(blocked.error, 'Provider overloaded.');
-    f.engine.retry(id); const done = await until(f.engine, id, ['done']);
+    const retried = f.engine.retry(id); assert.equal(retried.budgetBase, retried.tokens || 0, 'the budget starts over when the CEO continues a task');
+    const done = await until(f.engine, id, ['done']);
     assert.equal(done.review.approved, true); assert.equal(f.engine.notifications.counts().needsYou, 0);
   } finally { await f.close(); }
 });

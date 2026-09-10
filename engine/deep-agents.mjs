@@ -31,7 +31,7 @@ export const TERMINAL = new Set(['done', 'cancelled']);
 const LIVE_EVENTS = new Set(['run_started', 'run_finished', 'review_recorded', 'decision_requested', 'decision', 'question', 'escalated', 'completed', 'blocked']);
 // When the Program Manager chooses the teams, only the leads it actually involved must approve.
 export const involved = job => [...new Set((job.runs || []).filter(r => r.role === 'lead' && r.dept).map(r => r.dept))];
-export const DEFAULT_SETTINGS = { maxConcurrentJobs: 2, runTimeoutMinutes: 45, escalateAfterHours: 1, outboundTools: [], readOnlyTools: [] };
+export const DEFAULT_SETTINGS = { maxConcurrentJobs: 2, runTimeoutMinutes: 20, escalateAfterHours: 1, outboundTools: [], readOnlyTools: [] };
 const clean = value => String(value ?? '').trim();
 const httpError = (message, status = 400) => Object.assign(new Error(message), { status });
 const bounded = (value, fallback, min, max) => { const n = Number(value); return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.round(n))) : fallback; };
@@ -210,9 +210,13 @@ export class OfficeEngine {
     const controller = new AbortController(), entry = { controller, promise: null };
     this.running.set(id, entry);
     entry.promise = (async () => {
-      const minutes = Number(this.settings().runTimeoutMinutes) || 45;
-      const timer = AbortSignal.timeout(Math.max(50, minutes * 60000));
-      const signal = AbortSignal.any([controller.signal, timer]);
+      const minutes = Number(this.settings().runTimeoutMinutes) || 20;
+      // The limit is on progress, not on length: a run that goes this long without a single event (a hung provider, a stuck tool) is
+      // stopped; a long project that keeps working is not. Spend is bounded separately by the token budget.
+      const stall = new AbortController(); let stallTimer = null;
+      const alive = () => { clearTimeout(stallTimer); stallTimer = setTimeout(() => stall.abort(new Error('No progress.')), Math.max(50, minutes * 60000)); stallTimer.unref?.(); };
+      alive();
+      const signal = AbortSignal.any([controller.signal, stall.signal]);
       let tracker = null;
       try {
         const job = this.get(id);
@@ -222,24 +226,25 @@ export class OfficeEngine {
         const built = await this.build(this.get(id), signal);
         tracker = new RunTracker(this, id, built.models);
         const config = { configurable: { thread_id: id }, recursionLimit: 250, signal, version: 'v2' };
-        for await (const event of built.pm.streamEvents(input, config)) { if (signal.aborted) break; tracker.handle(event); }
+        for await (const event of built.pm.streamEvents(input, config)) { if (signal.aborted) break; alive(); tracker.handle(event); }
+        clearTimeout(stallTimer);
         if (signal.aborted) throw signal.reason || new Error('Stopped.');
         tracker.flush();
         await this.settle(id, built.pm);
       } catch (error) {
-        tracker?.flush();
-        const job = this.get(id);
+        tracker?.flush(); clearTimeout(stallTimer);
+        const stalled = stall.signal.aborted, job = this.get(id);
         if (this.closed || !job || TERMINAL.has(job.state)) return this.detail(id);
-        const reason = timer.aborted ? `The task ran longer than ${minutes} minutes and was stopped. Retry to continue from where it stopped, or raise the time limit in Settings.` : clean(error?.message) || 'The task stopped unexpectedly.';
-        if (!timer.aborted && (isTransientProviderError(error) || isProviderError(error))) { this.providerTrouble.push({ at: Date.now(), reason: reason.slice(0, 160), task: job.title }); if (this.providerTrouble.length > 200) this.providerTrouble.splice(0, 100); }
-        if (!timer.aborted && isTransientProviderError(error) && (job.autoRetries || 0) < 2) {
+        const reason = stalled ? `The task made no progress for ${minutes} minutes and was stopped. Retry to continue from where it stopped, or raise the no-progress limit in Settings.` : clean(error?.message) || 'The task stopped unexpectedly.';
+        if (!stalled && (isTransientProviderError(error) || isProviderError(error))) { this.providerTrouble.push({ at: Date.now(), reason: reason.slice(0, 160), task: job.title }); if (this.providerTrouble.length > 200) this.providerTrouble.splice(0, 100); }
+        if (!stalled && isTransientProviderError(error) && (job.autoRetries || 0) < 2) {
           // Twice, quietly, with a longer pause the second time: the CEO hears about it only if the third attempt fails too.
           const attempt = (job.autoRetries || 0) + 1, delay = attempt === 1 ? 30000 : 90000;
           this.update(id, j => { j.autoRetries = attempt; }, { touch: false });
           this.block(id, reason, { provider: true, quiet: true });
           this.event(id, 'provider_retry', null, `The model provider failed (${reason.slice(0, 120)}). Retrying automatically in ${delay / 1000} seconds (attempt ${attempt} of 2).`);
           setTimeout(() => { try { if (this.get(id)?.state === 'blocked') this.retry(id, undefined, { automatic: true }); } catch {} }, delay).unref?.();
-        } else this.block(id, reason, { provider: !timer.aborted && isProviderError(error) });
+        } else this.block(id, reason, { provider: !stalled && isProviderError(error) });
       } finally {
         this.running.delete(id);
         for (const key of [...this.gates.keys()]) if (key.startsWith(id + ':')) this.gates.delete(key);
@@ -573,7 +578,7 @@ export class OfficeEngine {
     if (!job || this.running.has(id) || !['blocked', 'escalated'].includes(job.state)) throw httpError('Only blocked or escalated tasks can be retried.', 409);
     const text = clean(feedback), started = job.calls > 0 && job.harness !== false && !job.prunedAt;
     if (text) this.threads.append(id, { role: 'ceo', kind: 'correction', text, jobId: id });
-    this.update(id, j => { j.error = null; j.reprompts = 0; j.reworkRounds = {}; if (!automatic) j.autoRetries = 0; for (const r of j.runs) if (['failed', 'paused'].includes(r.state)) r.state = 'interrupted'; }, { touch: false });
+    this.update(id, j => { j.error = null; j.reprompts = 0; j.reworkRounds = {}; if (!automatic) { j.autoRetries = 0; j.budgetBase = j.tokens || 0; } for (const r of j.runs) if (['failed', 'paused'].includes(r.state)) r.state = 'interrupted'; }, { touch: false });
     this.notifications.ackForJob(id, ['blocked', 'provider_error', 'escalated', 'question']);
     this.event(id, 'retry_requested', null, text || (automatic ? 'Retrying after the provider failure.' : 'CEO asked the team to continue.'));
     this.setState(id, 'queued', { escalation: null });

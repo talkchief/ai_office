@@ -101,8 +101,8 @@ export function restoreSchema(schema) {
 
 // Connects to every configured MCP server once and hands out tools per agent.
 export class ToolHub {
-  constructor({ items = () => [], settings = () => ({}), clientFactory, authProviderFor } = {}) {
-    this.items = items; this.settings = settings; this.clientFactory = clientFactory; this.authProviderFor = authProviderFor;
+  constructor({ items = () => [], settings = () => ({}), clientFactory, authProviderFor, busy = () => false } = {}) {
+    this.items = items; this.settings = settings; this.clientFactory = clientFactory; this.authProviderFor = authProviderFor; this.busy = busy;
     this.client = null; this.tools = []; this.status = {}; this.loading = null; this.retired = [];
   }
   // A reload never closes the session that running tasks still hold: the old client retires and is closed once no run can outlive it.
@@ -134,8 +134,10 @@ export class ToolHub {
       for (const raw of listed) { const t = tools.find(t => t.name === `mcp__${id}__${raw.name}`); if (t && raw.inputSchema) t.schema = restoreSchema(raw.inputSchema); }
     }
   }
-  graceMs() { return Math.max(1, Number(this.settings()?.runTimeoutMinutes) || 45) * 60000; }
+  // A retired session is closed once the no-progress limit has passed and no task is running, so a long task never loses a connector mid-run.
+  graceMs() { return Math.max(1, Number(this.settings()?.runTimeoutMinutes) || 20) * 60000; }
   sweep(now = Date.now()) {
+    if (this.busy()) return;
     const keep = [];
     for (const r of this.retired) { if (now - r.at >= this.graceMs()) Promise.resolve(r.client?.close?.()).catch(() => {}); else keep.push(r); }
     this.retired = keep;

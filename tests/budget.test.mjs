@@ -36,6 +36,26 @@ test('a task that passes its budget is stopped where it is, with a reason the CE
   assert.equal(engine.controller.signal.reason.budget, true);
 });
 
+test('after the CEO continues a stopped task, the budget counts from that point', () => {
+  const engine = fakeEngine({ budget: 100000, tokens: 150000 });
+  engine.job.budgetBase = 150000;
+  const tracker = new RunTracker(engine, 'job-1', { pm: 'test-model' });
+  tracker.handle(modelEnd(60000));
+  assert.equal(engine.controller.signal.aborted, false, 'only what was spent since the retry counts');
+  tracker.handle(modelEnd(50000));
+  assert.equal(engine.controller.signal.aborted, true);
+});
+
+test('tokens and calls are attributed to the run that spent them', () => {
+  const engine = fakeEngine({ budget: 0 });
+  engine.job.runs.push({ id: 'r1', agent: 'lexi', role: 'lead', dept: 'sales', state: 'working' });
+  const tracker = new RunTracker(engine, 'job-1', { lexi: 'test-model' });
+  const ev = { event: 'on_chat_model_start', run_id: 'r-1', metadata: { lc_agent_name: 'lexi' }, data: {} };
+  tracker.handle(ev);
+  tracker.handle({ event: 'on_chat_model_end', run_id: 'r-2', metadata: { lc_agent_name: 'lexi' }, data: { output: { usage_metadata: { input_tokens: 1200, output_tokens: 300 }, tool_calls: [] } } });
+  assert.equal(engine.job.runs[0].tokens, 1500); assert.equal(engine.job.runs[0].calls, 1); assert.equal(engine.job.tokens, 1500);
+});
+
 test('no budget means no stop', () => {
   const engine = fakeEngine({ budget: 0, tokens: 5000000 });
   new RunTracker(engine, 'job-1', { pm: 'test-model' }).handle(modelEnd(1000000));

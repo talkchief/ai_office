@@ -56,7 +56,7 @@ const index = await new KnowledgeIndex({ dir: path.join(DATA, 'knowledge-index')
 index.attach();
 let hub;
 const toolStore = new ToolStore({ dataDir: DATA, office, statusFor: id => hub?.status[id] || 'unchecked' });
-hub = new ToolHub({ items: () => toolStore.items, settings: () => settings.get(), authProviderFor: item => toolStore.authProviderFor(item) });
+hub = new ToolHub({ items: () => toolStore.items, settings: () => settings.get(), authProviderFor: item => toolStore.authProviderFor(item), busy: () => { try { return engine.running.size > 0; } catch { return false; } } });
 toolStore.onChange = () => { hub.load().then(() => bus.publish('office.updated', { area: 'tools' })).catch(e => console.warn('connectors:', e.message)); };
 const officeAccess = createOfficeAccess(process.env.AO_ACCESS_KEY);
 const unlockAttempts = new Map();

@@ -23,7 +23,7 @@ A task to Marketing ("what do you know about Talkchief?") failed because the Mar
 
 ### 3. Tools that survive the adapter (engine/tools.mjs)
 - `restoreSchema(raw)` rebuilds each MCP tool's input schema from the server's raw `inputSchema` after `@langchain/mcp-adapters` has flattened it: `anyOf`/`oneOf` of constants become `enum` with a type; `[X, null]` becomes X; unions of objects merge; other unions stay `anyOf`; `_meta`/`$schema` are dropped; `type`, `description`, `required`, `items`, `properties` are kept. `ToolHub.load()` fetches raw schemas via the adapter's per-server client and replaces `tool.schema`.
-- Reloading connectors no longer kills running tasks: `load()` builds the new client first, then parks the old one in `retired` with a timestamp; `sweep()` closes retired clients older than the run time limit (`settings().runTimeoutMinutes`, default 45). `close()` closes everything.
+- Reloading connectors no longer kills running tasks: `load()` builds the new client first, then parks the old one in `retired` with a timestamp; `sweep()` closes retired clients older than the no-progress limit (`settings().runTimeoutMinutes`, default 20), and only while no task is running. `close()` closes everything.
 
 ### 4. The scene shows a working lead (src/office.js)
 - A lead run with state `working` marks the lead as doing that task (runs are already sent to the board). Pod counts and the lead line follow.

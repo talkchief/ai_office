@@ -98,7 +98,7 @@ export class RunTracker {
   modelStart(event) {
     const engine = this.engine, agent = this.agentOf(event), job = engine.get(this.id), run = this.activeRun(job, agent);
     this.previews.set(agent, '');
-    engine.update(this.id, j => { j.calls = (j.calls || 0) + 1; (j.liveCalls ||= {})[agent] = { phase: run?.role || 'pm', state: 'running', model: this.models[agent] || null, startedAt: Date.now(), lastEventAt: Date.now(), preview: '', tool: null }; });
+    engine.update(this.id, j => { j.calls = (j.calls || 0) + 1; const own = j.runs.find(r => r.agent === agent && r.state === 'working'); if (own) own.calls = (own.calls || 0) + 1; (j.liveCalls ||= {})[agent] = { phase: run?.role || 'pm', state: 'running', model: this.models[agent] || null, startedAt: Date.now(), lastEventAt: Date.now(), preview: '', tool: null }; });
     // The lead picks the work back up after its specialists hand over: that is the review.
     if (run?.role === 'lead' && job.state === 'awaiting_lead_review' && !job.runs.some(r => r.dept === run.dept && r.role === 'specialist' && r.state === 'working')) engine.setState(this.id, 'reviewing');
   }
@@ -114,9 +114,10 @@ export class RunTracker {
     // The planning tool runs inside the agent's middleware and emits no tool events, so the plan is read from the model's own reply.
     const calls = output?.tool_calls || output?.kwargs?.tool_calls || [];
     for (const c of calls) if (c?.name === 'write_todos' && agent === 'pm' && Array.isArray(c.args?.todos)) { const todos = c.args.todos.slice(0, 30).map(t => ({ content: String(t.content || '').slice(0, 300), status: String(t.status || 'pending') })); this.engine.update(this.id, j => { j.todos = todos; }); this.engine.event(this.id, 'todos_updated', 'pm', `${todos.filter(t => t.status === 'completed').length}/${todos.length} planned steps done.`); }
-    this.engine.update(this.id, j => { if (used) { j.tokens = (j.tokens || 0) + used; (j.tokensByModel ||= {})[model] = (j.tokensByModel[model] || 0) + used; } if (j.liveCalls?.[agent]) { j.liveCalls[agent].state = 'returned'; j.liveCalls[agent].lastEventAt = Date.now(); j.liveCalls[agent].preview = this.previews.get(agent) || j.liveCalls[agent].preview; } });
-    // Past the budget, the run is stopped where it is; the task blocks with the reason and a Retry continues it.
-    const budget = Number(this.engine.settings?.()?.tokenBudgetPerTask) || 0, total = this.engine.get(this.id)?.tokens || 0;
+    this.engine.update(this.id, j => { if (used) { j.tokens = (j.tokens || 0) + used; (j.tokensByModel ||= {})[model] = (j.tokensByModel[model] || 0) + used; const own = j.runs.find(r => r.agent === agent && r.state === 'working'); if (own) own.tokens = (own.tokens || 0) + used; } if (j.liveCalls?.[agent]) { j.liveCalls[agent].state = 'returned'; j.liveCalls[agent].lastEventAt = Date.now(); j.liveCalls[agent].preview = this.previews.get(agent) || j.liveCalls[agent].preview; } });
+    // Past the budget, the run is stopped where it is; the task blocks with the reason and a Retry continues it. The budget counts
+    // from the last time the CEO continued the task, so that Retry gets a fresh budget instead of stopping again at once.
+    const budget = Number(this.engine.settings?.()?.tokenBudgetPerTask) || 0, after = this.engine.get(this.id), total = (after?.tokens || 0) - (after?.budgetBase || 0);
     if (budget && total > budget && !this.budgetHit) { this.budgetHit = true; this.engine.running.get(this.id)?.controller.abort(Object.assign(new Error(`This task used more than ${budget.toLocaleString('en-GB')} tokens and was stopped to protect your spend. Retry to continue from where it stopped, or raise the budget under Settings → Office.`), { budget: true })); }
   }
   flush() {

@@ -27,7 +27,7 @@ It runs on API keys from any provider: Anthropic, OpenAI, OpenRouter (GLM, Kimi 
 
 **Manage** opens a full settings page (the office pauses behind it):
 
-- **Office** — tasks running at once, the time limit per run, when to remind you again, the digest time.
+- **Office** — tasks running at once, how long a run may go without progress before it is stopped, the token budget per task, when to remind you again, the digest time.
 - **Teams & people** — add, rename and remove teams (up to 10; a team is a lead and up to six specialists), each person's job and standing instructions (both required) and model, the team's purpose and working instructions (its charter, required; the six default teams ship with one), review criteria, automated checks, tools, pace, standing rules, and tests.
 - **Models & keys** — provider keys, then the models you activate from each provider's own list (nothing is built in), and who runs on what (office default, Program Manager, leads, specialists, reviews, chat).
 - **Tools & connectors** — MCP servers by URL or local command, sign-in in a new window, which teams may use each, and approval rules per tool.

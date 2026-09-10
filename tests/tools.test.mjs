@@ -142,7 +142,9 @@ test('the hub restores schemas from the raw server listing and keeps the old ses
   assert.notEqual(hub.client, first, 'a reload makes a new session');
   assert.deepEqual(closed, [], 'the old session is not closed while a run could still hold it');
   assert.equal(hub.retired.length, 1);
-  hub.sweep(Date.now() + 46 * 60000);
+  hub.busy = () => true; hub.sweep(Date.now() + 46 * 60000);
+  assert.deepEqual(closed, [], 'nothing is closed while a task is running');
+  hub.busy = () => false; hub.sweep(Date.now() + 46 * 60000);
   assert.deepEqual(closed, [first.id], 'closed once the run time limit has passed');
   assert.equal(hub.retired.length, 0);
   await hub.load(); timeout = 1;

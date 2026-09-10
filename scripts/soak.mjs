@@ -47,7 +47,8 @@ function summarise(job) {
   const handoffs = ev.filter(e => e.type === 'handoff_requested').length, retries = ev.filter(e => e.type === 'provider_retry').length;
   const reviews = (job.reviews || []).length, files = (job.files || []).map(f => f.name);
   const started = job.startedAt || job.createdAt, ended = job.doneAt || (TERMINAL.has(job.state) ? job.stateSince : Date.now());
-  return { id: job.id, title: job.title, state: job.state, minutes: mins(ended - started), tokens: job.tokens || 0, calls: job.calls || 0, worked, handoffs, retries, reviews, files, error: job.error || '' };
+  const spent = (job.runs || []).reduce((a, r) => a + (r.tokens || 0), 0), by = [`pm ${Math.round(((job.tokens || 0) - spent) / 1000)}k`, ...(job.runs || []).filter(r => r.tokens).map(r => `${r.agent} ${Math.round(r.tokens / 1000)}k`)];
+  return { id: job.id, title: job.title, state: job.state, minutes: mins(ended - started), tokens: job.tokens || 0, calls: job.calls || 0, worked, handoffs, retries, reviews, files, by, error: job.error || '' };
 }
 
 const set = flag('--file') ? JSON.parse(await (await import('node:fs')).promises.readFile(flag('--file'), 'utf8')) : DEFAULT_SET;
@@ -59,6 +60,7 @@ const run = async spec => {
   const job = await waitFor(created.id, Date.now() + MINUTES * 60000);
   const r = summarise(job); results.push(r);
   console.log(`${r.state.padEnd(9)} ${r.minutes.padStart(5)} min ${String(r.tokens).padStart(9)} tok ${String(r.calls).padStart(4)} calls  ${r.worked.join('→') || '-'}  handoffs ${r.handoffs}  reviews ${r.reviews}  retries ${r.retries}  files ${r.files.length}  | ${r.title.slice(0, 60)}${r.error ? '  !! ' + r.error.slice(0, 80) : ''}`);
+  console.log(`          who spent what: ${r.by.join(' · ')}`);
   return r;
 };
 if (PARALLEL) await Promise.all(set.map(run)); else for (const spec of set) await run(spec);
