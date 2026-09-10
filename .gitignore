@@ -12,3 +12,6 @@ brain/.archive/
 brain/Digests/
 brain/Projects/
 backups/
+
+# Worktrees that parallel agents work in
+.claude/worktrees/
