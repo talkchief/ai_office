@@ -442,7 +442,10 @@ export class OfficeEngine {
   resumeCheck(jobId, toolCall) {
     const job = this.get(jobId); if (!job || toolCall.name !== 'task') return null;
     const { subagent, description } = parseTaskInput(toolCall.args), { isLead, dept } = this.target(subagent); if (!isLead || !dept) return null;
-    const title = description.slice(0, 300), prior = job.runs.filter(r => r.role === 'lead' && r.dept === dept && r.title === title && r.state !== 'working');
+    // The PM re-words a brief when it continues, so a package is recognised by what it says, not by the exact text.
+    const words = t => new Set(String(t || '').toLowerCase().slice(0, 300).split(/[^a-z0-9]+/).filter(w => w.length > 3));
+    const similar = (a, b) => { const A = words(a), B = words(b); if (!A.size || !B.size) return 0; let both = 0; for (const w of A) if (B.has(w)) both++; return both / (A.size + B.size - both); };
+    const prior = job.runs.filter(r => r.role === 'lead' && r.dept === dept && r.state !== 'working' && similar(r.title, description) >= 0.5);
     if (!prior.length) return null;
     const first = Math.min(...prior.map(r => r.startedAt || 0)), review = job.reviewsByDept?.[dept];
     const files = (() => { try { return listWorkspaceFiles(this.workspaceDir(jobId)).map(f => '/work/' + f.name); } catch { return []; } })();
@@ -451,6 +454,14 @@ export class OfficeEngine {
       return { skip: `Already done before the interruption: the ${dept} lead delivered this package and recorded an APPROVED review at ${new Date(review.at).toISOString().slice(11, 16)} UTC (${review.summary.slice(0, 300)}). Files in the workspace: ${files.join(', ') || 'none'}. Do not delegate it again; mark it done in the plan and carry on.` };
     }
     return { description: `Office note: this assignment was interrupted (a restart or a provider failure) and is being resumed. Your team may already have written files for it under /work/ (${files.join(', ') || 'none yet'}): read those first, reuse what is good, and do not repeat finished work.\n\n${description}` };
+  }
+  // What the office knows for certain about a task, for the Program Manager when it continues after a stop.
+  stateSummary(job) {
+    const office = this.office.get(), name = d => office.teams.find(t => t.id === d)?.name || d;
+    const approved = Object.entries(job.reviewsByDept || {}).filter(([, r]) => r?.approved).map(([d, r]) => `${name(d)} (approved ${new Date(r.at).toISOString().slice(11, 16)} UTC${r.file ? ', /work/' + r.file : ''})`);
+    const notYet = [...new Set(job.runs.filter(r => r.role === 'lead' && r.dept).map(r => r.dept))].filter(d => !job.reviewsByDept?.[d]?.approved).map(name);
+    const open = this.openHandoffs(job).map(h => `${name(h.from)} → ${name(h.team)}: ${h.request.slice(0, 80)}`);
+    return [`Approved and final so far: ${approved.join('; ') || 'nothing yet'}.`, notYet.length ? `Still without an approved review: ${notYet.join(', ')}.` : '', open.length ? `Hand-offs not yet delegated: ${open.join(' | ')}.` : '', 'Do not delegate an approved package again; the office refuses it.'].filter(Boolean).join(' ');
   }
   target(subagent) { const isLead = subagent.startsWith('lead-'); return { isLead, dept: isLead ? subagent.slice(5) : this.office.agents().find(a => a.id === subagent)?.department || null }; }
   resumeGuard(jobId) {
@@ -668,7 +679,7 @@ export class OfficeEngine {
     this.notifications.ackForJob(id, ['blocked', 'provider_error', 'escalated', 'question']);
     this.event(id, 'retry_requested', null, text || (automatic ? 'Retrying after the provider failure.' : 'CEO asked the team to continue.'));
     this.setState(id, 'queued', { escalation: null });
-    this.update(id, j => { j.next = !started ? null : { kind: 'message', text: text ? `CEO: ${text}` : 'Office: the task stopped before it was finished. Continue from where the work stopped; do not repeat finished work.' }; }, { touch: false });
+    this.update(id, j => { j.next = !started ? null : { kind: 'message', text: text ? `CEO: ${text}` : `Office: the task stopped before it was finished. Continue from where the work stopped; do not repeat finished work. ${this.stateSummary(j)}` }; }, { touch: false });
     this.pump(); return this.get(id);
   }
   cancel(id) {

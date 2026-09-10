@@ -313,10 +313,21 @@ test('a resumed task does not run an approved package again, and tells a mid-fli
     const mid = f.engine.resumeCheck(job.id, { name: 'task', args: { subagent_type: 'lead-marketing', description: title } });
     assert.match(mid.description, /^Office note: this assignment was interrupted[\s\S]*\/work\/announcement\.md[\s\S]*MARKETING: write the launch announcement$/);
     f.engine.update(job.id, j => { j.reviewsByDept = { marketing: { approved: true, at: Date.now(), summary: 'Approved: the announcement is ready.' } }; });
-    const done = f.engine.resumeCheck(job.id, { name: 'task', args: { subagent_type: 'lead-marketing', description: title } });
-    assert.match(done.skip, /Already done before the interruption[\s\S]*APPROVED review[\s\S]*\/work\/announcement\.md/);
+    const done = f.engine.resumeCheck(job.id, { name: 'task', args: { subagent_type: 'lead-marketing', description: title + '. CONTEXT FROM THE OTHER PARTS: the pricing table is approved; align the announcement with it.' } });
+    assert.match(done.skip, /Already done before the interruption[\s\S]*APPROVED review[\s\S]*\/work\/announcement\.md/, 'a re-worded brief for the same package is still recognised');
+    assert.equal(f.engine.resumeCheck(job.id, { name: 'task', args: { subagent_type: 'lead-marketing', description: 'MARKETING: write the objection-handling sheet for the new prices' } }), null, 'a different package for the same team runs');
     assert.ok(f.engine.events(job.id).some(e => e.type === 'resume_skipped'));
     assert.equal(f.engine.resumeCheck(job.id, { name: 'task', args: { subagent_type: 'lead-marketing', description: 'A brand-new package' } }), null, 'a new brief is not a resume');
+  } finally { await f.close(); }
+});
+
+test('when a task continues after a stop, the Program Manager is told what is already approved and what is not', async () => {
+  const f = fixture();
+  try {
+    const job = f.engine.create({ dept: 'marketing', text: 'Write it.', autoStart: false });
+    f.engine.update(job.id, j => { j.runs.push({ id: 'r1', agent: 'x', role: 'lead', dept: 'marketing', state: 'done', startedAt: 1 }, { id: 'r2', agent: 'y', role: 'lead', dept: 'sales', state: 'interrupted', startedAt: 2 }); j.reviewsByDept = { marketing: { approved: true, at: Date.now(), file: 'plan.md', summary: 'ok' } }; });
+    const text = f.engine.stateSummary(f.engine.get(job.id));
+    assert.match(text, /Approved and final so far: MARKETING \(approved \d\d:\d\d UTC, \/work\/plan\.md\)\. Still without an approved review: SALES\. Do not delegate an approved package again/);
   } finally { await f.close(); }
 });
 
