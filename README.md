@@ -51,26 +51,6 @@ machine.
 
 **Beta.** It works end to end. Expect rough edges and tell us about them in Issues.
 
-**License, in plain English:** free for personal and internal use. You may not sell it, resell it,
-or build a paid product on it. (Formal terms: PolyForm Noncommercial 1.0.0 — see [LICENSE](LICENSE).)
-
-## What you need
-
-- macOS or Linux (Windows: works with `npm` commands directly, `./setup` is Bash only)
-- Node.js 20+ — https://nodejs.org
-- git
-- **Claude Code**, logged in with your Claude account, or an `ANTHROPIC_API_KEY`
-
-## Install
-
-```bash
-git clone https://github.com/ajsahni/agents-office.git
-cd agents-office
-./setup          # checks Node, git and Claude; installs; builds; boots once
-npm start        # → http://localhost:4520
-```
-
-Without `./setup`: `npm install && node build.mjs && npm start`.
 
 ## First five minutes
 
