@@ -405,7 +405,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
 
   /* ---------- Skills ---------- */
   // Office Artifacts: every file every task produced, filtered by kind, date and words.
-  const artFilter = { kind: '', from: '', to: '', q: '' };
+  const artFilter = { kind: 'documents', from: '', to: '', q: '' };
   async function showArtifacts() {
     try {
       const params = new URLSearchParams(Object.entries(artFilter).filter(([, v]) => v)).toString();
@@ -413,8 +413,8 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       if (section !== 'artifacts') return;
       const size = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : b >= 1024 ? Math.round(b / 1024) + ' KB' : b + ' B';
       const kindLabel = Object.fromEntries(data.kinds.map(k => [k.id, k.label]));
-      content.innerHTML = `<p>Every file the teams produced, across every task: drafts, exports, data. Download one, or open the task it came from.</p>
-        <div class="space-actions"><label>Type<select id="artKind"><option value="">All types</option>${data.kinds.map(k => `<option value="${k.id}"${artFilter.kind === k.id ? ' selected' : ''}>${esc(k.label)}</option>`).join('')}</select></label>
+      content.innerHTML = `<p>The documents the teams produced, across every task. Download one, or open the task it came from. Drafts (Markdown, HTML, text) are under “Everything”.</p>
+        <div class="space-actions"><label>Type<select id="artKind"><option value="documents"${artFilter.kind === 'documents' ? ' selected' : ''}>Documents: PDF, PowerPoint, Word, Excel</option>${data.kinds.map(k => `<option value="${k.id}"${artFilter.kind === k.id ? ' selected' : ''}>${esc(k.label)}</option>`).join('')}<option value=""${artFilter.kind === '' ? ' selected' : ''}>Everything, including drafts</option></select></label>
         <label>From<input type="date" id="artFrom" value="${esc(artFilter.from)}"></label><label>To<input type="date" id="artTo" value="${esc(artFilter.to)}"></label>
         <label>Search<input type="search" id="artQ" placeholder="file, task or team" value="${esc(artFilter.q)}"></label><span class="space-count">${data.total} file${data.total === 1 ? '' : 's'}</span></div>
         ${data.artifacts.length ? data.artifacts.map(r => `<div class="audit-item art-item"><time>${when(r.modifiedAt)}</time>${fileIcon(r.name)}<b><a href="${esc(r.url)}" download>${esc(r.name.split('/').pop())}</a></b> <small>${esc(size(r.bytes))}${r.name.includes('/') ? ' · ' + esc(r.name.slice(0, r.name.lastIndexOf('/'))) : ''}</small><div class="art-task"><button type="button" class="space-link" data-open-task="${esc(r.taskId)}">${esc(r.taskTitle.slice(0, 90))}</button> <small>${esc(r.teams.join(', ') || 'Program Manager')}${r.projectId ? ' · project ' + esc(r.projectId) : ''} · ${esc(r.taskState)}</small></div></div>`).join('') : '<div class="space-empty"><h3>No files match.</h3><p>Loosen a filter, or give the teams a task that produces a document.</p></div>'}`;

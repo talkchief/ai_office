@@ -1,9 +1,11 @@
 // Office Artifacts: every file every task produced, in one list the CEO can filter by kind, by date and by words.
 const KINDS = [
-  ['pdf', /\.pdf$/i, 'PDF'], ['deck', /\.pptx?$/i, 'Deck'], ['markdown', /\.(md|markdown)$/i, 'Markdown'], ['data', /\.(csv|json|xlsx?|tsv)$/i, 'Data'],
+  ['pdf', /\.pdf$/i, 'PDF'], ['deck', /\.pptx?$/i, 'PowerPoint'], ['doc', /\.docx?$/i, 'Word'], ['data', /\.(xlsx?|csv|tsv)$/i, 'Excel / CSV'], ['json', /\.json$/i, 'JSON'], ['markdown', /\.(md|markdown)$/i, 'Markdown'],
   ['html', /\.html?$/i, 'HTML'], ['image', /\.(png|jpe?g|gif|svg|webp)$/i, 'Image'], ['text', /\.(txt|log)$/i, 'Text'],
 ];
 export const ARTIFACT_KINDS = KINDS.map(([id, , label]) => ({ id, label })).concat([{ id: 'other', label: 'Other' }]);
+// The usable documents: what the CEO opens, sends or prints. Drafts (Markdown, HTML, text) are the teams' working files.
+export const DOCUMENT_KINDS = ['pdf', 'deck', 'doc', 'data'];
 export const kindOf = name => (KINDS.find(([, re]) => re.test(String(name || ''))) || ['other'])[0];
 
 // One row per file: what it is, which task made it, for which teams and project, when, how big, and where to download it.
@@ -20,11 +22,11 @@ export function collectArtifacts({ jobs, filesFor, office }) {
   return rows.sort((a, b) => b.modifiedAt - a.modifiedAt);
 }
 
-// Filters: kind (one of ARTIFACT_KINDS), from/to (dates, inclusive; a date string or a time), words (in the file name or the task title).
+// Filters: kind (one of ARTIFACT_KINDS, or 'documents' for the usable ones, or '' for everything), from/to (dates, inclusive; a date string or a time), words (in the file name or the task title).
 export function filterArtifacts(rows, { kind = '', from = '', to = '', q = '' } = {}) {
   const start = from ? +new Date(from) : NaN, end = to ? +new Date(to) + (String(to).length <= 10 ? 86400000 - 1 : 0) : NaN;
   const words = String(q || '').toLowerCase().split(/\s+/).filter(Boolean);
-  return rows.filter(r => (!kind || r.kind === kind)
+  return rows.filter(r => (!kind || (kind === 'documents' ? DOCUMENT_KINDS.includes(r.kind) : r.kind === kind))
     && (Number.isNaN(start) || r.modifiedAt >= start) && (Number.isNaN(end) || r.modifiedAt <= end)
     && words.every(w => `${r.name} ${r.taskTitle} ${r.teams.join(' ')}`.toLowerCase().includes(w)));
 }

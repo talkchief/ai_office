@@ -15,8 +15,8 @@ const files = {
 
 test('every file is sorted into a kind the filter understands', () => {
   assert.equal(kindOf('brief.pdf'), 'pdf'); assert.equal(kindOf('deck.pptx'), 'deck'); assert.equal(kindOf('a/b/notes.md'), 'markdown');
-  assert.equal(kindOf('data.csv'), 'data'); assert.equal(kindOf('page.html'), 'html'); assert.equal(kindOf('shot.png'), 'image'); assert.equal(kindOf('log.txt'), 'text'); assert.equal(kindOf('archive.zip'), 'other');
-  assert.deepEqual(ARTIFACT_KINDS.map(k => k.id), ['pdf', 'deck', 'markdown', 'data', 'html', 'image', 'text', 'other']);
+  assert.equal(kindOf('data.csv'), 'data'); assert.equal(kindOf('brief.docx'), 'doc'); assert.equal(kindOf('sheet.xlsx'), 'data'); assert.equal(kindOf('x.json'), 'json'); assert.equal(kindOf('page.html'), 'html'); assert.equal(kindOf('shot.png'), 'image'); assert.equal(kindOf('log.txt'), 'text'); assert.equal(kindOf('archive.zip'), 'other');
+  assert.deepEqual(ARTIFACT_KINDS.map(k => k.id), ['pdf', 'deck', 'doc', 'data', 'json', 'markdown', 'html', 'image', 'text', 'other']);
 });
 
 test('artifacts are collected across tasks, newest first, with the task, the teams that worked and a download address', () => {
@@ -40,4 +40,5 @@ test('the list filters by kind, by an inclusive date range and by words in the f
   assert.deepEqual(filterArtifacts(rows, { q: 'portal' }).map(r => r.name), ['qa/audit.pptx', 'notes.csv']);
   assert.deepEqual(filterArtifacts(rows, { q: 'price table finance' }).map(r => r.name), ['growth-price-change/01-accounting-price-table.md']);
   assert.equal(filterArtifacts(rows, {}).length, 4);
+  assert.deepEqual(filterArtifacts(rows, { kind: 'documents' }).map(r => r.name), ['pack.pdf', 'qa/audit.pptx', 'notes.csv'], 'documents are the usable files: no Markdown drafts');
 });
