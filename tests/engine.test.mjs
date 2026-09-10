@@ -286,8 +286,7 @@ test('a provider error blocks the task with the real reason, and retry continues
   try {
     const id = start(f); const blocked = await until(f.engine, id, ['blocked']);
     assert.equal(blocked.error, 'Provider overloaded.');
-    const retried = f.engine.retry(id); assert.equal(retried.budgetBase, retried.tokens || 0, 'the budget starts over when the CEO continues a task');
-    const done = await until(f.engine, id, ['done']);
+    f.engine.retry(id); const done = await until(f.engine, id, ['done']);
     assert.equal(done.review.approved, true); assert.equal(f.engine.notifications.counts().needsYou, 0);
   } finally { await f.close(); }
 });

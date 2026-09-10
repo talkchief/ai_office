@@ -157,5 +157,5 @@ export function registerApi(router, ctx) {
     return { ok: true, source: 'office', reason: 'the office runs on API keys', window: { tokens, runs } };
   });
   router.on('GET', '/api/health', () => { const o = office.get(); return { ok: true, version: ctx.version, name: ctx.name, ready: models.ready(), providers: models.summary(), depts: o.teams.map(t => t.id), teams: o.teams.map(t => ({ id: t.id, name: t.name, lead: t.lead })),
-    agents: o.agents.map(({ id, name, role, does, department, lead }) => ({ id, name, role, does, department, lead })), notes: ctx.graph().notes, knowledge: ctx.index.status(), connectors: hub.status, inbox: engine.notifications.counts(), settings: settings.get(), provider: engine.providerHealth() }; });
+    agents: o.agents.map(({ id, name, role, does, department, lead }) => ({ id, name, role, does, department, lead })), notes: ctx.graph().notes, knowledge: ctx.index.status(), connectors: hub.status, inbox: engine.notifications.counts(), settings: settings.get(), provider: engine.providerHealth(), faults: engine.faults.slice(-5) }; });
 }

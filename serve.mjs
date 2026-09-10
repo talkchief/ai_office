@@ -272,4 +272,6 @@ server.listen(cfg.port, process.env.HOST || undefined, () => {
   console.log(`  tasks: ${path.join(DATA, 'workflows.sqlite')}   routines: ${loadRoutines().length} loaded`);
   setInterval(tickRoutines, 20000).unref(); tickRoutines(); scheduler.start(60000);
 });
+process.on('unhandledRejection', reason => engine.fault('unhandled rejection', reason));
+process.on('uncaughtException', error => engine.fault('uncaught exception', error));
 process.on('SIGTERM', async () => { scheduler.stop(); bus.close(); index.close(); await engine.close(); await hub.close(); server.close(() => process.exit(0)); });

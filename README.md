@@ -27,7 +27,7 @@ It runs on API keys from any provider: Anthropic, OpenAI, OpenRouter (GLM, Kimi 
 
 **Manage** opens a full settings page (the office pauses behind it):
 
-- **Office** — tasks running at once, how long a run may go without progress before it is stopped, the token budget per task, when to remind you again, the digest time.
+- **Office** — tasks running at once, how long a run may go without progress before it is stopped, when to remind you again, the digest time.
 - **Teams & people** — add, rename and remove teams (up to 10; a team is a lead and up to six specialists), each person's job and standing instructions (both required) and model, the team's purpose and working instructions (its charter, required; the six default teams ship with one), review criteria, automated checks, tools, pace, standing rules, and tests.
 - **Models & keys** — provider keys, then the models you activate from each provider's own list (nothing is built in), and who runs on what (office default, Program Manager, leads, specialists, reviews, chat).
 - **Tools & connectors** — MCP servers by URL or local command, sign-in in a new window, which teams may use each, and approval rules per tool.
@@ -82,7 +82,7 @@ The company's shared knowledge: your uploads, the office purpose, finished work 
 - **Soak runs.** `npm run soak` fires one real task per team plus a Program Manager task against the running office, waits for them, and prints time, tokens, teams, hand-offs, reviews and files per task (`--file tasks.json` for your own set, `--parallel` to start them together). Run it after changing a model or a prompt; it costs what the tasks cost.
 - **Post-mortems.** `node scripts/report.mjs <task id or start of its title>` (or `--latest N`) prints one task’s timeline: who worked for how long, tokens and calls per agent, the plan, reviews, hand-offs, loop stops, tool-call counts and files. Read it before changing a prompt or a limit.
 - **Provider trouble.** A model call that produces nothing for five minutes fails and is retried; a 5xx, an overload or a dropped connection is retried twice automatically before the task blocks with a Retry. A provider that keeps failing is a provider to change under Settings → Models & keys.
-- **Runaway work.** A run that makes no progress for the no-progress limit (Settings → Office, default 20 minutes) stops with a Retry; a task past its token budget (the per-task budget times the teams involved, at least three times it for a project task) stops the same way, and the budget starts over when you retry. An agent that repeats the same tool call with the same arguments is refused from the fifth time and told to finish with what it has or report what is missing, so a lead cannot sit listing an empty workspace while another team works. Deliverables are handed over as files under /work/ and read once by the lead, not re-typed.
+- **Runaway work.** A run that makes no progress for the no-progress limit (Settings → Office, default 20 minutes) stops with a Retry. There is no cap on tokens: a big task is allowed to be big. An agent that repeats the same tool call with the same arguments is refused from the fifth time and told to finish with what it has or report what is missing, so a lead cannot sit listing an empty workspace while another team works. Deliverables are handed over as files under /work/ and read once by the lead, not re-typed.
 
 ## The build loop
 

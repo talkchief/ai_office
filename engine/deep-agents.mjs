@@ -77,7 +77,7 @@ export class OfficeEngine {
     // Long-term memory shares the task database; null when the office runs without it (tests, older set-ups).
     this.memory = memoryFactory ? memoryFactory(this.db) : null;
     this.notifications = new Notifications({ db: this.db, bus }); this.threads = new Threads({ db: this.db, bus });
-    this.running = new Map(); this.waiting = []; this.followUps = new Map(); this.gates = new Map(); this.closed = false; this.providerTrouble = [];
+    this.running = new Map(); this.waiting = []; this.faults = []; this.followUps = new Map(); this.gates = new Map(); this.closed = false; this.providerTrouble = [];
   }
   settings() { return { ...DEFAULT_SETTINGS, ...(this.settingsFn() || {}) }; }
   /* ---------- records ---------- */
@@ -212,7 +212,7 @@ export class OfficeEngine {
     entry.promise = (async () => {
       const minutes = Number(this.settings().runTimeoutMinutes) || 20;
       // The limit is on progress, not on length: a run that goes this long without a single event (a hung provider, a stuck tool) is
-      // stopped; a long project that keeps working is not. Spend is bounded separately by the token budget.
+      // stopped; a long project that keeps working is not. There is no cap on tokens: a big task is allowed to be big.
       const stall = new AbortController(); let stallTimer = null;
       const alive = () => { clearTimeout(stallTimer); stallTimer = setTimeout(() => stall.abort(new Error('No progress.')), Math.max(50, minutes * 60000)); stallTimer.unref?.(); };
       alive();
@@ -389,6 +389,13 @@ export class OfficeEngine {
   }
   // The same call with the same arguments, over and over, is waiting, not working: an agent listing an empty workspace until
   // another team's file appears, or re-reading a note it already has. From the fifth repeat the call is refused with what to do instead.
+  // Something threw where nothing catches it (a rejection nobody awaited, an exception outside a request). The office never dies
+  // of it with tasks running: the fault is logged, kept for /api/health, and work carries on.
+  fault(kind, reason) {
+    const text = String(reason?.stack || reason?.message || reason || '').slice(0, 400);
+    this.faults.push({ at: Date.now(), kind, reason: text }); if (this.faults.length > 50) this.faults.splice(0, 25);
+    console.error(`${kind}:`, text);
+  }
   loopGuard(jobId, agentId) {
     const recent = [], LIMIT = 4;
     return createMiddleware({ name: `loop_guard_${agentId.replace(/[^a-zA-Z0-9_]/g, '_')}`, wrapToolCall: async (request, handler) => {
@@ -630,7 +637,7 @@ export class OfficeEngine {
     if (!job || this.running.has(id) || !['blocked', 'escalated'].includes(job.state)) throw httpError('Only blocked or escalated tasks can be retried.', 409);
     const text = clean(feedback), started = job.calls > 0 && job.harness !== false && !job.prunedAt;
     if (text) this.threads.append(id, { role: 'ceo', kind: 'correction', text, jobId: id });
-    this.update(id, j => { j.error = null; j.reprompts = 0; j.reworkRounds = {}; if (!automatic) { j.autoRetries = 0; j.budgetBase = j.tokens || 0; } for (const r of j.runs) if (['failed', 'paused'].includes(r.state)) r.state = 'interrupted'; }, { touch: false });
+    this.update(id, j => { j.error = null; j.reprompts = 0; j.reworkRounds = {}; if (!automatic) j.autoRetries = 0; for (const r of j.runs) if (['failed', 'paused'].includes(r.state)) r.state = 'interrupted'; }, { touch: false });
     this.notifications.ackForJob(id, ['blocked', 'provider_error', 'escalated', 'question']);
     this.event(id, 'retry_requested', null, text || (automatic ? 'Retrying after the provider failure.' : 'CEO asked the team to continue.'));
     this.setState(id, 'queued', { escalation: null });

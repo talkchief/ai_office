@@ -117,11 +117,6 @@ export class RunTracker {
     const calls = output?.tool_calls || output?.kwargs?.tool_calls || [];
     for (const c of calls) if (c?.name === 'write_todos' && agent === 'pm' && Array.isArray(c.args?.todos)) { const todos = c.args.todos.slice(0, 30).map(t => ({ content: String(t.content || '').slice(0, 300), status: String(t.status || 'pending') })); this.engine.update(this.id, j => { j.todos = todos; }); this.engine.event(this.id, 'todos_updated', 'pm', `${todos.filter(t => t.status === 'completed').length}/${todos.length} planned steps done.`); }
     this.engine.update(this.id, j => { if (used) { j.tokens = (j.tokens || 0) + used; (j.tokensByModel ||= {})[model] = (j.tokensByModel[model] || 0) + used; const own = j.runs.find(r => r.agent === agent && r.state === 'working'); if (own) own.tokens = (own.tokens || 0) + used; } if (j.liveCalls?.[agent]) { j.liveCalls[agent].state = 'returned'; j.liveCalls[agent].lastEventAt = Date.now(); j.liveCalls[agent].preview = this.previews.get(agent) || j.liveCalls[agent].preview; } });
-    // Past the budget, the run is stopped where it is; the task blocks with the reason and a Retry continues it. The budget counts
-    // from the last time the CEO continued the task, so that Retry gets a fresh budget instead of stopping again at once.
-    const after = this.engine.get(this.id), teams = new Set((after?.runs || []).filter(r => r.role === 'lead' && r.dept).map(r => r.dept)).size, factor = Math.max(1, teams, after?.projectId ? 3 : 1);
-    const budget = (Number(this.engine.settings?.()?.tokenBudgetPerTask) || 0) * factor, total = (after?.tokens || 0) - (after?.budgetBase || 0);
-    if (budget && total > budget && !this.budgetHit) { this.budgetHit = true; this.engine.running.get(this.id)?.controller.abort(Object.assign(new Error(`This task used more than ${budget.toLocaleString('en-GB')} tokens${factor > 1 ? ` (${factor} times the per-task budget: ${teams > 1 ? teams + ' teams are involved' : ''}${teams > 1 && after?.projectId ? ', ' : ''}${after?.projectId ? 'it belongs to a project' : ''})` : ''} and was stopped to protect your spend. Retry to continue from where it stopped, or raise the budget under Settings → Office.`), { budget: true })); }
   }
   flush() {
     this.lastWrite = Date.now(); if (!this.previews.size) return;

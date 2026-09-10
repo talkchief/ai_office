@@ -58,7 +58,6 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       content.innerHTML = `<p>How the whole office runs. Choices for one team live under Teams & people.</p><form id="setOffice" data-dirty><div class="space-grid">
         ${num('maxConcurrentJobs', 'Tasks running at once', 1, 8, 1, 'Across all teams. Each team also has its own pace.')}
         ${num('runTimeoutMinutes', 'Stop a run after this long without progress (minutes)', 1, 480, 1, 'A run that makes no progress for this long stops and tells you. A long task that keeps working is never stopped by this; the token budget is the spend limit.')}
-        ${num('tokenBudgetPerTask', 'Token budget per task (each team involved gets this much; a project task at least three times it)', 50000, 50000000, 50000, 'A task that uses more stops and tells you; Retry continues it. Protects the spend if an agent loops.')}
         ${num('escalateAfterHours', 'Remind me again after (hours)', 0.25, 72, 0.25, 'When something needs you and you have not acted.')}
         ${num('knowledgeSeedNotes', 'Brain notes handed to planners', 0, 20, 1, 'Agents can always search the Brain for more.')}
         <label>Daily digest time<input type="time" name="digestTime" value="${esc(s.digestTime)}"><small>The digest lands in your inbox and in the Brain under Digests.</small></label>
@@ -66,7 +65,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         <div class="space-settings-save"><span>${health.ready ? 'Models ready: the teams can work.' : 'Add a model key under Models & keys before work can start.'}</span><button type="submit">Save</button></div></form>`;
       $('setOffice').onsubmit = async event => {
         event.preventDefault(); const f = event.target.elements;
-        try { await api('/settings', 'PUT', { maxConcurrentJobs: +f.maxConcurrentJobs.value, runTimeoutMinutes: +f.runTimeoutMinutes.value, tokenBudgetPerTask: +f.tokenBudgetPerTask.value, escalateAfterHours: +f.escalateAfterHours.value, knowledgeSeedNotes: +f.knowledgeSeedNotes.value, digestTime: f.digestTime.value, publicOrigin: f.publicOrigin.value }); saved('Saved. New work uses these settings.'); }
+        try { await api('/settings', 'PUT', { maxConcurrentJobs: +f.maxConcurrentJobs.value, runTimeoutMinutes: +f.runTimeoutMinutes.value, escalateAfterHours: +f.escalateAfterHours.value, knowledgeSeedNotes: +f.knowledgeSeedNotes.value, digestTime: f.digestTime.value, publicOrigin: f.publicOrigin.value }); saved('Saved. New work uses these settings.'); }
         catch (error) { feedback(error.message, true); }
       };
     } catch (error) { feedback(error.message, true); }
