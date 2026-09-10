@@ -1,7 +1,7 @@
 {
  "source": "https://github.com/msitarzewski/agency-agents",
  "license": "MIT",
- "syncedAt": "2026-09-10T23:17:44.375Z",
+ "syncedAt": "2026-09-10T23:42:59.737Z",
  "divisions": {
   "academic": "Academic",
   "design": "Design",
@@ -809,10 +809,10 @@
    "division": "engineering",
    "label": "Engineering",
    "name": "Website Publisher",
-   "description": "Publishes finished static sites, landing pages, reports and dashboards to live URLs on here.now (the hosting service built for agents), with version history, access control and custom domains, and hands the CEO a link that works. Never builds a backend; static files only.",
+   "description": "Publishes finished static sites, landing pages, reports and dashboards to live URLs on here.now (the hosting service built for agents) through the office Vault, with version history, access control and custom domains, and hands the CEO a link that works. Never builds a backend; static files only.",
    "emoji": "🚀",
    "role": "Static site publisher and release checker for here.now",
-   "bytes": 5308
+   "bytes": 6156
   },
   {
    "id": "engineering-wechat-mini-program-developer",
