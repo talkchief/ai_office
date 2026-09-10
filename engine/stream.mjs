@@ -103,7 +103,9 @@ export class RunTracker {
     if (run?.role === 'lead' && job.state === 'awaiting_lead_review' && !job.runs.some(r => r.dept === run.dept && r.role === 'specialist' && r.state === 'working')) engine.setState(this.id, 'reviewing');
   }
   modelStream(event) {
-    const agent = this.agentOf(event), chunk = flat(event.data?.chunk?.content ?? event.data?.chunk?.kwargs?.content); if (!chunk) return;
+    const agent = this.agentOf(event), chunk = flat(event.data?.chunk?.content ?? event.data?.chunk?.kwargs?.content);
+    // A reasoning model streams thought before any content: those chunks carry no text, but they are activity the CEO should see.
+    if (!chunk) { if (Date.now() - this.lastWrite > 5000) this.flush(); return; }
     const preview = ((this.previews.get(agent) || '') + chunk).slice(-16000); this.previews.set(agent, preview);
     this.engine.bus?.publishLive(`live:${this.id}:${agent}`, 'task.live', { id: this.id, agent, preview });
     if (Date.now() - this.lastWrite > 750) this.flush();
