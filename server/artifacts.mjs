@@ -12,7 +12,9 @@ export function collectArtifacts({ jobs, filesFor, office }) {
   const rows = [];
   for (const job of jobs) {
     let files = []; try { files = filesFor(job.id) || []; } catch { continue; }
-    const teams = [...new Set([...(job.depts?.length ? job.depts : job.dept ? [job.dept] : []), ...(job.runs || []).filter(r => r.role === 'lead' && r.dept).map(r => r.dept)])].map(teamName);
+    // A task the CEO left to the PM (auto) lists the teams that actually worked; an assigned task lists the assigned teams as well.
+    const assigned = job.autoRoute ? [] : job.depts?.length ? job.depts : job.dept && job.dept !== 'auto' ? [job.dept] : [];
+    const teams = [...new Set([...assigned, ...(job.runs || []).filter(r => r.role === 'lead' && r.dept).map(r => r.dept)])].map(teamName);
     for (const f of files) rows.push({ id: `${job.id}:${f.name}`, taskId: job.id, taskTitle: job.title, taskState: job.state, projectId: job.projectId || null, teams, name: f.name, kind: kindOf(f.name), type: f.type, bytes: f.bytes, modifiedAt: f.modifiedAt, url: `/api/tasks/${job.id}/file?path=${encodeURIComponent(f.name)}` });
   }
   return rows.sort((a, b) => b.modifiedAt - a.modifiedAt);

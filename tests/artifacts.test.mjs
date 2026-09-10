@@ -6,7 +6,7 @@ const office = { teams: [{ id: 'sales', name: 'SALES' }, { id: 'fin', name: 'FIN
 const day = d => +new Date(d);
 const jobs = [
   { id: 'j1', title: 'Growth plan price change', state: 'done', dept: 'fin', depts: ['fin'], projectId: null, runs: [{ role: 'lead', dept: 'fin' }, { role: 'lead', dept: 'sales' }] },
-  { id: 'j2', title: 'Client portal sign-off package', state: 'working', dept: 'auto', depts: [], projectId: 'client-portal-launch', runs: [] },
+  { id: 'j2', title: 'Client portal sign-off package', state: 'working', dept: 'auto', autoRoute: true, depts: ['emails', 'sales', 'fin'], projectId: 'client-portal-launch', runs: [{ role: 'lead', dept: 'fin' }] },
 ];
 const files = {
   j1: [{ name: 'growth-price-change/01-accounting-price-table.md', bytes: 4000, modifiedAt: day('2026-09-11T01:26:00Z'), type: 'text/markdown' }, { name: 'pack.pdf', bytes: 90000, modifiedAt: day('2026-09-11T01:40:00Z'), type: 'application/pdf' }],
@@ -26,7 +26,7 @@ test('artifacts are collected across tasks, newest first, with the task, the tea
   assert.equal(pdf.taskTitle, 'Growth plan price change'); assert.deepEqual(pdf.teams, ['FINANCE', 'SALES']); assert.equal(pdf.kind, 'pdf');
   assert.equal(pdf.url, '/api/tasks/j1/file?path=pack.pdf');
   assert.equal(rows[1].url, '/api/tasks/j1/file?path=growth-price-change%2F01-accounting-price-table.md');
-  assert.equal(rows[2].projectId, 'client-portal-launch');
+  assert.equal(rows[2].projectId, 'client-portal-launch'); assert.deepEqual(rows[2].teams, ['FINANCE'], 'a task left to the PM lists only the teams that worked');
   const broken = collectArtifacts({ jobs, filesFor: id => { if (id === 'j2') throw new Error('gone'); return files[id]; }, office });
   assert.equal(broken.length, 2, 'a task whose workspace cannot be read is skipped, not fatal');
 });
