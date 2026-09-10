@@ -1514,6 +1514,42 @@ body[data-view=settings] :is(#scene, #hud, #tpanel, #rail, #zoomCtl, #overviewBt
 .rule-list { list-style: none; padding: 0; margin: 6px 0 10px; } .rule-list li { display: flex; justify-content: space-between; gap: 10px; border: 1px solid var(--hairline); border-radius: 9px; padding: 6px 10px; margin-bottom: 5px; font: 12.5px var(--ui); }
 .space-kinds { display: flex; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; } .space-kinds button { border: 1px solid var(--hairline); background: transparent; border-radius: 99px; padding: 4px 10px; font: 600 11px var(--ui); color: var(--ink); cursor: pointer; } .space-kinds button[aria-pressed=true] { background: var(--ink); color: var(--cream); }
 body.dark #inboxDrawer, body.dark #inboxDrawer header, body.dark #settingsPage { background: #1E1F24; }
+/* ---------- 001: lead chat task picker, task form options ---------- */
+#mChat { position: relative; }
+#mCtx { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 18px 0; font: 12px var(--ui); color: var(--grey); }
+#mCtx[hidden] { display: none; }
+#mCtx select { font: 12px var(--ui); border: 1px solid var(--hairline); border-radius: 8px; padding: 4px 6px; background: var(--cream); color: var(--ink); max-width: 230px; }
+#mCtx label { display: inline-flex; align-items: center; gap: 4px; }
+.ctx-ref { display: inline-flex; gap: 4px; align-items: center; border: 1px solid var(--hairline); border-radius: 99px; padding: 2px 8px; font-size: 11px; color: var(--ink); } .ctx-ref button { border: 0; background: none; cursor: pointer; color: var(--grey); padding: 0; }
+#mPicker { position: absolute; left: 18px; right: 18px; bottom: 60px; max-height: 220px; overflow: auto; z-index: 5; background: var(--cream); border: 1px solid var(--hairline); border-radius: 12px; box-shadow: 0 12px 32px #0000001f; }
+#mPicker[hidden] { display: none; }
+.pick-item { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 12px; font: 12.5px var(--ui); color: var(--ink); cursor: pointer; } .pick-item.active, .pick-item:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); } .pick-item small { color: var(--grey); margin-left: 6px; }
+.chat-about { display: block; font: 600 10px var(--ui); letter-spacing: .06em; opacity: .7; margin-bottom: 3px; }
+.space-options { margin: 4px 0 2px; }
+.space-options summary { font: 600 9.5px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--grey); cursor: pointer; }
+.space-options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.space-options label { display: flex; flex-direction: column; gap: 4px; font: 500 10.5px var(--ui); color: var(--grey); min-width: 0; }
+.space-options select, .space-options input { font: 12px var(--ui); border: 1px solid var(--hairline); border-radius: 8px; padding: 5px 7px; background: var(--cream); color: var(--ink); min-width: 0; max-width: 100%; }
+.space-involve { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font: 500 10.5px var(--ui); color: var(--grey); }
+.space-involve label { flex-direction: row; align-items: center; gap: 4px; color: var(--ink); }
+body.dark #mPicker, body.dark #mCtx select, body.dark .space-options select, body.dark .space-options input { background: #1E1F24; }
+/* ---------- 001: settings page polish (fieldsets, tabs, primary buttons, model rows) ---------- */
+#settingsPage fieldset { border: 1px solid var(--hairline); border-radius: 14px; padding: 12px 18px 16px; margin: 0 0 14px; min-width: 0; }
+#settingsPage legend { font: 600 13px var(--ui); padding: 0 6px; } #settingsPage legend small { font: 400 11px var(--ui); color: var(--grey); margin-left: 6px; }
+#settingsPage button:where(:not(.secondary):not(.space-text-action):not([data-settings-section]):not([data-team]):not(.pick-item)) { background: var(--ink); color: var(--cream); border: 0; padding: 8px 14px; border-radius: 99px; font: 500 11px var(--ui); cursor: pointer; }
+#settingsPage button:disabled { opacity: .45; cursor: not-allowed; }
+#settingsPage .space-settings-nav .space-tabs { display: flex; flex-direction: column; gap: 5px; border: 0; margin: 16px 0; }
+#settingsPage .space-settings-nav .space-tabs button { border: 0; border-radius: 7px; background: none; color: var(--grey); text-align: left; padding: 12px; font: 500 11px var(--ui); white-space: normal; cursor: pointer; }
+#settingsPage .space-settings-nav .space-tabs button.selected { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink); }
+#settingsPage .space-section-tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--hairline); overflow: auto; margin-bottom: 24px; }
+#settingsPage .space-section-tabs button { background: none; color: var(--grey); padding: 12px 0; border: 0; border-radius: 0; border-bottom: 2px solid transparent; font: 500 11px var(--ui); white-space: nowrap; cursor: pointer; }
+#settingsPage .space-section-tabs button[aria-pressed=true] { color: var(--ink); border-color: var(--ink); }
+#settingsPage .space-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0; }
+#settingsPage .space-settings-save { display: flex; justify-content: flex-end; align-items: center; gap: 14px; border-top: 1px solid var(--hairline); padding-top: 14px; margin-top: 18px; font: 12px var(--ui); color: var(--grey); }
+.model-list { list-style: none; padding: 0; margin: 8px 0 14px; } .model-list li { display: flex; align-items: center; gap: 10px; border: 1px solid var(--hairline); border-radius: 10px; padding: 8px 12px; margin-bottom: 6px; font: 12.5px var(--ui); }
+.model-list li b { font-weight: 600; } .model-list li small { color: var(--grey); } .model-list li .space-text-action { margin-left: auto; }
+.model-pick { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; margin: 6px 0 10px; } .model-pick label { margin: 0; } .model-pick select { max-width: 100%; }
+body.dark #settingsPage .secondary { background: transparent; color: var(--ink); border-color: rgba(236,234,227,.35); }
 </style>
 </head>
 <body>
@@ -1553,7 +1589,7 @@ body.dark #inboxDrawer, body.dark #inboxDrawer header, body.dark #settingsPage {
       <div id="mMsgs"></div>
       <div id="mChips"></div>
       <div class="mInput">
-        <input id="mIn" placeholder="Message this agent… (add task: … · every weekday at 8am, … · approve / reject)" autocomplete="off">
+        <input id="mIn" placeholder="Message… leads and the Program Manager: type @ to pick a task" autocomplete="off">
         <button id="mSend">SEND</button>
       </div>
     </div>

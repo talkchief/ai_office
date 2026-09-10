@@ -1,11 +1,13 @@
 import { DEPTS, DEPT_KEYS } from './data.js';
 import { officeReady } from './auth.js';
 import { initSettings } from './settings.js';
+import { unseenResult } from './activity.js';
 import { initInbox } from './inbox.js';
 import { connectLive } from './sse.js';
 // The new engine's states, shown with the interface's vocabulary; realState keeps the exact one.
 const UI_STATE = { awaiting_ceo: 'waiting', escalated: 'blocked', awaiting_lead_review: 'reviewing', executing: 'working' };
 const uiJob = j => ({ ...j, realState: j.state, state: UI_STATE[j.state] || j.state });
+const teamChip = k => k === 'auto' ? { chip: '#465B70', name: 'Program Manager chooses' } : DEPTS[k];
 import { renderTaskWorkspace, renderDocument } from './task-output.js';
 import { rightNowRows, rightNowHTML, jobChain } from './rightnow.js';
 
@@ -30,8 +32,9 @@ export function initOfficeWork(ctx) {
   let settingsDraft = null, settingsTeam = selectedTeam, settingsSection = 'overview', toolPoll = null;
   const panel = document.getElementById('tpanel');
   panel.innerHTML = `<form class="space-command">
-    <div class="space-team-picker"><button id="spaceDept" type="button" aria-expanded="false" aria-controls="spaceTeamMenu"><i style="background:${DEPTS[selectedTeam].chip}"></i><span>${esc(DEPTS[selectedTeam].name)}</span><span class="space-chevron">⌄</span></button><div id="spaceTeamMenu" hidden>${DEPT_KEYS.map(k => `<button type="button" data-pick-team="${k}"><i style="background:${DEPTS[k].chip}"></i>${esc(DEPTS[k].name)}</button>`).join('')}</div></div>
+    <div class="space-team-picker"><button id="spaceDept" type="button" aria-expanded="false" aria-controls="spaceTeamMenu"><i style="background:${teamChip(selectedTeam).chip}"></i><span>${esc(teamChip(selectedTeam).name)}</span><span class="space-chevron">⌄</span></button><div id="spaceTeamMenu" hidden><button type="button" data-pick-team="auto"><i style="background:#465B70"></i>Let the Program Manager choose</button>${DEPT_KEYS.map(k => `<button type="button" data-pick-team="${k}"><i style="background:${DEPTS[k].chip}"></i>${esc(DEPTS[k].name)}</button>`).join('')}</div></div>
     <textarea id="spaceBrief" rows="2" aria-label="Task brief" placeholder="What needs to get done?" required></textarea>
+    <details class="space-options" id="spaceOptions"><summary>Assign · due date · more teams · documents</summary><div class="space-options-grid"><label>For<select id="spaceAssignee"></select></label><label>Due<input type="datetime-local" id="spaceDue"></label><label>Priority<select id="spacePriority"><option value="1">Normal</option><option value="2">High</option><option value="0">Low</option></select></label><label>Documents<input type="file" id="spaceFiles" multiple accept=".pdf,.docx,.txt,.md,.csv"></label><div class="space-involve" id="spaceInvolve"></div></div></details>
     <div class="space-command-actions"><span>Lead-reviewed work</span><button type="submit" class="space-save-draft" data-backlog="true" title="Save without starting agents">Save idea</button><button type="submit">Add task <span aria-hidden="true">↗</span></button></div><p id="spaceHint" role="status"></p></form>
     <div class="space-now-head"><span class="space-h2">Right now</span><span class="tp-mode live" id="spaceNowMode">LIVE</span></div>
     <div id="spaceNow" class="space-now"></div>
@@ -58,8 +61,8 @@ export function initOfficeWork(ctx) {
     refresh: async () => {},
     activity: () => { const j = jobs.find(j => j.autoRoute && ['planning', 'working', 'reviewing'].includes(j.state)); return j ? { state: 'running', title: j.title } : null; },
   };
-  const settings = initSettings({ api, openTask: id => { settings.close(); showTask(id); }, brain: ctx.brain, syncBrain, onShow: () => { if (dialog.open) close(); inbox?.close(); } });
   const inbox = initInbox({ api, openTask: id => showTask(id), openNote: id => settings.openNote(id), retryTask: id => api(`/tasks/${id}/retry`, 'POST', {}) });
+  const settings = initSettings({ api, openTask: id => { settings.close(); showTask(id); }, brain: ctx.brain, syncBrain, onShow: () => { if (dialog.open) close(); inbox?.close(); } });
   const manage = document.createElement('div'); manage.className = 'space-manage';
   manage.innerHTML = `<button id="spaceManage" type="button" aria-label="Manage office" aria-expanded="false" aria-controls="spaceManageMenu"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.5" fill="var(--cream)"/><circle cx="15" cy="17" r="2.5" fill="var(--cream)"/></svg><span>Manage</span></button><div id="spaceManageMenu" hidden><span class="space-menu-label">YOUR OFFICE</span><button id="spaceProjects" type="button">Projects <span>↗</span></button><button id="spaceTeams" type="button">Teams <span>↗</span></button><button id="spaceTools" type="button">Tools & MCPs <span>↗</span></button><button id="spaceSkills" type="button">Skills <span>↗</span></button><button id="spaceReports" type="button">Reports <span>↗</span></button><button id="spaceBrain" type="button">Brain <span>↗</span></button><div class="space-menu-divider"></div></div>`;
   $('claudeConnect').before(manage); $('spaceManageMenu').appendChild($('claudeConnect'));
@@ -71,21 +74,37 @@ export function initOfficeWork(ctx) {
   $('spaceDept').onclick = () => toggleMenu('spaceDept','spaceTeamMenu',$('spaceTeamMenu').hidden);
   $('spaceTeamMenu').querySelectorAll('[data-pick-team]').forEach(button => button.onclick = () => {
     selectedTeam = button.dataset.pickTeam;
-    $('spaceDept').innerHTML = `<i style="background:${DEPTS[selectedTeam].chip}"></i><span>${esc(DEPTS[selectedTeam].name)}</span><span class="space-chevron">⌄</span>`;
-    toggleMenu('spaceDept','spaceTeamMenu',false); $('spaceBrief').focus();
+    $('spaceDept').innerHTML = `<i style="background:${teamChip(selectedTeam).chip}"></i><span>${esc(teamChip(selectedTeam).name)}</span><span class="space-chevron">⌄</span>`;
+    toggleMenu('spaceDept','spaceTeamMenu',false); fillOptions(); $('spaceBrief').focus();
   });
   document.addEventListener('click', event => {
     if (!manage.contains(event.target)) toggleMenu('spaceManage','spaceManageMenu',false);
     if (!event.target.closest('.space-team-picker')) toggleMenu('spaceDept','spaceTeamMenu',false);
   });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') { if (!$('spaceManageMenu').hidden) { toggleMenu('spaceManage','spaceManageMenu',false); $('spaceManage').focus(); } if (!$('spaceTeamMenu').hidden) { toggleMenu('spaceDept','spaceTeamMenu',false); $('spaceDept').focus(); } } });
+  function fillOptions() {
+    const auto = selectedTeam === 'auto', people = Object.values(R).map(r => r.a).filter(a => a.dept === selectedTeam);
+    $('spaceAssignee').innerHTML = `<option value="">${auto ? 'The Program Manager decides' : 'The lead decides'}</option>` + people.map(a => `<option value="${esc(a.id)}">${esc(a.name)}${a.lead ? ' (lead)' : ''}</option>`).join('');
+    $('spaceAssignee').disabled = auto;
+    $('spaceInvolve').innerHTML = auto ? '<small>The Program Manager brings in the teams it needs.</small>' : '<span>Also involve</span>' + DEPT_KEYS.filter(k => k !== selectedTeam).map(k => `<label><input type="checkbox" value="${k}">${esc(DEPTS[k].name)}</label>`).join('');
+  }
+  fillOptions();
   panel.querySelector('form').onsubmit = async event => {
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
-      const job = await api('/tasks', 'POST', { dept: selectedTeam, text: $('spaceBrief').value, backlog: !!event.submitter.dataset.backlog });
+      const files = [...($('spaceFiles').files || [])], refs = [];
+      for (const file of files) {
+        if (file.size > 25 * 1024 * 1024) throw new Error(`${file.name} is larger than 25 MB.`);
+        $('spaceHint').textContent = `Adding ${file.name} to the Brain…`;
+        const data = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(',')[1]); r.onerror = reject; r.readAsDataURL(file); });
+        refs.push((await api('/knowledge/upload', 'POST', { folder: 'Projects', name: file.name, data })).id);
+      }
+      const auto = selectedTeam === 'auto', involve = [...$('spaceInvolve').querySelectorAll('input:checked')].map(el => el.value), due = $('spaceDue').value;
+      const job = await api('/tasks', 'POST', { dept: auto ? 'auto' : selectedTeam, ...(auto ? { depts: 'auto' } : involve.length ? { depts: [selectedTeam, ...involve] } : {}), text: $('spaceBrief').value + (refs.length ? `\n\nReference documents in the Brain: ${refs.join(', ')}` : ''), assignee: $('spaceAssignee').value || undefined, dueAt: due ? new Date(due).getTime() : undefined, priority: Number($('spacePriority').value), backlog: !!event.submitter.dataset.backlog });
+      $('spaceDue').value = ''; $('spaceFiles').value = ''; $('spacePriority').value = '1'; $('spaceOptions').open = false; fillOptions();
       $('spaceBrief').value = ''; $('spaceHint').textContent = job.state === 'backlog' ? 'Idea saved. Start it when you are ready.' : 'Task received. The lead will create the plan.';
       await refresh(); await showTask(job.id);
-    } catch (error) { $('spaceHint').textContent = error.message; if (/Connect Claude/.test(error.message)) $('claudeConnect').click(); }
+    } catch (error) { $('spaceHint').textContent = error.message; if (/model key/i.test(error.message)) settings.open('models'); }
     finally { button.disabled = false; }
   };
   const AGENT_NAMES = {};
@@ -144,7 +163,7 @@ export function initOfficeWork(ctx) {
       if (id === 'history' && filter === 'all') return `<details class="space-closed-tasks" data-task-history ${historyOpen ? 'open' : ''}><summary>${title} <span>${items.length}</span></summary>${cards}</details>`;
       return `<section class="space-feed-group" aria-label="${title}">${filter === 'all' ? `<div class="space-group-heading">${title}<span>${items.length}</span></div>` : ''}${cards}${more}</section>`;
     }).join('') || (filter === 'all' ? `<div class="space-empty"><h3>The office is quiet.</h3><p>${Object.keys(R).length} agents at their desks, nothing assigned. Three things this office is good at, to get started:</p><div class="space-starters">${[['emails', 'Triage the inbox and tell me what needs me'], ['fin', 'List overdue invoices and draft the reminders'], ['sales', 'Summarise this week’s inbound leads']].filter(([k]) => DEPTS[k]).map(([k, t]) => `<button type="button" data-starter="${k}" data-text="${esc(t)}"><b style="color:${DEPTS[k].ink}">${esc(DEPTS[k].short)}</b>${esc(t)}</button>`).join('')}</div></div>` : '<div class="space-empty"><p>Nothing here right now.</p></div>');
-    $('spaceJobs').querySelectorAll('[data-starter]').forEach(b => b.onclick = () => { selectedTeam = b.dataset.starter; $('spaceDept').innerHTML = `<i style="background:${DEPTS[selectedTeam].chip}"></i><span>${esc(DEPTS[selectedTeam].name)}</span><span class="space-chevron">⌄</span>`; $('spaceBrief').value = b.dataset.text; $('spaceBrief').focus(); });
+    $('spaceJobs').querySelectorAll('[data-starter]').forEach(b => b.onclick = () => { selectedTeam = b.dataset.starter; setTimeout(fillOptions); $('spaceDept').innerHTML = `<i style="background:${teamChip(selectedTeam).chip}"></i><span>${esc(teamChip(selectedTeam).name)}</span><span class="space-chevron">⌄</span>`; $('spaceBrief').value = b.dataset.text; $('spaceBrief').focus(); });
     $('spaceJobs').querySelectorAll('[data-more]').forEach(b => b.onclick = () => { filter = b.dataset.more; render(); });
     $('spaceJobs').querySelectorAll('[data-inline]').forEach(b => b.onclick = async e => {
       e.stopPropagation(); const id = b.dataset.jobId, act = b.dataset.inline;
@@ -240,6 +259,8 @@ export function initOfficeWork(ctx) {
       if(taskCurrent)rememberTaskView();
       taskCurrent=job;taskSignature=signature;if(!taskTabTouched)taskTab=job.result?'result':'work';
       $('spaceTitle').textContent=job.title;renderTaskView();
+      // Opening a result, a blocker or a decision marks it seen: the person's pill and desk go back to idle.
+      if(reveal&&(unseenResult(job)||['blocked','waiting'].includes(job.state)))api(`/tasks/${id}/seen`,'POST',{}).then(()=>{const local=jobs.find(j=>j.id===id);if(local){local.seenAt=Date.now();render();}}).catch(()=>{});
     }catch(error){feedback(error.message,true);}
   }
   function renderAgent(id) {
@@ -413,6 +434,66 @@ export function initOfficeWork(ctx) {
     $('spaceNoteForm').onsubmit=async event=>{event.preventDefault();try{const form=event.target;await api('/knowledge','POST',{id:note.id,title:form.elements.title.value,content:'# '+form.elements.title.value.trim()+'\n\n'+form.elements.content.value.replace(/^#\s+.*(?:\r?\n)?/, '').trim(),updatedAt:note.updatedAt});await syncBrain();await showKnowledge();feedback('Saved. The next task can use this knowledge.');}catch(error){feedback(error.message,true);}};
     if($('spaceArchiveNote'))$('spaceArchiveNote').onclick=async()=>{try{await api('/knowledge/note?id='+encodeURIComponent(id),'DELETE');await syncBrain();await showKnowledge();feedback('Archived. This note is no longer supplied to agents.');}catch(error){feedback(error.message,true);}};
   }
+  // Lead and Program Manager chat: @ or / picks a task; Ask / Correct / Note; "remember" keeps a correction as a standing rule.
+  const chat = { agent: null, refs: [], kind: 'question', remember: '', items: [], active: 0, trigger: null, seq: 0 };
+  const leadChat = id => id === 'pm' || !!R[id]?.a?.lead;
+  const KIND_TEXT = { question: 'Ask', correction: 'Correct', note: 'Note' };
+  function chatBar() {
+    let bar = $('mCtx');
+    if (!bar) {
+      const input = $('mIn'); if (!input || !$('mChat')) return null;
+      bar = document.createElement('div'); bar.id = 'mCtx'; input.parentElement.before(bar);
+      const pick = document.createElement('div'); pick.id = 'mPicker'; pick.hidden = true; pick.setAttribute('role', 'listbox'); $('mChat').appendChild(pick);
+      pick.addEventListener('mousedown', e => { const b = e.target.closest('[data-pick]'); if (!b) return; e.preventDefault(); pickTask(+b.dataset.pick); });
+      bar.addEventListener('click', e => { const k = e.target.closest('[data-ctx-kind]'), x = e.target.closest('[data-unref]'); if (k) { chat.kind = k.dataset.ctxKind; renderChatBar(); } if (x) { chat.refs.splice(+x.dataset.unref, 1); renderChatBar(); } });
+      bar.addEventListener('change', e => { if (e.target.id === 'mRemember') chat.remember = e.target.value; });
+    }
+    return bar;
+  }
+  function renderChatBar() {
+    const bar = chatBar(); if (!bar) return;
+    if (!chat.agent || !leadChat(chat.agent)) { bar.hidden = true; return; }
+    bar.hidden = false;
+    if (!chat.refs.length) { bar.innerHTML = '<span>Type @ to pick a task to ask about or correct.</span>'; return; }
+    bar.innerHTML = chat.refs.map((r, i) => `<span class="ctx-ref">@${esc(r.title.slice(0, 48))}<button type="button" data-unref="${i}" aria-label="Remove">×</button></span>`).join('')
+      + `<span class="space-kinds" role="group" aria-label="Message type">${Object.entries(KIND_TEXT).map(([k, l]) => `<button type="button" data-ctx-kind="${k}" aria-pressed="${chat.kind === k}">${l}</button>`).join('')}</span>`
+      + (chat.kind === 'correction' ? `<label>Remember<select id="mRemember"><option value="">Only this task</option><option value="agent" ${chat.remember === 'agent' ? 'selected' : ''}>For this lead</option><option value="team" ${chat.remember === 'team' ? 'selected' : ''}>For the team</option></select></label>` : '');
+  }
+  const closePicker = () => { const p = $('mPicker'); if (p) p.hidden = true; chat.trigger = null; };
+  function renderPicker() {
+    const p = $('mPicker'); if (!p) return; p.hidden = false;
+    p.innerHTML = chat.items.length ? chat.items.map((t, i) => `<button type="button" class="pick-item ${i === chat.active ? 'active' : ''}" data-pick="${i}" role="option">${esc(t.title)}<small>${esc(labels[UI_STATE[t.state] || t.state] || t.state)}</small></button>`).join('') : '<p class="pick-item">No tasks match.</p>';
+  }
+  async function chatInput(id, el) {
+    chat.agent = id; if (!leadChat(id)) return;
+    const upto = el.value.slice(0, el.selectionStart ?? el.value.length), m = upto.match(/(?:^|\s)([@/])([^\s@/]{0,40})$/);
+    if (!m) return closePicker();
+    chat.trigger = { start: upto.length - m[2].length - 1, end: upto.length };
+    const seq = ++chat.seq, q = m[2].toLowerCase();
+    const items = id === 'pm' ? jobs.filter(j => j.kind !== 'evaluation' && (!q || j.title.toLowerCase().includes(q))).slice(0, 30).map(j => ({ id: j.id, title: j.title, state: j.realState || j.state }))
+      : await api(`/teams/${R[id].a.dept}/tasks?q=${encodeURIComponent(q)}`).catch(() => []);
+    if (seq !== chat.seq || !chat.trigger) return;
+    chat.items = items; chat.active = 0; renderPicker();
+  }
+  function pickTask(i) {
+    const t = chat.items[i], el = $('mIn'); if (!t || !el) return;
+    if (chat.trigger) el.value = el.value.slice(0, chat.trigger.start) + el.value.slice(chat.trigger.end);
+    if (!chat.refs.some(r => r.id === t.id)) chat.refs = [...chat.refs, t].slice(-3);
+    closePicker(); renderChatBar(); el.focus();
+  }
+  function chatPickerKey(e) {
+    const p = $('mPicker'); if (!p || p.hidden) return false;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); chat.active = (chat.active + (e.key === 'ArrowDown' ? 1 : chat.items.length - 1)) % Math.max(1, chat.items.length); renderPicker(); return true; }
+    if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); if (chat.items.length) pickTask(chat.active); else closePicker(); return true; }
+    if (e.key === 'Escape') { closePicker(); return true; }
+    return false;
+  }
+  function chatContext(id) {
+    if (chat.agent !== id || !chat.refs.length) return {};
+    return { taskId: chat.refs[0].id, refs: chat.refs.map(r => r.id), kind: chat.kind, remember: chat.kind === 'correction' ? chat.remember || undefined : undefined, about: `${KIND_TEXT[chat.kind]} · ${chat.refs.map(r => r.title).join(', ')}` };
+  }
+  function chatSent(id) { if (chat.agent === id) { chat.refs = []; chat.kind = 'question'; chat.remember = ''; renderChatBar(); } }
+  async function loadHistory(id) { const rows = await api('/threads/' + encodeURIComponent('agent:' + id)); return rows.slice(-30).map(m => ({ who: m.role === 'ceo' ? 'user' : 'agent', text: m.text, taskId: m.role === 'ceo' ? undefined : m.jobId || undefined })); }
   const rowHTML = key => { const list = jobs.filter(j => j.dept === key); return `<div class="b-tasks"><span>ACTIVE<b data-tk="${key}-doing">${list.filter(j => ['planning','working','reviewing'].includes(j.state)).length}</b></span><span>QUEUED<b data-tk="${key}-next">${list.filter(j=>j.state==='queued').length}</b></span><span>APPROVED<b data-tk="${key}-done">${list.filter(j=>j.state==='done').length}</b></span></div>`; };
   for(const key of DEPT_KEYS)deptRT[key].apprRow.insertAdjacentHTML('beforebegin',rowHTML(key));
   let liveStatus = 'connecting', taskTimer = null;
@@ -428,10 +509,10 @@ export function initOfficeWork(ctx) {
   const poll = () => setTimeout(async () => { await refresh(); poll(); }, liveStatus === 'live' ? 15000 : 2000);
   officeReady.then(async()=>{connectLive({ onEvent, onStatus: status => { liveStatus = status; } });poll();try{const health=await api('/health');onLive?.(health);await syncBrain();await refresh();const usage=await api('/usage');onUsage?.(usage);}catch(error){$('spaceHint').textContent=error.message;}});
   const noop=()=>{};
-  return { openInbox: () => inbox.open(), needsYouCount: () => inbox.counts.needsYou, settings, get tasks(){return jobs.flatMap(j=>[...j.subtasks.filter(s=>s.agent).map(s=>({...s,agent:s.agent,state:s.state==='working'?'doing':s.state})),...(['planning','reviewing'].includes(j.state)?[{agent:j.agent,state:'doing'}]:[])]);},
-    projectActivity:()=>projectUI.activity(),openProjects:()=>projectUI.open(),agentActivity:id=>activityByAgent.get(id),job:id=>jobs.find(j=>j.id===id),jobs:()=>jobs,tick:noop,panelWidth:()=>panel.offsetWidth,onFocusChange:key=>{if(DEPTS[key]&&key!=='brain'){selectedTeam=key;$('spaceDept').innerHTML=`<i style="background:${DEPTS[key].chip}"></i><span>${esc(DEPTS[key].name)}</span><span class="space-chevron">⌄</span>`;}render();},rowHTML,
+  return { chatContext, chatInput, chatPickerKey, chatSent, loadHistory, openInbox: () => inbox.open(), needsYouCount: () => inbox.counts.needsYou, settings, get tasks(){return jobs.flatMap(j=>[...j.subtasks.filter(s=>s.agent).map(s=>({...s,agent:s.agent,state:s.state==='working'?'doing':s.state})),...(['planning','reviewing'].includes(j.state)?[{agent:j.agent,state:'doing'}]:[])]);},
+    projectActivity:()=>projectUI.activity(),openProjects:()=>projectUI.open(),agentActivity:id=>activityByAgent.get(id),job:id=>jobs.find(j=>j.id===id),jobs:()=>jobs,tick:noop,panelWidth:()=>panel.offsetWidth,onFocusChange:key=>{if(DEPTS[key]&&key!=='brain'){selectedTeam=key;setTimeout(fillOptions);$('spaceDept').innerHTML=`<i style="background:${DEPTS[key].chip}"></i><span>${esc(DEPTS[key].name)}</span><span class="space-chevron">⌄</span>`;}render();},rowHTML,
     isLive:()=>true,isOpen:()=>dialog.open,open:()=>{open('board','Office work');content.innerHTML=jobs.map(j=>`<button class="space-note" data-job="${j.id}"><b>${esc(j.title)}</b><span>${labels[j.state]} · ${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)}</span></button>`).join('')||'<p>No tasks yet.</p>';content.querySelectorAll('[data-job]').forEach(b=>b.onclick=()=>showTask(b.dataset.job));},
-    toggle(){dialog.open?close():this.open();},close,openFor(){this.open();},openTask:showTask,refresh,renderAgent,railFor:id=>{agentOpen=id;const el=$('mRt');el.hidden=true;},syncPills:noop,
+    toggle(){dialog.open?close():this.open();},close,openFor(){this.open();},openTask:showTask,refresh,renderAgent,railFor:id=>{agentOpen=id;const el=$('mRt');if(el)el.hidden=true;if(chat.agent!==id){chat.agent=id;chat.refs=[];chat.kind='question';chat.remember='';}closePicker();renderChatBar();},syncPills:noop,
     onStuck:noop,onResolve:noop,pendingReject:()=>false,rejectLive:noop,resolveLive:noop,revise:()=>false,addTask:()=>null,routines:[],
     handleChat:async(id,text)=>{const match=text.match(/^\s*(?:add\s+(?:a\s+)?task|task|todo)\s*:\s*(.+)$/is);if(match){try{const job=await api('/tasks','POST',{dept:R[id].a.dept,text:match[1]});await refresh();return `Task received by the team lead: ${job.title}. Open Work to follow the plan and verification.`;}catch(error){return error.message;}}return null;},
   };

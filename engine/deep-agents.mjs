@@ -307,8 +307,10 @@ export class OfficeEngine {
   }
   async build(job, signal) {
     const office = this.office.get();
-    const teams = (job.depts?.length ? job.depts : [job.dept]).map(id => office.teams.find(t => t.id === id)).filter(Boolean);
-    if (!teams.length) throw new Error('This task’s team no longer exists. Create a new task for a current team.');
+    const assigned = (job.depts?.length ? job.depts : [job.dept]).map(id => office.teams.find(t => t.id === id)).filter(Boolean);
+    if (!assigned.length) throw new Error('This task’s team no longer exists. Create a new task for a current team.');
+    // The Program Manager can reach every lead, so a hand-off to another team needs no rebuild; a team test stays inside its team.
+    const teams = job.kind === 'evaluation' ? assigned : office.teams;
     await this.toolHub?.ensure?.();
     const models = {};
     const make = async (role, agent, team) => {
@@ -332,7 +334,7 @@ export class OfficeEngine {
       const { model, provider } = await make('lead', lead, team);
       const spotChecks = this.toolHub ? this.toolHub.toolsFor({ agent: lead, team, provider, evaluation, readOnly: true }).tools : [];
       const graph = this.agentFactory({ name: leadName(team.id), model, systemPrompt: leadPrompt({ office, team, lead, specialists, reworkRounds: reworkRounds(team) }),
-        tools: [this.reviewTool(job.id, team), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...spotChecks], subagents, backend, permissions: FILE_PERMISSIONS, checkpointer: true });
+        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...spotChecks], subagents, backend, permissions: FILE_PERMISSIONS, checkpointer: true });
       leads.push({ name: leadName(team.id), description: `${team.name} team, led by ${lead.name}.${team.purpose ? ' ' + team.purpose : ''}`.slice(0, 600), runnable: graph });
     }
     const { model } = await make('pm', null, null);
@@ -342,6 +344,23 @@ export class OfficeEngine {
     return { pm, models };
   }
   /* ---------- office tools ---------- */
+  // A lead whose assignment needs another team's expertise hands that part to the Program Manager and keeps working on its own part.
+  // The PM must delegate it before the task can close; the other lead's review is then required like any involved team's.
+  handoffTool(id, team, office) {
+    const others = office.teams.filter(t => t.id !== team.id);
+    return tool(async ({ team: target, request }) => {
+      const job = this.get(id), other = others.find(t => t.id === target); if (!job || job.state === 'cancelled') return 'The task is closed.';
+      if (!other) return `Unknown team. Choose one of: ${others.map(t => t.id).join(', ')}.`;
+      const text = clean(request).slice(0, 2000); if (!text) return 'Say what the other team should deliver.';
+      const handoff = { id: randomUUID(), from: team.id, team: other.id, request: text, at: Date.now() };
+      this.update(id, j => { j.handoffs = [...(j.handoffs || []), handoff]; if (!j.autoRoute && !(j.depts || []).includes(other.id)) j.depts = [...(j.depts || [j.dept]), other.id]; });
+      this.event(id, 'handoff_requested', team.lead, `${team.name} asked ${other.name} for: ${text.slice(0, 200)}`, { team: other.id, role: 'lead' });
+      return `Recorded. The Program Manager will delegate this to ${other.name} (${leadName(other.id)}). Continue with your own part now, and put this line in your report to the Program Manager: "HAND-OFF to ${other.name}: ${text.slice(0, 200)}".`;
+    }, { name: 'hand_to_program_manager', description: 'Ask the Program Manager to delegate part of this assignment to another team whose expertise it needs. Call once per hand-off, then carry on with your own team’s part. Never do the other team’s work yourself.',
+      schema: z.object({ team: z.enum(others.length ? others.map(t => t.id) : ['none']).describe('The team that should take it'), request: z.string().describe('What that team should deliver, with the context they need') }) });
+  }
+  // A hand-off is open until a lead run for that team starts after it was asked for.
+  openHandoffs(job) { return (job.handoffs || []).filter(h => !job.runs.some(r => r.role === 'lead' && r.dept === h.team && (r.startedAt || 0) >= h.at)); }
   progressTool(id, agentId) {
     return tool(async ({ text }) => { const line = clean(text).slice(0, 240); if (line) { this.update(id, j => { j.progressLine = line; }); this.event(id, 'progress', agentId, line); } return 'Noted.'; },
       { name: 'report_progress', description: 'Post a one-sentence progress update the CEO sees on the task card.', schema: z.object({ text: z.string() }) });
@@ -389,6 +408,8 @@ export class OfficeEngine {
   completeTool(id) {
     return tool(async ({ summary }) => {
       const job = this.get(id); if (job.state === 'cancelled') return 'The task was cancelled.';
+      const open = this.openHandoffs(job);
+      if (open.length) { const office = this.office.get(), name = d => office.teams.find(t => t.id === d)?.name || d; this.event(id, 'completion_refused', 'pm', `Hand-off not delegated: ${open.map(h => name(h.team)).join(', ')}.`); return `Refused: a lead asked for a hand-off that you have not delegated yet: ${open.map(h => `${name(h.from)} needs ${name(h.team)} to ${h.request.slice(0, 200)} (delegate with the task tool to ${leadName(h.team)})`).join('; ')}. Delegate it, wait for that lead's approved review, then complete.`; }
       const stale = this.staleDepts(job);
       if (stale[0] === '(none yet)') { this.event(id, 'completion_refused', 'pm', 'No team has worked on it yet.'); return 'Refused: no department lead has worked on this yet. Delegate it to the right lead first.'; }
       if (stale.length) { this.event(id, 'completion_refused', 'pm', `No approved review from ${stale.map(leadName).join(', ')}.`); return `Refused: ${stale.map(leadName).join(', ')} has no approved review of the latest work. Ask the lead to review, then call complete_task again.`; }
@@ -463,7 +484,8 @@ export class OfficeEngine {
   }
   message(id, { text, kind = 'message', agent = null, refs = [], remember = null } = {}) {
     const job = this.get(id); if (!job) throw httpError('No such task.', 404);
-    if (job.state === 'cancelled') throw httpError('This task was cancelled. Create a new task instead.', 409);
+    // A question can be asked about any task, including a cancelled one; nothing else reaches a cancelled task.
+    if (job.state === 'cancelled' && kind !== 'question') throw httpError('This task was cancelled. Create a new task instead.', 409);
     const body = clean(text); if (!body) throw httpError('Write a message first.');
     const office = this.office.get(), target = agent ? office.agents.find(a => a.id === agent) : null;
     if (agent && !target) throw httpError('Unknown agent.');

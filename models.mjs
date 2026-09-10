@@ -18,13 +18,9 @@ export const DEFAULT_REGISTRY = {
     { id: 'openai', type: 'openai', label: 'OpenAI', enabled: true },
     { id: 'openrouter', type: 'openai-compatible', label: 'OpenRouter', baseURL: 'https://openrouter.ai/api/v1', enabled: true, headers: { 'X-Title': 'Cloud AI Office' } },
   ],
-  models: [
-    { id: 'claude-opus-5', provider: 'anthropic', label: 'Claude Opus 5', supports: { effort: true } },
-    { id: 'claude-sonnet-5', provider: 'anthropic', label: 'Claude Sonnet 5', supports: { effort: true } },
-    { id: 'claude-fable-5-1', provider: 'anthropic', label: 'Claude Fable 5.1', supports: { effort: true } },
-    { id: 'claude-haiku-4-5', provider: 'anthropic', label: 'Claude Haiku 4.5', supports: { effort: false } },
-  ],
-  roleDefaults: { pm: 'claude-opus-5', lead: 'claude-sonnet-5', specialist: 'claude-sonnet-5', review: 'claude-sonnet-5', chat: 'claude-sonnet-5', office: 'claude-sonnet-5' },
+  // No model is built in: the owner adds a key, then activates models from the provider's own list.
+  models: [],
+  roleDefaults: { pm: '', lead: '', specialist: '', review: '', chat: '', office: '' },
   roleEfforts: { pm: 'high', lead: 'high', specialist: 'medium', review: 'high', chat: 'low', office: '' },
 };
 
@@ -72,7 +68,7 @@ export class ModelRegistry {
     const roleDefaults = {}, roleEfforts = {};
     for (const role of ROLES) {
       const wanted = normModel(input?.roleDefaults?.[role]);
-      roleDefaults[role] = known.has(wanted) ? wanted : (known.has(DEFAULT_REGISTRY.roleDefaults[role]) ? DEFAULT_REGISTRY.roleDefaults[role] : models[0]?.id || '');
+      roleDefaults[role] = known.has(wanted) ? wanted : (role === 'office' ? models[0]?.id || '' : '');
       roleEfforts[role] = input?.roleEfforts?.[role] === '' ? '' : normEffort(input?.roleEfforts?.[role]) || DEFAULT_REGISTRY.roleEfforts[role];
     }
     const embeddings = input?.embeddings && typeof input.embeddings === 'object' ? { provider: ids.has(input.embeddings.provider) ? input.embeddings.provider : '', model: text(input.embeddings.model, 120) } : { provider: '', model: '' };
@@ -131,8 +127,11 @@ export class ModelRegistry {
     const provider = this.provider(id); if (!provider) fail('No such provider.', 404);
     // Test the model the office actually runs on for this provider, else the first one registered.
     const usable = m => m.provider === id && m.enabled !== false, byId = mid => this.value.models.find(m => m.id === mid && usable(m));
-    const model = ['office', 'pm', 'lead', 'specialist', 'review', 'chat'].map(r => byId(this.value.roleDefaults?.[r])).find(Boolean) || this.value.models.find(usable); if (!model) fail('Add a model for this provider first.');
+    const model = ['office', 'pm', 'lead', 'specialist', 'review', 'chat'].map(r => byId(this.value.roleDefaults?.[r])).find(Boolean) || this.value.models.find(usable);
+    if (!this.usable(provider)) return { ok: false, model: model?.id || '', error: 'Add a key first.' };
     const started = Date.now();
+    // With no model activated yet, the key is checked by listing the provider's models.
+    if (!model) { try { const list = await this.listModels(id); return { ok: true, model: '', models: list.length, ms: Date.now() - started }; } catch (error) { return { ok: false, model: '', error: String(error.message || error).slice(0, 500) }; } }
     try { const chat = await this.instance({ model: model.id, streaming: false, maxTokens: 16 }); await chat.invoke('Reply with the word ready.'); return { ok: true, model: model.id, ms: Date.now() - started }; }
     catch (error) { return { ok: false, model: model.id, error: String(error.message || error).slice(0, 500) }; }
   }
@@ -145,7 +144,7 @@ export class ModelRegistry {
     const res = await this.fetch(base + '/models', { headers, signal: AbortSignal.timeout(15000) });
     if (!res.ok) fail(`${provider.label} returned ${res.status} when listing models.`, 502);
     const body = await res.json();
-    const list = (body.data || []).map(m => ({ id: m.id, label: m.display_name || m.name || m.id })).slice(0, 500);
+    const list = (body.data || []).map(m => ({ id: m.id, label: m.display_name || m.name || m.id, supports: { effort: provider.type === 'anthropic' && /claude-(opus|sonnet|fable)-(4\.[6-9]|[5-9])/.test(m.id), reasoning: provider.type !== 'anthropic' && (Array.isArray(m.supported_parameters) ? m.supported_parameters.includes('reasoning') : /o[1-9]|gpt-5|reasoning|thinking|glm-[5-9]|kimi-k[3-9]|deepseek-r/i.test(m.id)) } })).sort((a, b) => a.id.localeCompare(b.id)).slice(0, 2000);
     this.modelCache.set(id, { at: Date.now(), list }); return list;
   }
 }

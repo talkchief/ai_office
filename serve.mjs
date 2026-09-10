@@ -141,6 +141,12 @@ async function answerAbout(a, team, job, question) {
   const answer = await model.invoke([new SystemMessage(`You are ${a.name}, ${a.role}. The CEO is asking about one task. Answer briefly and concretely from this record; say what you do not know. Do not start new work.\n\n${context}`), new HumanMessage(question)], { signal: AbortSignal.timeout(120000) });
   return flat(answer.content).trim() || 'I do not have an answer to that yet.';
 }
+// A message about a task is kept in the task's thread and also in the person's chat, so the chat shows it when reopened.
+function keepInChat(agentId, message, reply, jobId) {
+  const thread = engine.threads.ensure('agent', agentId);
+  engine.threads.append(thread, { role: 'ceo', agent: agentId, text: message, jobId });
+  engine.threads.append(thread, { role: 'agent', agent: agentId, text: reply, jobId });
+}
 async function chat({ agent: agentId, text, taskId, kind, refs = [], remember = null }) {
   const message = String(text || '').trim(); if (!message) throw httpError('Write a message first.');
   const o = office.get(), isPm = agentId === 'pm', a = isPm ? PM : o.agents.find(x => x.id === agentId); if (!a) throw httpError('Unknown agent.');
@@ -152,11 +158,14 @@ async function chat({ agent: agentId, text, taskId, kind, refs = [], remember = 
       engine.message(taskId, { text: message, kind: 'question', agent: a.id, refs });
       const reply = await answerAbout(a, team, job, message);
       engine.threads.append(taskId, { role: 'agent', agent: a.id, kind: 'answer', text: reply, jobId: taskId });
+      keepInChat(a.id, message, reply, taskId);
       return { reply, taskId };
     }
     if (!isLead && !isPm) throw httpError('Corrections go through the team lead. Open the lead’s chat to send this.', 409);
     const result = engine.message(taskId, { text: message, kind: kind === 'note' ? 'note' : 'correction', agent: a.id, refs, remember: ['agent', 'team'].includes(remember) ? remember : null });
-    return { reply: result.queued ? 'Noted. The team gets this at its next step.' : isPm ? 'On it. I have sent this back to the team and will close it again after the lead approves.' : `On it. I have sent this back to the ${team.name} team and will review the result again.`, taskId, delegated: true };
+    const reply = result.queued ? 'Noted. The team gets this at its next step.' : isPm ? 'On it. I have sent this back to the team and will close it again after the lead approves.' : `On it. I have sent this back to the ${team.name} team and will review the new version before it comes back to you.`;
+    keepInChat(a.id, message, reply, taskId);
+    return { reply, taskId, delegated: true };
   }
   if (!isPm) { const rc = await routinesChat({ ...a, lead: isLead }, message); if (rc) return { reply: rc.reply, routine: rc.routine || null, routines: true }; }
   const question = /\?\s*$/.test(message) || /^(hi|hello|hey|thanks|thank you|what|who|why|how|when|where|which|can you|could you|do you|does|is|are|should)\b/i.test(message);

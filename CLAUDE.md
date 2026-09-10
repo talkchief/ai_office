@@ -11,10 +11,12 @@ All in the data folder (`data/`, or `AO_DATA`). The server owns these files; do 
 | File | Holds | Change it in |
 |---|---|---|
 | `office.json` | Teams, people, skills, standing rules | Settings → Teams & people, Settings → Skills, or `PUT /api/office` |
-| `providers.json` (0600) | Provider keys, models, who runs on what | Settings → Models & keys, or `PUT /api/providers` |
+| `providers.json` (0600) | Provider keys, activated models, who runs on what | Settings → Models & keys, or `PUT /api/providers` |
 | `settings.json` | Tasks at once, time limit, reminder window, digest time, approval rules | Settings → Office, or `PUT /api/settings` |
 | `tools.json` (0600) | Connectors (MCP servers) and their sign-ins | Settings → Tools & connectors |
 | `workflows.sqlite` | Tasks, threads, inbox, audit log, checkpoints | Never by hand |
+
+No model is built in: the owner saves a provider key, the office fetches that provider's model list (`GET /api/providers/:id/models`), and the owner activates the models the office may use and picks the office default and any per-role models. A lead whose assignment needs another team's expertise calls `hand_to_program_manager`; the Program Manager must delegate that part to the other lead before the task can close, and the other lead's review is then required.
 
 Every change through the API is validated (a bad edit is refused with a sentence, nothing is applied) and recorded in the audit log. **Never print, copy or commit provider keys or connector tokens.** Keys can also come from the environment: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`.
 

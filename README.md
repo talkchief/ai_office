@@ -1,301 +1,69 @@
-# Talkchief AI Space
+# Cloud AI Office
 
-This deployment adds persistent team workflows to the original 3D office. Open
-**Manage** for Teams, Skills, Reports, Tools & MCPs, Brain, and Claude authentication.
+![The office: department rooms around the Program Manager, with the task panel](assets/readme-hero.jpg)
 
-- Reusable skills have versioned instructions and team/agent assignments.
-- Teams have an explicit purpose and guardrails checked during lead review, plus editable agents, a designated lead, instructions, review criteria,
-  deterministic acceptance checks, multiple saved tests and execution budgets. Run an entire test suite and inspect each outcome in Reports.
-- Reports aggregate recorded task outcomes, review delays, model calls, token usage,
-  worker submissions and blockers. Test results remain separate; export as JSON.
-- LangGraph runs planning, worker subtasks and independent lead review with SQLite
-  checkpoints. Failed or interrupted work stays blocked until retried. Optional
-  owner approval survives a server restart.
-- Save an idea without starting agents, edit its brief and priority, then release it
-  to the queue. High-priority tasks run first as capacity becomes available.
-- Task and agent views show recorded plans, dependencies, deliverables, tools used,
-  supplied knowledge and review history. Public draft text appears while a worker
-  writes; drafts are explicitly unreviewed. Call/token use appears against the task
-  limits. Connection loss clears work animations until live updates resume.
-  The live office does not simulate tasks.
-- Completed tasks open on a readable result document with headings, lists, tables,
-  source links, rich-text copy and Markdown download. Team work and Review have
-  separate tabs. The feed groups attention, running work, ready results, ideas and
-  collapsed closed tasks. Background polling preserves reading position and selection.
-- Automated checks are editable in Teams: required text, prohibited text, minimum
-  length and maximum length. A failed check vetoes completion even if the lead approves.
-- MCP servers support HTTP/SSE or local commands, bearer credentials and the official
-  Claude CLI OAuth flow. Assign or unassign connectors in team settings; agents can
-  inherit the team selection or use a subset. Credentials stay on the server.
-- Brain manages the office purpose and Markdown knowledge, including editing and
-  archiving. Reviewed deliverables return to the knowledge library. The production
-  vault is `data/knowledge`; bundled sample notes remain in `brain` for reference.
+A 3D office run like a company, with you as the CEO. You give work to the **Program Manager**, who hands it to the right **department leads**; leads plan it, hand assignments to their **specialists**, review what comes back against the team's criteria, and only approved work is filed in the **Brain**, the company's shared knowledge. Anything that would send, post, pay or change something outside the office waits for your approval.
 
-Run `npm test` for the workflow/authentication/connector checks and `npm run build`
-for the UI. See [deployment notes](deploy/README.md) for operation and backups.
-The [verification record](deploy/verification.md) maps the requested capabilities
-to automated tests, browser checks and actual Claude runs, with operational limits.
-The original demo documentation below describes upstream features; its simulated
-activity applies to the offline demo, not this deployed workflow.
+It runs on API keys from any provider: Anthropic, OpenAI, OpenRouter (GLM, Kimi and many others) or any OpenAI-compatible endpoint, with a model per role, per team and per person. The agents are built on LangChain Deep Agents.
 
+**Beta.** It works end to end. Expect rough edges.
 
-![Agents Office — six department pods around the Brain, with the Task Status panel](assets/readme-hero.jpg)
-
-A 3D office where AI agents do real work on your own Claude login.
-
-One floor, a room per department with a door and glass walls, a Program Manager in a glass
-office at the centre, a lobby, a kitchen and a meeting room in the corners. Thirty-five agents at
-their desks who type, read, glance at whoever walks past, take a coffee, chat, and hold team
-meetings; wall screens that show who is working and a market feed; day and night that follow
-your clock. A task bar routes what you type to the right agent, and the Brain is your own folder of
-notes. Type a task, the office
-gives it to the right person, they read your notes, use the connectors you have already set up
-in Claude Code, do the work, and file the result back into your notes. Everything runs on your
-machine.
-
-**Beta.** It works end to end. Expect rough edges and tell us about them in Issues.
-
-**License, in plain English:** free for personal and internal use. You may not sell it, resell it,
-or build a paid product on it. (Formal terms: PolyForm Noncommercial 1.0.0 — see [LICENSE](LICENSE).)
+**License, in plain English:** free for personal and internal use. You may not sell it, resell it, or build a paid product on it. (Formal terms: PolyForm Noncommercial 1.0.0 — see [LICENSE](LICENSE).)
 
 ## What you need
 
-- macOS or Linux (Windows: works with `npm` commands directly, `./setup` is Bash only)
-- Node.js 22+ — https://nodejs.org (the service runtime is 22.23.2; on Rocky/RHEL 9: `dnf module switch-to nodejs:22`)
+- macOS or Linux
+- Node.js 22+ — https://nodejs.org (on Rocky/RHEL 9: `dnf module switch-to nodejs:22`)
 - git
-- **Claude Code**, logged in with your Claude account, or an `ANTHROPIC_API_KEY`
+- An API key from at least one model provider (Anthropic, OpenAI, OpenRouter, or an OpenAI-compatible service)
 
 ## Install
 
 ```bash
-git clone https://github.com/ajsahni/agents-office.git
+git clone <this repository>
 cd agents-office
-./setup          # checks Node, git and Claude; installs; builds; boots once
+./setup          # checks Node and git; installs; builds; boots once
 npm start        # → http://localhost:4520
 ```
 
-Without `./setup`: `npm install && node build.mjs && npm start`.
+Without `./setup`: `npm install && node build.mjs && npm start`. Then open **Manage → Models & keys**, paste a key, and choose which model runs each role. Keys stay on the server and are never shown again.
 
 ## Moving around
 
 - Scroll to zoom to the cursor, drag to pan, click a room to focus it, click a person to talk to them, double-click the floor or press `0` for the overview.
 - **Turn and tilt the office**: drag with the right mouse button (or hold Shift), or `Q` / `E` and the ↺ ↻ buttons. `⌂` straightens the view again.
-- `N` cycles morning → day → evening → night to preview the light; by default the office follows your clock (night after 20:00, dark tokens and desk lamps). `D` forces dark, `V` the filming backdrop, `G` the Brain, `B` the board, `X` sends two people to the centre for a chat (demo).
+- `N` cycles morning → day → evening → night to preview the light; by default the office follows your clock (night after 20:00, dark tokens and desk lamps). `D` forces dark, `V` the filming backdrop, `G` the Brain, `B` the board, `X` sends two people to the centre for a chat (offline preview only).
 
 ## First five minutes
 
-1. Open http://localhost:4520. The panel on the right says **LIVE · CLAUDE** when the server is
-   connected. Double-clicking `dist/command-centre-v2.html` opens the same office on its own,
-   without a server, in demo mode.
-2. In the bar at the top of the panel, pick a department, type a task in plain words, press **Add**.
-   Claude picks the agent and names them; the task appears in the feed; the agent picks it up,
-   works, and the deliverable lands in that agent's chat and in your brain folder as a note.
-3. Click any agent to talk to them. They answer in their role, grounded in your notes.
-   Say `revise: make it shorter` and they rework their last deliverable.
-4. Press **G**, or click the Brain, to open your notes as a graph. Hover a note to see its links,
-   click it to read where it sits and who read or wrote it.
-5. The top bar shows the connectors your Claude Code is connected to. When an agent uses one,
-   its logo pulses and the wire into that department lights up.
-6. The first deliverables will be competent and generic: the agents know the sample studio and
-   one sentence about their own job. Point the brain at your notes, then teach them how you
-   work (below). That is where the office becomes yours.
+1. Open http://localhost:4520. The panel on the right shows **Right now**: who is working with whom, live.
+2. In the box at the top of the panel, pick a team, or **Let the Program Manager choose**, type what you need and press **Add task**. Under **Assign · due date · more teams · documents** you can name who it is for, set a due date and priority, bring in other teams, and attach documents; they go into the Brain for the team to read.
+3. Watch it move: the lead plans, walks over to a specialist, the specialist works, the lead reviews. A lead whose part needs another team hands that part to the Program Manager, who brings the other team in while the first lead carries on. Each card shows the hand-off chain. The result opens as a readable document with the review checks beside it.
+4. The **Inbox** (top right, or click the lobby) collects everything that needs you: decisions, approvals for outbound actions, questions, blocked work, overdue work and the daily digest. Turn on desktop alerts there.
+5. Click a lead or the Program Manager to talk to them. Type **@** to pick one of the team's tasks, then choose **Ask**, **Correct** or **Note**. A correction reopens the task: the lead reworks it, reviews it again and files a new version. Tick **remember** to keep the correction as a standing rule. Specialists answer questions; corrections go through their lead.
+6. Open a finished task and use **Ask for changes** to correct it from there.
 
-## Connectors
+## Settings
 
-The bar under **CONNECTED TO** is real: it is the list from `claude mcp list` on this machine,
-which is the same list the agents get as tools. Gmail, Slack, Notion, Google Drive, Canva,
-whatever you have connected in claude.ai or added with `claude mcp add`. A server that needs
-authentication shows grey with the reason on hover, and is not wired to any pod until it works.
-Nothing connected yet? The bar says so.
+**Manage** opens a full settings page (the office pauses behind it):
 
-Agents can call those servers while they work, plus web search. They never get Bash, file
-tools or sub-agents. Their standing rule: read freely; send, post, pay, delete or change
-anything outside this machine **only** when your task explicitly asks for that exact action.
-A finished deliverable says which tools it used, and the note in your brain records them.
+- **Office** — tasks running at once, the time limit per run, when to remind you again, the digest time.
+- **Teams & people** — add, rename and remove teams (up to 10; a team is a lead and up to six specialists), each person's job, standing instructions and model, the team's purpose, review criteria, automated checks, tools, pace, standing rules, and tests.
+- **Models & keys** — provider keys, then the models you activate from each provider's own list (nothing is built in), and who runs on what (office default, Program Manager, leads, specialists, reviews, chat).
+- **Tools & connectors** — MCP servers by URL or local command, sign-in in a new window, which teams may use each, and approval rules per tool.
+- **Skills** — reusable methods you give to teams or people. See [SKILLS.md](SKILLS.md).
+- **Routines** — tasks the office starts on its own clock, for any team.
+- **Reports & KPIs** — throughput, cycle time, review wait, your response time, rework, overdue work, tokens by model.
+- **Brain** — upload documents (PDF, Word, text, Markdown, CSV), search everything, edit notes, rebuild the search index.
+- **Audit log** — every configuration change, who made it and what changed.
 
-Decide what the agents may touch in `office.config.json`:
+## Routines
 
-```json
-"mcp": { "allow": [], "deny": ["Stripe"], "departments": { "Slack": ["emails", "ops"] } },
-"tools": { "web": true }
-```
+A routine is a task the office starts by itself: "every weekday at 8am, triage the inbox and tell me what needs me". Add one under **Manage → Routines** with the schedule at the start of the sentence, or tell a lead in chat. Each run goes through the lead like any other task. A routine that would act outside the office waits for your approval. The clock lives in the server: the page does not have to be open.
 
-`allow` empty means every connected server. `deny` keeps a server in the bar but out of the
-agents' hands. `departments` says which pods a server is wired to (known brands have a default;
-anything else feeds every pod). Set `tools.web` to `false` to keep the agents off the web.
-Tool use needs the Claude Code login; on an `ANTHROPIC_API_KEY` the agents write from your notes only.
+## The Brain
 
-## Make the agents yours
-
-The 35 agents are in `office.agents.json`: an id, a department, a name, a role, what they do,
-and the connectors they usually use. Change the name, the role, what they do and their tools.
-Departments, leads and seats are fixed: six pods, 35 desks, that is the office. A new kind of
-agent is a renamed seat in the right department.
-
-The easy way is to let Claude do it. Open Claude Code in this folder and say what you want:
-
-```
-claude
-> Rename the Newsletter agent to PODCAST NOTES. It turns each episode into show notes and a LinkedIn post, and uses Google Drive.
-> Make the Sales department about wholesale accounts, not inbound leads. Rewrite what each agent does.
-> Tell every Finance agent to use Xero and nothing else.
-```
-
-Claude reads `CLAUDE.md`, writes your changes to `office.agents.local.json` (yours, ignored by
-git, so `git pull` never overwrites it), and validates them with `npm run check`. Restart the
-office and the desks carry the new names. Edit the file by hand if you prefer; the shape is:
-
-```json
-{ "agents": [
-  { "id": "newt", "name": "PODCAST NOTES", "role": "Podcast Notes Agent",
-    "does": "Turns each episode into show notes and a LinkedIn post.", "tools": ["google drive"],
-    "brief": "Show notes are five bullets and a pull quote. The LinkedIn post opens with the quote, never with the episode title." }
-] }
-```
-
-Edits to `id`, `department` or `lead` are ignored, and the server says so at start. The same
-file can also sit in your brain as `<brain>/Agents Office/agents.json`; the office reads the
-shipped roster, then the brain's, then the local file.
-
-## Teach the agents how you work
-
-Renaming an agent says what it does. It does not say *how*. Out of the box every agent knows
-its one-line job, your notes, and a rule to hand over a finished deliverable, so the first
-results are competent and generic. Two ways to fix that, both read before every task:
-
-- **A brief** is a few standing sentences on one agent: tone, red lines, who to escalate to.
-  It is the `brief` field above.
-- **A skill** is a folder in your brain, `<brain>/Agents Office/skills/<name>/`, with a
-  `SKILL.md` (when it applies, the steps, the shape, the rules) and the template or example
-  beside it. Bind it to an agent or a department in its front matter. Same shape as a Claude
-  Code skill.
-
-```markdown
----
-name: proposal
-description: How we write a client proposal
-agents: [piper]
----
-# Writing a proposal
-Use this for any request that ends in a document a client says yes or no to.
-1. Prices come from `10-Business/offer-ladder.md`. Never invent one.
-2. Follow `template.md` beside this file, section for section.
-- Three options, always. Recommend the middle one.
-```
-
-Three example skills ship in `skills/` for the sample studio. The fastest way to write yours is
-to hand Claude Code what you already have, the SOP, the email you keep copying, the last report
-you were happy with, and ask for a skill:
-
-```
-claude
-> Here is the proposal I sent Harbourside. Turn it into a skill for the Proposals agent: the
-  shape as a template, the rules I follow, and keep this one as the example.
-```
-
-Skills and briefs take effect on the next task, no restart. `npm run check` validates them and
-http://localhost:4520/api/skills shows who has what. The full guide, including what the agent
-sees and how to write a good one, is **[SKILLS.md](SKILLS.md)**.
-
-### Or let the lead interview you
-
-Click a department lead and say **set up**. The lead asks five questions, one at a time: what
-the department does here, the job you do most, what a good result looks like, what must never
-happen, which tools and people are involved. Then it writes a brief for each agent on its team
-and a skill for the job you described, into your brain, and tells you exactly what it wrote and
-one task to type to try it. Nothing is written until the last answer. "skip", "done" and
-"cancel" do what they say. A lead whose department has nothing of yours yet offers this in its
-greeting.
-
-### They learn from your corrections
-
-Send a deliverable back with `revise: …` in the agent's chat and the correction is recorded in
-`<brain>/Agents Office/feedback/<agent>.md`. Claude sorts it: a one-off about that task, or a
-standing rule ("proposals are always one page") that the agent then applies to every task from
-then on. The file is plain Markdown and it is yours: reword a rule, delete a line to unlearn it,
-move a one-off up to make it a rule. When a rule is really a process, ask Claude Code to fold it
-into the skill.
-
-## Routines: the office runs on its own clock
-
-A routine is a task the office does by itself, on a timetable: every weekday at 08:00, every
-Monday, every hour. In this release routines are for **Emails, Accounting and Sales**; the
-other departments get them later, and say so if you try.
-
-Three ways to set one, all the same underneath:
-
-- **Type it in the bar with the time in the sentence.** `every weekday at 8am, triage the
-  inbox and tell me what needs me`. The hint line reads the schedule back before you press Add.
-  Or press **REPEAT** and pick a cadence and a time. Times are this machine's clock.
-
-The task box grows as you type (Shift+Enter for a new line, Enter adds). The ⤢ button in the box, or
-⌘⇧E, opens a big editor with room for a whole brief; ⌘↵ adds from there, Esc closes.
-- **Tell a department lead in chat.** "every Monday 9am, list the overdue invoices and draft the
-  reminders". The lead puts it on the right desk and reads the timetable back on `routines`;
-  `pause …`, `resume …`, `run … now` and `delete …` work with a few words from the name.
-- **Ask Claude Code.** Routines live in `<brain>/Agents Office/routines.json`; `CLAUDE.md` tells
-  Claude Code how to write one.
-
-Where they show: a **SCHEDULED** chip in the Task Status panel with a countdown on every routine
-and RUN NOW / PAUSE / DELETE on each; a next-up line under the chips; a SCHEDULED column on the
-company board (**B**); a clock chip on the agent's name pill and a routines strip at the top of
-their chat.
-
-What a routine may do alone: a routine that only reads (a triage, a list, a reconciliation) runs
-and lands in DONE like any task. A routine that would send, pay or change anything has **needs
-my OK** on by default: the agent prepares everything, the draft lands in the chat, the card moves
-to WAITING ON APPROVAL and the agent stands and waves. **APPROVE** and the agent does the
-outbound step with its tools; **REJECT**, say what should change, and it comes back reworked,
-and that correction is remembered. Switch the OK off per routine for the ones you trust.
-
-The clock lives in the server: `npm start` has to be running, but the page does not have to be
-open. A run missed while the machine was asleep or the office was off is caught up once when it
-comes back, marked LATE; never more than one catch-up per routine. Every firing is a line in the
-terminal and a task in the panel, so "did it run" is never a guess. For filming, `every 2
-minutes` is accepted, though the picker does not offer it.
-
-## Which model, and how much of your plan
-
-Every run names its model. Three, by name: **Sonnet**, **Opus**, **Fable**. Sonnet is the
-default for everything, including the routing call that names the agent. The menu beside REPEAT
-in the bar shows the office default; change it and it applies to the task you are typing (or the
-routine, with REPEAT on). Four places, one precedence: the task beats the routine beats the agent
-(a `model` field in the roster) beats the office default (`model` in `office.config.json`). Every
-card says which model ran and, if it was set above the default, where.
-
-**Effort** sits beside the model: AUTO, Low, Medium, High, Extra high, Max, the levels Claude Code
-itself uses. AUTO is the model's own level (Opus runs at high). Set it on a task, a routine, an
-agent (an `effort` field in the roster) or the office (`effort` in `office.config.json`), same
-precedence as the model, and the card shows it next to the model name.
-
-The top bar shows what your Claude plan has used, the way Claude Code's own usage screen shows
-it: **session** and **week**, a bar and a percentage, reset times on hover. It is read from the
-same place Claude Code reads it, with the login token Claude Code keeps on this machine (the
-keychain on macOS, `~/.claude/.credentials.json` elsewhere). The token is read into memory, sent
-only to Anthropic's usage endpoint, never logged and never written. That endpoint is not a
-documented one; when it does not answer, the gauge shows the office's own count for the current
-five-hour window instead, and says so on hover. No dollars anywhere: the office runs on the plan
-you already pay for, and the gauge is there to show it.
-
-## Make it yours
-
-`office.config.json`:
-
-```json
-{ "name": "Northgate Studio", "brain": "./brain", "port": 4520, "model": "" }
-```
-
-- **name** — your business. It appears in the title and in every agent's brief.
-- **brain** — a folder of Markdown notes with `[[wiki links]]`. An Obsidian vault works as is.
-  The sample brain in `brain/` is a small fictional studio so the office works out of the box.
-  Point this at your own notes and rebuild (`node build.mjs`) or just restart the server.
-- **port** — where the office listens.
-- **model** — `sonnet` (default), `opus` or `fable`. The office default; a routine, an agent or a task can set its own.
-
-Put private overrides in `office.config.local.json` (ignored by git).
-
-Agents write their deliverables to `<brain>/Agents Office/` as dated notes with a link back to
-every note they read, so your graph grows as the office works.
+The company's shared knowledge: your uploads, the office purpose, finished work (`Agents Office/`) and daily digests (`Digests/`). The Program Manager, leads and specialists search it before and during work, and each result lists the notes it used. Search is full-text (Zvec, with a SQLite fallback). In production the Brain lives in `data/knowledge`; the sample notes in `brain/` are for a fresh install.
 
 ## Keys
 
@@ -313,39 +81,27 @@ every note they read, so your graph grows as the office works.
 ## The build loop
 
 ```bash
-npm run check         # build, offline smoke test in a headless browser, server smoke test
-npm run check:live    # the same, plus one real task and one chat turn through Claude
+npm test              # the test suite (engine, providers, inbox, scheduler, Brain search, …)
+npm run check         # build, configuration checks, the test suite, and an API smoke test on throwaway data
+CHECK_LIVE=1 npm run check   # … plus one real task through your model provider
 ```
-
-Every check prints ✓ or ✗ with the reason. The Beta was built against this loop and it is the
-first thing to run after any change.
 
 ## Where things live
 
 | Path | What |
 |---|---|
-| `src/` | The page: `main.js` chrome, rail, chat and hotkeys; `tasks.js` / `office.js` the Task Status panel (demo / served); `rightnow.js` the "Right now" rows and hand-off chains; `brain.js` the Brain; `mcp.js` connectors; `data.js` departments and roster; `v1data.js` agent personalities |
-| `src/scene/` | The 3D office on React Three Fiber: `index.jsx` mounts it and returns the handle the page uses; `office.jsx` the building, rooms, stations; `person.js` the figures and their poses; `sim.js` their life (work, coffee, chats, meetings, the PM's routes); `nav.js` wall-aware walking (A*); `screens.js` the wall screens; `daylight.js` the four phases; `overlays.js` cards, pills, speech bubbles; `rig.js` the camera |
-| `serve.mjs` | The local server: routing, deliverables, chat, the live Brain graph |
-| `mcp.mjs` | Connectors: `claude mcp list` parsed, allow/deny, the tools each agent may call |
-| `roster.mjs` · `office.agents.json` | The 35 agents: names, roles, what they do, their tools, their briefs (`<brain>/Agents Office/agents.json` and `office.agents.local.json` override) |
-| `skills.mjs` · `skills/` | Skills: how a kind of work is done, bound to agents or departments (`<brain>/Agents Office/skills/` is yours) |
-| `learn.mjs` | Corrections from `revise: …` recorded per agent in `<brain>/Agents Office/feedback/`; standing rules go back into the prompt |
-| `onboard.mjs` | The lead's five-question set-up interview; writes briefs and a skill into the brain |
-| `src/models.js` · `usage.mjs` | The three models by name and their CLI flags; the usage gauge (Claude's numbers, the office's own count underneath) |
-| `routines.mjs` · `src/when.js` | Routines: the timetable in `<brain>/Agents Office/routines.json`, plain words → a schedule, the clock and the catch-up (run state in `data/routines.json`) |
-| `SKILLS.md` | The guide to briefs and skills |
-| `CLAUDE.md` | What Claude Code does when you ask it to change agents, write a skill, put a routine on the timetable, or change connectors in this folder |
-| `graph-build.mjs` | Reads your brain folder and lays out the graph |
-| `dist/command-centre-v2.html` | The office as one built file (`node build.mjs` from `src/`); the server serves it, or double-click it for the demo |
-| `brain/` | The sample brain |
-| `data/tasks.json` | Your tasks (created on first run, ignored by git) |
+| `src/` | The page: `main.js` chrome, rail, chat and hotkeys; `office.js` the task panel, task view and chat context; `settings.js` the settings page; `inbox.js` the inbox; `sse.js` live updates; `rightnow.js` the "Right now" rows and hand-off chains; `brain.js` the Brain view; `mcp.js` connector docks |
+| `src/scene/` | The 3D office on React Three Fiber: `index.jsx` mounts it; `office.jsx` the building and rooms; `person.js` the figures; `sim.js` their life and the walk-and-talk hand-overs; `nav.js` walking; `screens.js` wall screens; `overlays.js` pills and speech bubbles; `rig.js` the camera |
+| `serve.mjs` · `server/` | The server and its API ([docs/api.md](docs/api.md)) |
+| `engine/` | The Program Manager → leads → specialists harness on Deep Agents: prompts, tools, approvals, reviews, live progress |
+| `models.mjs` | Providers, models and who runs on what |
+| `notifications.mjs` · `threads.mjs` · `sse.mjs` | The inbox, conversations, live events |
+| `scheduler.mjs` · `routines.mjs` | Overdue notices, reminders, the daily digest, retention; routines |
+| `knowledge.mjs` · `knowledge-index.mjs` · `documents.mjs` | The Brain, its search index, document text extraction |
+| `office-store.mjs` · `settings.mjs` · `tool-store.mjs` · `audit.mjs` | Teams and people, office settings, connectors, the audit log |
+| `data/` | Everything the office stores (ignored by git): `office.json`, `providers.json`, `settings.json`, `tools.json`, `workflows.sqlite`, `knowledge/` |
+| `deploy/` | Running it as a service ([deploy/README.md](deploy/README.md)) |
 
 ## Privacy
 
-Your notes are read from disk and sent to Claude only as context for the task or chat at hand
-(a handful of the most relevant notes, plus your brain's `CLAUDE.md` and `index.md` if present,
-plus the agent's brief, skills and standing rules from your corrections).
-When an agent calls a connector, that call goes to that service through your own Claude Code
-login, exactly as it would if you called it yourself. Nothing else leaves your machine.
-Deliverables are saved locally.
+Your notes and documents are read on the server and sent to your model provider only as context for the task or chat at hand. Connector calls go to that service with the sign-in you gave the office. Provider keys and connector tokens are stored on the server, readable only by the service, and never sent to the browser. Nothing else leaves the machine.

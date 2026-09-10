@@ -3,7 +3,8 @@
 ## Unreleased — the CEO-run office (branch 001-ceo-run-office)
 
 - **A Program Manager runs the work.** Every task goes to the Program Manager, who hands it to one or more department leads; leads hand assignments to their specialists and review the result against the team's criteria before anything is filed. Built on LangChain Deep Agents. The PM can choose the teams itself.
-- **Any model provider.** Anthropic, OpenAI, OpenRouter (GLM, Kimi and others) or any OpenAI-compatible endpoint, on API keys. A model per role (Program Manager, leads, specialists, reviews, chat), per team and per person. Keys stay on the server. The Claude Code login is no longer used.
+- **Cross-team hand-offs.** A lead whose assignment needs another team's expertise hands that part to the Program Manager and keeps working on its own part; the task cannot close until the other team has taken it and its lead has approved.
+- **Any model provider.** Anthropic, OpenAI, OpenRouter (GLM, Kimi and others) or any OpenAI-compatible endpoint, on API keys. Nothing is built in: save a key, activate models from the provider's own list, then choose a model per role (office default, Program Manager, leads, specialists, reviews, chat), per team and per person. Keys stay on the server. The Claude Code login is no longer used.
 - **Real states, real waiting.** "Waiting for the lead's review" is a state the lead is actually told about. A task that needs you says so, reminds you again after an hour, and clears when you act. Results are marked seen when you open them.
 - **You approve outbound actions.** Anything that sends, posts, pays, deletes or changes something outside the office waits for your approval, then runs exactly once. Per team, you can also ask to approve completion.
 - **Corrections through the lead.** Ask, correct or add a note on any task. A correction reopens it, gets a fresh review and files version 2. "Remember this" keeps it as a standing rule in your own words.

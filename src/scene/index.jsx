@@ -168,7 +168,7 @@ export function mountScene({ canvas, hud, DEMO, DEPTS, DEPT_KEYS, AGENTS, LAYOUT
     bindInput(canvas, {
       clickTargets: ctx.clickTargets, personTargets: ctx.personTargets,
       onPerson: id => { if (id === 'program-manager') page.openPM(); else page.openAgent(id); },
-      onDept: dk => { if (dk === 'brain') { page.openPM(); return; } page.zoomToDept(dk); },
+      onDept: dk => { if (dk === 'brain') { page.openPM(); return; } if (dk === 'lobby') { page.openInbox && page.openInbox(); return; } page.zoomToDept(dk); },
       onEmptyDouble: () => page.zoomOut(), onZoomChange: z => page.onZoom(z),
     });
     ready = true;

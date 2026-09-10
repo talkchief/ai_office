@@ -66,6 +66,7 @@ export function Building({ LAYOUT, DEPT_KEYS, clickTargets }) {
     const stage = (x, z, kind) => {
       const room = kind === 'lobby' ? makeLobby() : kind === 'kitchen' ? makeKitchen() : kind === 'meeting' ? makeMeetingRoom() : makeGarden();
       room.position.set(x, 0, z); room.rotation.y = z > mz ? Math.PI : 0; corners.push(room);
+      if (kind === 'lobby') room.traverse(o => { if (o.isMesh) { o.userData.dept = 'lobby'; clickTargets.push(o); } }); // reception: a click opens the CEO's inbox
       rig.corners = rig.corners || []; rig.corners.push({ kind, x, z, rot: z > mz ? Math.PI : 0, w: 14, d: 12 });
       const dir = new THREE.Vector2(mx - x, mz - z).normalize();
       corners.push(makeCorridor([x + dir.x * 7, z + dir.y * 7], [x + dir.x * 19, z + dir.y * 19], 'ring', 3.0));

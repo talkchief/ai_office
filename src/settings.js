@@ -175,28 +175,58 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   }
 
   /* ---------- Models & keys ---------- */
+  // Nothing is built in: a provider gets a key, its model list is fetched from the provider, and the owner activates the ones the office may use.
+  const ROLES = [['office', 'Office default'], ['pm', 'Program Manager'], ['lead', 'Team leads'], ['specialist', 'Specialists'], ['review', 'Reviews'], ['chat', 'Chat with people']];
+  let modelLists = {};
   async function showModels() {
     try {
-      const reg = await api('/providers');
+      const reg = await api('/providers'), active = structuredClone(reg.models), roles = { ...reg.roleDefaults };
       const providerName = id => reg.providers.find(p => p.id === id)?.label || id;
-      const options = selected => reg.models.filter(m => m.enabled !== false).map(m => `<option value="${esc(m.id)}" ${m.id === selected ? 'selected' : ''}>${esc(m.label || m.id)} · ${esc(providerName(m.provider))}</option>`).join('');
-      const modelRow = m => `<div class="space-grid" data-model-row><label>Model id<input data-field="id" value="${esc(m.id)}" placeholder="z-ai/glm-4.6" list="spaceModelIds"></label><label>Provider<select data-field="provider">${reg.providers.map(p => `<option value="${esc(p.id)}" ${p.id === m.provider ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select></label><label>Label<input data-field="label" value="${esc(m.label || '')}"></label><label class="space-check"><input type="checkbox" data-field="effort" ${m.supports?.effort || m.supports?.reasoning ? 'checked' : ''}>Supports effort</label></div>`;
-      const roles = [['pm', 'Program Manager'], ['lead', 'Team leads'], ['specialist', 'Specialists'], ['review', 'Reviews'], ['chat', 'Chat with people']];
-      content.innerHTML = `<p>The office runs on API keys from any provider: Anthropic, OpenAI, OpenRouter (GLM, Kimi and many more), or any OpenAI-compatible service. Keys stay on the server and are never shown again.</p><form id="spaceModelsForm" data-dirty><h3>Providers</h3>${reg.providers.map(p => `<fieldset data-provider="${esc(p.id)}"><legend>${esc(p.label)} <small>${p.hasKey ? 'Key stored' + (p.keySource === 'env' ? ' in the server environment' : '') : 'No key yet'}</small></legend>${p.type === 'openai-compatible' ? `<label>Base URL<input data-field="baseURL" value="${esc(p.baseURL || '')}"></label>` : ''}<label>API key<input data-field="apiKey" type="password" autocomplete="off" placeholder="${p.hasKey ? 'Leave blank to keep the stored key' : 'Paste the key'}"></label><div class="space-actions"><label class="space-check"><input type="checkbox" data-field="enabled" ${p.enabled !== false ? 'checked' : ''}>Enabled</label>${p.hasKey && p.keySource === 'file' ? '<label class="space-check"><input type="checkbox" data-field="clearKey">Remove stored key</label>' : ''}<button type="button" class="secondary" data-test-provider="${esc(p.id)}">Test connection</button><button type="button" class="secondary" data-list-models="${esc(p.id)}">Show available models</button></div></fieldset>`).join('')}
-        <h3>Models</h3><p>Add any model your provider offers by its id, for example <code>z-ai/glm-4.6</code> or <code>moonshotai/kimi-k2</code> on OpenRouter.</p><datalist id="spaceModelIds"></datalist><div id="spaceModelRows">${reg.models.map(modelRow).join('')}</div><button type="button" class="secondary" id="spaceAddModel">Add model</button>
-        <h3>Who runs on what</h3><div class="space-grid">${roles.map(([role, label]) => `<label>${label}<select data-role="${role}">${options(reg.roleDefaults[role])}</select></label>`).join('')}</div>
-        <div class="space-settings-save"><span>${reg.ready ? 'Ready: the teams can work.' : 'Add a key to start work.'}</span><button type="submit">Save</button></div></form>`;
-      $('spaceAddModel').onclick = () => { $('spaceModelRows').insertAdjacentHTML('beforeend', modelRow({ id: '', provider: reg.providers.find(p => p.id === 'openrouter') ? 'openrouter' : reg.providers[0].id, label: '' })); dirty = true; };
-      content.querySelectorAll('[data-test-provider]').forEach(button => button.onclick = async () => { button.disabled = true; try { const r = await api(`/providers/${button.dataset.testProvider}/test`, 'POST', {}); feedback(r.ok ? `${providerName(button.dataset.testProvider)} answered in ${r.ms} ms using ${r.model}.` : `${providerName(button.dataset.testProvider)}: ${r.error}`, !r.ok); } catch (error) { feedback(error.message, true); } finally { button.disabled = false; } });
-      content.querySelectorAll('[data-list-models]').forEach(button => button.onclick = async () => { button.disabled = true; try { const r = await api(`/providers/${button.dataset.listModels}/models`); const ids = (Array.isArray(r) ? r : r.models || []).map(m => typeof m === 'string' ? m : m.id).filter(Boolean); $('spaceModelIds').innerHTML = ids.slice(0, 500).map(id => `<option value="${esc(id)}">`).join(''); feedback(ids.length ? `${ids.length} models found. Start typing in a model id box to pick one.` : 'The provider returned no model list.'); } catch (error) { feedback(error.message, true); } finally { button.disabled = false; } });
-      $('spaceModelsForm').onsubmit = async event => {
-        event.preventDefault();
-        const providers = reg.providers.map(({ hasKey, keySource, usable, ...p }) => { const box = content.querySelector(`[data-provider="${p.id}"]`), field = name => box.querySelector(`[data-field="${name}"]`);
-          return { ...p, apiKey: field('apiKey').value, enabled: field('enabled').checked, clearKey: !!field('clearKey')?.checked, ...(field('baseURL') ? { baseURL: field('baseURL').value } : {}) }; });
-        const models = [...content.querySelectorAll('[data-model-row]')].map(row => { const v = name => row.querySelector(`[data-field="${name}"]`); const provider = v('provider').value, type = reg.providers.find(p => p.id === provider)?.type; return { id: v('id').value.trim(), provider, label: v('label').value.trim(), supports: { effort: v('effort').checked && type === 'anthropic', reasoning: v('effort').checked && type !== 'anthropic' } }; }).filter(m => m.id);
-        const roleDefaults = Object.fromEntries([...content.querySelectorAll('[data-role]')].map(select => [select.dataset.role, select.value]));
-        try { await api('/providers', 'PUT', { providers, models, roleDefaults: { ...reg.roleDefaults, ...roleDefaults }, roleEfforts: reg.roleEfforts, embeddings: reg.embeddings }); dirty = false; await showModels(); feedback('Saved. New work uses these models.'); } catch (error) { feedback(error.message, true); }
+      content.innerHTML = `<p>The office runs on API keys. Add a key for any provider (Anthropic, OpenAI, OpenRouter for GLM, Kimi and many more, or any OpenAI-compatible endpoint), save it, then activate the models the office may use from that provider's own list. Keys stay on the server and are never shown again.</p>
+        <form id="spaceKeysForm" data-dirty><h3>Providers</h3>${reg.providers.map(p => `<fieldset data-provider="${esc(p.id)}"><legend>${esc(p.label)}<small>${p.hasKey ? 'Key stored' + (p.keySource === 'env' ? ' in the server environment' : '') : 'No key yet'}${p.enabled === false ? ' · disabled' : ''}</small></legend>${p.type === 'openai-compatible' ? `<label>Base URL<input data-field="baseURL" value="${esc(p.baseURL || '')}"></label>` : ''}<label>API key<input data-field="apiKey" type="password" autocomplete="off" placeholder="${p.hasKey ? 'Leave blank to keep the stored key' : 'Paste the key'}"></label><div class="space-actions"><label class="space-check"><input type="checkbox" data-field="enabled" ${p.enabled !== false ? 'checked' : ''}>Enabled</label>${p.hasKey && p.keySource === 'file' ? '<label class="space-check"><input type="checkbox" data-field="clearKey">Remove stored key</label>' : ''}<button type="button" class="secondary" data-test-provider="${esc(p.id)}" ${p.hasKey ? '' : 'disabled'} title="${p.hasKey ? '' : 'Paste a key first'}">Test connection</button></div></fieldset>`).join('')}
+        <div class="space-settings-save"><span id="spaceKeysState">${reg.providers.some(p => p.hasKey) ? 'Keys are stored on the server.' : 'Add at least one key.'}</span><button type="submit">Save keys</button></div></form>
+        <h3>Active models</h3><div id="spaceModelsBox"></div>
+        <h3>Who runs on what</h3><p>Every role can have its own model; a role left on the office default follows it.</p><div class="space-grid" id="spaceRolesBox"></div>
+        <div class="space-settings-save"><span>${reg.ready ? 'Ready: the teams can work.' : 'Activate a model and choose the office default to start work.'}</span><button type="button" id="spaceSaveModels">Save models and roles</button></div>`;
+      const box = $('spaceModelsBox');
+      const collectKeys = () => reg.providers.map(({ hasKey, keySource, usable, ...p }) => { const f = content.querySelector(`[data-provider="${p.id}"]`), field = name => f.querySelector(`[data-field="${name}"]`); return { ...p, apiKey: field('apiKey').value, enabled: field('enabled').checked, clearKey: !!field('clearKey')?.checked, ...(field('baseURL') ? { baseURL: field('baseURL').value } : {}) }; });
+      const save = async message => { await api('/providers', 'PUT', { providers: collectKeys(), models: active, roleDefaults: roles, roleEfforts: reg.roleEfforts, embeddings: reg.embeddings }); dirty = false; await showModels(); if (message) feedback(message); };
+      // Test connection is only offered once there is a key: stored, or typed just now (it is saved first).
+      content.querySelectorAll('[data-field="apiKey"]').forEach(input => input.addEventListener('input', () => { const p = reg.providers.find(x => x.id === input.closest('[data-provider]').dataset.provider), b = content.querySelector(`[data-test-provider="${p.id}"]`); b.disabled = !(p.hasKey || input.value.trim()); b.title = b.disabled ? 'Paste a key first' : ''; }));
+      content.querySelectorAll('[data-test-provider]').forEach(button => button.onclick = async () => {
+        const id = button.dataset.testProvider; button.disabled = true;
+        try {
+          if (content.querySelector(`[data-provider="${id}"] [data-field="apiKey"]`).value.trim()) { await save(); return feedback(`Key saved. ${await testText(id)}`); }
+          feedback(await testText(id));
+        } catch (error) { feedback(error.message, true); } finally { if (button.isConnected) button.disabled = false; }
+      });
+      const testText = async id => { const r = await api(`/providers/${id}/test`, 'POST', {}); if (!r.ok) throw new Error(`${providerName(id)}: ${r.error}`); return r.model ? `${providerName(id)} answered in ${r.ms} ms using ${r.model}.` : `${providerName(id)} accepted the key: ${r.models} models available.`; };
+      $('spaceKeysForm').onsubmit = async event => { event.preventDefault(); try { await save('Keys saved.'); } catch (error) { feedback(error.message, true); } };
+      const renderRoles = () => {
+        const options = (selected, blank) => `<option value="">${blank}</option>` + active.filter(m => m.enabled !== false).map(m => `<option value="${esc(m.id)}" ${m.id === selected ? 'selected' : ''}>${esc(m.label || m.id)} · ${esc(providerName(m.provider))}</option>`).join('');
+        $('spaceRolesBox').innerHTML = active.length ? ROLES.map(([role, label]) => `<label>${label}<select data-role="${role}">${options(roles[role], role === 'office' ? 'Choose a model' : 'Use the office default')}</select></label>`).join('') : '<p>Activate a model first.</p>';
+        content.querySelectorAll('[data-role]').forEach(sel => sel.onchange = () => { roles[sel.dataset.role] = sel.value; dirty = true; });
       };
+      const renderModels = () => {
+        const withKey = reg.providers.filter(p => p.usable);
+        box.innerHTML = withKey.length ? withKey.map(p => { const mine = active.filter(m => m.provider === p.id), list = modelLists[p.id];
+          return `<fieldset data-models="${esc(p.id)}"><legend>${esc(p.label)}<small>${list ? `${list.length} models offered` : list === null ? 'could not load the model list' : 'loading the model list…'}</small></legend>
+            <div class="model-pick"><label>Add a model<input list="spaceList-${esc(p.id)}" data-pick="${esc(p.id)}" placeholder="${list ? 'Type to search the provider’s models' : 'Loading…'}" autocomplete="off"><datalist id="spaceList-${esc(p.id)}">${(list || []).map(m => `<option value="${esc(m.id)}">${esc(m.label !== m.id ? m.label : '')}</option>`).join('')}</datalist></label><button type="button" data-activate="${esc(p.id)}">Activate</button></div>
+            ${mine.length ? `<ul class="model-list">${mine.map(m => `<li><b>${esc(m.label || m.id)}</b><small>${esc(m.id)}${m.supports?.effort ? ' · effort' : m.supports?.reasoning ? ' · reasoning' : ''}</small><button type="button" class="space-text-action" data-deactivate="${esc(m.id)}">Remove</button></li>`).join('')}</ul>` : '<p class="space-footnote">No models activated from this provider yet.</p>'}</fieldset>`; }).join('')
+          : '<p>Add and save a provider key first; the models come from the provider.</p>';
+        box.querySelectorAll('[data-activate]').forEach(b => b.onclick = () => {
+          const pid = b.dataset.activate, input = box.querySelector(`[data-pick="${pid}"]`), id = input.value.trim(); if (!id) return feedback('Type or pick a model id first.', true);
+          if (active.some(m => m.id === id)) return feedback('That model is already active.', true);
+          const found = (modelLists[pid] || []).find(m => m.id === id);
+          active.push({ id, provider: pid, label: found?.label || id, supports: found?.supports || { effort: false, reasoning: false } }); if (!roles.office) roles.office = id; dirty = true; renderModels(); renderRoles();
+          if (!found) feedback(`“${id}” is not in ${providerName(pid)}’s list; it is activated as typed.`);
+        });
+        box.querySelectorAll('[data-pick]').forEach(input => input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); box.querySelector(`[data-activate="${input.dataset.pick}"]`).click(); } }));
+        box.querySelectorAll('[data-deactivate]').forEach(b => b.onclick = () => { const id = b.dataset.deactivate; active.splice(active.findIndex(m => m.id === id), 1); for (const r of Object.keys(roles)) if (roles[r] === id) roles[r] = ''; dirty = true; renderModels(); renderRoles(); });
+      };
+      renderModels(); renderRoles();
+      for (const p of reg.providers.filter(p => p.usable && !modelLists[p.id])) api(`/providers/${p.id}/models`).then(list => { modelLists[p.id] = list; if (section === 'models') renderModels(); }).catch(error => { modelLists[p.id] = null; if (section === 'models') { renderModels(); feedback(`${p.label}: ${error.message}`, true); } });
+      $('spaceSaveModels').onclick = async () => { if (active.length && !roles.office) return feedback('Choose the office default model.', true); try { await save('Saved. New work uses these models.'); } catch (error) { feedback(error.message, true); } };
     } catch (error) { feedback(error.message, true); }
   }
 

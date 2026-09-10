@@ -17,16 +17,21 @@ test('model precedence runs task > routine > agent > team > role > office, with 
   const dir = temp();
   try {
     const reg = new ModelRegistry({ dataDir: dir, env: {} });
+    assert.equal(reg.value.models.length, 0, 'nothing is built in'); assert.equal(reg.ready(), false);
+    const setup = structuredClone(reg.value);
+    setup.models = ['claude-opus-5', 'claude-sonnet-5', 'claude-fable-5-1', 'claude-haiku-4-5'].map(id => ({ id, provider: 'anthropic', supports: { effort: id !== 'claude-haiku-4-5' } }));
+    setup.roleDefaults = { pm: 'claude-opus-5', office: 'claude-sonnet-5' }; reg.update(setup);
+    assert.equal(reg.resolve({ role: 'review' }).from, 'office', 'a role without its own model uses the office default');
     const base = { role: 'specialist' };
-    assert.equal(reg.resolve(base).model, 'claude-sonnet-5'); assert.equal(reg.resolve(base).from, 'role');
+    assert.equal(reg.resolve(base).model, 'claude-sonnet-5'); assert.equal(reg.resolve(base).from, 'office');
     assert.equal(reg.resolve({ ...base, team: { models: { specialist: 'claude-haiku-4-5' } } }).from, 'team');
     assert.equal(reg.resolve({ ...base, agent: { model: 'opus' }, team: { models: { specialist: 'claude-haiku-4-5' } } }).model, 'claude-opus-5');
     assert.equal(reg.resolve({ ...base, routine: { model: 'claude-haiku-4-5' }, agent: { model: 'opus' } }).from, 'routine');
     assert.equal(reg.resolve({ ...base, task: { model: 'fable' }, routine: { model: 'claude-haiku-4-5' } }).model, 'claude-fable-5-1');
     assert.equal(reg.resolve({ role: 'lead', team: { models: { lead: 'opus' } } }).model, 'claude-opus-5');
-    assert.equal(reg.resolve({ role: 'lead', team: { planningModel: 'opus', models: { lead: '' } } }).from, 'role');
+    assert.equal(reg.resolve({ role: 'lead', team: { planningModel: 'opus', models: { lead: '' } } }).from, 'office');
     assert.equal(reg.resolve({ role: 'pm' }).model, 'claude-opus-5');
-    assert.equal(reg.resolve({ ...base, agent: { model: 'unknown-model' } }).from, 'role');
+    assert.equal(reg.resolve({ ...base, agent: { model: 'unknown-model' } }).from, 'office');
     assert.equal(reg.resolve({ role: 'pm' }).effort, 'high'); assert.equal(reg.resolve({ role: 'chat', agent: { effort: 'max' } }).effort, 'max');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
@@ -35,7 +40,7 @@ test('an override whose provider has no key falls back to the next level that ca
   const dir = temp();
   try {
     const reg = new ModelRegistry({ dataDir: dir, env: { OPENROUTER_API_KEY: 'r' } });
-    const input = structuredClone(reg.value); input.models.push({ id: 'z-ai/glm-4.6', provider: 'openrouter' }); input.roleDefaults.specialist = 'z-ai/glm-4.6'; reg.update(input);
+    const input = structuredClone(reg.value); input.models.push({ id: 'claude-opus-5', provider: 'anthropic' }, { id: 'z-ai/glm-4.6', provider: 'openrouter' }); input.roleDefaults = { pm: 'claude-opus-5', specialist: 'z-ai/glm-4.6' }; reg.update(input);
     const pick = reg.resolve({ role: 'specialist', agent: { model: 'claude-opus-5' } });
     assert.deepEqual([pick.model, pick.from], ['z-ai/glm-4.6', 'role']);
     assert.equal(reg.resolve({ role: 'pm' }).model, 'claude-opus-5', 'with nothing runnable in the chain, the configured model is still named');
@@ -47,7 +52,7 @@ test('provider keys never reach the browser, blank keeps a key, clearKey removes
   try {
     const reg = new ModelRegistry({ dataDir: dir, env: { OPENROUTER_API_KEY: 'sk-or-env-secret' } });
     assert.equal(reg.ready(), false);
-    const input = structuredClone(DEFAULT_REGISTRY); input.providers[0].apiKey = 'sk-ant-file-secret';
+    const input = structuredClone(DEFAULT_REGISTRY); input.providers[0].apiKey = 'sk-ant-file-secret'; input.models.push({ id: 'claude-sonnet-5', provider: 'anthropic' });
     input.models.push({ id: 'z-ai/glm-4.6', provider: 'openrouter', label: 'GLM 4.6' });
     input.roleDefaults.specialist = 'z-ai/glm-4.6';
     const summary = reg.update(input);
@@ -68,7 +73,7 @@ test('effort maps to each provider’s own control and is ignored where unsuppor
   try {
     const reg = new ModelRegistry({ dataDir: dir, env: { ANTHROPIC_API_KEY: 'a', OPENAI_API_KEY: 'o', OPENROUTER_API_KEY: 'r' } });
     const input = structuredClone(reg.value);
-    input.models.push({ id: 'gpt-5', provider: 'openai', supports: { reasoning: true } }, { id: 'moonshotai/kimi-k2', provider: 'openrouter' });
+    input.models.push({ id: 'claude-sonnet-5', provider: 'anthropic', supports: { effort: true } }, { id: 'claude-opus-5', provider: 'anthropic', supports: { effort: true } }, { id: 'claude-haiku-4-5', provider: 'anthropic', supports: { effort: false } }, { id: 'gpt-5', provider: 'openai', supports: { reasoning: true } }, { id: 'moonshotai/kimi-k2', provider: 'openrouter' });
     reg.update(input);
     const a = reg.options({ model: 'claude-sonnet-5', effort: 'xhigh' });
     assert.equal(a.type, 'anthropic'); assert.deepEqual(a.options.outputConfig, { effort: 'xhigh' }); assert.deepEqual(a.options.thinking, { type: 'adaptive' }); assert.equal(a.options.betas, undefined);

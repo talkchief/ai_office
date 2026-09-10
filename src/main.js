@@ -24,6 +24,7 @@ const forcedDarkAtLoad = document.body.classList.contains('dark'); // the /dark 
 const page = {
   tasks: () => tasks,
   openAgent: (id) => openAgent(id, DEMO ? 'chat' : 'activity'),
+  openInbox: () => tasks?.openInbox?.(),
   zoomToDept: (k) => zoomToDept(k),
   zoomToApproval: (k) => zoomToApproval(k),
   openPM: () => openPM(),
@@ -94,6 +95,8 @@ function ensureChat(id) {
     { who: 'work', i: '⏺', text: DEMO ? 'Demo activity' : 'Only your real tasks and results appear here.' },
   ];
   if (FILE_GEN[id] && DEMO) chatHist[id].push({ who: 'file', ...FILE_GEN[id]() });
+  // The conversation is kept on the server: earlier messages come back when the chat opens again.
+  if (!DEMO) tasks?.loadHistory?.(id).then(ms => { if (ms?.length) { chatHist[id].splice(2, 0, ...ms); if (modalOpen === id) renderChat(id); } }).catch(() => {});
 }
 function chatPush(id, msg) {
   ensureChat(id);
@@ -104,7 +107,7 @@ function chatPush(id, msg) {
 function renderChat(id) {
   mMsgs.innerHTML = chatHist[id].map((m, i) => {
     if (m.who === 'agent') return `<div class="m-agent">${esc(m.text)}${m.taskId ? `<button class="space-chat-task" data-chat-task="${esc(m.taskId)}">Open plan, progress & result ↗</button>` : ''}</div>`;
-    if (m.who === 'user') return `<div class="m-user">${esc(m.text)}</div>`;
+    if (m.who === 'user') return `<div class="m-user">${m.about ? `<span class="chat-about">${esc(m.about)}</span>` : ''}${esc(m.text)}</div>`;
     if (m.who === 'work') return `<div class="m-work"><span class="wi">${m.i || '▸'}</span>${esc(m.text)}</div>`;
     if (m.who === 'file') return `
       <div class="m-file" data-i="${i}">
@@ -301,30 +304,31 @@ function sendChat(text) {
   const id = modalOpen;
   if (!id || !text.trim()) return;
   const r = R[id];
-  chatPush(id, { who: 'user', text });
+  const context = (!DEMO && tasks?.chatContext?.(id)) || {};
+  chatPush(id, { who: 'user', text, about: context.about });
   document.getElementById('mIn').value = '';
   const low = text.toLowerCase();
   setTimeout(async () => {
     if (tasks && tasks.pendingReject(id)) { tasks.rejectLive(id, text); return; }
     if (r.state === 'stuck' && /\b(approve|reject)\b/.test(low)) { resolveApproval(id, /approve/.test(low)); return; }
-    const rv = tasks && tasks.isLive() && text.match(/^\s*revise\s*[:\-–]\s*(.+)$/i);
+    const rv = !context.taskId && tasks && tasks.isLive() && text.match(/^\s*revise\s*[:\-–]\s*(.+)$/i);
     if (rv && tasks.revise(id, rv[1].trim())) { chatPush(id, { who: 'agent', text: 'On it — revising now. It will land here when it is ready.' }); return; }
-    const tr = tasks && await tasks.handleChat(id, text);
+    const tr = !context.taskId && tasks && await tasks.handleChat(id, text);
     if (tr) { chatPush(id, { who: 'agent', text: tr }); return; }
     if (tasks && tasks.isLive()) {
       chatPush(id, { who: 'work', i: '…', text: `${r.a.name} is thinking` });
       fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ agent: id, text, history: chatHist[id].filter(m => m.who === 'user' || m.who === 'agent').slice(-8) }) })
+        body: JSON.stringify({ agent: id, text, taskId: context.taskId, refs: context.refs, kind: context.kind, remember: context.remember, history: chatHist[id].filter(m => m.who === 'user' || m.who === 'agent').slice(-8) }) })
         .then(async res => { if (!res.ok) throw new Error((await res.json()).error || res.statusText); return res.json(); })
         .then(j => {
           const h = chatHist[id]; const k = h.findIndex(m => m.who === 'work' && m.text === `${r.a.name} is thinking`); if (k >= 0) h.splice(k, 1);
-          chatPush(id, { who: 'agent', text: j.reply, taskId: j.taskId });
+          chatPush(id, { who: 'agent', text: j.reply, taskId: j.taskId }); tasks.chatSent?.(id);
           if (j.taskId) tasks.refresh();
           if (j.routines && tasks.refresh) tasks.refresh();
           if (j.read) for (const n of j.read.slice(0, 2)) brain.readNote(id, n);
           if (j.tools && j.tools.length) mcp.onToolsUsed(id, j.tools);
         })
-        .catch(e => chatPush(id, { who: 'agent', text: `I couldn't reach Claude (${e.message}).` }));
+        .catch(e => chatPush(id, { who: 'agent', text: `I could not answer that (${e.message}).` }));
       return;
     }
     const hit = (r.v1.chat || []).find(c => c.k.some(k => low.includes(k)));
@@ -333,7 +337,8 @@ function sendChat(text) {
   }, 450 + Math.random() * 500);
 }
 document.getElementById('mSend').addEventListener('click', () => sendChat(document.getElementById('mIn').value));
-document.getElementById('mIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(e.target.value); e.stopPropagation(); });
+document.getElementById('mIn').addEventListener('keydown', (e) => { e.stopPropagation(); if (tasks?.chatPickerKey?.(e)) return; if (e.key === 'Enter') sendChat(e.target.value); });
+document.getElementById('mIn').addEventListener('input', (e) => tasks?.chatInput?.(modalOpen, e.target));
 
 /* ---------- approval mockups — show exactly what is being approved (demo) ---------- */
 function mockupFor(id) {

@@ -346,3 +346,35 @@ test('a lead cannot review its own work: the review is refused until a specialis
     assert.doesNotMatch(done.result, /Lead-written/);
   } finally { await f.close(); }
 });
+
+test('a cancelled task still answers questions but refuses corrections', async () => {
+  const f = fixture();
+  try {
+    const job = f.engine.create({ dept: 'marketing', text: 'An idea.', backlog: true, autoStart: false }); f.engine.cancel(job.id);
+    const asked = f.engine.message(job.id, { text: 'Why was this stopped?', kind: 'question' });
+    assert.equal(asked.message.kind, 'question'); assert.equal(f.engine.get(job.id).state, 'cancelled');
+    assert.throws(() => f.engine.message(job.id, { text: 'Redo it.', kind: 'correction' }), /cancelled/);
+  } finally { await f.close(); }
+});
+
+test('a lead hands part of the work to another team through the Program Manager and keeps working on its own part', async () => {
+  const pm = context => {
+    if (context.last.type === 'tool' && /^Refused: a lead asked for a hand-off/.test(context.last.text)) return { calls: [call('task', { subagent_type: 'lead-sales', description: 'Confirm the price list for the launch report.' })] };
+    return defaultPm(context);
+  };
+  const lead = () => context => {
+    const specialist = /Specialists on your team:\n- ([a-z0-9_-]+):/i.exec(context.system)?.[1], marketing = /lead of the MARKETING team/i.test(context.system);
+    if (context.last.type === 'human') return { calls: [...(marketing ? [call('hand_to_program_manager', { team: 'sales', request: 'Confirm the current price list.' })] : []), call('task', { subagent_type: specialist, description: 'Write it' })] };
+    return defaultLead(specialist)(context);
+  };
+  const f = fixture({ pm, lead });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done'], 15000);
+    assert.equal(done.handoffs.length, 1); assert.deepEqual([done.handoffs[0].from, done.handoffs[0].team], ['marketing', 'sales']);
+    assert.ok(done.depts.includes('sales'), 'the other team is now involved');
+    assert.ok(f.engine.events(id).some(e => e.type === 'handoff_requested'));
+    assert.ok(f.engine.events(id).some(e => e.type === 'completion_refused' && /Hand-off/.test(e.message)), 'the PM could not close before delegating');
+    assert.deepEqual(Object.keys(done.reviewsByDept).sort(), ['marketing', 'sales']);
+    assert.ok(done.runs.some(r => r.role === 'specialist' && r.dept === 'marketing') && done.runs.some(r => r.role === 'specialist' && r.dept === 'sales'));
+  } finally { await f.close(); }
+});
