@@ -8,26 +8,6 @@ It runs on API keys from any provider: Anthropic, OpenAI, OpenRouter (GLM, Kimi 
 
 **Beta.** It works end to end. Expect rough edges.
 
-**License, in plain English:** free for personal and internal use. You may not sell it, resell it, or build a paid product on it. (Formal terms: PolyForm Noncommercial 1.0.0 — see [LICENSE](LICENSE).)
-
-## What you need
-
-- macOS or Linux
-- Node.js 22+ — https://nodejs.org (on Rocky/RHEL 9: `dnf module switch-to nodejs:22`)
-- git
-- An API key from at least one model provider (Anthropic, OpenAI, OpenRouter, or an OpenAI-compatible service)
-
-## Install
-
-```bash
-git clone <this repository>
-cd agents-office
-./setup          # checks Node and git; installs; builds; boots once
-npm start        # → http://localhost:4520
-```
-
-Without `./setup`: `npm install && node build.mjs && npm start`. Then open **Manage → Models & keys**, paste a key, and choose which model runs each role. Keys stay on the server and are never shown again.
-
 ## Moving around
 
 - Scroll to zoom to the cursor, drag to pan, click a room to focus it, click a person to talk to them, double-click the floor or press `0` for the overview.
