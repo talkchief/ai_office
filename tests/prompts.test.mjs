@@ -29,6 +29,7 @@ test('the Program Manager sees the whole company: every team, its people, its pu
   assert.match(prompt, /MARKETING[\s\S]*Tools: Google Calendar \(no web access: cannot research the internet\)\n/, 'MARKETING shows only the calendar, and that it cannot reach the web');
   assert.match(prompt, /EMAILS[\s\S]*Tools: Web search & fetch, Google Calendar\n/, 'a team with web access carries no such note');
   assert.match(prompt, /Match every package to the Tools line of the team you send it to/, 'the PM is told to route by the tools a team actually has');
+  assert.match(prompt, /send the blocking one on its own first/, 'a package that unblocks the next step goes out alone');
   assert.match(prompt, /that assembly and export is a work package like any other[\s\S]*\/work\/ is read-only for you/, 'assembling a document is delegated, never done by the PM');
   assert.match(prompt, /SALES[\s\S]*Tools: none besides the Brain/, 'a team without connectors is told so');
   assert.ok(prompt.includes('a tool only another team has'), 'hand-offs cover missing tools, not just expertise');
