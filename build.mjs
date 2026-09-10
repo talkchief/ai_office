@@ -1,4 +1,4 @@
-// Bundle src/main.js (+three) into a single self-contained HTML that opens by double-click.
+// Bundle src/main.js (+three, react, @react-three/fiber) into a single self-contained HTML that opens by double-click.
 import { build } from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { buildBrainGraph } from './graph-build.mjs';
@@ -11,6 +11,9 @@ const res = await build({
   minify: true,
   write: false,
   target: 'es2020',
+  jsx: 'automatic',                       // src/scene/*.jsx — the office on React Three Fiber
+  loader: { '.jsx': 'jsx' },
+  define: { 'process.env.NODE_ENV': '"production"' },
 });
 const js = res.outputFiles[0].text;
 const outDir = process.env.AO_DIST || 'dist';

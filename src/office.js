@@ -2,6 +2,7 @@ import {projectWorkspace} from './projects.js';
 import { DEPTS, DEPT_KEYS } from './data.js';
 import { officeReady } from './auth.js';
 import { renderTaskWorkspace, renderDocument } from './task-output.js';
+import { rightNowRows, rightNowHTML, jobChain } from './rightnow.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const labels = { backlog: 'Backlog', queued: 'Queued', planning: 'Planning', working: 'Working', reviewing: 'Lead review', saving: 'Saving deliverable', waiting: 'Your approval', blocked: 'Blocked', done: 'Approved', cancelled: 'Cancelled', pending: 'Pending', failed: 'Failed', interrupted: 'Interrupted' };
@@ -27,8 +28,10 @@ export function initOfficeWork(ctx) {
     <div class="space-team-picker"><button id="spaceDept" type="button" aria-expanded="false" aria-controls="spaceTeamMenu"><i style="background:${DEPTS[selectedTeam].chip}"></i><span>${esc(DEPTS[selectedTeam].name)}</span><span class="space-chevron">⌄</span></button><div id="spaceTeamMenu" hidden>${DEPT_KEYS.map(k => `<button type="button" data-pick-team="${k}"><i style="background:${DEPTS[k].chip}"></i>${esc(DEPTS[k].name)}</button>`).join('')}</div></div>
     <textarea id="spaceBrief" rows="2" aria-label="Task brief" placeholder="What needs to get done?" required></textarea>
     <div class="space-command-actions"><span>Lead-reviewed work</span><button type="submit" class="space-save-draft" data-backlog="true" title="Save without starting agents">Save idea</button><button type="submit">Add task <span aria-hidden="true">↗</span></button></div><p id="spaceHint" role="status"></p></form>
+    <div class="space-now-head"><span class="space-h2">Right now</span><span class="tp-mode live" id="spaceNowMode">LIVE</span></div>
+    <div id="spaceNow" class="space-now"></div>
     <div class="space-feed-head"><h2>Work & results</h2><span class="tp-mode" hidden></span></div>
-    <div id="spaceFilters" class="space-filters"></div><div id="spaceJobs" class="space-jobs"></div>`;
+    <div id="spaceFilters" class="space-filters"></div><div id="spaceOffline" class="space-offline" hidden></div><div id="spaceJobs" class="space-jobs"></div>`;
   const dialog = document.createElement('dialog'); dialog.id = 'spaceDialog';
   dialog.innerHTML = '<header><h2 id="spaceTitle"></h2><button type="button" id="spaceClose" aria-label="Close">×</button></header><p id="spaceMessage" role="status"></p><div id="spaceContent"></div>';
   document.body.appendChild(dialog);
@@ -66,6 +69,20 @@ export function initOfficeWork(ctx) {
     } catch (error) { $('spaceHint').textContent = error.message; if (/Connect Claude/.test(error.message)) $('claudeConnect').click(); }
     finally { button.disabled = false; }
   };
+  const AGENT_NAMES = {};
+  let lastRefreshAt = 0;
+  function renderNow() {
+    const el = $('spaceNow'); if (!el) return;
+    for (const r of Object.values(R)) { const a = activityByAgent.get(r.a.id); r.liveJobId = a?.jobId || null; }
+    const rows = rightNowRows({ R, pm: ctx.pm ? ctx.pm() : null, DEPTS, jobs, live: true });
+    const html = rightNowHTML(rows);
+    if (el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; el.querySelectorAll('[data-agent]').forEach(row => row.onclick = () => { const id = row.dataset.agent; if (id === 'program-manager') projectUI.open(); else ctx.openAgent && ctx.openAgent(id, 'activity'); }); }
+    const ago = lastRefreshAt ? Math.max(0, Math.round((Date.now() - lastRefreshAt) / 1000)) : null;
+    $('spaceNowMode').textContent = connectionStale ? 'RECONNECTING' : ago == null ? 'LIVE' : `LIVE · UPDATED ${ago < 3 ? 'JUST NOW' : ago + 'S AGO'}`;
+    $('spaceNowMode').classList.toggle('live', !connectionStale);
+    const off = $('spaceOffline'); if (off) { off.hidden = !connectionStale; if (connectionStale) off.textContent = `Lost the server${ago != null ? ' ' + ago + 's ago' : ''}. Showing the last known state; work animations paused until it’s back.`; }
+  }
+  setInterval(renderNow, 1500);
   function scopedJobs() { const dept = getFocused(); return dept && dept !== 'brain' ? jobs.filter(j => j.dept === dept) : jobs; }
   function render() {
     activityByAgent.clear();
@@ -86,20 +103,40 @@ export function initOfficeWork(ctx) {
     $('spaceFilters').querySelectorAll('button').forEach(b => b.onclick = () => { filter = b.dataset.filter; render(); });
     const visible = scope.filter(j => filter === 'all' || (filter === 'active' ? ['queued', 'planning', 'working', 'reviewing', 'saving'].includes(j.state) : j.state === filter));
     const historyOpen = $('spaceJobs').querySelector('[data-task-history]')?.open || false;
+    const nameOf = id => (R[id] && R[id].a.name) || AGENT_NAMES[id] || id || 'worker';
+    const chain = j => `<span class="space-chain">${jobChain(j, nameOf)}</span>`;
+    const dateOf = j => new Date(j.doneAt || j.updatedAt || j.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     const card = j => {
-      const terminal = ['done','cancelled'].includes(j.state);
-      const caption = j.state==='done' ? 'Lead verified · View result ↗' : j.state==='cancelled' ? 'Task closed' : j.state==='backlog' ? 'Saved for later' : j.subtasks.length ? `${j.completedSteps}/${j.subtasks.length} assignments submitted` : j.state==='blocked' ? 'Open to resolve the blocker' : 'Awaiting the lead’s plan';
-      return `<button class="space-job ${j.state}" data-job="${j.id}"><span class="space-card-top"><span class="space-state">${j.state==='done'?'Ready':labels[j.state] || esc(j.state)}${j.priority===2?' · Priority':''}${j.kind==='evaluation'?' · Test':''}</span><time>${new Date(j.doneAt || j.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</time></span><strong>${esc(j.title)}</strong>${j.resultPreview&&j.state==='done'?`<span class="space-result-excerpt">${esc(j.resultPreview)}</span>`:''}<span class="space-card-context">${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)} · ${caption}</span>${!terminal&&j.subtasks.length?`<progress value="${j.completedSteps}" max="${j.subtasks.length}" aria-label="Assignments submitted"></progress>`:''}</button>`;
+      const terminal = ['done', 'cancelled'].includes(j.state);
+      const lead = nameOf(j.team?.lead || (R[j.agent] && R[j.agent].a.lead ? j.agent : null) || j.agent);
+      const loading = j.state === 'planning' && !j.subtasks.length;
+      const context = j.state === 'done' ? `${esc(lead)} verified · ${j.resultPreview ? 'read' : 'open'} ↗` : j.state === 'cancelled' ? 'Task closed' : j.state === 'backlog' ? 'Saved for later' : loading ? `${esc(lead)} is planning · reading the Brain · usually under a minute` : j.state === 'blocked' ? (j.error ? esc(j.error.slice(0, 90)) : 'Open to resolve the blocker') : j.state === 'waiting' ? `${esc(lead)} verified · ${j.review?.checks?.length ? j.review.checks.filter(c => c.passed).length + '/' + j.review.checks.length + ' checks passed · ' : ''}ready for your approval` : j.subtasks.length ? `${j.completedSteps}/${j.subtasks.length} steps in · ${labels[j.state].toLowerCase()}` : 'Awaiting the lead’s plan';
+      const actions = j.state === 'waiting' ? `<span class="space-card-actions">${j.review?.approved ? `<button type="button" data-inline="approve" data-job-id="${j.id}">APPROVE</button>` : ''}<button type="button" class="secondary" data-inline="changes" data-job-id="${j.id}">REQUEST CHANGES</button><button type="button" class="space-text-action" data-inline="read" data-job-id="${j.id}">Read ↗</button></span>`
+        : j.state === 'blocked' ? `<span class="space-card-actions"><button type="button" data-inline="retry" data-job-id="${j.id}">RETRY</button><button type="button" class="secondary" data-inline="changes" data-job-id="${j.id}">FIX & RETRY</button><button type="button" class="space-text-action" data-inline="cancel" data-job-id="${j.id}">Cancel</button></span>` : '';
+      return `<div class="space-job ${j.state}${loading ? ' loading' : ''}" data-job="${j.id}" role="button" tabindex="0"><span class="space-card-top"><span class="space-state">${j.state === 'done' ? 'Ready' : loading ? 'Planning' : labels[j.state] || esc(j.state)}${j.priority === 2 ? ' · Priority' : ''}${j.kind === 'evaluation' ? ' · Test' : ''}</span><time>${dateOf(j)}</time></span><strong>${esc(j.title)}</strong>${!terminal && j.state !== 'backlog' ? chain(j) : ''}${j.resultPreview && j.state === 'done' ? `<span class="space-result-excerpt">${esc(j.resultPreview)}</span>` : ''}<span class="space-card-context">${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)} · ${context}</span>${actions}</div>`;
     };
-    const groups = [['attention','Needs your attention',['waiting','blocked']],['active','In progress',['queued','planning','working','reviewing','saving']],['results','Ready results',['done']],['ideas','Ideas',['backlog']],['history','Closed tasks',['cancelled']]];
-    $('spaceJobs').innerHTML = groups.map(([id,title,states])=>{
-      const items=visible.filter(j=>states.includes(j.state)).sort((a,b)=>(b.doneAt||b.updatedAt||b.createdAt)-(a.doneAt||a.updatedAt||a.createdAt));
-      if(!items.length)return '';
-      const cards=items.map(card).join('');
-      if(id==='history'&&filter==='all')return `<details class="space-closed-tasks" data-task-history ${historyOpen?'open':''}><summary>${title} <span>${items.length}</span></summary>${cards}</details>`;
-      return `<section class="space-feed-group" aria-label="${title}">${filter==='all'?`<div class="space-group-heading">${title}<span>${items.length}</span></div>`:''}${cards}</section>`;
-    }).join('') || '<div class="space-empty"><span class="space-empty-mark" aria-hidden="true">○</span><h3>A little room for your next idea.</h3><p>Add a task to put your team to work.</p></div>';
-    $('spaceJobs').querySelectorAll('[data-job]').forEach(b => b.onclick = () => showTask(b.dataset.job));
+    const groups = [['attention', 'Your call', ['waiting', 'blocked']], ['results', 'Ready to read', ['done']], ['active', 'In progress', ['queued', 'planning', 'working', 'reviewing', 'saving']], ['ideas', 'Ideas', ['backlog']], ['history', 'Closed tasks', ['cancelled']]];
+    $('spaceJobs').innerHTML = groups.map(([id, title, states]) => {
+      let items = visible.filter(j => states.includes(j.state)).sort((a, b) => (b.doneAt || b.updatedAt || b.createdAt) - (a.doneAt || a.updatedAt || a.createdAt));
+      if (!items.length) return '';
+      let more = '';
+      if (id === 'results' && filter === 'all' && items.length > 3) { more = `<button type="button" class="space-more" data-more="done">+${items.length - 3} more results</button>`; items = items.slice(0, 3); }
+      const cards = items.map(card).join('');
+      if (id === 'history' && filter === 'all') return `<details class="space-closed-tasks" data-task-history ${historyOpen ? 'open' : ''}><summary>${title} <span>${items.length}</span></summary>${cards}</details>`;
+      return `<section class="space-feed-group" aria-label="${title}">${filter === 'all' ? `<div class="space-group-heading">${title}<span>${items.length}</span></div>` : ''}${cards}${more}</section>`;
+    }).join('') || (filter === 'all' ? `<div class="space-empty"><h3>The office is quiet.</h3><p>${Object.keys(R).length} agents at their desks, nothing assigned. Three things this office is good at, to get started:</p><div class="space-starters">${[['emails', 'Triage the inbox and tell me what needs me'], ['fin', 'List overdue invoices and draft the reminders'], ['sales', 'Summarise this week’s inbound leads']].filter(([k]) => DEPTS[k]).map(([k, t]) => `<button type="button" data-starter="${k}" data-text="${esc(t)}"><b style="color:${DEPTS[k].ink}">${esc(DEPTS[k].short)}</b>${esc(t)}</button>`).join('')}</div></div>` : '<div class="space-empty"><p>Nothing here right now.</p></div>');
+    $('spaceJobs').querySelectorAll('[data-starter]').forEach(b => b.onclick = () => { selectedTeam = b.dataset.starter; $('spaceDept').innerHTML = `<i style="background:${DEPTS[selectedTeam].chip}"></i><span>${esc(DEPTS[selectedTeam].name)}</span><span class="space-chevron">⌄</span>`; $('spaceBrief').value = b.dataset.text; $('spaceBrief').focus(); });
+    $('spaceJobs').querySelectorAll('[data-more]').forEach(b => b.onclick = () => { filter = b.dataset.more; render(); });
+    $('spaceJobs').querySelectorAll('[data-inline]').forEach(b => b.onclick = async e => {
+      e.stopPropagation(); const id = b.dataset.jobId, act = b.dataset.inline;
+      if (act === 'read') return showTask(id);
+      if (act === 'changes') { await showTask(id); const d = content.querySelector('[data-detail-key="revision"]'); if (d) { d.open = true; d.querySelector('textarea')?.focus(); } return; }
+      if (act === 'cancel' && !confirm('Cancel this task?')) return;
+      b.disabled = true;
+      try { await api(`/tasks/${id}/${act}`, 'POST', act === 'retry' ? { feedback: '' } : {}); await refresh(); } catch (error) { feedback(error.message, true); b.disabled = false; }
+    });
+    $('spaceJobs').querySelectorAll('[data-job]').forEach(b => { b.onclick = e => { if (e.target.closest('[data-inline]')) return; showTask(b.dataset.job); }; b.onkeydown = e => { if (e.key === 'Enter') showTask(b.dataset.job); }; });
+    renderNow();
     for (const key of DEPT_KEYS) {
       const list = jobs.filter(j => j.dept === key);
       const values = { doing: list.filter(j => ['planning', 'working', 'reviewing'].includes(j.state)).length, next: list.filter(j => j.state === 'queued').length, done: list.filter(j => j.state === 'done').length };
@@ -110,7 +147,7 @@ export function initOfficeWork(ctx) {
   async function refresh() {
     if (refreshing) return; refreshing = true;
     try {
-      const before = jobs.filter(j => j.state === 'done').length; jobs = await api('/tasks'); if(connectionStale){$('spaceHint').textContent='Connection restored.';connectionStale=false;} render(); if (jobs.filter(j => j.state === 'done').length !== before) await syncBrain();
+      const before = jobs.filter(j => j.state === 'done').length; jobs = await api('/tasks'); lastRefreshAt = Date.now(); if(connectionStale){$('spaceHint').textContent='Connection restored.';connectionStale=false;} for (const j of jobs) for (const a of (j.agents || [])) AGENT_NAMES[a.id] = a.name; render(); if (jobs.filter(j => j.state === 'done').length !== before) await syncBrain();
       await projectUI.refresh();
       if (agentOpen) renderAgent(agentOpen);
       if (dialog.open && modalKind === 'reports' && document.activeElement?.id !== 'spaceReportPeriod') await showReports(false);
@@ -358,7 +395,7 @@ export function initOfficeWork(ctx) {
   officeReady.then(async()=>{setInterval(refresh,2000);try{const health=await api('/health');onLive?.(health);await syncBrain();await refresh();const usage=await api('/usage');onUsage?.(usage);}catch(error){$('spaceHint').textContent=error.message;}});
   const noop=()=>{};
   return { get tasks(){return jobs.flatMap(j=>[...j.subtasks.filter(s=>s.agent).map(s=>({...s,agent:s.agent,state:s.state==='working'?'doing':s.state})),...(['planning','reviewing'].includes(j.state)?[{agent:j.agent,state:'doing'}]:[])]);},
-    projectActivity:()=>projectUI.activity(),openProjects:()=>projectUI.open(),agentActivity:id=>activityByAgent.get(id),tick:noop,panelWidth:()=>panel.offsetWidth,onFocusChange:key=>{if(DEPTS[key]&&key!=='brain'){selectedTeam=key;$('spaceDept').innerHTML=`<i style="background:${DEPTS[key].chip}"></i><span>${esc(DEPTS[key].name)}</span><span class="space-chevron">⌄</span>`;}render();},rowHTML,
+    projectActivity:()=>projectUI.activity(),openProjects:()=>projectUI.open(),agentActivity:id=>activityByAgent.get(id),job:id=>jobs.find(j=>j.id===id),jobs:()=>jobs,tick:noop,panelWidth:()=>panel.offsetWidth,onFocusChange:key=>{if(DEPTS[key]&&key!=='brain'){selectedTeam=key;$('spaceDept').innerHTML=`<i style="background:${DEPTS[key].chip}"></i><span>${esc(DEPTS[key].name)}</span><span class="space-chevron">⌄</span>`;}render();},rowHTML,
     isLive:()=>true,isOpen:()=>dialog.open,open:()=>{open('board','Office work');content.innerHTML=jobs.map(j=>`<button class="space-note" data-job="${j.id}"><b>${esc(j.title)}</b><span>${labels[j.state]} · ${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)}</span></button>`).join('')||'<p>No tasks yet.</p>';content.querySelectorAll('[data-job]').forEach(b=>b.onclick=()=>showTask(b.dataset.job));},
     toggle(){dialog.open?close():this.open();},close,openFor(){this.open();},openTask:showTask,refresh,renderAgent,railFor:id=>{agentOpen=id;const el=$('mRt');el.hidden=true;},syncPills:noop,
     onStuck:noop,onResolve:noop,pendingReject:()=>false,rejectLive:noop,resolveLive:noop,revise:()=>false,addTask:()=>null,routines:[],

@@ -125,5 +125,6 @@ Agents get only connected servers (plus web when enabled). They never get Bash, 
 ## Everything else
 
 - `npm run check` is the loop. Run it after any change to code; fix what is red.
+- The 3D office is `src/scene/` (React Three Fiber; `index.jsx` returns the handle `src/main.js` uses). Change the building in `office.jsx` / `furniture.js`, the figures in `person.js`, their behaviour in `sim.js`, walking in `nav.js`, the wall screens in `screens.js`, the light in `daylight.js`. `node scripts/screenshots.mjs` shows the result headless.
 - `README.md` says what the product does. Keep it true to the code.
 - Release: `node scripts/release.mjs --push` (owner only).

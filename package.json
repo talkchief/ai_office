@@ -1,7 +1,7 @@
 {
   "name": "talkchief-ai-space",
-  "version": "3.6.1-beta.1",
-  "description": "Talkchief AI Space — configurable AI teams with durable workflows and lead verification",
+  "version": "3.7.0-beta.1",
+  "description": "Talkchief AI Space \u2014 configurable AI teams with durable workflows and lead verification",
   "type": "module",
   "private": true,
   "scripts": {
@@ -13,7 +13,7 @@
     "test": "node --test tests/*.test.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "@langchain/core": "^1.2.9",
@@ -24,9 +24,13 @@
     "zod": "^4.6.0"
   },
   "devDependencies": {
+    "@react-three/fiber": "^9.7.0",
     "esbuild": "^0.28.1",
     "playwright-core": "^1.62.0",
-    "three": "^0.185.1"
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "three": "^0.185.1",
+    "zustand": "^5.0.15"
   },
   "optionalDependencies": {
     "@anthropic-ai/sdk": "^0.80.0"

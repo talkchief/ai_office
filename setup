@@ -8,9 +8,9 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"; cd "$ROOT"
 step "1/4 Checking the basics"
 command -v git >/dev/null 2>&1 || fail "git is missing. macOS: xcode-select --install · Linux: install git, then re-run ./setup"
 ok "git"
-command -v node >/dev/null 2>&1 || fail "Node.js is missing. Install Node 20+ from https://nodejs.org, then re-run ./setup"
+command -v node >/dev/null 2>&1 || fail "Node.js is missing. Install Node 22+ from https://nodejs.org, then re-run ./setup"
 NODE_MAJOR=$(node -e 'console.log(process.versions.node.split(".")[0])')
-[[ "$NODE_MAJOR" -ge 20 ]] || fail "Node 20+ required (you have $(node --version))."
+[[ "$NODE_MAJOR" -ge 22 ]] || fail "Node 22+ required (you have $(node --version))."
 ok "Node $(node --version)"
 
 step "2/4 Claude"

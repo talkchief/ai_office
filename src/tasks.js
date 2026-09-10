@@ -120,7 +120,7 @@ const agentOf = id => AGENTS.find(a => a.id === id);
 const STATE_LABEL = { next: 'Backlog', doing: 'In progress', waiting: 'Waiting', done: 'Done', sched: 'Scheduled' };
 
 export function initTasks(ctx) {
-  const { R, deptRT, spawnEmote, chatPush, chatHist, feedPush, zoomToApproval, enterFocus, openAgent,
+  const { R, deptRT, spawnEmote, chatPush, chatHist, feedPush, zoomToApproval, enterFocus, openAgent, rightNow,
           getFocused, esc, brainWrite, brain, onLive, onTools, requestApproval, setStuck, onUsage } = ctx;
   // LIVE mode (served by serve.mjs): the bar routes through Claude, agents produce real
   // deliverables saved as notes in the brain, and tasks persist. Opened as a file it stays demo.
@@ -273,7 +273,7 @@ export function initTasks(ctx) {
   const P_ = {
     dd: panel.querySelector('.tp-dd'), ddName: panel.querySelector('.tp-dd .tp-ddn'), ddDot: panel.querySelector('.tp-dd .dot'),
     menu: panel.querySelector('.tp-menu'), input: panel.querySelector('.tp-in'), add: panel.querySelector('.tp-add'),
-    hint: panel.querySelector('.tp-hint'), chips: panel.querySelector('.tp-chips'), rows: panel.querySelector('.tp-rows'),
+    hint: panel.querySelector('.tp-hint'), chips: panel.querySelector('.tp-chips'), rows: panel.querySelector('.tp-rows'), now: panel.querySelector('.tp-now'),
     scope: panel.querySelector('.tp-scope'),
     rep: panel.querySelector('.tp-rep'), repRow: panel.querySelector('.tp-rep-row'), cad: panel.querySelector('.tp-cad'), at: panel.querySelector('.tp-at'), okc: panel.querySelector('.tp-okc'), next: panel.querySelector('.tp-next'),
     model: panel.querySelector('.tp-model'), effort: panel.querySelector('.tp-effort'),
@@ -678,9 +678,18 @@ export function initTasks(ctx) {
       requestAnimationFrame(() => requestAnimationFrame(() => { n.style.transition = 'transform .65s var(--ease)'; n.style.transform = ''; }));
     });
   }
+  function renderNow() { // design 1a: who is working with whom, from the scene's own runtime
+    if (!P_.now || !rightNow) return;
+    const html = rightNow(getFocused());
+    if (P_.now.dataset.html === html) return;
+    P_.now.dataset.html = html; P_.now.innerHTML = html;
+    P_.now.querySelectorAll('[data-agent]').forEach(row => row.addEventListener('click', () => { const id = row.dataset.agent; if (id !== 'program-manager' && openAgent) openAgent(id, 'chat'); }));
+  }
+  setInterval(renderNow, 1200);
   function render(structural) {
     const f = getFocused();
     P_.scope.textContent = (f && f !== 'brain') ? DEPTS[f].name : 'WHOLE OFFICE';
+    renderNow();
     P_.chips.innerHTML = chipsHTML();
     const list = scoped().filter(t => filter === 'all' || t.state === filter)
       .sort((a, b) => b.changedAt - a.changedAt).slice(0, 60);
