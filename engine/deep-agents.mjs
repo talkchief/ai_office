@@ -7,7 +7,7 @@ import { Command } from '@langchain/langgraph';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import { HumanMessage, ToolMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
-import { createMiddleware } from 'langchain';
+import { createMiddleware, todoListMiddleware } from 'langchain';
 import { createDeepAgent } from 'deepagents';
 import { z } from 'zod';
 import { officeBackend, FILE_PERMISSIONS, SKILL_SOURCES } from './backend.mjs';
@@ -337,12 +337,12 @@ export class OfficeEngine {
       const { model, provider } = await make('lead', lead, team);
       const spotChecks = this.toolHub ? this.toolHub.toolsFor({ agent: lead, team, provider, evaluation, readOnly: true }).tools : [];
       const graph = this.agentFactory({ name: leadName(team.id), model, systemPrompt: leadPrompt({ office, team, lead, specialists, reworkRounds: reworkRounds(team) }),
-        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...spotChecks], subagents, backend, permissions: FILE_PERMISSIONS, checkpointer: true });
+        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...spotChecks], subagents, backend, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware()] });
       leads.push({ name: leadName(team.id), description: `${team.name} team, led by ${lead.name}.${team.purpose ? ' ' + team.purpose : ''}`.slice(0, 600), runnable: graph });
     }
     const { model } = await make('pm', null, null);
     const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams }),
-      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend, permissions: FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [this.planFirst(job.id)],
+      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend, permissions: FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id)],
       checkpointer: this.saver, interruptOn: job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {} });
     return { pm, models };
   }
