@@ -378,3 +378,30 @@ test('a lead hands part of the work to another team through the Program Manager 
     assert.ok(done.runs.some(r => r.role === 'specialist' && r.dept === 'marketing') && done.runs.some(r => r.role === 'specialist' && r.dept === 'sales'));
   } finally { await f.close(); }
 });
+
+test('a connector enabled for one team is usable there and absent for another team and for a person opted out of it', async () => {
+  const { ToolHub } = await import('../engine/tools.mjs');
+  const lookup = tool(async () => 'price list: 42', { name: 'mcp__crm__lookup', description: 'Look up a price', schema: z.object({}) });
+  const hub = new ToolHub({ clientFactory: async () => ({ getTools: async () => [lookup], close: async () => {} }), items: () => [{ name: 'crm', config: { type: 'http', url: 'https://crm.example/mcp' } }] });
+  const replies = {};
+  const specialist = ({ last, system }) => {
+    const who = /You are ([A-Z][A-Z ]+),/.exec(system)?.[1] || 'someone';
+    if (last.type === 'human') return { calls: [call('mcp__crm__lookup', {})] };
+    (replies[who] ||= []).push(last.text); return { text: 'Done: ' + last.text.slice(0, 60) };
+  };
+  const lead = () => context => { const sp = /Specialists on your team:\n- ([a-z0-9_-]+):/i.exec(context.system)?.[1]; return context.last.type === 'human' ? { calls: [call('task', { subagent_type: sp, description: 'Look it up' })] } : defaultLead(sp)(context); };
+  const pm = context => context.last.type === 'human' ? { calls: [call('task', { subagent_type: /for (SALES|Sales)/.test(context.last.text) ? 'lead-sales' : 'lead-marketing', description: 'Deliver: ' + context.last.text.slice(0, 120) })] } : defaultPm(context);
+  const f = fixture({ pm, lead, specialist, hub, configure: config => { config.teams.find(t => t.id === 'marketing').tools = ['crm']; config.teams.find(t => t.id === 'sales').tools = []; } });
+  try {
+    const m = start(f); const marketing = await until(f.engine, m, ['done'], 15000);
+    const s = start(f, { dept: 'sales' }); const sales = await until(f.engine, s, ['done'], 15000);
+    const used = job => job.runs.filter(r => r.role === 'specialist').flatMap(r => r.tools);
+    assert.deepEqual(used(marketing), ['mcp__crm__lookup'], 'the enabled team used the connector'); assert.deepEqual(used(sales), [], 'the other team never got it');
+    assert.ok(Object.values(replies).flat().some(t => /price list: 42/.test(t)), 'the marketing specialist got the real result');
+    assert.ok(Object.values(replies).flat().some(t => /not a valid tool|unknown tool|not available/i.test(t)), 'the sales specialist was told the tool does not exist');
+    // A person can opt out of the team's connectors.
+    const cfg = f.office.get(); const worker = cfg.agents.find(a => a.department === 'marketing' && a.id === f.worker); worker.inheritTools = false; worker.tools = []; f.office.update(cfg);
+    const m2 = start(f); const again = await until(f.engine, m2, ['done'], 15000);
+    assert.deepEqual(used(again), [], 'the opted-out person no longer has it');
+  } finally { await hub.close(); await f.close(); }
+});

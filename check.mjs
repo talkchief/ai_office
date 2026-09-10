@@ -155,6 +155,17 @@ await step('tests: the full suite passes', async () => {
       const audit = await call('/api/audit'); if (!audit.json.some(a => /routine/i.test(a.summary))) throw new Error('not in the audit log');
       return `${made.json.routine.desc} · removed · audited`;
     });
+    await step('server: connector access is per team and per person, and the catalog lists what agents can call', async () => {
+      const before = await call('/api/office'); const cfg = before.json, t1 = cfg.teams[0], t2 = cfg.teams[1] || cfg.teams[0];
+      t1.tools = ['web']; if (t2 !== t1) t2.tools = []; const person = cfg.agents.find(a => a.department === t1.id && a.id !== t1.lead); person.inheritTools = false; person.tools = [];
+      const saved = await call('/api/office', 'PUT', cfg); if (!saved.ok) throw new Error('save: ' + JSON.stringify(saved.json).slice(0, 160));
+      const tools = await call('/api/tools'); const web = tools.json.find(x => x.id === 'web');
+      if (!web || !web.assignedTeams.some(x => x.id === t1.id) || (t2 !== t1 && web.assignedTeams.some(x => x.id === t2.id))) throw new Error('assignedTeams: ' + JSON.stringify(web?.assignedTeams));
+      const after = (await call('/api/office')).json; const p = after.agents.find(a => a.id === person.id); if (p.inheritTools !== false) throw new Error('person opt-out not kept');
+      const catalog = await call('/api/tools/catalog'); if (!Array.isArray(catalog.json)) throw new Error('catalog shape');
+      const bad = await call('/api/office', 'PUT', { ...after, teams: after.teams.map(x => ({ ...x, tools: 'nope' })) }); if (bad.ok && !(await call('/api/office')).json.teams.every(x => Array.isArray(x.tools))) throw new Error('a bad tools value was stored');
+      return `${t1.name} has web, ${t2 !== t1 ? t2.name + ' does not, ' : ''}${person.name} opted out · catalog ${catalog.json.length} tools`;
+    });
     await step('server: settings refuse a bad value', async () => { const r = await call('/api/settings', 'PUT', { digestTime: '25:00' }); if (r.status !== 400) throw new Error('status ' + r.status); return r.json.error; });
     await step('server: inbox, KPIs and live updates answer', async () => {
       const inbox = await call('/api/inbox'); if (!Array.isArray(inbox.json.items) || typeof inbox.json.counts?.needsYou !== 'number') throw new Error('inbox shape');
