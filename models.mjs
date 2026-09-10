@@ -37,6 +37,28 @@ async function defaultFactory(type, options) {
 
 // One request to a provider, streaming included: a call that produces nothing for this long is treated as failed and retried.
 export const CALL_TIMEOUT_MS = 5 * 60 * 1000;
+
+// The SDKs' timeout covers the wait for the response headers only; once a stream is open, a provider that stops sending would hold
+// the call forever. This wraps fetch so that a body with no data for `ms` fails the call with a message the retry rule treats as transient.
+export function silenceGuard(fetchImpl, ms = CALL_TIMEOUT_MS) {
+  return async (url, init) => {
+    const res = await fetchImpl(url, init);
+    if (!res.ok || !res.body) return res;
+    const reader = res.body.getReader();
+    let timer = null;
+    const body = new ReadableStream({
+      async pull(controller) {
+        try {
+          const next = await Promise.race([reader.read(), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`The model stream timed out: no data for ${Math.round(ms / 60000) || 1} minutes.`)), ms); })]);
+          clearTimeout(timer);
+          if (next.done) controller.close(); else controller.enqueue(next.value);
+        } catch (error) { clearTimeout(timer); reader.cancel(error).catch(() => {}); controller.error(error); }
+      },
+      cancel(reason) { clearTimeout(timer); return reader.cancel(reason).catch(() => {}); },
+    });
+    return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
+  };
+}
 export class ModelRegistry {
   constructor({ dataDir, env = process.env, factory = defaultFactory, fetchImpl = globalThis.fetch }) {
     this.file = path.join(dataDir, 'providers.json'); this.env = env; this.factory = factory; this.fetch = fetchImpl; this.modelCache = new Map();
@@ -112,7 +134,7 @@ export class ModelRegistry {
     const provider = this.provider(model.provider); if (!this.usable(provider)) fail(`Add a key for ${provider?.label || model.provider} in Settings → Models.`, 409);
     const { key } = this.keyFor(provider);
     if (provider.type === 'anthropic') {
-      const options = { model: model.id, apiKey: key, maxTokens: maxTokens || 64000, streaming, clientOptions: { timeout: CALL_TIMEOUT_MS, ...(provider.baseURL ? { baseURL: provider.baseURL } : {}) } };
+      const options = { model: model.id, apiKey: key, maxTokens: maxTokens || 64000, streaming, clientOptions: { timeout: CALL_TIMEOUT_MS, fetch: silenceGuard(this.fetch), ...(provider.baseURL ? { baseURL: provider.baseURL } : {}) } };
       if (model.supports.effort) { options.thinking = { type: 'adaptive' }; if (effort) options.outputConfig = { effort }; }
       // Refusal fallbacks are opt-out per provider; they only apply to models that support them.
       if (provider.refusalFallback && REFUSAL_FALLBACK_MODELS.has(model.id)) { options.betas = ['server-side-fallback-2026-07-01']; options.invocationKwargs = { fallbacks: 'default' }; }
@@ -120,7 +142,7 @@ export class ModelRegistry {
     }
     const reasoningEffort = effort ? (['xhigh', 'max'].includes(effort) ? 'high' : effort) : '';
     const options = { model: model.id, apiKey: key || 'not-needed', streaming, streamUsage: true, timeout: CALL_TIMEOUT_MS, ...(maxTokens ? { maxTokens } : {}),
-      configuration: { ...(provider.baseURL ? { baseURL: provider.baseURL } : {}), ...(Object.keys(provider.headers || {}).length ? { defaultHeaders: provider.headers } : {}) } };
+      configuration: { fetch: silenceGuard(this.fetch), ...(provider.baseURL ? { baseURL: provider.baseURL } : {}), ...(Object.keys(provider.headers || {}).length ? { defaultHeaders: provider.headers } : {}) } };
     if (reasoningEffort && (provider.type === 'openai' || model.supports.reasoning)) options.reasoning = { effort: reasoningEffort };
     return { type: 'openai', options };
   }
