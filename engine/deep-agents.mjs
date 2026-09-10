@@ -14,6 +14,7 @@ import { officeBackend, FILE_PERMISSIONS, PM_FILE_PERMISSIONS, SKILL_SOURCES } f
 import { ROOT } from '../config.mjs';
 import { programManagerPrompt, leadPrompt, specialistPrompt, leadName } from './prompts.mjs';
 import { exportPdfTool, exportPptxTool, assembleFilesTool, listWorkspaceFiles, workspaceFile } from './documents.mjs';
+import { fetchWithRetries } from '../models.mjs';
 
 // Deep Agents gives every agent that has subagents a built-in "general-purpose" worker with the parent's own tools. In this
 // office every worker is a named person on a team, reviewed by a lead, so that worker is switched off for every provider
@@ -31,6 +32,8 @@ export const TERMINAL = new Set(['done', 'cancelled']);
 const LIVE_EVENTS = new Set(['run_started', 'run_finished', 'review_recorded', 'decision_requested', 'decision', 'question', 'escalated', 'completed', 'blocked']);
 // When the Program Manager chooses the teams, only the leads it actually involved must approve.
 export const involved = job => [...new Set((job.runs || []).filter(r => r.role === 'lead' && r.dept).map(r => r.dept))];
+// Calls that change something outside the office through the Vault pause for the CEO, like every outbound action.
+export const VAULT_APPROVALS = { api_request: { allowedDecisions: ['approve', 'edit', 'reject'] }, api_upload: { allowedDecisions: ['approve', 'reject'] } };
 export const DEFAULT_SETTINGS = { maxConcurrentJobs: 2, runTimeoutMinutes: 20, escalateAfterHours: 1, outboundTools: [], readOnlyTools: [] };
 const clean = value => String(value ?? '').trim();
 const httpError = (message, status = 400) => Object.assign(new Error(message), { status });
@@ -67,7 +70,7 @@ export function isProviderError(error) {
 }
 
 export class OfficeEngine {
-  constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent, pmSkillsDir = null, toolLabels = () => ({}), memoryFactory = null, projectFor = () => null, brain = null }) {
+  constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent, pmSkillsDir = null, toolLabels = () => ({}), memoryFactory = null, projectFor = () => null, brain = null, vault = null }) {
     fs.mkdirSync(dataDir, { recursive: true });
     this.workspaces = path.join(dataDir, 'workspaces'); this.knowledgeDir = knowledgeDir || path.join(dataDir, 'knowledge');
     this.saver = SqliteSaver.fromConnString(path.join(dataDir, 'workflows.sqlite')); this.db = this.saver.db;
@@ -77,7 +80,7 @@ export class OfficeEngine {
     // Long-term memory shares the task database; null when the office runs without it (tests, older set-ups).
     this.memory = memoryFactory ? memoryFactory(this.db) : null;
     this.notifications = new Notifications({ db: this.db, bus }); this.threads = new Threads({ db: this.db, bus });
-    this.running = new Map(); this.waiting = []; this.faults = []; this.brain = brain; this.followUps = new Map(); this.gates = new Map(); this.closed = false; this.providerTrouble = [];
+    this.running = new Map(); this.waiting = []; this.faults = []; this.brain = brain; this.vault = vault; this.followUps = new Map(); this.gates = new Map(); this.closed = false; this.providerTrouble = [];
   }
   settings() { return { ...DEFAULT_SETTINGS, ...(this.settingsFn() || {}) }; }
   /* ---------- records ---------- */
@@ -376,12 +379,12 @@ export class OfficeEngine {
         const { model, provider } = await make('specialist', agent, team);
         const set = this.toolHub ? this.toolHub.toolsFor({ agent, team, provider, evaluation }) : { tools: [], interruptOn: {} };
         subagents.push({ name: agent.id, description: `${agent.name}, ${agent.role}. ${agent.does || ''}`.slice(0, 600), systemPrompt: specialistPrompt({ office, team, agent, leadAgent: lead, toolLabels }),
-          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id)], interruptOn: set.interruptOn, middleware: [this.pace(job.id, team, agent.id, signal), this.loopGuard(job.id, agent.id), this.specialistReadGuard(job.id, agent.id)] });
+          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id), ...this.vaultTools(job.id, team, agent.id)], interruptOn: { ...set.interruptOn, ...VAULT_APPROVALS }, middleware: [this.pace(job.id, team, agent.id, signal), this.loopGuard(job.id, agent.id), this.specialistReadGuard(job.id, agent.id)] });
       }
       const { model, provider } = await make('lead', lead, team);
       const spotChecks = this.toolHub ? this.toolHub.toolsFor({ agent: lead, team, provider, evaluation, readOnly: true }).tools : [];
       const graph = this.agentFactory({ name: leadName(team.id), model, systemPrompt: leadPrompt({ office, team, lead, specialists, reworkRounds: reworkRounds(team), toolLabels }),
-        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), this.brainTool(job.id, lead.id), ...spotChecks], interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] } }, subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
+        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), this.brainTool(job.id, lead.id), ...this.vaultTools(job.id, team, lead.id), ...spotChecks], interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...VAULT_APPROVALS }, subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
       leads.push({ name: leadName(team.id), description: `${team.name} team, led by ${lead.name}.${team.purpose ? ' ' + team.purpose : ''}`.slice(0, 600), runnable: graph });
     }
     const { model } = await make('pm', null, null);
@@ -426,6 +429,47 @@ export class OfficeEngine {
       return `Written to /knowledge/${id}; the earlier copy is archived and the Brain index refreshes on its own. Cite it as /knowledge/${id}.`;
     }, { name: 'update_brain_note', description: 'Propose a change to a note in the company Brain: a confirmed number for the numbers ledger, a decision, a fact the whole company must know from now on. The CEO approves it before anything is written, and the earlier copy is archived. Never for drafts or deliverables; those live under /work/.',
       schema: z.object({ path: z.string().describe('The note, e.g. /knowledge/00-Meta/numbers-ledger.md; a new path under /knowledge/ creates a note'), mode: z.enum(['append', 'replace']).optional().describe('append adds the content at the end (default); replace rewrites the whole note'), content: z.string().describe('The Markdown to add (for append, e.g. new table rows) or the whole new note (for replace)'), why: z.string().optional().describe('One sentence the CEO reads before approving') }) });
+  }
+  // The Vault's tools: vault_list says which outside services the team may reach; api_get reads; api_request and api_upload change
+  // things outside the office and pause for the CEO. The office injects the key; the agent never sees it, and every answer is masked.
+  vaultTools(jobId, team, agentId) {
+    if (!this.vault) return [];
+    const services = () => this.vault.forTeam(team.id, 'api');
+    const missing = service => `Refused: "${service}" is not an outside service in the Vault for your team. Call vault_list; if it is missing, say in your report that the CEO must add it under Settings → Vault, and stop.`;
+    const send = async ({ service, method, path: rel, body, headers }) => {
+      const s = services().find(x => x.id === service); if (!s) return missing(service);
+      if (!s.secret) return `Refused: the Vault has "${service}" but no key yet. Report that the CEO must add the key under Settings → Vault, and stop.`;
+      rel = String(rel || '').trim(); if (!rel.startsWith('/')) return 'Refused: give a path that starts with /, relative to the service’s base address.';
+      const h = Object.fromEntries(Object.entries(headers && typeof headers === 'object' ? headers : {}).filter(([k]) => !/^(authorization|cookie|host|x-api-key)$/i.test(k)).slice(0, 10).map(([k, v]) => [String(k).slice(0, 60), String(v).slice(0, 500)]));
+      h[s.authHeader] = `${s.authPrefix || ''}${s.secret}`;
+      let payload; if (body !== undefined && body !== null && !['GET', 'HEAD'].includes(method)) { payload = typeof body === 'string' ? body : JSON.stringify(body); if (!Object.keys(h).some(k => k.toLowerCase() === 'content-type')) h['content-type'] = 'application/json'; }
+      try {
+        const res = await fetchWithRetries(globalThis.fetch, s.baseURL + rel, { method, headers: h, body: payload, signal: AbortSignal.timeout(60000) });
+        const text = this.vault.mask((await res.text()).slice(0, 20000));
+        this.event(jobId, 'api_called', agentId, `${method} ${service}${rel.slice(0, 80)} → ${res.status}`);
+        return `${res.status} ${res.statusText}\n${text}`;
+      } catch (error) { return `The request to ${service} failed: ${this.vault.mask(String(error?.cause?.message || error?.message || error)).slice(0, 200)}`; }
+    };
+    const list = tool(async () => {
+      const all = services();
+      return all.length ? 'Outside services your team may use through the Vault (the office adds the key; you never see it):\n' + all.map(s => `- ${s.id} (${s.name}) at ${s.baseURL}${s.secret ? '' : ' — no key stored yet'}${s.notes ? ': ' + s.notes : ''}`).join('\n') : 'The Vault holds no outside service for your team. If the work needs one (for example here.now to publish a site), say so in your report: the CEO adds it under Settings → Vault.';
+    }, { name: 'vault_list', description: 'List the outside services (APIs) your team may call through the office Vault, with their base addresses. Keys stay in the Vault; you never see or type one.', schema: z.object({}) });
+    const get = tool(async ({ service, path: rel, headers }) => send({ service, method: 'GET', path: rel, headers }),
+      { name: 'api_get', description: 'Read from an outside service in the Vault: GET <base address><path>. The office adds the key. Returns the status and the body.', schema: z.object({ service: z.string().describe('The service id from vault_list'), path: z.string().describe('Path relative to the base address, starting with /'), headers: z.record(z.string()).optional() }) });
+    const request = tool(async ({ service, method, path: rel, body, headers }) => send({ service, method: String(method || 'POST').toUpperCase(), path: rel, body, headers }),
+      { name: 'api_request', description: 'Call an outside service in the Vault with POST, PUT, PATCH or DELETE. This changes data outside the office, so it pauses for the CEO’s approval first. The office adds the key. Returns the status and the body.', schema: z.object({ service: z.string(), method: z.enum(['POST', 'PUT', 'PATCH', 'DELETE']), path: z.string().describe('Path relative to the base address, starting with /'), body: z.any().optional().describe('The JSON body'), headers: z.record(z.string()).optional() }) });
+    const upload = tool(async ({ url, file, contentType }) => {
+      let target; try { target = new URL(String(url || '')); } catch { return 'Refused: give the full https address you were handed for the upload.'; }
+      if (target.protocol !== 'https:') return 'Refused: uploads go to https addresses only.';
+      let f; try { f = workspaceFile(this.workspaceDir(jobId), file); } catch (error) { return 'Refused: ' + error.message; }
+      if (!fs.existsSync(f.abs)) return `Refused: there is no file at /work/${f.rel}.`;
+      try {
+        const res = await fetchWithRetries(globalThis.fetch, target.href, { method: 'PUT', headers: { 'content-type': contentType || 'application/octet-stream' }, body: fs.readFileSync(f.abs), signal: AbortSignal.timeout(120000) });
+        this.event(jobId, 'api_called', agentId, `PUT /work/${f.rel} → ${target.hostname} → ${res.status}`);
+        return `${res.status} ${res.statusText}: uploaded /work/${f.rel} (${fs.statSync(f.abs).size} bytes) to ${target.hostname}.`;
+      } catch (error) { return `The upload of /work/${f.rel} failed: ${String(error?.cause?.message || error?.message || error).slice(0, 200)}`; }
+    }, { name: 'api_upload', description: 'Upload one workspace file’s bytes with PUT to an https address you were handed by an outside service (a presigned upload address). This sends data outside the office, so it pauses for the CEO’s approval first.', schema: z.object({ url: z.string().describe('The full https address to PUT to'), file: z.string().describe('The file under /work/ to send'), contentType: z.string().optional() }) });
+    return [list, get, request, upload];
   }
   // A subagent whose model replies with nothing (no text, no tool call: a provider hiccup) is sent the assignment once more; if it
   // happens twice the caller is told plainly. Deep Agents would otherwise report "Task completed" and the caller would believe it.

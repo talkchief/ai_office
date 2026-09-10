@@ -35,6 +35,7 @@ import { Scheduler } from './scheduler.mjs';
 import { listShape } from './server/shape.mjs';
 import { Router, json, httpError } from './server/routes.mjs';
 import { registerApi } from './server/api.mjs';
+import { VaultStore } from './vault.mjs';
 import { readJsonBody as body } from './http-body.mjs';
 
 const cfg = loadConfig();
@@ -61,7 +62,8 @@ toolStore.onChange = () => { hub.load().then(() => bus.publish('office.updated',
 const officeAccess = createOfficeAccess(process.env.AO_ACCESS_KEY);
 const unlockAttempts = new Map();
 
-const engine = new OfficeEngine({ dataDir: DATA, office, models, toolHub: hub, toolLabels: () => Object.fromEntries(toolStore.list().map(t => [t.id, t.name])), memoryFactory: db => new OfficeMemory({ db, office, tools: () => toolStore.list(), projects: () => projects.summary({ tasks: () => engine.list() }), name: cfg.name }), projectFor: id => { const p = projects.get(id); return p ? { ...p, brief: projects.brief(p) } : null; }, brain: { save: input => knowledge.save(input), read: id => knowledge.read(id) }, knowledgeDir: BRAIN, knowledgeIndex: index, bus, name: cfg.name, settings: () => settings.get(),
+const vault = new VaultStore({ dataDir: DATA });
+const engine = new OfficeEngine({ dataDir: DATA, office, models, toolHub: hub, vault, toolLabels: () => Object.fromEntries(toolStore.list().map(t => [t.id, t.name])), memoryFactory: db => new OfficeMemory({ db, office, tools: () => toolStore.list(), projects: () => projects.summary({ tasks: () => engine.list() }), name: cfg.name }), projectFor: id => { const p = projects.get(id); return p ? { ...p, brief: projects.brief(p) } : null; }, brain: { save: input => knowledge.save(input), read: id => knowledge.read(id) }, knowledgeDir: BRAIN, knowledgeIndex: index, bus, name: cfg.name, settings: () => settings.get(),
   onChange: job => bus.publish('task.updated', listShape(job, office.get())),
   onComplete: async job => {
     if (job.kind === 'evaluation') return;
@@ -205,7 +207,7 @@ function syncProject(id) {
 }
 bus.on(event => { if (event.type === 'task.updated' && event.data?.projectId) syncProject(event.data.projectId); });
 for (const p of projects.list()) syncProject(p.id);
-registerApi(router, { projects, syncProject, office, engine, models, settings, toolStore, hub, knowledge, index, bus, audit, routines: routineApi, chat, version, name: cfg.name, graph: () => graph, discover: () => mcp.discover({ timeout: 15000 }), agency: new Agency() });
+registerApi(router, { projects, syncProject, office, engine, models, settings, toolStore, hub, knowledge, index, bus, audit, vault, routines: routineApi, chat, version, name: cfg.name, graph: () => graph, discover: () => mcp.discover({ timeout: 15000 }), agency: new Agency() });
 const oauthPage = (title, text) => `<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font:15px system-ui;padding:40px;max-width:520px"><h1 style="font-size:20px">${title}</h1><p>${text}</p><p><a href="/">Back to the office</a></p><script>setTimeout(()=>{if(window.opener){window.opener.postMessage('connector-signed-in','*');window.close();}},1200)</script>`;
 
 const server = http.createServer(async (req, res) => {

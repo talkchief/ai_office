@@ -33,6 +33,7 @@ test('the Program Manager sees the whole company: every team, its people, its pu
   assert.match(prompt, /proposes it with update_brain_note and the CEO approves it before it is written/, 'a Brain change is proposed, never made directly');
   assert.match(prompt, /call assemble_files with the files in order/, 'a combined document is assembled by the office, not by hand');
   assert.match(prompt, /turn the charter's constraints into acceptance criteria in each lead's brief/, 'the charter binds every lead');
+  assert.match(prompt, /vault_list shows which services your team may use[\s\S]*You never see, type or ask for a key/, 'the Vault is explained: use it, never see it');
   assert.match(prompt, /that assembly and export is a work package like any other[\s\S]*\/work\/ is read-only for you/, 'assembling a document is delegated, never done by the PM');
   assert.match(prompt, /SALES[\s\S]*Tools: none besides the Brain/, 'a team without connectors is told so');
   assert.ok(prompt.includes('a tool only another team has'), 'hand-offs cover missing tools, not just expertise');

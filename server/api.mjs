@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { workspaceFile, mimeOf } from '../engine/documents.mjs';
+import { VAULT_KINDS } from '../vault.mjs';
 import { readJsonBody as body } from '../http-body.mjs';
 import { listShape, detailShape } from './shape.mjs';
 import { httpError } from './routes.mjs';
@@ -10,7 +11,7 @@ import { collectArtifacts, filterArtifacts, ARTIFACT_KINDS } from './artifacts.m
 import { extractDocument } from '../documents.mjs';
 
 export function registerApi(router, ctx) {
-  const { office, engine, models, settings, toolStore, hub, knowledge, bus, routines, audit, projects } = ctx;
+  const { office, engine, models, settings, toolStore, hub, knowledge, bus, routines, audit, projects, vault } = ctx;
   const record = entry => { try { audit?.record(entry); } catch (error) { console.warn('audit:', error.message); } };
   const withoutRevision = ({ revision, ...rest }) => rest;
   // Connectors without their secrets: env values and tokens are reduced to names and flags.
@@ -27,6 +28,10 @@ export function registerApi(router, ctx) {
   router.on('GET', '/api/tasks/:id', ({ params }) => { task(params.id); return { ...detailShape(engine.detail(params.id), office.get()), files: engine.files(params.id) }; });
   // A file from the task's workspace (a PDF the team exported, a CSV it wrote), streamed as a download. Paths never leave /work/.
   // Every file every task produced, filtered by kind, date and words; newest first.
+  // The Vault: entries without their secrets; a secret is write-only (a blank field keeps it, clearSecret removes it); the audit log sees no secret.
+  router.on('GET', '/api/vault', () => ({ kinds: VAULT_KINDS, entries: vault ? vault.list() : [] }));
+  router.on('PUT', '/api/vault/:id', async ({ req, params }) => { if (!vault) throw httpError('The Vault is not available.', 503); const before = vault.list(); const entry = vault.upsert({ ...(await body(req)), id: params.id }); record({ area: 'vault', summary: `Vault: saved ${entry.kind} entry ${entry.id}`, before, after: vault.list() }); bus.publish('office.updated', { area: 'vault' }); return entry; });
+  router.on('DELETE', '/api/vault/:id', ({ params }) => { if (!vault) throw httpError('The Vault is not available.', 503); const before = vault.list(); const out = vault.remove(params.id); record({ area: 'vault', summary: `Vault: removed ${params.id}`, before, after: vault.list() }); bus.publish('office.updated', { area: 'vault' }); return out; });
   router.on('GET', '/api/artifacts', ({ url }) => { const q = url.searchParams; const rows = filterArtifacts(collectArtifacts({ jobs: engine.list(), filesFor: id => engine.files(id), office: office.get() }), { kind: q.get('kind') || '', from: q.get('from') || '', to: q.get('to') || '', q: q.get('q') || '' }); return { kinds: ARTIFACT_KINDS, total: rows.length, artifacts: rows.slice(0, 500) }; });
   router.on('GET', '/api/tasks/:id/file', ({ params, url, res }) => {
     task(params.id);
