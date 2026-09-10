@@ -67,7 +67,7 @@ export function isProviderError(error) {
 }
 
 export class OfficeEngine {
-  constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent, pmSkillsDir = null, toolLabels = () => ({}), memoryFactory = null, projectFor = () => null }) {
+  constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent, pmSkillsDir = null, toolLabels = () => ({}), memoryFactory = null, projectFor = () => null, brain = null }) {
     fs.mkdirSync(dataDir, { recursive: true });
     this.workspaces = path.join(dataDir, 'workspaces'); this.knowledgeDir = knowledgeDir || path.join(dataDir, 'knowledge');
     this.saver = SqliteSaver.fromConnString(path.join(dataDir, 'workflows.sqlite')); this.db = this.saver.db;
@@ -77,7 +77,7 @@ export class OfficeEngine {
     // Long-term memory shares the task database; null when the office runs without it (tests, older set-ups).
     this.memory = memoryFactory ? memoryFactory(this.db) : null;
     this.notifications = new Notifications({ db: this.db, bus }); this.threads = new Threads({ db: this.db, bus });
-    this.running = new Map(); this.waiting = []; this.faults = []; this.followUps = new Map(); this.gates = new Map(); this.closed = false; this.providerTrouble = [];
+    this.running = new Map(); this.waiting = []; this.faults = []; this.brain = brain; this.followUps = new Map(); this.gates = new Map(); this.closed = false; this.providerTrouble = [];
   }
   settings() { return { ...DEFAULT_SETTINGS, ...(this.settingsFn() || {}) }; }
   /* ---------- records ---------- */
@@ -378,13 +378,13 @@ export class OfficeEngine {
       const { model, provider } = await make('lead', lead, team);
       const spotChecks = this.toolHub ? this.toolHub.toolsFor({ agent: lead, team, provider, evaluation, readOnly: true }).tools : [];
       const graph = this.agentFactory({ name: leadName(team.id), model, systemPrompt: leadPrompt({ office, team, lead, specialists, reworkRounds: reworkRounds(team), toolLabels }),
-        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), ...spotChecks], subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
+        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), this.brainTool(job.id, lead.id), ...spotChecks], interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] } }, subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
       leads.push({ name: leadName(team.id), description: `${team.name} team, led by ${lead.name}.${team.purpose ? ' ' + team.purpose : ''}`.slice(0, 600), runnable: graph });
     }
     const { model } = await make('pm', null, null);
     const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams, toolLabels }),
-      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.subagentGuard(job.id, 'pm', leads.map(l => l.name), 'lead'), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm')],
-      checkpointer: this.saver, interruptOn: job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {} });
+      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm'), this.brainTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.subagentGuard(job.id, 'pm', leads.map(l => l.name), 'lead'), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm')],
+      checkpointer: this.saver, interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...(job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {}) } });
     return { pm, models };
   }
   // The same call with the same arguments, over and over, is waiting, not working: an agent listing an empty workspace until
@@ -406,6 +406,23 @@ export class OfficeEngine {
       this.event(jobId, 'loop_stopped', agentId, `${call.name} was called with the same arguments ${repeats} times; the call was refused.`);
       return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `Refused: this is the same call for the ${repeats}th time. Whatever you are waiting for will not appear in this run: nobody else writes into your workspace while you wait. Do the work with what you have, or reply now to whoever assigned this with exactly what is missing.` });
     } });
+  }
+  // A change to the Brain (a confirmed number, a decision, a fact the whole company must know) is proposed, not made: the CEO
+  // approves it before the note is written, and the earlier copy is archived. Drafts and deliverables never go this way.
+  brainTool(jobId, agentId) {
+    return tool(async ({ path: where, mode = 'append', content, why }) => {
+      if (!this.brain) return 'Refused: this office has no Brain writer configured; put the change in your report for the CEO.';
+      const id = String(where || '').trim().replace(/^\/?knowledge\//, '').replace(/^\/+/, '');
+      if (!id || !/\.md$/i.test(id) || id.includes('..')) return 'Refused: name a Markdown note under /knowledge/, for example /knowledge/00-Meta/numbers-ledger.md.';
+      const text = clean(content); if (!text) return 'Refused: say what to write.';
+      let existing = '', how = mode === 'replace' ? 'replace' : 'append';
+      try { existing = this.brain.read(id).content || ''; } catch { how = 'replace'; }
+      const next = how === 'replace' ? text : existing.replace(/\s*$/, '') + '\n\n' + text + '\n';
+      await this.brain.save({ id, content: next });
+      this.event(jobId, 'brain_updated', agentId, `${how === 'replace' ? 'Rewrote' : 'Appended to'} /knowledge/${id} with the CEO’s approval${clean(why) ? ': ' + clean(why).slice(0, 160) : ''}.`);
+      return `Written to /knowledge/${id}; the earlier copy is archived and the Brain index refreshes on its own. Cite it as /knowledge/${id}.`;
+    }, { name: 'update_brain_note', description: 'Propose a change to a note in the company Brain: a confirmed number for the numbers ledger, a decision, a fact the whole company must know from now on. The CEO approves it before anything is written, and the earlier copy is archived. Never for drafts or deliverables; those live under /work/.',
+      schema: z.object({ path: z.string().describe('The note, e.g. /knowledge/00-Meta/numbers-ledger.md; a new path under /knowledge/ creates a note'), mode: z.enum(['append', 'replace']).optional().describe('append adds the content at the end (default); replace rewrites the whole note'), content: z.string().describe('The Markdown to add (for append, e.g. new table rows) or the whole new note (for replace)'), why: z.string().optional().describe('One sentence the CEO reads before approving') }) });
   }
   // A subagent whose model replies with nothing (no text, no tool call: a provider hiccup) is sent the assignment once more; if it
   // happens twice the caller is told plainly. Deep Agents would otherwise report "Task completed" and the caller would believe it.

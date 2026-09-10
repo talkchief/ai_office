@@ -34,7 +34,7 @@ function sendHub(sent) {
   const sendEmail = tool(async ({ to, body }) => { sent.push({ to, body }); return `sent to ${to}`; }, { name: 'send_email', description: 'Send an email', schema: z.object({ to: z.string(), body: z.string() }) });
   return { tools: [sendEmail], calls: [], async ensure() {}, toolsFor(args) { this.calls.push(args); return args.evaluation || args.readOnly ? { tools: [], interruptOn: {} } : { tools: [sendEmail], interruptOn: { send_email: { allowedDecisions: ['approve', 'edit', 'reject'] } } }; } };
 }
-function fixture({ dir = temp(), pm, lead, specialist, settings = {}, hub = null, configure, keep = false, knowledgeIndex = null } = {}) {
+function fixture({ dir = temp(), pm, lead, specialist, settings = {}, hub = null, configure, keep = false, knowledgeIndex = null, brain = null } = {}) {
   const office = new OfficeStore({ dataDir: dir, initialAgents: loadRoster().agents });
   if (configure) { const config = office.get(); configure(config); office.update(config); }
   const team = office.team('marketing'), workers = office.agents().filter(a => a.department === 'marketing' && a.id !== team.lead).map(a => a.id);
@@ -42,7 +42,7 @@ function fixture({ dir = temp(), pm, lead, specialist, settings = {}, hub = null
   const meter = { active: 0, peak: 0, start() { this.active++; this.peak = Math.max(this.peak, this.active); }, end() { this.active--; } };
   const models = { resolve: ({ role }) => ({ model: role === 'specialist' ? 'specialist' : role === 'pm' ? 'pm' : 'lead', effort: '' }), instance: async ({ model }) => new ScriptedModel(model, scripts[model], { meter }) };
   const completed = [];
-  const engine = new OfficeEngine({ dataDir: dir, office, models, toolHub: hub, knowledgeDir: path.join(dir, 'knowledge'), knowledgeIndex, settings: () => settings, onComplete: async job => { completed.push(job.id); } });
+  const engine = new OfficeEngine({ dataDir: dir, office, models, toolHub: hub, knowledgeDir: path.join(dir, 'knowledge'), knowledgeIndex, brain, settings: () => settings, onComplete: async job => { completed.push(job.id); } });
   return { dir, office, engine, workers, worker: workers[0], meter, completed, close: async () => { await engine.close(); if (!keep) fs.rmSync(dir, { recursive: true, force: true }); } };
 }
 async function until(engine, id, states, ms = 20000) {
@@ -347,6 +347,29 @@ test('a lead that delegates to someone outside its team is refused with the righ
     const refused = done.events.filter(e => e.type === 'subagent_refused'); assert.equal(refused.length, 1);
     assert.match(refused[0].message, /"alead", who is not on the team/);
     assert.equal(done.review.approved, true); assert.equal(done.runs.filter(r => r.role === 'specialist').length, 1, 'only the real specialist ran');
+  } finally { await f.close(); }
+});
+
+test('a lead proposes a Brain change; nothing is written until the CEO approves, then the note is appended and archived', async () => {
+  const notes = { '00-Meta/numbers-ledger.md': '# Numbers ledger\n\n| Metric | Value |\n|---|---|\n| Active clients | 14 |' }, written = [];
+  const brain = { read: id => { if (!(id in notes)) throw new Error('no such note'); return { id, content: notes[id] }; }, save: async ({ id, content }) => { notes[id] = content; written.push(id); return { id }; } };
+  const lead = workers => { const worker = workers[0]; return ({ last, system, messages }) => {
+    if (last.type === 'human') return { calls: [call('update_brain_note', { path: '/knowledge/00-Meta/numbers-ledger.md', mode: 'append', content: '| Growth plan price (from 1 Oct 2026) | $2,700 per month |', why: 'The CEO confirmed the price in this task.' })] };
+    if (last.type === 'tool' && /^Written to/.test(last.text)) return { calls: [call('task', { subagent_type: worker, description: 'Write the report' })] };
+    if (last.type === 'tool' && REVIEW.test(last.text)) return { text: /APPROVED/.test(last.text) ? 'Review approved.' : 'Not approved: ' + last.text };
+    if (last.type === 'tool') return { calls: [call('record_review', { approved: true, summary: 'Checked.', criteria: criteria(system).map(id => ({ id, passed: true, evidence: 'Present.' })), deliverable: 'Final: ' + toolTexts(messages).join('\n') })] };
+    return { text: 'ok' };
+  }; };
+  const f = fixture({ lead, brain });
+  try {
+    const id = start(f); const parked = await until(f.engine, id, ['awaiting_ceo']);
+    assert.equal(parked.pendingActions[0].name, 'update_brain_note'); assert.equal(written.length, 0, 'nothing is written before the CEO decides');
+    assert.equal(f.engine.decide(id, [{ type: 'approve' }]).ok, true);
+    const done = await until(f.engine, id, ['done']);
+    assert.deepEqual(written, ['00-Meta/numbers-ledger.md']);
+    assert.match(notes['00-Meta/numbers-ledger.md'], /Active clients \| 14 \|\n\n\| Growth plan price \(from 1 Oct 2026\) \| \$2,700 per month \|\n$/);
+    assert.ok(done.events.some(e => e.type === 'brain_updated' && /Appended to \/knowledge\/00-Meta\/numbers-ledger\.md/.test(e.message)));
+    assert.equal(done.review.approved, true);
   } finally { await f.close(); }
 });
 

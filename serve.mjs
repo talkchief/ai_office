@@ -61,7 +61,7 @@ toolStore.onChange = () => { hub.load().then(() => bus.publish('office.updated',
 const officeAccess = createOfficeAccess(process.env.AO_ACCESS_KEY);
 const unlockAttempts = new Map();
 
-const engine = new OfficeEngine({ dataDir: DATA, office, models, toolHub: hub, toolLabels: () => Object.fromEntries(toolStore.list().map(t => [t.id, t.name])), memoryFactory: db => new OfficeMemory({ db, office, tools: () => toolStore.list(), projects: () => projects.summary({ tasks: () => engine.list() }), name: cfg.name }), projectFor: id => { const p = projects.get(id); return p ? { ...p, brief: projects.brief(p) } : null; }, knowledgeDir: BRAIN, knowledgeIndex: index, bus, name: cfg.name, settings: () => settings.get(),
+const engine = new OfficeEngine({ dataDir: DATA, office, models, toolHub: hub, toolLabels: () => Object.fromEntries(toolStore.list().map(t => [t.id, t.name])), memoryFactory: db => new OfficeMemory({ db, office, tools: () => toolStore.list(), projects: () => projects.summary({ tasks: () => engine.list() }), name: cfg.name }), projectFor: id => { const p = projects.get(id); return p ? { ...p, brief: projects.brief(p) } : null; }, brain: { save: input => knowledge.save(input), read: id => knowledge.read(id) }, knowledgeDir: BRAIN, knowledgeIndex: index, bus, name: cfg.name, settings: () => settings.get(),
   onChange: job => bus.publish('task.updated', listShape(job, office.get())),
   onComplete: async job => {
     if (job.kind === 'evaluation') return;

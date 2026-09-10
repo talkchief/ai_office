@@ -4,6 +4,7 @@ import { DEPTS } from './data.js';
 import { renderDocument } from './task-output.js';
 import { stateLabel } from './labels.js';
 import { fileIcon } from './fileicon.js';
+import { toast } from './toast.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const when = value => value ? new Date(value).toLocaleString() : '—';
@@ -20,7 +21,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   document.body.appendChild(page);
   const $ = id => document.getElementById(id), content = $('settingsContent'), main = page.querySelector('.settings-main');
   let section = null, dirty = false, config = null, tools = [], providers = { models: [] }, draft = null, team = null, teamSection = 'overview', reportDays = 7, pendingNote = null, toolPoll = null, statusPoll = null, statusTries = 0;
-  const feedback = (text, error = false) => { const m = $('settingsMessage'); m.textContent = text; m.classList.toggle('error', error); };
+  const feedback = (text, error = false) => { const m = $('settingsMessage'); m.textContent = text; m.classList.toggle('error', error); if (text) toast(text, { kind: error ? 'error' : 'ok' }); };
   content.addEventListener('input', event => { if (event.target.closest('form[data-dirty]') && !event.target.closest('.agency-picker')) dirty = true; });
   page.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Escape' && !event.target.closest('input,textarea,select')) close(); });
   $('settingsBack').onclick = event => { event.preventDefault(); close(); };
