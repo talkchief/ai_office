@@ -26,11 +26,14 @@ function fixture(options = {}) {
 test('teams support real roster edits and protect the lead/worker separation', () => {
   const dir = temp(), store = new OfficeStore({ dataDir: dir, initialAgents: loadRoster().agents });
   const config = store.get();
-  config.agents.push({ id: 'new-writer', name: 'Writer', role: 'Copywriter', department: 'marketing' });
-  config.teams.find(t => t.id === 'marketing').lead = 'new-writer';
+  // a team is a lead and up to six specialists: Marketing is full, Finance has room
+  const full = structuredClone(config); full.agents.push({ id: 'eighth', name: 'Eighth', role: 'Extra', department: 'marketing' });
+  assert.throws(() => store.update(full), /maximum of 7/);
+  config.agents.push({ id: 'new-writer', name: 'Writer', role: 'Copywriter', department: 'fin' });
+  config.teams.find(t => t.id === 'fin').lead = 'new-writer';
   const updated = store.update(config);
   assert.equal(updated.agents.find(a => a.id === 'new-writer').lead, true);
-  assert.equal(updated.agents.find(a => a.id === 'mlead').lead, false);
+  assert.equal(updated.agents.find(a => a.id === 'alead').lead, false);
   assert.throws(() => store.update(config), /another tab/);
   const invalid = store.get(); invalid.agents = invalid.agents.filter(a => a.id !== 'new-writer');
   assert.throws(() => store.update(invalid), /Assign a lead/);
