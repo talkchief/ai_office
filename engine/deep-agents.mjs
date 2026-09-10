@@ -546,7 +546,7 @@ export class OfficeEngine {
   searchTool(id, agentId) {
     return tool(async ({ query, folder = '', k = 6 }) => {
       if (!this.knowledgeIndex) return 'The Brain search is not available in this office.';
-      const hits = this.knowledgeIndex.search(query, { folder, k });
+      let hits = []; try { hits = this.knowledgeIndex.search(query, { folder, k }); } catch (error) { return `The Brain search could not run that query (${String(error.message).slice(0, 120)}). Try plain words.`; }
       if (hits.length) this.update(id, j => {
         j.sources = [...new Set([...(j.sources || []), ...hits.map(h => h.path)])].slice(0, 60);
         const run = j.runs.filter(r => r.agent === agentId && r.state === 'working').at(-1); if (run) run.sources = [...new Set([...(run.sources || []), ...hits.map(h => h.path)])].slice(0, 20);

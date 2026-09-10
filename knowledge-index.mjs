@@ -37,8 +37,13 @@ class ZvecBackend {
   upsert(docs) { for (let i = 0; i < docs.length; i += 500) this.c.upsertSync(docs.slice(i, i + 500).map(d => ({ id: d.id, fields: { path: d.path, folder: d.folder, heading: d.heading, text: d.text } }))); }
   remove(ids) { for (let i = 0; i < ids.length; i += 500) this.c.deleteSync(ids.slice(i, i + 500)); }
   query(words, { folder, k }) {
-    return this.c.querySync({ fieldName: 'text', fts: { queryString: words.join(' ') }, topk: k, ...(folder ? { filter: `folder = ${JSON.stringify(folder)}` } : {}) })
-      .map(d => ({ path: d.fields.path, heading: d.fields.heading, text: d.fields.text, score: d.score }));
+    // Every word is a literal term: an agent that searches for `"q4 campaign" OR "campaign"` means the words, not the FTS operators.
+    const literal = words.filter(w => !/^(and|or|not|near)$/i.test(w)).map(w => '"' + w.replace(/"/g, '') + '"');
+    if (!literal.length) return [];
+    try {
+      return this.c.querySync({ fieldName: 'text', fts: { queryString: literal.join(' ') }, topk: k, ...(folder ? { filter: `folder = ${JSON.stringify(folder)}` } : {}) })
+        .map(d => ({ path: d.fields.path, heading: d.fields.heading, text: d.fields.text, score: d.score }));
+    } catch (error) { console.warn('Brain search:', error.message); return []; }
   }
   count() { return this.c.stats.docCount; }
   close() { try { this.c?.closeSync(); } catch {} }

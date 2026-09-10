@@ -72,3 +72,17 @@ test('long documents are split by heading with overlap and the largest readable 
     assert.equal(index.search('catering guidance')[0].path, 'Company/handbook.md');
   } finally { index.close(); fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('a search made of FTS operator words or quoted phrases never throws, on either backend', async () => {
+  for (const backend of ['zvec', 'sqlite']) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'talkchief-index-ops-'));
+    const store = new KnowledgeStore(path.join(dir, 'brain'));
+    await store.writeNote('40-Marketing/q4-campaign.md', '# Q4 campaign\n\nThe campaign runs in October and targets owner-led firms.\n');
+    const index = await new KnowledgeIndex({ dir: path.join(dir, 'index'), store, backend }).open(); index.sync();
+    assert.doesNotThrow(() => index.search('"q4 campaign" OR "campaign"'));
+    assert.ok(index.search('"q4 campaign" OR "campaign"').some(h => h.path === '40-Marketing/q4-campaign.md'), backend + ': the words still find the note');
+    assert.deepEqual(index.search('or'), [], backend + ': an operator word alone finds nothing and throws nothing');
+    assert.doesNotThrow(() => index.search('not and near (campaign'));
+    index.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  }
+});
