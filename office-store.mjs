@@ -29,7 +29,7 @@ export class OfficeStore {
   validate(input) {
     if (!input || !Array.isArray(input.agents) || !Array.isArray(input.teams)) fail('An office needs teams and agents.');
     const teamIds = new Set(input.teams.map(t => t.id));
-    if (input.teams.length < 1 || input.teams.length > 12) fail('An office supports 1–12 teams.');
+    if (input.teams.length < 1 || input.teams.length > 10) fail('An office supports 1–10 teams.');
     if (teamIds.size !== input.teams.length || [...teamIds].some(id => !/^[a-z][a-z0-9_-]{0,47}$/.test(id || '') || id === 'brain')) fail('Teams need unique IDs.');
     const skillIds = new Set();
     const skills = (Array.isArray(input.skills) ? input.skills : []).map(skill => {
