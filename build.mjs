@@ -2,7 +2,7 @@
 import { build } from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { buildBrainGraph } from './graph-build.mjs';
-await buildBrainGraph(new URL('./brain/', import.meta.url).pathname); // V3.6: bake the vault's wiki-link graph into src/braingraph.js
+await buildBrainGraph(); // bake the configured Brain's wiki-link graph into src/braingraph.js (the config resolves the path on every OS)
 
 const res = await build({
   entryPoints: ['src/main.js'],
