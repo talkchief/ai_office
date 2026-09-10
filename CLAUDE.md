@@ -25,7 +25,7 @@ For a running office, read `GET /api/office`, change what the owner asked for, a
 - `does` is the person's job description, read before every assignment. `brief` is the owner's standing instructions to that person (up to 2,000 characters). Anything longer, or with steps and a template, is a skill.
 - `model` is a model id from Settings → Models & keys, or empty for the team's, then the role's default.
 - `rules` are the owner's standing rules in their own words. The office adds them when the owner ticks "remember" on a correction. Only remove one when the owner asks.
-- Teams can be added, renamed and removed (up to 12 teams, 12 people each; a team keeps a lead and at least one specialist). A team with unfinished work cannot be removed.
+- Teams can be added, renamed and removed (up to 10 teams; a team is a lead and one to six specialists). A team with unfinished work cannot be removed.
 
 **First start only:** a brand-new office seeds its people from `office.agents.json` → `<brain>/Agents Office/agents.json` → `office.agents.local.json` (later wins), 35 seats in six departments. After the first start these files are not read again, so edits to them do nothing for a running office.
 
@@ -69,5 +69,7 @@ Any tool that sends, posts, pays, deletes or changes something outside the offic
 
 - `npm run check` is the loop: build, configuration checks, the whole test suite, and an API smoke test on throwaway data. Run it after any code change and fix what is red. `CHECK_LIVE=1 npm run check` also runs one real task through the configured provider.
 - `npm test` runs the test suite alone (Node 22).
+- `npm run check` is the loop. Run it after any change to code; fix what is red.
+- The 3D office is `src/scene/` (React Three Fiber; `index.jsx` returns the handle `src/main.js` uses). Change the building in `office.jsx` / `furniture.js`, the figures in `person.js`, their behaviour in `sim.js`, walking in `nav.js`, the wall screens in `screens.js`, the light in `daylight.js`. `node scripts/screenshots.mjs` shows the result headless.
 - `README.md` says what the product does. Keep it true to the code.
 - Release: `node scripts/release.mjs --push` (owner only).

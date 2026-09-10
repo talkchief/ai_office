@@ -41,10 +41,14 @@ activity applies to the offline demo, not this deployed workflow.
 
 ![Agents Office — six department pods around the Brain, with the Task Status panel](assets/readme-hero.jpg)
 
-A 3D isometric office where AI agents do real work on your own Claude login.
+A 3D office where AI agents do real work on your own Claude login.
 
-Six departments, thirty-five agents at their desks, a task bar that routes what you type to the
-right agent, and a Brain at the centre that is your own folder of notes. Type a task, the office
+One floor, a room per department with a door and glass walls, a Program Manager in a glass
+office at the centre, a lobby, a kitchen and a meeting room in the corners. Thirty-five agents at
+their desks who type, read, glance at whoever walks past, take a coffee, chat, and hold team
+meetings; wall screens that show who is working and a market feed; day and night that follow
+your clock. A task bar routes what you type to the right agent, and the Brain is your own folder of
+notes. Type a task, the office
 gives it to the right person, they read your notes, use the connectors you have already set up
 in Claude Code, do the work, and file the result back into your notes. Everything runs on your
 machine.
@@ -57,7 +61,7 @@ or build a paid product on it. (Formal terms: PolyForm Noncommercial 1.0.0 — s
 ## What you need
 
 - macOS or Linux (Windows: works with `npm` commands directly, `./setup` is Bash only)
-- Node.js 20+ — https://nodejs.org
+- Node.js 22+ — https://nodejs.org (the service runtime is 22.23.2; on Rocky/RHEL 9: `dnf module switch-to nodejs:22`)
 - git
 - **Claude Code**, logged in with your Claude account, or an `ANTHROPIC_API_KEY`
 
@@ -71,6 +75,12 @@ npm start        # → http://localhost:4520
 ```
 
 Without `./setup`: `npm install && node build.mjs && npm start`.
+
+## Moving around
+
+- Scroll to zoom to the cursor, drag to pan, click a room to focus it, click a person to talk to them, double-click the floor or press `0` for the overview.
+- **Turn and tilt the office**: drag with the right mouse button (or hold Shift), or `Q` / `E` and the ↺ ↻ buttons. `⌂` straightens the view again.
+- `N` cycles morning → day → evening → night to preview the light; by default the office follows your clock (night after 20:00, dark tokens and desk lamps). `D` forces dark, `V` the filming backdrop, `G` the Brain, `B` the board, `X` sends two people to the centre for a chat (demo).
 
 ## First five minutes
 
@@ -314,7 +324,8 @@ first thing to run after any change.
 
 | Path | What |
 |---|---|
-| `src/` | The office: `main.js` scene, `tasks.js` task panel, `brain.js` the Brain, `mcp.js` connectors, `data.js` departments and roster, `v1data.js` agent personalities |
+| `src/` | The page: `main.js` chrome, rail, chat and hotkeys; `tasks.js` / `office.js` the Task Status panel (demo / served); `rightnow.js` the "Right now" rows and hand-off chains; `brain.js` the Brain; `mcp.js` connectors; `data.js` departments and roster; `v1data.js` agent personalities |
+| `src/scene/` | The 3D office on React Three Fiber: `index.jsx` mounts it and returns the handle the page uses; `office.jsx` the building, rooms, stations; `person.js` the figures and their poses; `sim.js` their life (work, coffee, chats, meetings, the PM's routes); `nav.js` wall-aware walking (A*); `screens.js` the wall screens; `daylight.js` the four phases; `overlays.js` cards, pills, speech bubbles; `rig.js` the camera |
 | `serve.mjs` | The local server: routing, deliverables, chat, the live Brain graph |
 | `mcp.mjs` | Connectors: `claude mcp list` parsed, allow/deny, the tools each agent may call |
 | `roster.mjs` · `office.agents.json` | The 35 agents: names, roles, what they do, their tools, their briefs (`<brain>/Agents Office/agents.json` and `office.agents.local.json` override) |

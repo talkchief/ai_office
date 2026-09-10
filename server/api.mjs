@@ -103,6 +103,17 @@ export function registerApi(router, ctx) {
   router.on('POST', '/api/routines/:id/pause', ({ params }) => routines.pause(params.id, true));
   router.on('POST', '/api/routines/:id/resume', ({ params }) => routines.pause(params.id, false));
   router.on('POST', '/api/chat', async ({ req }) => ctx.chat(await body(req)));
+  // Compatibility for the scene: connector docks (was the Claude Code list) and the top-bar usage gauge (was the Claude plan).
+  router.on('GET', '/api/mcp', () => {
+    const teams = office.get().teams, key = name => String(name).toLowerCase().replace(/^claude[ ._]ai[ ._]/, '').replace(/[^a-z0-9]/g, '');
+    return { tools: true, web: teams.some(t => t.tools.includes('web')), servers: toolStore.list().filter(t => !['builtin', 'candidate'].includes(t.type)).map(t => ({ id: t.id, key: key(t.name), name: t.name, allowed: true,
+      status: t.type === 'stdio' || t.auth === 'signed-in' || t.hasToken ? 'connected' : 'needs-auth', depts: teams.filter(x => x.tools.includes(t.id)).map(x => x.id) })) };
+  });
+  router.on('GET', '/api/usage', () => {
+    const since = Date.now() - 5 * 3600000; let tokens = 0, runs = 0;
+    for (const j of engine.list()) { if ((j.updatedAt || 0) >= since) tokens += j.tokens || 0; runs += (j.runs || []).filter(r => (r.startedAt || 0) >= since).length; }
+    return { ok: true, source: 'office', reason: 'the office runs on API keys', window: { tokens, runs } };
+  });
   router.on('GET', '/api/health', () => { const o = office.get(); return { ok: true, version: ctx.version, name: ctx.name, ready: models.ready(), providers: models.summary(), depts: o.teams.map(t => t.id), teams: o.teams.map(t => ({ id: t.id, name: t.name, lead: t.lead })),
     agents: o.agents.map(({ id, name, role, does, department, lead }) => ({ id, name, role, does, department, lead })), notes: ctx.graph().notes, knowledge: ctx.index.status(), connectors: hub.status, inbox: engine.notifications.counts(), settings: settings.get() }; });
 }

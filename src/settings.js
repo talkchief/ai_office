@@ -134,7 +134,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     content.querySelectorAll('[data-settings-section]').forEach(b => b.onclick = () => { collectTeam(); teamSection = b.dataset.settingsSection; renderTeam(); });
     $('spaceTeamForm').addEventListener('input', () => { $('spaceSaveState').textContent = 'Unsaved changes'; });
     $('spaceAddTeam').onclick = () => {
-      collectTeam(); if (draft.teams.length >= 12) return feedback('An office supports up to 12 teams.', true);
+      collectTeam(); if (draft.teams.length >= 10) return feedback('An office supports up to 10 teams.', true);
       const id = 'team-' + crypto.randomUUID().slice(0, 8), lead = id + '-lead', template = structuredClone(config.teams[0]);
       draft.teams.push({ ...template, id, name: 'New team', lead, purpose: '', instructions: '', guardrails: [], tools: [], skills: [], tests: [], checks: [], rules: [], models: {} });
       draft.agents.push({ id: lead, department: id, name: 'Team lead', role: 'Team lead', does: 'Plan, delegate and review the work of the team.', brief: '', model: '', effort: '', tools: [], skills: [], rules: [], inheritTools: true }, { id: id + '-specialist', department: id, name: 'Specialist', role: 'Specialist', does: '', brief: '', model: '', effort: '', tools: [], skills: [], rules: [], inheritTools: true });
@@ -152,7 +152,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     $('spaceAddCheck').onclick = () => { collectTeam(); if (t.checks.length >= 20) return feedback('A team supports up to 20 checks.', true); t.checks.push({ type: 'contains', label: 'New acceptance check', value: '' }); dirty = true; renderTeam(); $('spaceCheckEditors').lastElementChild.open = true; };
     content.querySelectorAll('[data-remove-check]').forEach(b => b.onclick = () => { collectTeam(); t.checks.splice(Number(b.dataset.removeCheck), 1); rerender(); });
     content.querySelectorAll('[data-check-type]').forEach(select => select.onchange = () => { const input = select.closest('[data-check-editor]').querySelector('[data-check-value]'); input.type = select.value.includes('length') ? 'number' : 'text'; });
-    $('spaceAddAgent').onclick = () => { collectTeam(); if (agents.length >= 12) return feedback('Each team supports up to 12 people.', true); const id = 'agent-' + crypto.randomUUID().slice(0, 8); draft.agents.push({ id, department: t.id, name: 'New person', role: 'Specialist', does: '', brief: '', model: '', effort: '', tools: [], skills: [], rules: [], inheritTools: true }); dirty = true; renderTeam(); content.querySelector(`[data-agent-editor="${id}"]`).open = true; };
+    $('spaceAddAgent').onclick = () => { collectTeam(); if (agents.length >= 7) return feedback('A team is a lead and up to six specialists.', true); const id = 'agent-' + crypto.randomUUID().slice(0, 8); draft.agents.push({ id, department: t.id, name: 'New person', role: 'Specialist', does: '', brief: '', model: '', effort: '', tools: [], skills: [], rules: [], inheritTools: true }); dirty = true; renderTeam(); content.querySelector(`[data-agent-editor="${id}"]`).open = true; };
     content.querySelectorAll('[data-remove-agent]').forEach(b => b.onclick = () => {
       collectTeam(); if (agents.length <= 2) return feedback('Keep a lead and at least one specialist.', true);
       draft.agents = draft.agents.filter(a => a.id !== b.dataset.removeAgent);

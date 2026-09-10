@@ -16,7 +16,7 @@ export const DEFAULT_REGISTRY = {
   providers: [
     { id: 'anthropic', type: 'anthropic', label: 'Anthropic', enabled: true, refusalFallback: true },
     { id: 'openai', type: 'openai', label: 'OpenAI', enabled: true },
-    { id: 'openrouter', type: 'openai-compatible', label: 'OpenRouter', baseURL: 'https://openrouter.ai/api/v1', enabled: true, headers: { 'X-Title': 'Talkchief AI Space' } },
+    { id: 'openrouter', type: 'openai-compatible', label: 'OpenRouter', baseURL: 'https://openrouter.ai/api/v1', enabled: true, headers: { 'X-Title': 'Cloud AI Office' } },
   ],
   models: [
     { id: 'claude-opus-5', provider: 'anthropic', label: 'Claude Opus 5', supports: { effort: true } },

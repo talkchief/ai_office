@@ -1,4 +1,4 @@
-// Talkchief AI Space — the server. The office runs on any chat model you configure in Settings → Models & keys:
+// Cloud AI Office — the server. The office runs on any chat model you configure in Settings → Models & keys:
 // the Program Manager delegates to department leads, leads delegate to specialists, and anything that
 // would leave the office waits for the CEO. State lives in data/ (SQLite + JSON); the Brain is a folder of notes.
 //
@@ -237,7 +237,7 @@ engine.recover();
 hub.load().then(() => console.log(`  connectors: ${Object.values(hub.status).filter(s => s === 'connected').length} of ${Object.keys(hub.status).length} connected`)).catch(e => console.warn('connectors:', e.message));
 mcp.discover({ timeout: 15000 }).catch(() => {});
 server.listen(cfg.port, process.env.HOST || undefined, () => {
-  console.log(`Talkchief AI Space ${version} → http://localhost:${cfg.port}`);
+  console.log(`Cloud AI Office ${version} → http://localhost:${cfg.port}`);
   console.log(`  business: ${cfg.name}   brain: ${BRAIN} (${graph.notes} notes)   models: ${models.ready() ? 'ready' : 'no provider key yet — add one in Settings → Models & keys'}`);
   console.log(`  tasks: ${path.join(DATA, 'workflows.sqlite')}   routines: ${loadRoutines().length} loaded`);
   setInterval(tickRoutines, 20000).unref(); tickRoutines(); scheduler.start(60000);
