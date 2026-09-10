@@ -948,11 +948,12 @@
 .space-card-top time { font-size:9px; color:var(--grey); flex-shrink:0; }
 .space-card-context { color:var(--grey); font-size:9px; }
 .space-job .space-result-excerpt { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; color:var(--grey); font-size:11px; line-height:1.6; }
-.space-group-heading { display:flex; justify-content:space-between; margin:16px 2px 9px; font:500 10px var(--ui); color:var(--grey); }
-.space-group-heading span { font-weight:400; }
+.space-group-heading { display:flex; align-items:baseline; justify-content:space-between; margin:18px 2px 9px; font-family:var(--serif); font-size:19px; letter-spacing:.02em; color:var(--ink); }
+.space-group-heading span { font:400 10px var(--ui); color:var(--grey); letter-spacing:0; }
 .space-closed-tasks { margin:18px 0 0; border-top:1px solid var(--hairline); padding-top:13px; }
-.space-closed-tasks>summary { color:var(--grey); cursor:pointer; font:10px var(--ui); margin-bottom:12px; }
-.space-closed-tasks>summary span { margin-left:6px; }.space-job.cancelled { opacity:.65; }
+.space-closed-tasks>summary { color:var(--ink); cursor:pointer; font-family:var(--serif); font-size:19px; letter-spacing:.02em; margin:18px 2px 12px; }
+.space-closed-tasks>summary span { margin-left:8px; font:400 10px var(--ui); color:var(--grey); letter-spacing:0; }
+.space-card-context b { font-weight:700; }.space-job.cancelled { opacity:.65; }
 .space-empty { padding:48px 12px; text-align:center; color:var(--grey); font:11px/1.6 var(--ui); }
 .space-empty-mark { display:block; font:26px var(--serif); opacity:.35; margin-bottom:14px; }
 .space-empty h3 { color:var(--ink); font:19px var(--serif); margin-bottom:7px; }
@@ -1366,7 +1367,7 @@ body.dark .space-card-actions .space-text-action { background: transparent; colo
 body.dark .space-more { color: var(--grey); border-color: var(--hairline); }
 body.dark #spaceDialog .secondary { background: transparent; color: var(--ink); border-color: rgba(236,234,227,.35); }
 body.dark .space-command, body.dark .space-command textarea { color: var(--ink); }
-body.dark .space-now-head .space-h2, body.dark .space-feed-head h2, body.dark .tp-lab { color: var(--ink); }
+body.dark .space-now-head .space-h2, body.dark .space-feed-head h2, body.dark .tp-lab, body.dark .space-group-heading, body.dark .space-closed-tasks>summary { color: var(--ink); }
 /* the right panel scrolls without a scrollbar */
 .space-jobs, #tpanel, .tp-rows, #mMsgs, #mAct { scrollbar-width: none; }
 .space-jobs::-webkit-scrollbar, #tpanel::-webkit-scrollbar, #mMsgs::-webkit-scrollbar, #mAct::-webkit-scrollbar { display: none; }
