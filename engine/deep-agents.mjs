@@ -266,9 +266,12 @@ export class OfficeEngine {
     const pending = this.threads.pending(id);
     if (pending.length && !interrupts.length) {
       this.threads.markDelivered(pending.map(m => m.seq));
-      const text = pending.map(m => `CEO ${m.kind === 'note' ? 'note' : 'message'}: ${m.text}${this.referenceText(m.meta?.refs, id)}`).join('\n\n');
-      this.update(id, j => { j.reprompts = 0; if (j.state === 'done') { j.reviewsByDept = {}; j.review = null; j.correction = { seq: pending.at(-1).seq, text: pending.map(m => m.text).join('\n') }; } });
-      this.event(id, 'notes_delivered', null, `${pending.length} note${pending.length === 1 ? '' : 's'} passed to the Program Manager.`);
+      // Notes that arrived while the task was busy. Delivered after completion, they do not undo the approved reviews: the Program
+      // Manager answers them, routes a real change to the one lead it concerns, and completes again.
+      const late = job.state === 'done';
+      const text = (late ? `Office: this task is already complete and its result is filed (${this.stateSummary(job)}). The notes below arrived after completion. If they change nothing, call complete_task again with the same summary. If one asks for a change, route only that change to the lead who owns it and complete again after that lead's review; the other approved reviews stand.\n\n` : '') + pending.map(m => `CEO ${m.kind === 'note' ? 'note' : 'message'}: ${m.text}${this.referenceText(m.meta?.refs, id)}`).join('\n\n');
+      this.update(id, j => { j.reprompts = 0; j.correction = { seq: pending.at(-1).seq, text: pending.map(m => m.text).join('\n'), at: Date.now() }; });
+      this.event(id, 'notes_delivered', null, `${pending.length} note${pending.length === 1 ? '' : 's'} passed to the Program Manager${late ? ' after completion; approved reviews stand' : ''}.`);
       this.setState(id, 'working'); this.followUps.set(id, { kind: 'message', text }); return;
     }
     if (TERMINAL.has(job.state) || ['escalated', 'awaiting_ceo'].includes(job.state)) return;
@@ -466,7 +469,8 @@ export class OfficeEngine {
     if (!prior.length) return null;
     const first = Math.min(...prior.map(r => r.startedAt || 0)), review = job.reviewsByDept?.[dept];
     const files = (() => { try { return listWorkspaceFiles(this.workspaceDir(jobId)).map(f => '/work/' + f.name); } catch { return []; } })();
-    if (review?.approved && review.at >= first) {
+    // A correction from the CEO after the approval means the package may legitimately run again.
+    if (review?.approved && review.at >= first && !(job.correction?.at > review.at)) {
       this.event(jobId, 'resume_skipped', 'pm', `${dept} had already delivered this package before the interruption; it was not run again.`);
       return { skip: `Already done before the interruption: the ${dept} lead delivered this package and recorded an APPROVED review at ${new Date(review.at).toISOString().slice(11, 16)} UTC (${review.summary.slice(0, 300)}). Files in the workspace: ${files.join(', ') || 'none'}. Do not delegate it again; mark it done in the plan and carry on.` };
     }
@@ -718,7 +722,7 @@ export class OfficeEngine {
     if (busy) return { queued: true, message, job: this.get(id) };
     if (notStarted) return { queued: false, message, job };
     const reopening = job.state === 'done';
-    this.update(id, j => { j.reprompts = 0; j.reworkRounds = {}; if (reopening) { j.reviewsByDept = {}; j.review = null; j.correction = { seq: message.seq, text: body }; } });
+    this.update(id, j => { j.reprompts = 0; j.reworkRounds = {}; if (reopening) { j.reviewsByDept = {}; j.review = null; j.correction = { seq: message.seq, text: body, at: Date.now() }; } });
     this.notifications.ackForJob(id, ['question', 'escalated', 'blocked', 'provider_error']);
     this.setState(id, 'working', { error: null, escalation: null });
     const label = kind === 'answer' ? 'CEO answer' : reopening || kind === 'correction' ? 'CEO correction' : 'CEO message';

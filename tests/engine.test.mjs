@@ -172,7 +172,8 @@ test('a note posted while the team works is kept, delivered at the next turn and
     const done = await until(f.engine, id, ['done']);
     assert.equal(f.engine.threads.pending(id).length, 0);
     assert.ok(done.messages.some(m => m.kind === 'note' && m.deliveredAt));
-    assert.ok(done.runs.some(r => r.role === 'lead' && /CEO note: Use the October launch date/.test(r.title)));
+    assert.ok(done.runs.some(r => r.role === 'lead' && /Office: this task is already complete/.test(r.title)), 'the note reaches the PM behind the office’s note that the task was already complete');
+    assert.match(done.events.find(e => e.type === 'notes_delivered')?.message || '', /after completion; approved reviews stand/);
   } finally { release(); await f.close(); }
 });
 
@@ -316,6 +317,9 @@ test('a resumed task does not run an approved package again, and tells a mid-fli
     const done = f.engine.resumeCheck(job.id, { name: 'task', args: { subagent_type: 'lead-marketing', description: title + '. CONTEXT FROM THE OTHER PARTS: the pricing table is approved; align the announcement with it.' } });
     assert.match(done.skip, /Already done before the interruption[\s\S]*APPROVED review[\s\S]*\/work\/announcement\.md/, 'a re-worded brief for the same package is still recognised');
     assert.equal(f.engine.resumeCheck(job.id, { name: 'task', args: { subagent_type: 'lead-marketing', description: 'MARKETING: write the objection-handling sheet for the new prices' } }), null, 'a different package for the same team runs');
+    f.engine.update(job.id, j => { j.correction = { seq: 9, text: 'Change the headline.', at: Date.now() + 1000 }; });
+    const again = f.engine.resumeCheck(job.id, { name: 'task', args: { subagent_type: 'lead-marketing', description: title } });
+    assert.equal(again.skip, undefined, 'after a CEO correction the same package is not skipped'); assert.match(again.description, /reuse what is good/);
     assert.ok(f.engine.events(job.id).some(e => e.type === 'resume_skipped'));
     assert.equal(f.engine.resumeCheck(job.id, { name: 'task', args: { subagent_type: 'lead-marketing', description: 'A brand-new package' } }), null, 'a new brief is not a resume');
   } finally { await f.close(); }
@@ -411,6 +415,21 @@ test('a specialist may open twelve things in one run; the thirteenth is refused 
     const id = start(f); const done = await until(f.engine, id, ['done']);
     assert.equal(done.events.filter(e => e.type === 'reads_capped' && e.agent === f.worker).length, 2);
     assert.equal(done.review.approved, true);
+  } finally { await f.close(); }
+});
+
+test('a note sent while the task was busy and delivered after completion does not undo the approved reviews', async () => {
+  const gate = 300;
+  const f = fixture({ specialist: () => ({ text: 'Verified result and evidence.', wait: gate }) });
+  try {
+    const id = start(f);
+    await new Promise(r => setTimeout(r, 60)); assert.ok(f.engine.running.has(id), 'the task is running');
+    const sent = f.engine.message(id, { text: 'Also mention October in the title.' }); assert.equal(sent.queued, true);
+    const done = await until(f.engine, id, ['done']);
+    const delivered = done.events.find(e => e.type === 'notes_delivered');
+    assert.ok(delivered, 'the note reached the Program Manager'); assert.match(delivered.message, /after completion; approved reviews stand/);
+    assert.equal(done.reviews.filter(r => r.approved).length >= 1, true);
+    assert.equal(typeof done.correction?.at, 'number');
   } finally { await f.close(); }
 });
 
