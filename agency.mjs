@@ -23,8 +23,10 @@ export function parsePersona(markdown, { division = '', file = '' } = {}) {
   const role = text(bullet(identity, 'Role') || meta.description.split(/[.—–-]\s/)[0], 120);
   const rules = section('critical rules', 'rules'), mission = section('core mission', 'mission', 'core responsibilities');
   const lines = block => block.split('\n').map(l => l.trim()).filter(l => /^[-*]\s/.test(l)).map(l => l.replace(/^[-*]\s+/, '').replace(/\*\*/g, ''));
-  const brief = [...lines(rules), ...lines(mission)].filter(l => l.length > 8 && !/^(Role|Personality|Memory|Experience):/i.test(l)).slice(0, 25).map(l => '- ' + l).join('\n').slice(0, 2000);
+  const extracted = [...lines(rules), ...lines(mission)].filter(l => l.length > 8 && !/^(Role|Personality|Memory|Experience):/i.test(l)).slice(0, 25).map(l => '- ' + l).join('\n').slice(0, 2000);
   const id = slugOf(file.replace(/\.md$/, '') || meta.name);
+  // A persona without rules or mission bullets still needs standing instructions: the office refuses a person without a brief.
+  const brief = extracted || [`Your job: ${text(meta.description, 400)}`, meta.vibe ? `Work like this: ${text(meta.vibe, 300)}` : '', `Follow the ${meta.name} method in your skills, step by step, and hand finished work to your lead in the format asked for, with assumptions and blockers named.`].filter(Boolean).join('\n').slice(0, 2000);
   return { id, division, name: meta.name, description: text(meta.description, 500), emoji: meta.emoji || '', vibe: text(meta.vibe, 300), role, does: text(meta.description, 1200), brief, body };
 }
 

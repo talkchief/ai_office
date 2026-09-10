@@ -9,7 +9,7 @@ import { ToolStore } from '../tool-store.mjs';
 import { OfficeStore } from '../office-store.mjs';
 import { loadRoster } from '../roster.mjs';
 import { layoutGraph } from '../graph-build.mjs';
-import { isOutbound, assertPublicUrl, mcpServers, ToolHub } from '../engine/tools.mjs';
+import { isOutbound, assertPublicUrl, mcpServers, ToolHub, restoreSchema, agentToolIds, extraToolIds } from '../engine/tools.mjs';
 
 const setup = (options = {}) => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'space-tools-')); const office = new OfficeStore({ dataDir: dir, initialAgents: loadRoster().agents }); return { dir, office, store: new ToolStore({ dataDir: dir, office, summary: () => ({ servers: [] }), ...options }) }; };
 
@@ -19,7 +19,7 @@ test('connectors keep credentials private, retain tokens when edited and lose th
     let list = store.save({ name: 'test-mcp', type: 'http', url: 'https://example.com/mcp', token: 'private-token' });
     assert.equal(list.find(t => t.id === 'test_mcp').hasToken, true); assert.ok(!JSON.stringify(list).includes('private-token'));
     store.save({ name: 'test-mcp', type: 'http', url: 'https://example.com/v2', token: '' }); assert.equal(store.items[0].config.headers.Authorization, 'Bearer private-token');
-    assert.equal(fs.statSync(store.file).mode & 0o777, 0o600);
+    if (process.platform !== 'win32') assert.equal(fs.statSync(store.file).mode & 0o777, 0o600, 'tokens are private to the server account');
     const cfg = office.get(); cfg.teams[0].tools = ['test_mcp']; cfg.agents[0].tools = ['test_mcp']; office.update(cfg);
     store.remove('test_mcp'); assert.deepEqual(office.get().teams[0].tools, []); assert.deepEqual(office.get().agents[0].tools, []); assert.equal(store.items.length, 0);
     assert.throws(() => store.save({ name: 'bad', type: 'http', url: 'https://user:password@example.com' }), /credentials/);
@@ -96,4 +96,70 @@ test('the Brain includes standalone notes and an empty vault has no sample graph
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'space-graph-'));
   try { let g = await layoutGraph(dir); assert.deepEqual(g.nodes, []); fs.writeFileSync(path.join(dir, 'purpose.md'), '# Purpose\nFacts without links.'); g = await layoutGraph(dir); assert.equal(g.notes, 1); assert.equal(g.nodes.length, 1); }
   finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('restoreSchema gives the model back the types the MCP server declared', () => {
+  // Zapier's shapes: nested unions of constants, "boolean or null", arrays of constants, metadata keys, plain objects.
+  const raw = { type: 'object', properties: {
+    ordering: { description: 'Sort order', anyOf: [{ anyOf: [{ type: 'string', const: 'startTime', description: 'Start Time' }, { type: 'string', const: 'updated', description: 'Updated' }] }, { type: 'null' }] },
+    expand_recurring: { _meta: { 'zapier/alters_dynamic_properties': true }, description: 'Expand', anyOf: [{ type: 'boolean' }, { type: 'null' }] },
+    eventTypes: { anyOf: [{ type: 'array', items: { anyOf: [{ type: 'string', const: 'birthday' }, { type: 'string', const: 'default' }] } }, { type: 'null' }] },
+    attendee_email: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    output_hint: { type: 'string', description: 'REQUIRED.' },
+    dynamic_properties: { type: 'object', additionalProperties: { anyOf: [{ type: 'string' }, { type: 'number' }] } },
+    shape: { oneOf: [{ type: 'object', properties: { a: { type: 'string' } }, required: ['a'] }, { type: 'object', properties: { b: { type: 'number' } }, required: ['a', 'b'] }] },
+  }, required: ['output_hint'], $schema: 'http://json-schema.org/draft-07/schema#' };
+  const out = restoreSchema(raw);
+  assert.deepEqual(out.properties.ordering, { description: 'Sort order', enum: ['startTime', 'updated'], type: 'string' });
+  assert.deepEqual(out.properties.expand_recurring, { description: 'Expand', type: 'boolean' });
+  assert.deepEqual(out.properties.eventTypes, { type: 'array', items: { enum: ['birthday', 'default'], type: 'string' } });
+  assert.deepEqual(out.properties.attendee_email, { type: 'string' });
+  assert.deepEqual(out.properties.output_hint, { type: 'string', description: 'REQUIRED.' });
+  assert.deepEqual(out.properties.dynamic_properties.additionalProperties, { anyOf: [{ type: 'string' }, { type: 'number' }] });
+  assert.deepEqual(out.properties.shape, { type: 'object', properties: { a: { type: 'string' }, b: { type: 'number' } }, required: ['a'] });
+  assert.deepEqual(out.required, ['output_hint']);
+  assert.ok(!('$schema' in out) && !('_meta' in out.properties.expand_recurring));
+  assert.equal(restoreSchema(null), null);
+});
+
+test('the hub restores schemas from the raw server listing and keeps the old session alive across a reload', async () => {
+  const mk = name => tool(async () => 'ok', { name, description: 'x', schema: z.object({}) });
+  const closed = [];
+  let n = 0;
+  const factory = async () => {
+    const id = ++n, tools = [mk('mcp__cal__find_events')];
+    tools[0].schema = { type: 'object', properties: { ordering: { description: 'flattened' } } };
+    return { id, getTools: async () => tools, close: async () => { closed.push(id); },
+      getClient: async () => ({ listTools: async () => ({ tools: [{ name: 'find_events', inputSchema: { type: 'object', properties: { ordering: { anyOf: [{ const: 'startTime' }, { const: 'updated' }] } } } }] }) }) };
+  };
+  let timeout = 45;
+  const hub = new ToolHub({ clientFactory: factory, settings: () => ({ runTimeoutMinutes: timeout }), items: () => [{ name: 'cal', config: { type: 'http', url: 'https://c.example' } }] });
+  await hub.load();
+  assert.deepEqual(hub.tools[0].schema.properties.ordering, { enum: ['startTime', 'updated'], type: 'string' }, 'types restored from the raw listing');
+  assert.equal(hub.status.cal, 'connected');
+  const first = hub.client;
+  await hub.load();
+  assert.notEqual(hub.client, first, 'a reload makes a new session');
+  assert.deepEqual(closed, [], 'the old session is not closed while a run could still hold it');
+  assert.equal(hub.retired.length, 1);
+  hub.sweep(Date.now() + 46 * 60000);
+  assert.deepEqual(closed, [first.id], 'closed once the run time limit has passed');
+  assert.equal(hub.retired.length, 0);
+  await hub.load(); timeout = 1;
+  hub.sweep(Date.now() + 2 * 60000);
+  assert.equal(closed.length, 2, 'the grace period follows the office time limit');
+  await hub.close();
+  assert.equal(closed.length, 3, 'close() closes the live session too');
+});
+
+test('a tool given to one person counts, even when the team does not have it', () => {
+  const team = { tools: ['Google_Calendar'] };
+  assert.deepEqual(agentToolIds(team, { inheritTools: true, tools: [] }), ['Google_Calendar'], 'inheriting the team');
+  assert.deepEqual(agentToolIds(team, { inheritTools: true, tools: ['web'] }), ['Google_Calendar', 'web'], 'a personal grant adds to the team');
+  assert.deepEqual(agentToolIds(team, { inheritTools: false, tools: ['web'] }), ['web'], 'not inheriting: only the personal list');
+  assert.deepEqual(agentToolIds(team, { inheritTools: false, tools: [] }), [], 'opted out of everything');
+  assert.deepEqual(extraToolIds(team, { tools: ['web', 'Google_Calendar'] }), ['web']);
+  const hub = new ToolHub({ clientFactory: async () => ({ getTools: async () => [], close: async () => {} }), items: () => [] });
+  const { tools } = hub.toolsFor({ agent: { inheritTools: true, tools: ['web'] }, team, provider: 'openai' });
+  assert.deepEqual(tools.map(t => t.name), ['web_fetch'], 'the person gets web fetch although the team has no web access');
 });

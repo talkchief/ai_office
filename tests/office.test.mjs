@@ -15,7 +15,7 @@ test('teams support real roster edits and protect the lead/worker separation', (
   const dir = temp(), store = new OfficeStore({ dataDir: dir, initialAgents: loadRoster().agents });
   try {
     const config = store.get();
-    config.agents.push({ id: 'new-writer', name: 'Writer', role: 'Copywriter', department: 'fin' });
+    config.agents.push({ id: 'new-writer', name: 'Writer', role: 'Copywriter', department: 'fin', does: 'Writes the finance team’s client-facing copy.', brief: 'Plain words, numbers from the ledger, nothing sent without the CEO.' });
     config.teams.find(t => t.id === 'fin').lead = 'new-writer';
     const updated = store.update(config);
     assert.equal(updated.agents.find(a => a.id === 'new-writer').lead, true); assert.equal(updated.agents.find(a => a.id === 'alead').lead, false);
@@ -49,7 +49,9 @@ test('the Brain is editable, protected from traversal and symlinks, and archived
     assert.equal(store.list().length, 2); assert.match(store.read(note.id).content, /customers/);
     assert.deepEqual(store.retrieve('snowflake revenue').notes, ['Finance/snow.md']);
     assert.throws(() => store.read('../outside.md'), /Invalid/);
-    fs.symlinkSync('/etc', path.join(dir, 'linked')); assert.throws(() => store.read('linked/test.md'), /Linked/);
+    // Creating a symlink needs a privilege Windows does not grant by default; the traversal check above runs everywhere.
+    let linked = true; try { fs.symlinkSync(process.platform === 'win32' ? os.tmpdir() : '/etc', path.join(dir, 'linked'), 'dir'); } catch (error) { if (process.platform !== 'win32') throw error; linked = false; }
+    if (linked) assert.throws(() => store.read('linked/test.md'), /Linked/);
     await store.archive('Finance/snow.md');
     assert.equal(store.list().length, 1); assert.deepEqual(store.retrieve('snowflake revenue').notes, []);
     assert.equal(fs.readdirSync(path.join(dir, '.archive')).length, 1);
@@ -89,4 +91,42 @@ test('documents upload into Brain folders; the same path replaces the note and a
     await store.archive('Status/big.md');
     assert.deepEqual(seen, [['write', 'Projects/Launch plan.md'], ['write', 'Projects/Launch plan.md'], ['write', 'Status/big.md'], ['remove', 'Status/big.md']]);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('every team has a charter and every person a brief; empty ones are refused, older files are filled once', async () => {
+  const { OfficeStore } = await import('../office-store.mjs');
+  const { loadRoster } = await import('../roster.mjs');
+  const { TEAM_CHARTERS, fillOrganisation } = await import('../office-charters.mjs');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'talkchief-charters-'));
+  const store = new OfficeStore({ dataDir: dir, initialAgents: loadRoster().agents });
+  const office = store.get();
+  for (const t of office.teams) { assert.ok(t.purpose.length > 40, `${t.id} has a purpose`); assert.ok(t.instructions.includes('\n'), `${t.id} has working instructions`); }
+  for (const a of office.agents) assert.ok(a.brief.length > 40, `${a.id} has a brief`);
+  assert.equal(office.teams.find(t => t.id === 'fin').purpose, TEAM_CHARTERS.fin.purpose);
+
+  const noPurpose = store.get(); noPurpose.teams[0].purpose = '  ';
+  assert.throws(() => store.update(noPurpose), /EMAILS needs a purpose/);
+  const noInstructions = store.get(); noInstructions.teams[1].instructions = '';
+  assert.throws(() => store.update(noInstructions), /SALES needs working instructions/);
+  const noBrief = store.get(); noBrief.agents.find(a => a.id === 'riley').brief = '';
+  assert.throws(() => store.update(noBrief), /RESEARCH needs standing instructions/);
+  const noDoes = store.get(); noDoes.agents.find(a => a.id === 'riley').does = '';
+  assert.throws(() => store.update(noDoes), /RESEARCH needs a job description/);
+
+  // An office file written before charters existed loads, gets filled where empty, and is written back once.
+  const old = store.get();
+  for (const t of old.teams) { t.purpose = ''; t.instructions = ''; }
+  for (const a of old.agents) a.brief = '';
+  old.teams.push({ id: 'people', name: 'PEOPLE', lead: 'hr1', purpose: '', instructions: '', criteria: ['ok'], checks: [], tools: [], skills: [], tests: [], rules: [], models: {} });
+  old.agents.push({ id: 'hr1', department: 'people', name: 'HR LEAD', role: 'People lead', does: '', brief: '', tools: [], skills: [], rules: [] }, { id: 'hr2', department: 'people', name: 'RECRUITER', role: 'Recruiter', does: 'Finds candidates.', brief: '', tools: [], skills: [], rules: [] });
+  fs.writeFileSync(path.join(dir, 'office.json'), JSON.stringify(old));
+  const reopened = new OfficeStore({ dataDir: dir, initialAgents: loadRoster().agents }).get();
+  assert.equal(reopened.teams.find(t => t.id === 'marketing').instructions, TEAM_CHARTERS.marketing.instructions, 'a shipped charter fills a default team');
+  assert.match(reopened.teams.find(t => t.id === 'people').purpose, /Own the PEOPLE work/, 'a custom team gets a generic charter');
+  assert.match(reopened.agents.find(a => a.id === 'hr1').does, /People lead in the PEOPLE team/, 'a custom person gets a job line');
+  assert.match(reopened.agents.find(a => a.id === 'hr2').brief, /Your job: Finds candidates\./, 'a custom person gets a brief from what they do');
+  assert.equal(reopened.agents.find(a => a.id === 'riley').brief, loadRoster().agents.find(a => a.id === 'riley').brief, 'a default seat gets the shipped brief');
+  const again = JSON.parse(fs.readFileSync(path.join(dir, 'office.json'), 'utf8'));
+  assert.equal(fillOrganisation(again, loadRoster().agents).changed, false, 'the fill is idempotent');
 });

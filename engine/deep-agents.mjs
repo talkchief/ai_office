@@ -8,11 +8,18 @@ import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import { HumanMessage, ToolMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { createMiddleware, todoListMiddleware } from 'langchain';
-import { createDeepAgent } from 'deepagents';
+import { createDeepAgent, registerHarnessProfile } from 'deepagents';
 import { z } from 'zod';
 import { officeBackend, FILE_PERMISSIONS, SKILL_SOURCES } from './backend.mjs';
 import { ROOT } from '../config.mjs';
 import { programManagerPrompt, leadPrompt, specialistPrompt, leadName } from './prompts.mjs';
+import { exportPdfTool, exportPptxTool, listWorkspaceFiles } from './documents.mjs';
+
+// Deep Agents gives every agent that has subagents a built-in "general-purpose" worker with the parent's own tools. In this
+// office every worker is a named person on a team, reviewed by a lead, so that worker is switched off for every provider
+// the office can run on (profiles are keyed by the model class: ChatAnthropic, ChatOpenAI, ChatGoogleGenerativeAI).
+export const PROVIDERS_WITHOUT_GENERAL_WORKER = ['anthropic', 'openai', 'google'];
+for (const provider of PROVIDERS_WITHOUT_GENERAL_WORKER) registerHarnessProfile(provider, { generalPurposeSubagent: { enabled: false } });
 import { checkOutput, coveredCriteria } from './checks.mjs';
 import { RunTracker } from './stream.mjs';
 import { Notifications } from '../notifications.mjs';
@@ -46,6 +53,13 @@ class Gate {
 
 // Failures that come from the model provider (bad key, no credit, rate limit, outage, unknown model), not from the work.
 const PROVIDER_STATUS = new Set([401, 402, 403, 408, 429, 500, 502, 503, 504, 529]);
+// Worth one automatic retry: the provider or the network failed, not the key, the credit or the model name.
+export function isTransientProviderError(error) {
+  const status = Number(error?.status ?? error?.statusCode ?? error?.response?.status ?? error?.error?.status);
+  const message = String(error?.message || '');
+  if (/api.?key|unauthori[sz]ed|authenticat|permission denied|insufficient|credit|quota|not found|does not exist|no such model/i.test(message)) return false;
+  return (status >= 500 && status < 600) || status === 429 || /\b5\d\d\b|internal server error|bad gateway|service unavailable|gateway time.?out|overloaded|rate.?limit|too many requests|timed? ?out|ECONNRESET|ETIMEDOUT|EAI_AGAIN|socket hang up|fetch failed|network|connection (error|reset|refused|closed)|ECONNREFUSED/i.test(message);
+}
 export function isProviderError(error) {
   const status = Number(error?.status ?? error?.statusCode ?? error?.response?.status ?? error?.error?.status);
   if (PROVIDER_STATUS.has(status)) return true;
@@ -53,13 +67,15 @@ export function isProviderError(error) {
 }
 
 export class OfficeEngine {
-  constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent, pmSkillsDir = null }) {
+  constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent, pmSkillsDir = null, toolLabels = () => ({}), memoryFactory = null, projectFor = () => null }) {
     fs.mkdirSync(dataDir, { recursive: true });
     this.workspaces = path.join(dataDir, 'workspaces'); this.knowledgeDir = knowledgeDir || path.join(dataDir, 'knowledge');
     this.saver = SqliteSaver.fromConnString(path.join(dataDir, 'workflows.sqlite')); this.db = this.saver.db;
     this.db.pragma('journal_mode = WAL'); this.db.pragma('busy_timeout = 5000');
     this.db.exec('CREATE TABLE IF NOT EXISTS office_jobs (id TEXT PRIMARY KEY, body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS office_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL, body TEXT NOT NULL); CREATE INDEX IF NOT EXISTS office_events_job ON office_events(job_id, seq);');
-    Object.assign(this, { office, models, toolHub, knowledgeIndex, bus, settingsFn: settings, onComplete, onChange, name, agentFactory, pmSkillsDir });
+    Object.assign(this, { office, models, toolHub, knowledgeIndex, bus, settingsFn: settings, onComplete, onChange, name, agentFactory, pmSkillsDir, toolLabels, projectFor });
+    // Long-term memory shares the task database; null when the office runs without it (tests, older set-ups).
+    this.memory = memoryFactory ? memoryFactory(this.db) : null;
     this.notifications = new Notifications({ db: this.db, bus }); this.threads = new Threads({ db: this.db, bus });
     this.running = new Map(); this.waiting = []; this.followUps = new Map(); this.gates = new Map(); this.closed = false;
   }
@@ -92,10 +108,10 @@ export class OfficeEngine {
   }
   activeAgents() {
     const office = this.office.get();
-    return new Set(this.list().filter(j => !TERMINAL.has(j.state) && j.state !== 'backlog').flatMap(j => [...(j.runs || []).map(r => r.agent), ...(j.autoRoute ? involved(j) : j.depts || [j.dept]).map(d => office.teams.find(t => t.id === d)?.lead)]).filter(Boolean));
+    return new Set(this.list().filter(j => !TERMINAL.has(j.state) && j.state !== 'backlog').flatMap(j => [...(j.runs || []).filter(r => ['working', 'paused'].includes(r.state)).map(r => r.agent), ...(j.autoRoute ? involved(j) : j.depts || [j.dept]).map(d => office.teams.find(t => t.id === d)?.lead)]).filter(Boolean));
   }
   /* ---------- creating and scheduling ---------- */
-  create({ dept, depts, text, title, model, effort, kind = 'task', testId, suiteId, routine = null, backlog = false, priority = 1, assignee = null, dueAt = null, autoStart = true, completionApproval, requireHumanApproval }) {
+  create({ dept, depts, text, title, model, effort, kind = 'task', testId, suiteId, routine = null, backlog = false, priority = 1, assignee = null, dueAt = null, autoStart = true, completionApproval, requireHumanApproval, projectId = null }) {
     const office = this.office.get();
     const autoRoute = depts === 'auto' || dept === 'auto';
     const all = autoRoute ? office.teams.map(t => t.id) : [...new Set([dept, ...(Array.isArray(depts) ? depts : [])].filter(Boolean))];
@@ -104,11 +120,13 @@ export class OfficeEngine {
     if (clean(text).length > 12000) throw httpError('Task descriptions must be under 12000 characters.');
     if (assignee && !office.agents.some(a => a.id === assignee && all.includes(a.department))) throw httpError('The assignee must belong to one of the task’s teams.');
     const due = dueAt ? Number(new Date(dueAt)) : null; if (dueAt && !Number.isFinite(due)) throw httpError('Enter a valid due date.');
+    const project = projectId ? this.projectFor(String(projectId)) : null;
+    if (projectId && !project) throw httpError('There is no such project.'); if (project?.status === 'archived') throw httpError('That project is archived. Reopen it under Settings → Projects first.');
     const team = teams[0], testcase = kind === 'evaluation' ? team.tests.find(t => t.id === testId) : null;
     if (kind === 'evaluation' && !testcase) throw httpError('Choose a saved team test.');
     const skillIds = new Set(teams.flatMap(t => [...(t.skills || []), ...office.agents.filter(a => a.department === t.id).flatMap(a => a.skills || [])]));
     const now = Date.now();
-    const job = { schemaVersion: 2, id: randomUUID(), kind, dept: team.id, depts: all, autoRoute, title: clean(title || text).slice(0, 100), text: clean(text), assignee: assignee || null, dueAt: due,
+    const job = { schemaVersion: 2, id: randomUUID(), kind, dept: team.id, depts: all, autoRoute, title: clean(title || text).slice(0, 100), text: clean(text), assignee: assignee || null, dueAt: due, projectId: project ? project.id : null, projectName: project ? project.name : null,
       priority: [0, 1, 2].includes(priority) ? priority : 1, routine, suiteId: suiteId || null, testId: testcase?.id || null, testName: testcase?.name || null, agent: autoRoute ? 'pm' : team.lead,
       model: clean(model) || null, effort: clean(effort) || null, state: backlog ? 'backlog' : 'queued', stateSince: now, createdAt: now, updatedAt: now,
       officeRevision: office.revision, skills: office.skills.filter(s => skillIds.has(s.id)),
@@ -148,10 +166,13 @@ export class OfficeEngine {
   brief(job) {
     const office = this.office.get(), assignee = job.assignee ? office.agents.find(a => a.id === job.assignee) : null;
     const later = this.threads.list(job.id).filter(m => m.role === 'ceo').slice(1).map(m => '- ' + m.text);
-    return [job.autoRoute ? 'CEO task (choose which department leads to involve; delegate only to the teams that fit):' : `CEO task for ${job.depts.map(d => office.teams.find(t => t.id === d)?.name || d).join(' + ')}:`, job.text,
+    const project = job.projectId ? this.projectFor(job.projectId) : null;
+    return [project ? this.projectBrief(project) + '\n' : '', job.autoRoute ? 'CEO task (choose which department leads to involve; delegate only to the teams that fit):' : `CEO task for ${job.depts.map(d => office.teams.find(t => t.id === d)?.name || d).join(' + ')}:`, job.text,
       assignee ? `The CEO wants ${assignee.name} (${assignee.role}) to do this.` : '', job.dueAt ? `Due: ${new Date(job.dueAt).toISOString().slice(0, 16).replace('T', ' ')} UTC.` : '',
       later.length ? 'Later notes from the CEO:\n' + later.join('\n') : '', this.seedNotes(job.text)].filter(Boolean).join('\n');
   }
+  // The project block a task carries: purpose, charter, timeline and where the whole page is. projectFor may hand back a plain record.
+  projectBrief(project) { return typeof project.brief === 'string' ? project.brief : `PROJECT: ${project.name} (${project.status || 'active'})\n${project.description || ''}\nThe project page and its files are under /knowledge/Projects/${project.id}/ (read project.md there before planning).`; }
   // The Program Manager starts with the Brain passages that best match the brief.
   seedNotes(text) {
     const n = Number(this.settings().knowledgeSeedNotes ?? 6); if (!this.knowledgeIndex || !n) return '';
@@ -205,7 +226,14 @@ export class OfficeEngine {
         const job = this.get(id);
         if (this.closed || !job || TERMINAL.has(job.state)) return this.detail(id);
         const reason = timer.aborted ? `The task ran longer than ${minutes} minutes and was stopped. Retry to continue from where it stopped, or raise the time limit in Settings.` : clean(error?.message) || 'The task stopped unexpectedly.';
-        this.block(id, reason, { provider: !timer.aborted && isProviderError(error) });
+        if (!timer.aborted && isTransientProviderError(error) && (job.autoRetries || 0) < 2) {
+          // Twice, quietly, with a longer pause the second time: the CEO hears about it only if the third attempt fails too.
+          const attempt = (job.autoRetries || 0) + 1, delay = attempt === 1 ? 30000 : 90000;
+          this.update(id, j => { j.autoRetries = attempt; }, { touch: false });
+          this.block(id, reason, { provider: true, quiet: true });
+          this.event(id, 'provider_retry', null, `The model provider failed (${reason.slice(0, 120)}). Retrying automatically in ${delay / 1000} seconds (attempt ${attempt} of 2).`);
+          setTimeout(() => { try { if (this.get(id)?.state === 'blocked') this.retry(id, undefined, { automatic: true }); } catch {} }, delay).unref?.();
+        } else this.block(id, reason, { provider: !timer.aborted && isProviderError(error) });
       } finally {
         this.running.delete(id);
         for (const key of [...this.gates.keys()]) if (key.startsWith(id + ':')) this.gates.delete(key);
@@ -269,10 +297,11 @@ export class OfficeEngine {
     this.notifications.notify({ kind: completion ? 'ceo_approval' : 'ceo_decision', title: completion ? `Approve completion: ${job.title}` : `Decision needed: ${job.title}`,
       body: actions.map(a => `${a.name} ${JSON.stringify(a.args).slice(0, 600)}`).join('\n'), jobId: id, dept: job.dept, agent: job.pendingActions[0]?.agent, dedupe: `decision:${id}`, action: { type: 'decide' } });
   }
-  block(id, reason, { provider = false } = {}) {
+  block(id, reason, { provider = false, quiet = false } = {}) {
     this.update(id, j => { for (const r of j.runs) if (['working', 'paused'].includes(r.state)) r.state = 'failed'; for (const c of Object.values(j.liveCalls || {})) if (c.state === 'running') c.state = 'failed'; });
     const job = this.setState(id, 'blocked', { error: reason });
     this.event(id, 'blocked', null, reason, provider ? { provider: true } : {});
+    if (quiet) return;
     // One inbox item per blocked task; a provider failure says where to fix it.
     this.notifications.notify(provider
       ? { kind: 'provider_error', title: `Model provider problem: ${job.title}`, body: `${reason}\n\nCheck the key, credit and model under Settings → Models & keys, then retry.`, jobId: id, dept: job.dept, dedupe: `blocked:${id}`, action: { type: 'retry' } }
@@ -323,26 +352,27 @@ export class OfficeEngine {
     };
     // The Program Manager's skills: the shipped programme/project-management methods, and the owner's own under the Brain.
     const pmSkills = { agency: this.pmSkillsDir || path.join(ROOT, 'agency', 'pm-skills'), office: path.join(this.knowledgeDir, 'Agents Office', 'pm-skills') };
-    const backend = officeBackend({ workspaceDir: path.join(this.workspaces, job.id), knowledgeDir: this.knowledgeDir, skillDirs: pmSkills });
-    const evaluation = job.kind === 'evaluation', leads = [];
+    // Same workspace and Brain for everyone; the memory mounts differ by role (the company for the Program Manager, one page per team).
+    const backendFor = who => officeBackend({ workspaceDir: path.join(this.workspaces, job.id), knowledgeDir: this.knowledgeDir, skillDirs: pmSkills, memoryRoutes: this.memory?.routesFor(who) || {} });
+    const evaluation = job.kind === 'evaluation', leads = [], toolLabels = this.toolLabels();
     for (const team of teams) {
       const lead = office.agents.find(a => a.id === team.lead), specialists = office.agents.filter(a => a.department === team.id && a.id !== team.lead);
       const subagents = [];
       for (const agent of specialists) {
         const { model, provider } = await make('specialist', agent, team);
         const set = this.toolHub ? this.toolHub.toolsFor({ agent, team, provider, evaluation }) : { tools: [], interruptOn: {} };
-        subagents.push({ name: agent.id, description: `${agent.name}, ${agent.role}. ${agent.does || ''}`.slice(0, 600), systemPrompt: specialistPrompt({ office, team, agent, leadAgent: lead }),
-          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id)], interruptOn: set.interruptOn, middleware: [this.pace(job.id, team, agent.id, signal)] });
+        subagents.push({ name: agent.id, description: `${agent.name}, ${agent.role}. ${agent.does || ''}`.slice(0, 600), systemPrompt: specialistPrompt({ office, team, agent, leadAgent: lead, toolLabels }),
+          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id)], interruptOn: set.interruptOn, middleware: [this.pace(job.id, team, agent.id, signal)] });
       }
       const { model, provider } = await make('lead', lead, team);
       const spotChecks = this.toolHub ? this.toolHub.toolsFor({ agent: lead, team, provider, evaluation, readOnly: true }).tools : [];
-      const graph = this.agentFactory({ name: leadName(team.id), model, systemPrompt: leadPrompt({ office, team, lead, specialists, reworkRounds: reworkRounds(team) }),
-        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...spotChecks], subagents, backend, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware()] });
+      const graph = this.agentFactory({ name: leadName(team.id), model, systemPrompt: leadPrompt({ office, team, lead, specialists, reworkRounds: reworkRounds(team), toolLabels }),
+        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), ...spotChecks], subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware()] });
       leads.push({ name: leadName(team.id), description: `${team.name} team, led by ${lead.name}.${team.purpose ? ' ' + team.purpose : ''}`.slice(0, 600), runnable: graph });
     }
     const { model } = await make('pm', null, null);
-    const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams }),
-      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend, permissions: FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id)],
+    const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams, toolLabels }),
+      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id)],
       checkpointer: this.saver, interruptOn: job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {} });
     return { pm, models };
   }
@@ -367,11 +397,18 @@ export class OfficeEngine {
       this.update(id, j => { j.handoffs = [...(j.handoffs || []), handoff]; if (!j.autoRoute && !(j.depts || []).includes(other.id)) j.depts = [...(j.depts || [j.dept]), other.id]; });
       this.event(id, 'handoff_requested', team.lead, `${team.name} asked ${other.name} for: ${text.slice(0, 200)}`, { team: other.id, role: 'lead' });
       return `Recorded. The Program Manager will delegate this to ${other.name} (${leadName(other.id)}). Continue with your own part now, and put this line in your report to the Program Manager: "HAND-OFF to ${other.name}: ${text.slice(0, 200)}".`;
-    }, { name: 'hand_to_program_manager', description: 'Ask the Program Manager to delegate part of this assignment to another team whose expertise it needs. Call once per hand-off, then carry on with your own team’s part. Never do the other team’s work yourself.',
+    }, { name: 'hand_to_program_manager', description: 'Ask the Program Manager to delegate part of this assignment to another team that has the expertise or the tool it needs (for example web access for research). Call once per hand-off, then carry on with your own team’s part. Never do the other team’s work yourself.',
       schema: z.object({ team: z.enum(others.length ? others.map(t => t.id) : ['none']).describe('The team that should take it'), request: z.string().describe('What that team should deliver, with the context they need') }) });
   }
   // A hand-off is open until a lead run for that team starts after it was asked for.
   openHandoffs(job) { return (job.handoffs || []).filter(h => !job.runs.some(r => r.role === 'lead' && r.dept === h.team && (r.startedAt || 0) >= h.at)); }
+  // The files a task's workspace holds, for the task page; and the tool that turns a Markdown deliverable into a PDF there.
+  workspaceDir(id) { return path.join(this.workspaces, id); }
+  files(id) { return listWorkspaceFiles(this.workspaceDir(id)); }
+  exportTools(id, agentId) {
+    const workspaceDir = this.workspaceDir(id), saved = what => ({ file, pages, slides }) => this.event(id, 'file_saved', agentId, `Saved /work/${file} (${what === 'pdf' ? `${pages} page${pages === 1 ? '' : 's'}` : `${slides} slides`}).`, { file });
+    return [exportPdfTool({ workspaceDir, onSaved: saved('pdf') }), exportPptxTool({ workspaceDir, onSaved: saved('pptx') })];
+  }
   progressTool(id, agentId) {
     return tool(async ({ text }) => { const line = clean(text).slice(0, 240); if (line) { this.update(id, j => { j.progressLine = line; }); this.event(id, 'progress', agentId, line); } return 'Noted.'; },
       { name: 'report_progress', description: 'Post a one-sentence progress update the CEO sees on the task card.', schema: z.object({ text: z.string() }) });
@@ -525,14 +562,14 @@ export class OfficeEngine {
     return { queued: false, message, job: this.get(id) };
   }
   answer(id, text) { return this.message(id, { text, kind: 'answer' }); }
-  retry(id, feedback = '') {
+  retry(id, feedback, { automatic = false } = {}) {
     const job = this.get(id);
     if (!job || this.running.has(id) || !['blocked', 'escalated'].includes(job.state)) throw httpError('Only blocked or escalated tasks can be retried.', 409);
     const text = clean(feedback), started = job.calls > 0 && job.harness !== false && !job.prunedAt;
     if (text) this.threads.append(id, { role: 'ceo', kind: 'correction', text, jobId: id });
-    this.update(id, j => { j.error = null; j.reprompts = 0; j.reworkRounds = {}; for (const r of j.runs) if (['failed', 'paused'].includes(r.state)) r.state = 'interrupted'; }, { touch: false });
+    this.update(id, j => { j.error = null; j.reprompts = 0; j.reworkRounds = {}; if (!automatic) j.autoRetries = 0; for (const r of j.runs) if (['failed', 'paused'].includes(r.state)) r.state = 'interrupted'; }, { touch: false });
     this.notifications.ackForJob(id, ['blocked', 'provider_error', 'escalated', 'question']);
-    this.event(id, 'retry_requested', null, text || 'CEO asked the team to continue.');
+    this.event(id, 'retry_requested', null, text || (automatic ? 'Retrying after the provider failure.' : 'CEO asked the team to continue.'));
     this.setState(id, 'queued', { escalation: null });
     this.update(id, j => { j.next = !started ? null : { kind: 'message', text: text ? `CEO: ${text}` : 'Office: the task stopped before it was finished. Continue from where the work stopped; do not repeat finished work.' }; }, { touch: false });
     this.pump(); return this.get(id);

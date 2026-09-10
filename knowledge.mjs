@@ -25,7 +25,7 @@ export class KnowledgeStore {
     const base = String(name || 'document').replace(/\.[a-z0-9]{1,5}$/i, '').replace(/[^A-Za-z0-9 _-]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 80) || 'document';
     const id = `${where}/${base}.md`, file = this.resolve(id);
     let replaced = null;
-    if (fs.existsSync(file)) { const trash = path.join(this.root, '.archive'); fs.mkdirSync(trash, { recursive: true }); replaced = path.join('.archive', `${Date.now()}-${path.basename(file)}`); fs.copyFileSync(file, path.join(this.root, replaced)); }
+    if (fs.existsSync(file)) { const trash = path.join(this.root, '.archive'); fs.mkdirSync(trash, { recursive: true }); replaced = `.archive/${Date.now()}-${path.basename(file)}`; fs.copyFileSync(file, path.join(this.root, replaced)); }
     const note = await this.writeNote(id, `# ${base}\n\nSource file: ${String(name).slice(0, 200)} · Added ${new Date().toISOString()}\n\n${String(content || '').trim()}\n`);
     return { ...note, replaced };
   }
@@ -46,7 +46,7 @@ export class KnowledgeStore {
         if (entry.isDirectory()) walk(file);
         else if (entry.name.endsWith('.md')) {
           const stat = fs.statSync(file), content = fs.readFileSync(file, 'utf8');
-          notes.push({ id: path.relative(this.root, file), title: content.match(/^#\s+(.+)$/m)?.[1] || entry.name.replace(/\.md$/, ''),
+          notes.push({ id: path.relative(this.root, file).split(path.sep).join('/'), title: content.match(/^#\s+(.+)$/m)?.[1] || entry.name.replace(/\.md$/, ''),
             kind: content.includes('Unreviewed answer;') ? 'conversation' : file.includes(path.sep + 'Agents Office' + path.sep) || file.includes(path.sep+'Projects'+path.sep) ? 'deliverable' : 'knowledge', updatedAt: stat.mtimeMs, bytes: stat.size, preview: content.replace(/^#.*\n/, '').trim().slice(0, 200) });
         }
       }

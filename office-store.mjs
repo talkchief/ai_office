@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { DEPTS, DEPT_KEYS } from './src/data.js';
+import { TEAM_CHARTERS, fillOrganisation } from './office-charters.mjs';
 
 const text = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
 const fail = message => { throw Object.assign(new Error(message), { status: 400 }); };
@@ -18,13 +19,16 @@ export class OfficeStore {
   constructor({ dataDir, initialAgents }) {
     fs.mkdirSync(dataDir, { recursive: true });
     this.file = path.join(dataDir, 'office.json');
-    if (fs.existsSync(this.file)) this.value = this.validate(JSON.parse(fs.readFileSync(this.file, 'utf8')));
-    else {
+    if (fs.existsSync(this.file)) {
+      // An office from before charters were required gets the shipped ones once, only where a field is empty.
+      const { office: filled, changed } = fillOrganisation(JSON.parse(fs.readFileSync(this.file, 'utf8')), initialAgents);
+      this.value = this.validate(filled); if (changed) this.persist();
+    } else {
       this.value = { version: 1, schema: 2, revision: 1, agents: initialAgents.map(a => ({ ...a, skills: [], model: a.model || '' })),
         teams: DEPT_KEYS.map(id => ({ id, name: DEPTS[id].name, lead: initialAgents.find(a => a.department === id && a.lead)?.id,
-          instructions: '', criteria: [...DEFAULT_CRITERIA], checks: [], tools: [], maxParallelRuns: 2, maxReworkRounds: 3,
+          purpose: TEAM_CHARTERS[id]?.purpose || '', instructions: TEAM_CHARTERS[id]?.instructions || '', criteria: [...DEFAULT_CRITERIA], checks: [], tools: [], maxParallelRuns: 2, maxReworkRounds: 3,
            requireHumanApproval: false, tests: [] })) };
-      this.value = this.validate(this.value); this.persist();
+      this.value = this.validate(fillOrganisation(this.value, initialAgents).office); this.persist();
     }
   }
   get() { return structuredClone(this.value); }
@@ -55,6 +59,8 @@ export class OfficeStore {
       ids.add(a.id);
       if (!teamIds.has(a.department)) fail('Choose an existing functional area.');
       if (!text(a.name, 48) || !text(a.role, 120)) fail('Each agent needs a name and role.');
+      if (!text(a.does, 1200)) fail(`${text(a.name, 48)} needs a job description: what this person does.`);
+      if (!text(a.brief, 6000)) fail(`${text(a.name, 48)} needs standing instructions: how the CEO wants this person to work.`);
       return { id: a.id, department: a.department, name: text(a.name, 48), role: text(a.role, 120), does: text(a.does, 1200), brief: text(a.brief, 6000),
         model: modelOf(a.model, legacy), effort: ['', 'low', 'medium', 'high', 'xhigh', 'max'].includes(a.effort || '') ? a.effort || '' : '',
         skills: skillRefs(a.skills), tools: Array.isArray(a.tools) ? a.tools.map(t => text(t, 80)).filter(Boolean).slice(0, 20) : [], inheritTools: a.inheritTools !== false, rules: rulesOf(a.rules), lead: false };
@@ -68,6 +74,8 @@ export class OfficeStore {
       const lead = members.find(a => a.id === t.lead);
       if (!lead) fail(`Assign a lead who belongs to ${t.name || t.id}.`);
       lead.lead = true;
+      if (!text(t.purpose, 3000)) fail(`${text(t.name, 48) || t.id} needs a purpose: what the team owns and what success looks like.`);
+      if (!text(t.instructions, 12000)) fail(`${text(t.name, 48) || t.id} needs working instructions: how the team does its work.`);
       const criteria = (Array.isArray(t.criteria) ? t.criteria : DEFAULT_CRITERIA).map(c => text(c, 1000)).filter(Boolean).slice(0, 12);
       if (!criteria.length) fail('Add at least one review criterion.');
       const checks = (Array.isArray(t.checks) ? t.checks : []).slice(0, 20).map((c, i) => {
@@ -97,6 +105,7 @@ export class OfficeStore {
     const next = this.validate(input);
     for (const id of busyAgentIds) {
       const before = this.value.agents.find(a => a.id === id), after = next.agents.find(a => a.id === id);
+      if (!before) continue;
       if (!after || after.department !== before?.department) fail('An agent with unfinished work cannot be removed or moved. Finish or cancel its work first.');
     }
     for (const skill of next.skills) { const before = this.value.skills.find(s => s.id === skill.id); skill.revision = before ? before.revision + Number(skill.name !== before.name || skill.description !== before.description || skill.instructions !== before.instructions) : 1; }

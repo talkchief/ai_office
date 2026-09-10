@@ -28,7 +28,7 @@ It runs on API keys from any provider: Anthropic, OpenAI, OpenRouter (GLM, Kimi 
 **Manage** opens a full settings page (the office pauses behind it):
 
 - **Office** — tasks running at once, the time limit per run, when to remind you again, the digest time.
-- **Teams & people** — add, rename and remove teams (up to 10; a team is a lead and up to six specialists), each person's job, standing instructions and model, the team's purpose, review criteria, automated checks, tools, pace, standing rules, and tests.
+- **Teams & people** — add, rename and remove teams (up to 10; a team is a lead and up to six specialists), each person's job and standing instructions (both required) and model, the team's purpose and working instructions (its charter, required; the six default teams ship with one), review criteria, automated checks, tools, pace, standing rules, and tests.
 - **Models & keys** — provider keys, then the models you activate from each provider's own list (nothing is built in), and who runs on what (office default, Program Manager, leads, specialists, reviews, chat).
 - **Tools & connectors** — MCP servers by URL or local command, sign-in in a new window, which teams may use each, and approval rules per tool.
 - **Skills** — reusable methods you give to teams or people, typed by you or added from the Agency. See [SKILLS.md](SKILLS.md).
@@ -45,7 +45,13 @@ The office ships the open-source Agency catalogue ([msitarzewski/agency-agents](
 
 The Program Manager runs on LangChain Deep Agents: it plans every task with the built-in task list (the CEO sees the plan on the task page), delegates to department leads with the delegation tool, and reads its skills on demand. Its skills are the project-management methods from the Agency (project shepherd, senior project manager, studio producer and operations, meeting notes, experiment tracker, Jira workflow steward) plus the office's own *running-a-task* and *cross-team-handoff* methods, under `agency/pm-skills/`. Put your own under `<brain>/Agents Office/pm-skills/<name>/SKILL.md`.
 
-When a lead's assignment needs another team's expertise, the lead hands that part to the Program Manager and keeps working on its own part. The Program Manager delegates it to the other lead, and the task cannot close until both leads have approved their work.
+When a lead's assignment needs another team's expertise, or a tool its own team does not have (web research without web access, say), the lead hands that part to the Program Manager and keeps working on its own part. The Program Manager delegates it to the other lead, and the task cannot close until both leads have approved their work.
+
+Who knows what: the Program Manager's prompt carries the whole company, every team's purpose, people, tools and skills, so it can route each part of a task to the team that can actually do it. A lead is told only its own team and its own tools, including any tool a single person on the team has been given; a specialist is told to stop and say so rather than substitute a tool it does not have. Deliverables are Markdown, text, CSV, JSON or HTML in the task workspace, and a team can export a Markdown deliverable as a formatted PDF or as PowerPoint slides; every workspace file is downloadable from the task page's Artifacts tab. PDFs are printed by the Chrome or Edge installed on the machine (set `AO_CHROME` to a browser path elsewhere), with a built-in fallback renderer when there is none. The same pages are kept in long-term memory, a LangGraph store in `data/workflows.sqlite` mounted by role: the Program Manager reads `/memories/company/org-chart.md` and `connectors.md`, a team reads its own `/memories/team/team.md`, and everyone shares `/memories/notes/`. The pages are rewritten whenever teams, people, skills or connectors change, so a task already running reads the current state. A lead delegates only to named people on its team; there is no anonymous general-purpose worker.
+
+## Projects
+
+The Program Manager runs big pieces of work as projects. Under Settings → Projects you define each one: a purpose, a charter written the way you would brief a new hire, owning teams, start and target dates, milestones you tick off, and files uploaded into the project's Brain folder. Attach tasks to a project from the task form or from the project page; every such task starts from the project page, which the office keeps current with the charter, the timeline, the files and what earlier tasks delivered, so the third task knows what the first two did.
 
 ## Routines
 
@@ -67,6 +73,13 @@ The company's shared knowledge: your uploads, the office purpose, finished work 
 | `V` | Full screen view with dimmed lighting |
 | `D` | Dark mode. http://localhost:4520/dark opens in it |
 | `Esc` | Back |
+
+## Running it for real
+
+- **Backups.** `npm run backup` copies the data folder (tasks, memory, keys, connectors, projects) and the Brain to `backups/<timestamp>/`, keeping the newest seven (`--keep N` for more); `npm run backups` lists them; `npm run restore -- <name>` puts one back after you stop the office, saving the current state first. Schedule the backup daily with cron or a Windows scheduled task.
+- **CI.** `.github/workflows/check.yml` runs the whole check loop on Linux and Windows for every push and pull request.
+- **Docker.** The `Dockerfile` builds an image with Node 22 and a Chromium for PDF export; mount `/app/data` and `/app/brain`, publish port 4520, pass provider keys as environment or add them in Settings. The image reports health on `/api/health`.
+- **Provider trouble.** A model call that produces nothing for five minutes fails and is retried; a 5xx, an overload or a dropped connection is retried twice automatically before the task blocks with a Retry. A provider that keeps failing is a provider to change under Settings → Models & keys.
 
 ## The build loop
 

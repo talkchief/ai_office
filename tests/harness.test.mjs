@@ -60,7 +60,8 @@ test('provider keys never reach the browser, blank keeps a key, clearKey removes
     assert.equal(summary.providers.find(p => p.id === 'anthropic').keySource, 'file');
     assert.equal(summary.providers.find(p => p.id === 'openrouter').keySource, 'env');
     assert.equal(summary.ready, true); assert.equal(reg.resolve({ role: 'specialist' }).model, 'z-ai/glm-4.6');
-    assert.equal(fs.statSync(path.join(dir, 'providers.json')).mode & 0o777, 0o600);
+    // POSIX file modes do not exist on Windows; where they do, keys are private to the server account.
+    if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(dir, 'providers.json')).mode & 0o777, 0o600);
     const kept = reg.update({ ...input, providers: input.providers.map(p => ({ ...p, apiKey: '' })) });
     assert.equal(kept.providers.find(p => p.id === 'anthropic').hasKey, true);
     const cleared = reg.update({ ...input, providers: input.providers.map(p => p.id === 'anthropic' ? { ...p, apiKey: '', clearKey: true } : { ...p, apiKey: '' }) });

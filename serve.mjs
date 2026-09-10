@@ -26,6 +26,8 @@ import { ToolHub } from './engine/tools.mjs';
 import { OfficeEngine } from './engine/deep-agents.mjs';
 import { chatPrompt, pmChatPrompt } from './engine/prompts.mjs';
 import { runMigrations } from './migrations.mjs';
+import { OfficeMemory } from './office-memory.mjs';
+import { ProjectStore } from './projects.mjs';
 import { KnowledgeIndex } from './knowledge-index.mjs';
 import { Agency } from './agency.mjs';
 import { AuditLog } from './audit.mjs';
@@ -49,6 +51,7 @@ const bus = new EventBus();
 let graph = { notes: 0, nodes: [], links: [], floor: [] };
 async function rebuildGraph() { try { graph = await layoutGraph(BRAIN); bus.publish('brain.updated', { notes: graph.notes }); } catch (e) { console.warn('brain graph failed:', e.message); } return graph; }
 const knowledge = new KnowledgeStore(BRAIN, rebuildGraph);
+const projects = new ProjectStore({ dataDir: DATA, office });
 const index = await new KnowledgeIndex({ dir: path.join(DATA, 'knowledge-index'), store: knowledge }).open();
 index.attach();
 let hub;
@@ -58,7 +61,7 @@ toolStore.onChange = () => { hub.load().then(() => bus.publish('office.updated',
 const officeAccess = createOfficeAccess(process.env.AO_ACCESS_KEY);
 const unlockAttempts = new Map();
 
-const engine = new OfficeEngine({ dataDir: DATA, office, models, toolHub: hub, knowledgeDir: BRAIN, knowledgeIndex: index, bus, name: cfg.name, settings: () => settings.get(),
+const engine = new OfficeEngine({ dataDir: DATA, office, models, toolHub: hub, toolLabels: () => Object.fromEntries(toolStore.list().map(t => [t.id, t.name])), memoryFactory: db => new OfficeMemory({ db, office, tools: () => toolStore.list(), projects: () => projects.summary({ tasks: () => engine.list() }), name: cfg.name }), projectFor: id => { const p = projects.get(id); return p ? { ...p, brief: projects.brief(p) } : null; }, knowledgeDir: BRAIN, knowledgeIndex: index, bus, name: cfg.name, settings: () => settings.get(),
   onChange: job => bus.publish('task.updated', listShape(job, office.get())),
   onComplete: async job => {
     if (job.kind === 'evaluation') return;
@@ -187,7 +190,22 @@ async function chat({ agent: agentId, text, taskId, kind, refs = [], remember = 
 
 /* ---------- http ---------- */
 const router = new Router();
-registerApi(router, { office, engine, models, settings, toolStore, hub, knowledge, index, bus, audit, routines: routineApi, chat, version, name: cfg.name, graph: () => graph, discover: () => mcp.discover({ timeout: 15000 }), agency: new Agency() });
+// Every change to teams, people, skills, connectors or models rewrites the company pages agents read from /memories/.
+bus.on(event => { if (event.type === 'office.updated') engine.memory?.refresh().catch(e => console.warn('memory:', e.message)); });
+// The page every agent reads about a project, rewritten when the project or its tasks change (debounced per project).
+const projectSyncTimers = new Map();
+function syncProject(id) {
+  clearTimeout(projectSyncTimers.get(id));
+  projectSyncTimers.set(id, setTimeout(async () => {
+    projectSyncTimers.delete(id);
+    const p = projects.get(id); if (!p) return;
+    try { await knowledge.writeNote(projects.pageId(p), projects.page(p, { teams: office.get().teams, tasks: engine.list().filter(j => j.projectId === id).map(j => listShape(j, office.get())), files: knowledge.list().filter(n => n.id.startsWith(projects.folder(p) + '/') && n.id !== projects.pageId(p)) })); }
+    catch (error) { console.warn('project page:', error.message); }
+  }, 1500));
+}
+bus.on(event => { if (event.type === 'task.updated' && event.data?.projectId) syncProject(event.data.projectId); });
+for (const p of projects.list()) syncProject(p.id);
+registerApi(router, { projects, syncProject, office, engine, models, settings, toolStore, hub, knowledge, index, bus, audit, routines: routineApi, chat, version, name: cfg.name, graph: () => graph, discover: () => mcp.discover({ timeout: 15000 }), agency: new Agency() });
 const oauthPage = (title, text) => `<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font:15px system-ui;padding:40px;max-width:520px"><h1 style="font-size:20px">${title}</h1><p>${text}</p><p><a href="/">Back to the office</a></p><script>setTimeout(()=>{if(window.opener){window.opener.postMessage('connector-signed-in','*');window.close();}},1200)</script>`;
 
 const server = http.createServer(async (req, res) => {
@@ -200,6 +218,8 @@ const server = http.createServer(async (req, res) => {
     const api = url.pathname.startsWith('/api/');
     if (api) res.setHeader('Cache-Control', 'no-store');
     if (api && !['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !sameOrigin(req)) return json(res, 403, { error: 'Requests must come from this office.' });
+    // Liveness for containers and monitors, before the access code: says the office is up and whether a model is ready, nothing more.
+    if (url.pathname === '/api/health' && req.method === 'GET' && !officeAccess.allowed(req)) return json(res, 200, { ok: true, version, ready: models.ready() });
     if (url.pathname === '/api/auth/status' && req.method === 'GET') return json(res, 200, { locked: !officeAccess.allowed(req), secure: secure || local, accessRequired: officeAccess.required, providersReady: models.ready() });
     if (url.pathname === '/api/auth/unlock' && req.method === 'POST') {
       if (!secure && !local) return json(res, 403, { error: 'Open this office over HTTPS before signing in.' });
@@ -244,7 +264,7 @@ if (migrated.jobs || migrated.office || migrated.skills || migrated.conversation
 await rebuildGraph();
 const indexed = index.sync(); console.log(`  Brain search: ${indexed.backend}, ${indexed.notes} notes (${indexed.indexed} refreshed, ${indexed.removed} removed)`);
 engine.recover();
-hub.load().then(() => console.log(`  connectors: ${Object.values(hub.status).filter(s => s === 'connected').length} of ${Object.keys(hub.status).length} connected`)).catch(e => console.warn('connectors:', e.message));
+hub.load().then(() => engine.memory?.refresh()).then(() => console.log(`  connectors: ${Object.values(hub.status).filter(s => s === 'connected').length} of ${Object.keys(hub.status).length} connected`)).catch(e => console.warn('connectors:', e.message));
 mcp.discover({ timeout: 15000 }).catch(() => {});
 server.listen(cfg.port, process.env.HOST || undefined, () => {
   console.log(`Cloud AI Office ${version} → http://localhost:${cfg.port}`);

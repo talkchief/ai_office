@@ -35,6 +35,8 @@ async function defaultFactory(type, options) {
   const { ChatOpenAI } = await import('@langchain/openai'); return new ChatOpenAI(options);
 }
 
+// One request to a provider, streaming included: a call that produces nothing for this long is treated as failed and retried.
+export const CALL_TIMEOUT_MS = 5 * 60 * 1000;
 export class ModelRegistry {
   constructor({ dataDir, env = process.env, factory = defaultFactory, fetchImpl = globalThis.fetch }) {
     this.file = path.join(dataDir, 'providers.json'); this.env = env; this.factory = factory; this.fetch = fetchImpl; this.modelCache = new Map();
@@ -110,14 +112,14 @@ export class ModelRegistry {
     const provider = this.provider(model.provider); if (!this.usable(provider)) fail(`Add a key for ${provider?.label || model.provider} in Settings → Models.`, 409);
     const { key } = this.keyFor(provider);
     if (provider.type === 'anthropic') {
-      const options = { model: model.id, apiKey: key, maxTokens: maxTokens || 64000, streaming, ...(provider.baseURL ? { clientOptions: { baseURL: provider.baseURL } } : {}) };
+      const options = { model: model.id, apiKey: key, maxTokens: maxTokens || 64000, streaming, clientOptions: { timeout: CALL_TIMEOUT_MS, ...(provider.baseURL ? { baseURL: provider.baseURL } : {}) } };
       if (model.supports.effort) { options.thinking = { type: 'adaptive' }; if (effort) options.outputConfig = { effort }; }
       // Refusal fallbacks are opt-out per provider; they only apply to models that support them.
       if (provider.refusalFallback && REFUSAL_FALLBACK_MODELS.has(model.id)) { options.betas = ['server-side-fallback-2026-07-01']; options.invocationKwargs = { fallbacks: 'default' }; }
       return { type: 'anthropic', options };
     }
     const reasoningEffort = effort ? (['xhigh', 'max'].includes(effort) ? 'high' : effort) : '';
-    const options = { model: model.id, apiKey: key || 'not-needed', streaming, streamUsage: true, ...(maxTokens ? { maxTokens } : {}),
+    const options = { model: model.id, apiKey: key || 'not-needed', streaming, streamUsage: true, timeout: CALL_TIMEOUT_MS, ...(maxTokens ? { maxTokens } : {}),
       configuration: { ...(provider.baseURL ? { baseURL: provider.baseURL } : {}), ...(Object.keys(provider.headers || {}).length ? { defaultHeaders: provider.headers } : {}) } };
     if (reasoningEffort && (provider.type === 'openai' || model.supports.reasoning)) options.reasoning = { effort: reasoningEffort };
     return { type: 'openai', options };

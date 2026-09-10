@@ -34,7 +34,7 @@ export function initOfficeWork(ctx) {
   panel.innerHTML = `<button type="button" id="tpanelHandle" aria-label="Expand or collapse the work panel"></button><form class="space-command">
     <div class="space-team-picker"><button id="spaceDept" type="button" aria-expanded="false" aria-controls="spaceTeamMenu"><i style="background:${teamChip(selectedTeam).chip}"></i><span>${esc(teamChip(selectedTeam).name)}</span><span class="space-chevron">⌄</span></button><div id="spaceTeamMenu" hidden><button type="button" data-pick-team="auto"><i style="background:#465B70"></i>Let the Program Manager choose</button>${DEPT_KEYS.map(k => `<button type="button" data-pick-team="${k}"><i style="background:${DEPTS[k].chip}"></i>${esc(DEPTS[k].name)}</button>`).join('')}</div></div>
     <textarea id="spaceBrief" rows="2" aria-label="Task brief" placeholder="What needs to get done?" required></textarea>
-    <details class="space-options" id="spaceOptions"><summary>Assign · due date · more teams · documents</summary><div class="space-options-grid"><label>For<select id="spaceAssignee"></select></label><label>Due<input type="datetime-local" id="spaceDue"></label><label>Priority<select id="spacePriority"><option value="1">Normal</option><option value="2">High</option><option value="0">Low</option></select></label><label>Documents<input type="file" id="spaceFiles" multiple accept=".pdf,.docx,.txt,.md,.csv"></label><div class="space-involve" id="spaceInvolve"></div></div></details>
+    <details class="space-options" id="spaceOptions"><summary>Assign · due date · more teams · documents</summary><div class="space-options-grid"><label>For<select id="spaceAssignee"></select></label><label>Due<input type="datetime-local" id="spaceDue"></label><label>Priority<select id="spacePriority"><option value="1">Normal</option><option value="2">High</option><option value="0">Low</option></select></label><label>Documents<input type="file" id="spaceFiles" multiple accept=".pdf,.docx,.txt,.md,.csv"></label><label>Project<select id="spaceProject"><option value="">None</option></select></label><div class="space-involve" id="spaceInvolve"></div></div></details>
     <div class="space-command-actions"><span>Lead-reviewed work</span><button type="submit" class="space-save-draft" data-backlog="true" title="Save without starting agents">Save idea</button><button type="submit">Add task <span aria-hidden="true">↗</span></button></div><p id="spaceHint" role="status"></p></form>
     <div class="space-now-head"><span class="space-h2">Right now</span><span class="tp-mode live" id="spaceNowMode">LIVE</span></div>
     <div id="spaceNow" class="space-now"></div>
@@ -55,15 +55,19 @@ export function initOfficeWork(ctx) {
     open() {
       open('projects', 'Program Manager');
       const mine = jobs.filter(j => j.autoRoute).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
-      content.innerHTML = `<p>Give the Program Manager anything that spans teams, or when you are not sure who should own it. It brings in the right leads and closes the task once they approve the work.</p><form id="spacePmForm"><label>What needs to get done?<textarea name="text" rows="4" required></textarea></label><div class="space-actions"><button type="submit">Send to the Program Manager ↗</button></div></form><h3>The Program Manager's tasks</h3>${mine.map(j => `<button class="space-note" data-job="${j.id}"><b>${esc(j.title)}</b><span>${labels[j.state] || esc(j.state)}${j.progressLine ? ' · ' + esc(j.progressLine) : ''}</span></button>`).join('') || '<p>None yet.</p>'}`;
+      content.innerHTML = `<p>Give the Program Manager anything that spans teams, or when you are not sure who should own it. It brings in the right leads and closes the task once they approve the work.</p><form id="spacePmForm"><label>What needs to get done?<textarea name="text" rows="4" required></textarea></label><div class="space-actions"><button type="submit">Send to the Program Manager ↗</button></div></form><h3>Projects</h3>${projectsOpen.length ? `<div class="space-pm-projects">${projectsOpen.map(p => `<span>${esc(p.name)}${p.status === 'paused' ? ' · paused' : ''}</span>`).join('')}</div>` : '<p>No projects yet.</p>'}<p><a href="#/settings/projects" class="space-text-action">Define a project: charter, timeline, files ↗</a></p><h3>The Program Manager's tasks</h3>${mine.map(j => `<button class="space-note" data-job="${j.id}"><b>${esc(j.title)}</b><span>${labels[j.state] || esc(j.state)}${j.progressLine ? ' · ' + esc(j.progressLine) : ''}</span></button>`).join('') || '<p>None yet.</p>'}`;
       content.querySelectorAll('[data-job]').forEach(b => b.onclick = () => showTask(b.dataset.job));
-      $('spacePmForm').onsubmit = async event => { event.preventDefault(); const button = event.target.querySelector('button'); button.disabled = true; try { const job = await api('/tasks', 'POST', { dept: 'auto', depts: 'auto', text: event.target.elements.text.value }); await refresh(); await showTask(job.id); } catch (error) { feedback(error.message, true); button.disabled = false; } };
+      $('spacePmForm').onsubmit = async event => { event.preventDefault(); const button = event.target.querySelector('button'); button.disabled = true; try { const job = await api('/tasks', 'POST', { dept: 'auto', depts: 'auto', text: event.target.elements.text.value }); await refresh(); projectUI.open(); feedback(`Task received: ${job.title}. Open it from the list when you want to follow the plan.`); } catch (error) { feedback(error.message, true); button.disabled = false; } };
     },
     refresh: async () => {},
     activity: () => { const j = jobs.find(j => j.autoRoute && ['planning', 'working', 'reviewing'].includes(j.state)); return j ? { state: 'running', title: j.title } : null; },
   };
   const inbox = initInbox({ api, openTask: id => showTask(id), openNote: id => settings.openNote(id), retryTask: id => api(`/tasks/${id}/retry`, 'POST', {}) });
-  const settings = initSettings({ api, openTask: id => { settings.close(); showTask(id); }, brain: ctx.brain, syncBrain, onShow: () => { if (dialog.open) close(); inbox?.close(); } });
+  let rosterChanged = false, projectsOpen = [];
+  // Open projects for the task form; refreshed with the board.
+  const fillProjects = () => { const sel = $('spaceProject'); if (!sel) return; const current = sel.value; sel.innerHTML = '<option value="">None</option>' + projectsOpen.map(p => `<option value="${esc(p.id)}">${esc(p.name)}${p.status === 'paused' ? ' (paused)' : ''}</option>`).join(''); if (projectsOpen.some(p => p.id === current)) sel.value = current; };
+  const reloadForRoster = () => { if (!rosterChanged || settings.isOpen() || dialog.open || taskDirty) return; rosterChanged = false; $('spaceHint').textContent = 'The roster changed. Refreshing the office…'; setTimeout(() => location.reload(), 600); };
+  const settings = initSettings({ api, openTask: id => { settings.close(); showTask(id); }, brain: ctx.brain, syncBrain, onShow: () => { if (dialog.open) close(); inbox?.close(); }, onHide: () => setTimeout(reloadForRoster, 50) });
   const manage = document.createElement('div'); manage.className = 'space-manage';
   manage.innerHTML = `<button id="spaceManage" type="button" aria-label="Manage office" aria-expanded="false" aria-controls="spaceManageMenu"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.5" fill="var(--cream)"/><circle cx="15" cy="17" r="2.5" fill="var(--cream)"/></svg><span>Manage</span></button><div id="spaceManageMenu" hidden><span class="space-menu-label">YOUR OFFICE</span><button id="spaceProjects" type="button">Projects <span>↗</span></button><button id="spaceTeams" type="button">Teams <span>↗</span></button><button id="spaceTools" type="button">Tools & MCPs <span>↗</span></button><button id="spaceSkills" type="button">Skills <span>↗</span></button><button id="spaceReports" type="button">Reports <span>↗</span></button><button id="spaceBrain" type="button">Brain <span>↗</span></button><div class="space-menu-divider"></div></div>`;
   $('claudeConnect').before(manage); $('spaceManageMenu').appendChild($('claudeConnect'));
@@ -101,10 +105,10 @@ export function initOfficeWork(ctx) {
         refs.push((await api('/knowledge/upload', 'POST', { folder: 'Projects', name: file.name, data })).id);
       }
       const auto = selectedTeam === 'auto', involve = [...$('spaceInvolve').querySelectorAll('input:checked')].map(el => el.value), due = $('spaceDue').value;
-      const job = await api('/tasks', 'POST', { dept: auto ? 'auto' : selectedTeam, ...(auto ? { depts: 'auto' } : involve.length ? { depts: [selectedTeam, ...involve] } : {}), text: $('spaceBrief').value + (refs.length ? `\n\nReference documents in the Brain: ${refs.join(', ')}` : ''), assignee: $('spaceAssignee').value || undefined, dueAt: due ? new Date(due).getTime() : undefined, priority: Number($('spacePriority').value), backlog: !!event.submitter.dataset.backlog });
+      const job = await api('/tasks', 'POST', { dept: auto ? 'auto' : selectedTeam, ...(auto ? { depts: 'auto' } : involve.length ? { depts: [selectedTeam, ...involve] } : {}), text: $('spaceBrief').value + (refs.length ? `\n\nReference documents in the Brain: ${refs.join(', ')}` : ''), assignee: $('spaceAssignee').value || undefined, dueAt: due ? new Date(due).getTime() : undefined, priority: Number($('spacePriority').value), backlog: !!event.submitter.dataset.backlog, projectId: $('spaceProject').value || undefined });
       $('spaceDue').value = ''; $('spaceFiles').value = ''; $('spacePriority').value = '1'; $('spaceOptions').open = false; fillOptions();
-      $('spaceBrief').value = ''; $('spaceHint').textContent = job.state === 'backlog' ? 'Idea saved. Start it when you are ready.' : 'Task received. The lead will create the plan.';
-      await refresh(); await showTask(job.id);
+      $('spaceBrief').value = ''; $('spaceHint').textContent = job.state === 'backlog' ? 'Idea saved. Start it when you are ready.' : 'Task received. The lead will create the plan; open the task from the list on the right to follow it.';
+      await refresh();
     } catch (error) { $('spaceHint').textContent = error.message; if (/model key/i.test(error.message)) settings.open('models'); }
     finally { button.disabled = false; }
   };
@@ -122,16 +126,19 @@ export function initOfficeWork(ctx) {
     const off = $('spaceOffline'); if (off) { off.hidden = !connectionStale; if (connectionStale) off.textContent = `Lost the server${ago != null ? ' ' + ago + 's ago' : ''}. Showing the last known state; work animations paused until it’s back.`; }
   }
   setInterval(renderNow, 1500);
-  function scopedJobs() { const dept = getFocused(); return dept && dept !== 'brain' ? jobs.filter(j => j.dept === dept) : jobs; }
+  const involves = (j, key) => (!j.autoRoute && (j.dept === key || (j.depts || []).includes(key))) || (j.runs || []).some(r => r.role === 'lead' && r.dept === key);
+  function scopedJobs() { const dept = getFocused(); return dept && dept !== 'brain' ? jobs.filter(j => involves(j, dept)) : jobs; }
   function render() {
     activityByAgent.clear();
     for (const job of [...jobs].reverse()) {
       if (job.state === 'done') {
-        for (const id of [job.agent,...job.subtasks.map(s=>s.agent).filter(Boolean)]) activityByAgent.set(id,{phase:'done',title:job.title,jobId:job.id});
-      } else if (!['cancelled','backlog'].includes(job.state)) for(const step of job.subtasks) if(step.state==='done' && step.agent) activityByAgent.set(step.agent,{phase:'submitted',title:step.title,jobId:job.id});
+        if (unseenResult(job)) for (const id of [job.agent,...job.subtasks.map(s=>s.agent).filter(Boolean)]) activityByAgent.set(id,{phase:'done',title:job.title,jobId:job.id});
+      } else if (!['cancelled','backlog'].includes(job.state)) for(const step of job.subtasks) if(step.state==='done' && step.agent && (job.runs||[]).some(r=>r.role==='lead'&&r.state==='working'&&r.dept===R[step.agent]?.a.dept)) activityByAgent.set(step.agent,{phase:'submitted',title:step.title,jobId:job.id});
     }
     for (const job of jobs) {
       if (['planning','reviewing'].includes(job.state)) activityByAgent.set(job.agent,{phase:job.state,title:job.title,jobId:job.id});
+      // A lead doing its own work (reading the calendar, checking the inbox) is working, not free.
+      if (job.state==='working') for (const r of job.runs||[]) if (r.role==='lead'&&r.state==='working'&&r.agent&&!(job.runs||[]).some(x=>x.role==='specialist'&&x.state==='working'&&x.dept===r.dept)) activityByAgent.set(r.agent,{phase:'working',title:job.title,jobId:job.id});
       if (!['cancelled','done'].includes(job.state)) for (const step of job.subtasks) if (step.state==='working'&&step.agent) activityByAgent.set(step.agent,{phase:'working',title:step.title,jobId:job.id});
     }
     const scope = scopedJobs();
@@ -150,9 +157,15 @@ export function initOfficeWork(ctx) {
       const lead = nameOf(j.team?.lead || (R[j.agent] && R[j.agent].a.lead ? j.agent : null) || j.agent);
       const loading = j.state === 'planning' && !j.subtasks.length;
       const context = j.state === 'done' ? `${esc(lead)} verified · ${j.resultPreview ? 'read' : 'open'} ↗` : j.state === 'cancelled' ? 'Task closed' : j.state === 'backlog' ? 'Saved for later' : loading ? `${esc(lead)} is planning · reading the Brain · usually under a minute` : j.state === 'blocked' ? (j.error ? esc(j.error.slice(0, 90)) : 'Open to resolve the blocker') : j.state === 'waiting' ? `${esc(lead)} verified · ${j.review?.checks?.length ? j.review.checks.filter(c => c.passed).length + '/' + j.review.checks.length + ' checks passed · ' : ''}ready for your approval` : j.subtasks.length ? `${j.completedSteps}/${j.subtasks.length} steps in · ${labels[j.state].toLowerCase()}` : 'Awaiting the lead’s plan';
+      // A task handed across teams belongs to all of them; the card says so and names who is on it right now.
+      // The teams that actually worked, in the order they joined; a Program-Manager task lists every team as possible, which is not the same thing.
+      const worked = [...new Set((j.runs || []).filter(r => r.role === 'lead' && r.dept).map(r => r.dept))];
+      const teamsLine = (worked.length ? worked : j.autoRoute ? [] : [j.dept]).map(d => esc(DEPTS[d]?.name || (d === j.dept ? j.teamName : d) || d)).join(' → ') || 'Program Manager';
+      const onIt = terminal || ['backlog', 'queued', 'waiting'].includes(j.state) ? [] : [...new Set((j.runs || []).filter(r => r.state === 'working' && r.agent).map(r => nameOf(r.agent)).filter(Boolean))];
       const actions = j.state === 'waiting' ? `<span class="space-card-actions">${j.review?.approved || j.pendingActions?.length ? `<button type="button" data-inline="approve" data-job-id="${j.id}">APPROVE</button>` : ''}<button type="button" class="secondary" data-inline="changes" data-job-id="${j.id}">REQUEST CHANGES</button><button type="button" class="space-text-action" data-inline="read" data-job-id="${j.id}">Read ↗</button></span>`
-        : j.state === 'blocked' ? `<span class="space-card-actions"><button type="button" data-inline="retry" data-job-id="${j.id}">RETRY</button><button type="button" class="secondary" data-inline="changes" data-job-id="${j.id}">FIX & RETRY</button><button type="button" class="space-text-action" data-inline="cancel" data-job-id="${j.id}">Cancel</button></span>` : '';
-      return `<div class="space-job ${j.state}${loading ? ' loading' : ''}" data-job="${j.id}" role="button" tabindex="0"><span class="space-card-top"><span class="space-state">${j.state === 'done' ? 'Ready' : loading ? 'Planning' : labels[j.state] || esc(j.state)}${j.priority === 2 ? ' · Priority' : ''}${j.kind === 'evaluation' ? ' · Test' : ''}</span><time>${dateOf(j)}</time></span><strong>${esc(j.title)}</strong>${!terminal && j.state !== 'backlog' ? chain(j) : ''}${j.resultPreview && j.state === 'done' ? `<span class="space-result-excerpt">${esc(j.resultPreview)}</span>` : ''}<span class="space-card-context"><b>${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)}</b> · ${context}</span>${actions}</div>`;
+        : j.state === 'blocked' ? `<span class="space-card-actions"><button type="button" data-inline="retry" data-job-id="${j.id}">RETRY</button><button type="button" class="secondary" data-inline="changes" data-job-id="${j.id}">FIX & RETRY</button><button type="button" class="space-text-action" data-inline="cancel" data-job-id="${j.id}">Cancel</button></span>`
+        : ['queued', 'planning', 'working', 'reviewing', 'backlog'].includes(j.state) ? `<span class="space-card-actions"><button type="button" class="space-text-action" data-inline="cancel" data-job-id="${j.id}">${j.state === 'backlog' ? 'Discard' : 'Cancel'}</button></span>` : '';
+      return `<div class="space-job ${j.state}${loading ? ' loading' : ''}" data-job="${j.id}" role="button" tabindex="0"><span class="space-card-top"><span class="space-state">${j.state === 'done' ? 'Ready' : loading ? 'Planning' : labels[j.state] || esc(j.state)}${j.priority === 2 ? ' · Priority' : ''}${j.kind === 'evaluation' ? ' · Test' : ''}</span><time>${dateOf(j)}</time></span><strong>${esc(j.title)}</strong>${j.projectName ? `<span class="space-card-project">${esc(j.projectName)}</span>` : ''}${!terminal && j.state !== 'backlog' ? chain(j) : ''}${j.resultPreview && j.state === 'done' ? `<span class="space-result-excerpt">${esc(j.resultPreview)}</span>` : ''}<span class="space-card-context"><b>${teamsLine}</b> · ${onIt.length ? esc(onIt.join(' & ')) + ' on it · ' : ''}${context}</span>${actions}</div>`;
     };
     const groups = [['attention', 'Your call', ['waiting', 'blocked']], ['results', 'Ready to read', ['done']], ['active', 'In progress', ['queued', 'planning', 'working', 'reviewing', 'saving']], ['ideas', 'Ideas', ['backlog']], ['history', 'Closed tasks', ['cancelled']]];
     $('spaceJobs').innerHTML = groups.map(([id, title, states]) => {
@@ -177,7 +190,7 @@ export function initOfficeWork(ctx) {
     $('spaceJobs').querySelectorAll('[data-job]').forEach(b => { b.onclick = e => { if (e.target.closest('[data-inline]')) return; showTask(b.dataset.job); }; b.onkeydown = e => { if (e.key === 'Enter') showTask(b.dataset.job); }; });
     renderNow();
     for (const key of DEPT_KEYS) {
-      const list = jobs.filter(j => j.dept === key);
+      const list = jobs.filter(j => involves(j, key));
       const values = { doing: list.filter(j => ['planning', 'working', 'reviewing'].includes(j.state)).length, next: list.filter(j => j.state === 'queued').length, done: list.filter(j => j.state === 'done').length };
       for (const [state, count] of Object.entries(values)) document.querySelectorAll(`[data-tk="${key}-${state}"]`).forEach(el => el.textContent = count);
     }
@@ -186,7 +199,7 @@ export function initOfficeWork(ctx) {
   async function refresh() {
     if (refreshing) return; refreshing = true;
     try {
-      const before = jobs.filter(j => j.state === 'done').length; jobs = (await api('/tasks')).map(uiJob); lastRefreshAt = Date.now(); if(connectionStale){$('spaceHint').textContent='Connection restored.';connectionStale=false;} for (const j of jobs) for (const a of (j.agents || [])) AGENT_NAMES[a.id] = a.name; render(); if (jobs.filter(j => j.state === 'done').length !== before) await syncBrain();
+      const before = jobs.filter(j => j.state === 'done').length; jobs = (await api('/tasks')).map(uiJob); try { projectsOpen = await api('/projects/open'); fillProjects(); } catch {} lastRefreshAt = Date.now(); if(connectionStale){$('spaceHint').textContent='Connection restored.';connectionStale=false;} for (const j of jobs) for (const a of (j.agents || [])) AGENT_NAMES[a.id] = a.name; render(); if (jobs.filter(j => j.state === 'done').length !== before) await syncBrain();
       await projectUI.refresh();
       if (agentOpen) renderAgent(agentOpen);
       if (dialog.open && modalKind === 'reports' && document.activeElement?.id !== 'spaceReportPeriod') await showReports(false);
@@ -220,8 +233,8 @@ export function initOfficeWork(ctx) {
     });
     content.querySelector('[role=tablist]').onkeydown=event=>{
       if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
-      event.preventDefault();const tabs=['result','work','review'];const index=tabs.indexOf(taskTab);
-      const next=event.key==='Home'?0:event.key==='End'?2:(index+(event.key==='ArrowRight'?1:2))%3;
+      event.preventDefault();const tabs=['result','work','review','artifacts'];const index=tabs.indexOf(taskTab);
+      const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+(event.key==='ArrowRight'?1:tabs.length-1))%tabs.length;
       content.querySelector(`[data-task-tab="${tabs[next]}"]`).click();
     };
     content.querySelectorAll('[data-output-anchor]').forEach(link=>link.onclick=event=>{event.preventDefault();$(link.dataset.outputAnchor)?.scrollIntoView({behavior:'smooth',block:'start'});});
@@ -264,8 +277,14 @@ export function initOfficeWork(ctx) {
       if(reveal&&(unseenResult(job)||['blocked','waiting'].includes(job.state)))api(`/tasks/${id}/seen`,'POST',{}).then(()=>{const local=jobs.find(j=>j.id===id);if(local){local.seenAt=Date.now();render();}}).catch(()=>{});
     }catch(error){feedback(error.message,true);}
   }
+  function acknowledgeAgent(id) {
+    const mine = jobs.filter(j => unseenResult(j) && (j.agent === id || (j.subtasks || []).some(s => s.agent === id)));
+    if (!mine.length) return;
+    for (const j of mine) { j.seenAt = Date.now(); api(`/tasks/${j.id}/seen`, 'POST', {}).catch(() => {}); }
+    render();
+  }
   function renderAgent(id) {
-    agentOpen = id;
+    agentOpen = id; acknowledgeAgent(id);
     const assigned = jobs.filter(j => j.agent === id || j.subtasks.some(s => s.agent === id || s.eligible?.includes(id)));
     $('mNow').innerHTML = `<b>${assigned.some(j => ['working', 'planning', 'reviewing'].includes(j.state)) ? 'Assigned work' : 'Ready for your next task'}</b>`;
     $('mStats').innerHTML = ''; $('mChart').hidden = true;
@@ -495,25 +514,26 @@ export function initOfficeWork(ctx) {
   }
   function chatSent(id) { if (chat.agent === id) { chat.refs = []; chat.kind = 'question'; chat.remember = ''; renderChatBar(); } }
   async function loadHistory(id) { const rows = await api('/threads/' + encodeURIComponent('agent:' + id)); return rows.slice(-30).map(m => ({ who: m.role === 'ceo' ? 'user' : 'agent', text: m.text, taskId: m.role === 'ceo' ? undefined : m.jobId || undefined })); }
-  const rowHTML = key => { const list = jobs.filter(j => j.dept === key); return `<div class="b-tasks"><span>ACTIVE<b data-tk="${key}-doing">${list.filter(j => ['planning','working','reviewing'].includes(j.state)).length}</b></span><span>QUEUED<b data-tk="${key}-next">${list.filter(j=>j.state==='queued').length}</b></span><span>APPROVED<b data-tk="${key}-done">${list.filter(j=>j.state==='done').length}</b></span></div>`; };
+  const rowHTML = key => { const list = jobs.filter(j => involves(j, key)); return `<div class="b-tasks"><span>ACTIVE<b data-tk="${key}-doing">${list.filter(j => ['planning','working','reviewing'].includes(j.state)).length}</b></span><span>QUEUED<b data-tk="${key}-next">${list.filter(j=>j.state==='queued').length}</b></span><span>APPROVED<b data-tk="${key}-done">${list.filter(j=>j.state==='done').length}</b></span></div>`; };
   for(const key of DEPT_KEYS)deptRT[key].apprRow.insertAdjacentHTML('beforebegin',rowHTML(key));
   let liveStatus = 'connecting', taskTimer = null;
   const refreshOpenTask = id => { if (dialog.open && modalKind === 'task' && modalTask === id && !taskDirty) { clearTimeout(taskTimer); taskTimer = setTimeout(() => showTask(id, false), 500); } };
   const onEvent = (type, data) => {
     lastRefreshAt = Date.now();
+    settings.onEvent?.(type, data);
     if (type.startsWith('notification.')) inbox.onEvent(type, data);
     else if (type === 'task.updated') { const j = uiJob(data), i = jobs.findIndex(x => x.id === j.id); if (i >= 0) jobs[i] = j; else jobs.unshift(j); render(); if (agentOpen) renderAgent(agentOpen); refreshOpenTask(j.id); }
     else if (['task.state', 'task.live', 'task.event'].includes(type)) refreshOpenTask(data.id);
     else if (type === 'brain.updated') syncBrain().catch(() => {});
-    else if (type === 'resync' || type === 'office.updated') refresh();
+    else if (type === 'resync' || type === 'office.updated') { if (type === 'office.updated' && data?.area === 'office') { rosterChanged = true; reloadForRoster(); } refresh(); }
   };
   const poll = () => setTimeout(async () => { await refresh(); poll(); }, liveStatus === 'live' ? 15000 : 2000);
-  officeReady.then(async()=>{connectLive({ onEvent, onStatus: status => { liveStatus = status; } });poll();try{const health=await api('/health');onLive?.(health);await syncBrain();await refresh();const usage=await api('/usage');onUsage?.(usage);}catch(error){$('spaceHint').textContent=error.message;}});
+  officeReady.then(async()=>{connectLive({ onEvent, onStatus: status => { const was = liveStatus; liveStatus = status; if (status === 'live' && was !== 'live') refresh(); } });poll();try{const health=await api('/health');onLive?.(health);await syncBrain();await refresh();const usage=await api('/usage');onUsage?.(usage);}catch(error){$('spaceHint').textContent=error.message;}});
   const noop=()=>{};
-  return { chatContext, chatInput, chatPickerKey, chatSent, loadHistory, openInbox: () => inbox.open(), needsYouCount: () => inbox.counts.needsYou, settings, get tasks(){return jobs.flatMap(j=>[...j.subtasks.filter(s=>s.agent).map(s=>({...s,agent:s.agent,state:s.state==='working'?'doing':s.state})),...(['planning','reviewing'].includes(j.state)?[{agent:j.agent,state:'doing'}]:[])]);},
+  return { chatContext, chatInput, chatPickerKey, chatSent, loadHistory, openInbox: () => inbox.open(), needsYouCount: () => inbox.counts.needsYou, settings, get tasks(){return jobs.flatMap(j=>[...j.subtasks.filter(s=>s.agent).map(s=>({...s,agent:s.agent,state:s.state==='working'?'doing':s.state})),...(['planning','reviewing'].includes(j.state)?[{agent:j.agent,state:'doing'}]:[]),...(j.state==='working'?(j.runs||[]).filter(r=>r.role==='lead'&&r.state==='working'&&r.agent&&!(j.runs||[]).some(x=>x.role==='specialist'&&x.state==='working'&&x.dept===r.dept)).map(r=>({agent:r.agent,state:'doing'})):[])]);},
     projectActivity:()=>projectUI.activity(),openProjects:()=>projectUI.open(),agentActivity:id=>activityByAgent.get(id),job:id=>jobs.find(j=>j.id===id),jobs:()=>jobs,tick:noop,panelWidth:()=>panel.offsetWidth,onFocusChange:key=>{if(DEPTS[key]&&key!=='brain'){selectedTeam=key;setTimeout(fillOptions);$('spaceDept').innerHTML=`<i style="background:${DEPTS[key].chip}"></i><span>${esc(DEPTS[key].name)}</span><span class="space-chevron">⌄</span>`;}render();},rowHTML,
     isLive:()=>true,isOpen:()=>dialog.open,open:()=>{open('board','Office work');content.innerHTML=jobs.map(j=>`<button class="space-note" data-job="${j.id}"><b>${esc(j.title)}</b><span>${labels[j.state]} · ${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)}</span></button>`).join('')||'<p>No tasks yet.</p>';content.querySelectorAll('[data-job]').forEach(b=>b.onclick=()=>showTask(b.dataset.job));},
-    toggle(){dialog.open?close():this.open();},close,openFor(){this.open();},openTask:showTask,refresh,renderAgent,railFor:id=>{agentOpen=id;const el=$('mRt');if(el)el.hidden=true;if(chat.agent!==id){chat.agent=id;chat.refs=[];chat.kind='question';chat.remember='';}closePicker();renderChatBar();},syncPills:noop,
+    toggle(){dialog.open?close():this.open();},close,openFor(){this.open();},openTask:showTask,refresh,renderAgent,railFor:id=>{agentOpen=id;acknowledgeAgent(id);const el=$('mRt');if(el)el.hidden=true;if(chat.agent!==id){chat.agent=id;chat.refs=[];chat.kind='question';chat.remember='';}closePicker();renderChatBar();},syncPills:noop,
     onStuck:noop,onResolve:noop,pendingReject:()=>false,rejectLive:noop,resolveLive:noop,revise:()=>false,addTask:()=>null,routines:[],
     handleChat:async(id,text)=>{const match=text.match(/^\s*(?:add\s+(?:a\s+)?task|task|todo)\s*:\s*(.+)$/is);if(match){try{const job=await api('/tasks','POST',{dept:R[id].a.dept,text:match[1]});await refresh();return `Task received by the team lead: ${job.title}. Open Work to follow the plan and verification.`;}catch(error){return error.message;}}return null;},
   };

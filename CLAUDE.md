@@ -24,7 +24,8 @@ Every change through the API is validated (a bad edit is refused with a sentence
 
 For a running office, read `GET /api/office`, change what the owner asked for, and send the whole object back with `PUT /api/office`. A person has `id, department, name, role, does, brief, model, effort, tools, inheritTools, skills, rules`; a team has `id, name, lead, purpose, instructions, criteria, guardrails, checks, tools, skills, models {lead, specialist, review}, maxParallelRuns (1–4), maxReworkRounds (0–5), completionApproval, rules, tests`.
 
-- `does` is the person's job description, read before every assignment. `brief` is the owner's standing instructions to that person (up to 2,000 characters). Anything longer, or with steps and a template, is a skill.
+- `does` is the person's job description, read before every assignment. `brief` is the owner's standing instructions to that person (up to 2,000 characters). Both are required: a person without them is refused with a sentence. Anything longer, or with steps and a template, is a skill.
+- A team's `purpose` and `instructions` are required too (its charter). The six default teams ship with charters in `office-charters.mjs` and every default seat ships with a brief in `office.agents.json`; an older office gets them filled once, only where a field was empty. When the CEO adds a team or a person, they write these; hiring from the Agency fills them from the persona.
 - `model` is a model id from Settings → Models & keys, or empty for the team's, then the role's default.
 - `rules` are the owner's standing rules in their own words. The office adds them when the owner ticks "remember" on a correction. Only remove one when the owner asks.
 - Teams can be added, renamed and removed (up to 10 teams; a team is a lead and one to six specialists). A team with unfinished work cannot be removed.
@@ -45,9 +46,17 @@ Decide brief or skill first: a paragraph with no steps and no template is a `bri
 
 Skill folders in `<brain>/Agents Office/skills/` are imported once, when an older office is upgraded.
 
+## Who knows what
+
+The Program Manager sees the whole company in its prompt: every team's purpose, people, tools and skills. A lead sees only its own team and its own tools, and hands off through the Program Manager when a task needs another team's expertise or a tool it does not have; a specialist is told to stop rather than substitute a tool. The same pages live in long-term memory (`office-memory.mjs`, a LangGraph store on `workflows.sqlite`), mounted by role: the Program Manager's file system carries `/memories/company/org-chart.md` and `/memories/company/connectors.md`, a team's carries only `/memories/team/team.md`, and everyone shares `/memories/notes/`. The pages are rewritten on every change to teams, people, skills or connectors, so a task already running sees the change; they are read-only to agents. Every worker a lead can delegate to is a named person on its team: Deep Agents' built-in general-purpose worker is switched off for every provider (`engine/deep-agents.mjs`). A hire from the Agency always arrives with a brief; a persona file without rules gets one derived from its description and method.
+
 ## The Brain
 
 The company's shared knowledge, in the folder named by `brain` in `office.config(.local).json` (default `./brain`, or `AO_BRAIN`). The Program Manager, leads and specialists search it before and during work and cite the notes they used. Owners upload documents (PDF, Word, text, Markdown, CSV; 25 MB each) into folders such as Company, Projects, Departments. Uploading a file with the same name replaces it and archives the old copy. Finished tasks land in `Agents Office/`, digests in `Digests/`. The search index lives in `data/knowledge-index/`; Settings → Brain can rebuild it.
+
+## Projects: the big pieces of work
+
+A project (Settings → Projects, or `POST/PUT /api/projects`, stored in `data/projects.json` by `projects.mjs`) has a name, a purpose, a charter, owning teams, start and target dates, milestones and a Brain folder `Projects/<id>/` for its files (`POST /api/projects/:id/upload`). The office keeps `Projects/<id>/project.md` current: charter, timeline, files and what the project's tasks delivered. A task created with `projectId` starts with a PROJECT block (purpose, charter, next milestone, page path); the Program Manager reads the page before planning and passes the project to every lead; `/memories/company/projects.md` lists every open project. Owning teams are a hint, not a fence: the Program Manager brings in any team a task needs. Archived projects take no new tasks.
 
 ## Routines: tasks on the office's own clock
 
@@ -69,15 +78,16 @@ The server re-reads the file every 20 seconds. Run state lives in `data/routines
 
 ## Connectors and approvals
 
-Connectors are MCP servers the office connects to itself (Settings → Tools & connectors): add by URL or local command, sign in with OAuth in a new window, then give teams access. A person can use a smaller set than the team. Connectors found in this machine's Claude Code can be imported, then signed in again; the office does not use the Claude Code login.
+Connectors are MCP servers the office connects to itself (Settings → Tools & connectors): add by URL or local command, sign in with OAuth in a new window, then give teams access. A person inherits the team's tools, can be limited to a smaller set, or can be given a tool the team does not have (`tools` on the person); the lead and the Program Manager are told who has what, so work that needs the tool goes to that person rather than to another team. Connectors found in this machine's Claude Code can be imported, then signed in again; the office does not use the Claude Code login.
 
-Any tool that sends, posts, pays, deletes or changes something outside the office pauses for the owner's approval and runs once after it. The office decides from the tool's description and name; Settings → Tools & connectors → Approval rules overrides that per tool. Agents never get a shell or the server's files; each task has its own scratch workspace, and the Brain is read-only to them.
+Any tool that sends, posts, pays, deletes or changes something outside the office pauses for the owner's approval and runs once after it. The office decides from the tool's description and name; Settings → Tools & connectors → Approval rules overrides that per tool. Agents never get a shell or the server's files; each task has its own scratch workspace, and the Brain is read-only to them. They write Markdown, text, CSV, JSON and HTML into that workspace, and turn a Markdown file into a PDF with `export_pdf` or a PowerPoint deck with `export_pptx` (engine/documents.mjs: Markdown to HTML with a print stylesheet, printed by Chrome or Edge on the machine through playwright-core, or by pdfkit when no browser is installed; decks through pptxgenjs, one slide per `##` heading). The task page's Artifacts tab lists the workspace files with download links (`GET /api/tasks/:id/file?path=`). A transient provider failure (a 5xx, an overload, a dropped connection) is retried once automatically, thirty seconds later, before the task blocks. A model call that stays silent for five minutes fails and is retried instead of running to the task limit.
 
 ## Everything else
 
 - `npm run check` is the loop: build, configuration checks, the whole test suite, and an API smoke test on throwaway data. Run it after any code change and fix what is red. `CHECK_LIVE=1 npm run check` also runs one real task through the configured provider.
 - `npm test` runs the test suite alone (Node 22).
-- `npm run check` is the loop. Run it after any change to code; fix what is red.
+- `npm run check` is the loop. Run it after any change to code; fix what is red. CI (`.github/workflows/check.yml`) runs it on Linux and Windows; the suite is green on both.
+- `npm run backup` / `npm run backups` / `npm run restore -- <name>` (scripts/backup.mjs) copy and restore `data/` and the Brain. The `Dockerfile` ships the office with a Chromium for PDFs; `AO_CHROME` names the browser binary elsewhere.
 - The 3D office is `src/scene/` (React Three Fiber; `index.jsx` returns the handle `src/main.js` uses). Change the building in `office.jsx` / `furniture.js`, the figures in `person.js`, their behaviour in `sim.js`, walking in `nav.js`, the wall screens in `screens.js`, the light in `daylight.js`. `node scripts/screenshots.mjs` shows the result headless.
 - `README.md` says what the product does. Keep it true to the code.
 - Release: `node scripts/release.mjs --push` (owner only).

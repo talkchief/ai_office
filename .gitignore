@@ -7,3 +7,8 @@ office.agents.local.json
 brain/Agents Office/
 .DS_Store
 *.backup-*
+# Written by a running office into the sample Brain, and local backups
+brain/.archive/
+brain/Digests/
+brain/Projects/
+backups/

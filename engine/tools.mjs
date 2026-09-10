@@ -7,6 +7,11 @@ import { z } from 'zod';
 const OUTBOUND = /(^|_)(send|create|update|delete|remove|post|publish|pay|charge|refund|write|move|archive|reply|forward|invite|cancel|trash|label|modify|edit|upload|share|schedule|book|transfer|submit|approve|reject|merge|close|resolve|assign)(_|$)/i;
 // Same ids as mcp.mjs (case kept): teams already reference connectors as e.g. claude_ai_Gmail.
 export const toolId = name => String(name).replace(/[^A-Za-z0-9_]+/g, '_');
+// What one person may call: the team's tools (or the subset they list when not inheriting) plus their own grants.
+// `known` limits personal grants to tools that exist (the connector ids plus 'web'); without it every listed id counts.
+export const agentToolIds = (team, agent, known = null) => { const own = (agent?.tools || []).filter(id => !known || known.has(id)); return [...new Set([...(team?.tools || []).filter(id => agent?.inheritTools !== false || own.includes(id)), ...own])]; };
+// A person's grants beyond the team's: what the lead needs to know to delegate well.
+export const extraToolIds = (team, agent, known = null) => (agent?.tools || []).filter(id => !(team?.tools || []).includes(id) && (!known || known.has(id)));
 
 // A tool is outbound unless the server marks it read-only and the CEO has not listed it as outbound.
 export function isOutbound(t, { outboundTools = [], readOnlyTools = [] } = {}) {
@@ -42,45 +47,98 @@ export async function assertPublicUrl(raw, lookup = dns.lookup) {
 const toText = html => html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<noscript[\s\S]*?<\/noscript>/gi, ' ').replace(/<br\s*\/?>|<\/(p|div|h\d|li|tr)>/gi, '\n').replace(/<[^>]+>/g, ' ')
   .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n\n').trim();
 
+// A page that cannot be fetched is a result the agent reads and works around, never an error that ends the run.
+const fetchReason = error => error?.name === 'TimeoutError' || error?.name === 'AbortError' ? 'no reply within 20 seconds' : error?.cause?.code || error?.cause?.message || error?.message || 'network error';
 export function webFetchTool({ fetchImpl = globalThis.fetch, lookup } = {}) {
   return tool(async ({ url }) => {
-    const target = await assertPublicUrl(url, lookup);
-    const res = await fetchImpl(target, { redirect: 'manual', signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'TalkchiefAISpace/1.0 (+research)' } });
-    if (res.status >= 300 && res.status < 400) return `Redirected to ${res.headers.get('location')}. Fetch that URL if it is relevant.`;
+    let target; try { target = await assertPublicUrl(url, lookup); } catch (error) { return `Could not fetch ${url}: ${error.message}`; }
+    let res; try { res = await fetchImpl(target, { redirect: 'manual', signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'TalkchiefAISpace/1.0 (+research)' } }); }
+    catch (error) { return `Could not fetch ${target.href}: ${fetchReason(error)}. Try another address or another source.`; }
+    if (res.status >= 300 && res.status < 400) { const to = res.headers.get('location') || ''; let next = to; try { next = new URL(to, target).href; } catch {} return `Redirected to ${next}. Fetch that URL if it is relevant.`; }
     if (!res.ok) return `The page returned HTTP ${res.status}.`;
     const type = res.headers.get('content-type') || '';
     if (!/text|json|xml|html/.test(type)) return `The page is ${type || 'binary'} and cannot be read as text.`;
-    const body = (await res.text()).slice(0, 400000);
+    let body; try { body = (await res.text()).slice(0, 400000); } catch (error) { return `Could not read ${target.href}: ${fetchReason(error)}.`; }
     return (/html/.test(type) ? toText(body) : body).slice(0, 40000) || 'The page had no readable text.';
-  }, { name: 'web_fetch', description: 'Fetch a public web page and return its readable text (first 40,000 characters). Use for sources the task needs; cite the URL.', schema: z.object({ url: z.string().describe('Public http(s) URL') }) });
+  }, { name: 'web_fetch', description: 'Fetch a public web page and return its readable text (first 40,000 characters). Use for sources the task needs; cite the URL. A page that cannot be fetched comes back as a short explanation.', schema: z.object({ url: z.string().describe('Public http(s) URL') }) });
 }
 export const anthropicWebSearch = { type: 'web_search_20260209', name: 'web_search', max_uses: 8 };
+
+// The adapter that hands MCP tools to the model flattens each schema and keeps only unions of objects, so a server's
+// "one of these strings" or "boolean or null" reaches the model with no type at all and the model guesses. Rebuild what the
+// server declared: constants become an enum, "X or null" becomes X, unions of objects merge, anything else stays a union.
+const typeOfValues = values => { const kinds = new Set(values.map(v => v === null ? 'null' : typeof v)); if (kinds.size !== 1) return undefined; const k = [...kinds][0]; return ['string', 'number', 'boolean'].includes(k) ? k : undefined; };
+export function restoreSchema(schema) {
+  if (!schema || typeof schema !== 'object') return schema;
+  if (Array.isArray(schema)) return schema.map(restoreSchema);
+  const { _meta, $schema, anyOf, oneOf, ...rest } = schema;
+  const out = { ...rest };
+  const union = anyOf || oneOf;
+  if (Array.isArray(union)) {
+    const members = union.filter(m => m && typeof m === 'object' && m.type !== 'null' && !(Array.isArray(m.type) && m.type.every(t => t === 'null'))).map(restoreSchema);
+    if (members.length && members.every(m => m.enum || m.const !== undefined)) { const values = [...new Set(members.flatMap(m => m.enum || [m.const]))]; out.enum = values; out.type = out.type || typeOfValues(values); }
+    else if (members.length === 1) Object.assign(out, members[0], rest);
+    else if (members.length && members.every(m => m.type === 'object' || m.properties)) {
+      out.type = 'object'; out.properties = Object.assign({}, ...members.map(m => m.properties || {}));
+      const sets = members.map(m => new Set(m.required || [])), common = [...sets[0]].filter(k => sets.every(set => set.has(k)));
+      if (common.length) out.required = common;
+    } else if (members.length) out.anyOf = members;
+  }
+  if (out.const !== undefined) { out.enum = out.enum || [out.const]; delete out.const; }
+  if (out.enum && !out.type) out.type = typeOfValues(out.enum);
+  if (out.properties && typeof out.properties === 'object') out.properties = Object.fromEntries(Object.entries(out.properties).map(([k, v]) => [k, restoreSchema(v)]));
+  if (out.items) out.items = Array.isArray(out.items) ? out.items.map(restoreSchema) : restoreSchema(out.items);
+  if (out.additionalProperties && typeof out.additionalProperties === 'object') out.additionalProperties = restoreSchema(out.additionalProperties);
+  return out;
+}
 
 // Connects to every configured MCP server once and hands out tools per agent.
 export class ToolHub {
   constructor({ items = () => [], settings = () => ({}), clientFactory, authProviderFor } = {}) {
     this.items = items; this.settings = settings; this.clientFactory = clientFactory; this.authProviderFor = authProviderFor;
-    this.client = null; this.tools = []; this.status = {}; this.loading = null;
+    this.client = null; this.tools = []; this.status = {}; this.loading = null; this.retired = [];
   }
+  // A reload never closes the session that running tasks still hold: the old client retires and is closed once no run can outlive it.
   async load() {
     if (this.loading) return this.loading;
     this.loading = (async () => {
       const servers = mcpServers(this.items(), { authProviderFor: this.authProviderFor });
-      await this.client?.close?.().catch(() => {});
+      const previous = this.client;
       this.status = Object.fromEntries(Object.keys(servers).map(id => [id, 'connecting']));
-      if (!Object.keys(servers).length) { this.client = null; this.tools = []; return this.tools; }
-      const make = this.clientFactory || (async config => { const { MultiServerMCPClient } = await import('@langchain/mcp-adapters'); return new MultiServerMCPClient(config); });
-      this.client = await make({ mcpServers: servers, prefixToolNameWithServerName: true, additionalToolNamePrefix: 'mcp', onConnectionError: 'ignore', useStandardContentBlocks: false, defaultToolTimeout: 120000 });
-      this.tools = await this.client.getTools().catch(() => []);
-      for (const id of Object.keys(servers)) this.status[id] = this.tools.some(t => t.name.startsWith(`mcp__${id}__`)) ? 'connected' : 'unavailable';
+      if (!Object.keys(servers).length) { this.client = null; this.tools = []; }
+      else {
+        const make = this.clientFactory || (async config => { const { MultiServerMCPClient } = await import('@langchain/mcp-adapters'); return new MultiServerMCPClient(config); });
+        const client = await make({ mcpServers: servers, prefixToolNameWithServerName: true, additionalToolNamePrefix: 'mcp', onConnectionError: 'ignore', useStandardContentBlocks: false, defaultToolTimeout: 120000 });
+        const tools = await client.getTools().catch(() => []);
+        await this.restoreSchemas(client, tools, Object.keys(servers));
+        this.client = client; this.tools = tools;
+        for (const id of Object.keys(servers)) this.status[id] = tools.some(t => t.name.startsWith(`mcp__${id}__`)) ? 'connected' : 'unavailable';
+      }
+      if (previous) this.retired.push({ client: previous, at: Date.now() });
+      this.sweep();
       return this.tools;
     })().finally(() => { this.loading = null; });
     return this.loading;
   }
+  async restoreSchemas(client, tools, ids) {
+    if (typeof client?.getClient !== 'function') return;
+    for (const id of ids) {
+      let listed; try { listed = (await (await client.getClient(id))?.listTools())?.tools || []; } catch { continue; }
+      for (const raw of listed) { const t = tools.find(t => t.name === `mcp__${id}__${raw.name}`); if (t && raw.inputSchema) t.schema = restoreSchema(raw.inputSchema); }
+    }
+  }
+  graceMs() { return Math.max(1, Number(this.settings()?.runTimeoutMinutes) || 45) * 60000; }
+  sweep(now = Date.now()) {
+    const keep = [];
+    for (const r of this.retired) { if (now - r.at >= this.graceMs()) Promise.resolve(r.client?.close?.()).catch(() => {}); else keep.push(r); }
+    this.retired = keep;
+  }
   async ensure() { if (!this.client && !this.tools.length) await this.load(); return this.tools; }
-  // The tools one agent may call: team assignment ∩ agent selection. Evaluations never get outbound tools.
+  // The tools one agent may call: the team's tools (all of them, or only the ones the person lists when they opt out of inheriting)
+  // plus any tool granted to that person alone. Evaluations never get outbound tools.
   toolsFor({ agent, team, provider, evaluation = false, readOnly = false }) {
-    const assigned = (team?.tools || []).filter(id => agent?.inheritTools !== false || (agent?.tools || []).includes(id));
+    this.sweep();
+    const assigned = agentToolIds(team, agent, new Set(['web', ...this.tools.map(t => t.name.split('__')[1]).filter(Boolean)]));
     const settings = this.settings();
     const out = [], interruptOn = {};
     for (const t of this.tools) {
@@ -93,5 +151,8 @@ export class ToolHub {
     return { tools: out, interruptOn };
   }
   catalog() { return this.tools.map(t => ({ name: t.name, description: String(t.description || '').slice(0, 300), outbound: isOutbound(t, this.settings()) })); }
-  async close() { await this.client?.close?.().catch(() => {}); }
+  async close() {
+    for (const r of this.retired) await Promise.resolve(r.client?.close?.()).catch(() => {});
+    this.retired = []; await this.client?.close?.().catch(() => {});
+  }
 }

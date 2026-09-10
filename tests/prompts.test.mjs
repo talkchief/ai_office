@@ -1,0 +1,80 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { OfficeStore } from '../office-store.mjs';
+import { loadRoster } from '../roster.mjs';
+import { programManagerPrompt, leadPrompt, specialistPrompt } from '../engine/prompts.mjs';
+
+const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'talkchief-prompts-'));
+const labels = { Google_Calendar: 'Google Calendar', web: 'Web search & fetch' };
+
+// An office where only EMAILS has web access and two teams share the calendar connector.
+function officeWithTools() {
+  const store = new OfficeStore({ dataDir: temp(), initialAgents: loadRoster().agents });
+  const office = store.get();
+  office.teams.find(t => t.id === 'emails').tools = ['web', 'Google_Calendar'];
+  office.teams.find(t => t.id === 'marketing').tools = ['Google_Calendar'];
+  return store.update(office);
+}
+
+test('the Program Manager sees the whole company: every team, its people, its purpose and its tools', () => {
+  const office = officeWithTools();
+  const prompt = programManagerPrompt({ office, name: 'Northgate', teams: office.teams, toolLabels: labels });
+  for (const team of office.teams) assert.ok(prompt.includes(team.name), `lists ${team.name}`);
+  for (const team of office.teams) assert.ok(prompt.includes(team.purpose.slice(0, 40)), `carries the purpose of ${team.name}`);
+  assert.ok(prompt.includes('RESEARCH, Daily Research Agent'), 'names a marketing specialist with their role');
+  assert.match(prompt, /EMAILS[\s\S]*Tools: Web search & fetch, Google Calendar/, 'EMAILS shows web and the calendar');
+  assert.match(prompt, /MARKETING[\s\S]*Tools: Google Calendar\n/, 'MARKETING shows only the calendar');
+  assert.match(prompt, /SALES[\s\S]*Tools: none besides the Brain/, 'a team without connectors is told so');
+  assert.ok(prompt.includes('a tool only another team has'), 'hand-offs cover missing tools, not just expertise');
+  assert.ok(prompt.includes('leads only see their own team, you see all of it'));
+});
+
+test('a lead sees its own team and its own tools only, and is told to hand off for a tool it lacks', () => {
+  const office = officeWithTools();
+  const team = office.teams.find(t => t.id === 'marketing'), lead = office.agents.find(a => a.id === team.lead);
+  const specialists = office.agents.filter(a => a.department === team.id && a.id !== team.lead);
+  const prompt = leadPrompt({ office, team, lead, specialists, reworkRounds: 3, toolLabels: labels });
+  assert.ok(prompt.includes('Tools your team can call: Google Calendar.'));
+  assert.ok(!prompt.includes('Web search & fetch'), 'another team’s web access is not shown');
+  assert.ok(!prompt.includes('CLIENT EMAILS'), 'another team’s people are not shown');
+  assert.ok(prompt.includes('or a tool your team does not have'));
+  assert.ok(prompt.includes('never substitute an unrelated tool'));
+  assert.ok(prompt.includes(team.purpose), 'the charter is in the prompt');
+  assert.ok(prompt.includes(lead.brief.slice(0, 40)), 'the lead’s standing brief is in the prompt');
+});
+
+test('a specialist is told its tools, and to stop rather than substitute a tool it does not have', () => {
+  const office = officeWithTools();
+  const team = office.teams.find(t => t.id === 'marketing'), lead = office.agents.find(a => a.id === team.lead);
+  const riley = office.agents.find(a => a.id === 'riley');
+  const prompt = specialistPrompt({ office, team, agent: riley, leadAgent: lead, toolLabels: labels });
+  assert.ok(prompt.includes('Tools you can call: Google Calendar.'));
+  assert.ok(prompt.includes('never use another tool as a substitute'));
+  const sales = office.teams.find(t => t.id === 'sales'), piper = office.agents.find(a => a.id === 'piper');
+  assert.ok(specialistPrompt({ office, team: sales, agent: piper, leadAgent: null, toolLabels: labels }).includes('Tools you can call: none besides the Brain'));
+});
+
+test('a person who opted out of a team tool is not told they have it', () => {
+  const office = officeWithTools();
+  const team = office.teams.find(t => t.id === 'emails');
+  const cmail = office.agents.find(a => a.id === 'cmail'); cmail.inheritTools = false; cmail.tools = ['web'];
+  const prompt = specialistPrompt({ office, team, agent: cmail, leadAgent: null, toolLabels: labels });
+  assert.ok(prompt.includes('Tools you can call: Web search & fetch.'));
+  assert.ok(!prompt.includes('Google Calendar'));
+});
+
+test('a lead and the Program Manager are told which person has a tool the team lacks', () => {
+  const office = officeWithTools();
+  const fin = office.teams.find(t => t.id === 'fin'), alead = office.agents.find(a => a.id === fin.lead);
+  fin.tools = ['Google_Calendar'];
+  const invo = office.agents.find(a => a.id === 'invo'); invo.tools = ['web', 'notion'];
+  const specialists = office.agents.filter(a => a.department === 'fin' && a.id !== fin.lead);
+  const lead = leadPrompt({ office, team: fin, lead: alead, specialists, reworkRounds: 3, toolLabels: labels });
+  assert.ok(lead.includes('Tools your team can call: Google Calendar. INVOICING also has Web search & fetch: delegate work that needs it to them.'), lead.slice(lead.indexOf('Tools your team'), lead.indexOf('Tools your team') + 160));
+  const pm = programManagerPrompt({ office, name: 'Northgate', teams: office.teams, toolLabels: labels });
+  assert.match(pm, /FINANCE[\s\S]*Tools: Google Calendar; INVOICING also has Web search & fetch/);
+  assert.ok(specialistPrompt({ office, team: fin, agent: invo, leadAgent: alead, toolLabels: labels }).includes('Tools you can call: Google Calendar, Web search & fetch.'));
+});

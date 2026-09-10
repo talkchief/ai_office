@@ -1,4 +1,7 @@
 // Every /api route. `ctx` carries the stores and the engine built in serve.mjs.
+import fs from 'node:fs';
+import path from 'node:path';
+import { workspaceFile, mimeOf } from '../engine/documents.mjs';
 import { readJsonBody as body } from '../http-body.mjs';
 import { listShape, detailShape } from './shape.mjs';
 import { httpError } from './routes.mjs';
@@ -6,7 +9,7 @@ import { officeReport, kpis } from '../reporting.mjs';
 import { extractDocument } from '../documents.mjs';
 
 export function registerApi(router, ctx) {
-  const { office, engine, models, settings, toolStore, hub, knowledge, bus, routines, audit } = ctx;
+  const { office, engine, models, settings, toolStore, hub, knowledge, bus, routines, audit, projects } = ctx;
   const record = entry => { try { audit?.record(entry); } catch (error) { console.warn('audit:', error.message); } };
   const withoutRevision = ({ revision, ...rest }) => rest;
   // Connectors without their secrets: env values and tokens are reduced to names and flags.
@@ -17,8 +20,18 @@ export function registerApi(router, ctx) {
   const accepted = value => ({ $status: 202, body: value });
   /* ---------- tasks ---------- */
   router.on('GET', '/api/tasks', () => { const o = office.get(); return engine.list().map(j => listShape(j, o)); });
+  // The task form's project picker: open projects only.
+  router.on('GET', '/api/projects/open', () => projects.list().filter(p => ['active', 'paused'].includes(p.status)).map(p => ({ id: p.id, name: p.name, status: p.status })));
   router.on('POST', '/api/tasks', async ({ req }) => { const input = await body(req); if (!String(input.text || '').trim()) throw httpError('Describe the task first.', 400); if (!input.backlog) ready(); return accepted(engine.create({ ...input, kind: 'task', testId: undefined })); });
-  router.on('GET', '/api/tasks/:id', ({ params }) => { task(params.id); return detailShape(engine.detail(params.id), office.get()); });
+  router.on('GET', '/api/tasks/:id', ({ params }) => { task(params.id); return { ...detailShape(engine.detail(params.id), office.get()), files: engine.files(params.id) }; });
+  // A file from the task's workspace (a PDF the team exported, a CSV it wrote), streamed as a download. Paths never leave /work/.
+  router.on('GET', '/api/tasks/:id/file', ({ params, url, res }) => {
+    task(params.id);
+    let file; try { file = workspaceFile(engine.workspaceDir(params.id), url.searchParams.get('path') || ''); } catch (error) { return { $status: 400, body: { error: error.message } }; }
+    if (!fs.existsSync(file.abs) || !fs.statSync(file.abs).isFile()) return { $status: 404, body: { error: 'There is no such file in this task.' } };
+    res.writeHead(200, { 'content-type': mimeOf(file.rel), 'content-length': fs.statSync(file.abs).size, 'content-disposition': `attachment; filename="${path.basename(file.rel).replace(/[^\w. -]/g, '_')}"`, 'cache-control': 'no-store' });
+    fs.createReadStream(file.abs).pipe(res); return { $handled: true };
+  });
   router.on('POST', '/api/tasks/:id/queue', async ({ req, params }) => { const input = await body(req); if (input.state === 'queued') ready(); return engine.editQueue(params.id, input); });
   router.on('POST', '/api/tasks/:id/cancel', ({ params }) => engine.cancel(params.id));
   router.on('POST', '/api/tasks/:id/seen', ({ params }) => engine.markSeen(params.id));
@@ -100,6 +113,30 @@ export function registerApi(router, ctx) {
   router.on('GET', '/api/agency/:id', ({ params }) => { const { body, ...p } = ctx.agency.get(params.id); return { ...p, body: body.slice(0, 20000) }; });
   router.on('POST', '/api/agency/:id/hire', async ({ req, params }) => { const input = await body(req); return audited('office', `Hired ${params.id} from the Agency into ${input.dept}`, () => { const r = ctx.agency.hire(office, params.id, { dept: input.dept, name: input.name, lead: !!input.lead, busy: engine.activeAgents() }); bus.publish('office.updated', { area: 'office' }); return r; }); });
   router.on('POST', '/api/agency/:id/skill', async ({ req, params }) => { const input = await body(req); return audited('office', `Added the ${params.id} method from the Agency as a skill`, () => { const r = ctx.agency.addSkill(office, params.id, { teams: input.teams || [], agents: input.agents || [], busy: engine.activeAgents() }); bus.publish('office.updated', { area: 'office' }); return r; }); });
+  // Projects: the big pieces of work. The office keeps a page per project in the Brain; files upload into the project's folder.
+  const projectOut = p => ({ ...p, folder: projects.folder(p), page: projects.pageId(p), next: projects.nextMilestone(p), tasks: engine.list().filter(j => j.projectId === p.id).length, open: engine.list().filter(j => j.projectId === p.id && !['done', 'cancelled'].includes(j.state)).length });
+  router.on('GET', '/api/projects', () => ({ projects: projects.list().map(projectOut), teams: office.get().teams.map(t => ({ id: t.id, name: t.name })) }));
+  router.on('POST', '/api/projects', async ({ req }) => { const input = await body(req, 256 * 1024); const p = projects.create(input); record({ area: 'projects', summary: `Created project “${p.name}”` }); ctx.syncProject?.(p.id); bus.publish('office.updated', { area: 'projects' }); return projectOut(p); });
+  router.on('GET', '/api/projects/:id', ({ params }) => { const p = projects.get(params.id); if (!p) throw httpError('There is no such project.', 404); const o = office.get(); return { project: projectOut(p), tasks: engine.list().filter(j => j.projectId === p.id).map(j => listShape(j, o)), files: knowledge.list().filter(n => n.id.startsWith(projects.folder(p) + '/') && n.id !== projects.pageId(p)) }; });
+  router.on('PUT', '/api/projects/:id', async ({ req, params }) => { const input = await body(req, 256 * 1024); const p = projects.update(params.id, input); record({ area: 'projects', summary: `Updated project “${p.name}”` }); ctx.syncProject?.(p.id); bus.publish('office.updated', { area: 'projects' }); return projectOut(p); });
+  router.on('POST', '/api/projects/:id/status', async ({ req, params }) => { const { status } = await body(req); const p = projects.setStatus(params.id, status); record({ area: 'projects', summary: `Project “${p.name}” is now ${p.status}` }); ctx.syncProject?.(p.id); bus.publish('office.updated', { area: 'projects' }); return projectOut(p); });
+  // Deleting a project: refused while it has open work; finished tasks are detached and kept; the files stay in the Brain; the page is archived.
+  router.on('DELETE', '/api/projects/:id', async ({ params }) => {
+    const p = projects.get(params.id); if (!p) throw httpError('There is no such project.', 404);
+    const mine = engine.list().filter(j => j.projectId === p.id), open = mine.filter(j => !['done', 'cancelled'].includes(j.state));
+    if (open.length) throw httpError(`“${p.name}” still has ${open.length} open task${open.length === 1 ? '' : 's'}. Cancel or finish them first, or archive the project instead.`, 409);
+    for (const j of mine) engine.update(j.id, x => { x.projectId = null; x.projectName = null; });
+    try { await knowledge.archive(projects.pageId(p)); } catch {}
+    projects.remove(p.id); record({ area: 'projects', summary: `Deleted project “${p.name}” (${mine.length} finished task${mine.length === 1 ? '' : 's'} kept, files kept in the Brain)` });
+    bus.publish('office.updated', { area: 'projects' }); return { ok: true, detached: mine.length, folder: projects.folder(p) };
+  });
+  router.on('POST', '/api/projects/:id/upload', async ({ req, params }) => {
+    const p = projects.get(params.id); if (!p) throw httpError('There is no such project.', 404);
+    const input = await body(req, 36 * 1024 * 1024), doc = await extractDocument({ name: input.name, data: input.data });
+    const note = await knowledge.upload({ folder: projects.folder(p), name: doc.name, content: doc.content });
+    record({ area: 'projects', summary: `${note.replaced ? 'Replaced' : 'Added'} ${doc.name} in project “${p.name}”` }); ctx.syncProject?.(p.id);
+    return { id: note.id, replaced: note.replaced, characters: doc.characters };
+  });
   router.on('GET', '/api/routines', () => routines.out());
   router.on('POST', '/api/routines', async ({ req }) => { const r = await routines.make(await body(req)); return r.error ? { $status: 400, body: r } : r; });
   router.on('DELETE', '/api/routines/:id', ({ params }) => routines.remove(params.id));

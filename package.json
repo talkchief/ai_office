@@ -10,7 +10,10 @@
     "check": "node check.mjs",
     "check:live": "CHECK_LIVE=1 node check.mjs",
     "graph": "node graph-build.mjs",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
+    "backup": "node scripts/backup.mjs",
+    "restore": "node scripts/backup.mjs --restore",
+    "backups": "node scripts/backup.mjs --list"
   },
   "engines": {
     "node": ">=22"
@@ -29,12 +32,14 @@
     "langchain": "^1.5.11",
     "langsmith": "^0.9.0",
     "markdown-it": "15.0.1",
+    "pdfkit": "^0.20.2",
+    "playwright-core": "^1.63.0",
+    "pptxgenjs": "^4.0.1",
     "zod": "^4.6.0"
   },
   "devDependencies": {
     "@react-three/fiber": "^9.7.0",
     "esbuild": "^0.28.1",
-    "playwright-core": "^1.62.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "three": "^0.185.1",

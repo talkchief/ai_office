@@ -16,7 +16,8 @@ test('the vendored Agency catalogue loads, every persona parses to a person, and
   assert.ok(agency.list({ division: 'project-management' }).length >= 5); assert.ok(agency.list({ q: 'shepherd' }).some(p => p.id === 'project-management-project-shepherd'));
   const pm = fs.readdirSync(path.join(process.cwd(), 'agency', 'pm-skills')).filter(d => fs.existsSync(path.join('agency', 'pm-skills', d, 'SKILL.md')));
   for (const name of ['running-a-task', 'cross-team-handoff', 'project-shepherd']) assert.ok(pm.includes(name), name);
-  for (const d of pm) assert.match(fs.readFileSync(path.join('agency', 'pm-skills', d, 'SKILL.md'), 'utf8'), /^---\nname: [a-z0-9-]+\ndescription: .+\n---\n/, d + ' front matter');
+  // Files checked out with CRLF (git autocrlf on Windows) are the same skills; the parser accepts both line endings.
+  for (const d of pm) assert.match(fs.readFileSync(path.join('agency', 'pm-skills', d, 'SKILL.md'), 'utf8').replace(/\r\n/g, '\n'), /^---\nname: [a-z0-9-]+\ndescription: .+\n---\n/, d + ' front matter');
   assert.equal(parsePersona('no front matter'), null);
 });
 
