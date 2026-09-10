@@ -59,7 +59,7 @@ export class OfficeStore {
       if (!teamIds.has(t.id) || seen.has(t.id)) fail('Each functional area must appear exactly once.');
       seen.add(t.id);
       const members = agents.filter(a => a.department === t.id);
-      if (members.length < 2 || members.length > 12) fail(`${t.name || t.id} needs a lead and at least one worker, with a maximum of 12 agents.`);
+      if (members.length < 2 || members.length > 7) fail(`${t.name || t.id} needs a lead and at least one worker, with a maximum of 7 agents (a lead and six specialists).`);
       const lead = members.find(a => a.id === t.lead);
       if (!lead) fail(`Assign a lead who belongs to ${t.name || t.id}.`);
       lead.lead = true;

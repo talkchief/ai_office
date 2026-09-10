@@ -288,7 +288,7 @@ export function initOfficeWork(ctx) {
       const input=select.closest('[data-check-editor]').querySelector('[data-check-value]');
       input.type=select.value.includes('length')?'number':'text';input.min='1';input.max='100000';input.step='1';input.maxLength=1000;
     });
-    $('spaceAddAgent').onclick = () => { collectTeam(); if (agents.length >= 12) return feedback('Each team supports up to 12 agents.', true); settingsDraft.agents.push({ id: 'agent-' + crypto.randomUUID().slice(0,8), department: team.id, name: 'New agent', role: 'Specialist', does: '', brief: '', model: 'sonnet', tools: [], inheritTools: true, skills:[] }); renderTeam();content.querySelector('.space-agent-editors').lastElementChild.open=true; };
+    $('spaceAddAgent').onclick = () => { collectTeam(); if (agents.length >= 7) return feedback('A team is a lead and up to six specialists.', true); settingsDraft.agents.push({ id: 'agent-' + crypto.randomUUID().slice(0,8), department: team.id, name: 'New agent', role: 'Specialist', does: '', brief: '', model: 'sonnet', tools: [], inheritTools: true, skills:[] }); renderTeam();content.querySelector('.space-agent-editors').lastElementChild.open=true; };
     content.querySelectorAll('[data-remove-agent]').forEach(b => b.onclick = () => {
       collectTeam(); if (agents.length <= 2) return feedback('Keep a lead and at least one worker.', true);
       settingsDraft.agents = settingsDraft.agents.filter(a => a.id !== b.dataset.removeAgent);
