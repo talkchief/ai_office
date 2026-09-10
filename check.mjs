@@ -98,7 +98,8 @@ await step('routines: any team can have one; bad ones are named', async () => {
 await step('tests: the full suite passes', async () => {
   const files = fs.readdirSync(path.join(ROOT, 'tests')).filter(f => f.endsWith('.test.mjs')).map(f => path.join('tests', f));
   let out;
-  try { out = await sh(NODE, ['--test', '--test-reporter=tap', ...files]); }
+  // One file at a time: the engine tests run fake models against real timers and flake when several files share the CPU.
+  try { out = await sh(NODE, ['--test', '--test-concurrency=1', '--test-reporter=tap', ...files]); }
   catch (e) { const fails = [...String(e.out || '').matchAll(/^not ok \d+ - (.+)$/gm)].map(m => m[1]).slice(0, 5); throw new Error(fails.length ? 'failing: ' + fails.join(' · ') : e.message); }
   const n = key => Number(out.match(new RegExp(`^# ${key} (\\d+)`, 'm'))?.[1] || 0);
   if (n('fail')) throw new Error(`${n('fail')} failing`);
