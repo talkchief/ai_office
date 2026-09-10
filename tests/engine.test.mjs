@@ -331,6 +331,25 @@ test('when a task continues after a stop, the Program Manager is told what is al
   } finally { await f.close(); }
 });
 
+test('a lead that delegates to someone outside its team is refused with the right names and carries on', async () => {
+  let tried = false;
+  const lead = workers => { const worker = workers[0]; return ({ last, system, messages }) => {
+    if (last.type === 'human') { tried = true; return { calls: [call('task', { subagent_type: 'alead', description: 'Check the numbers' })] }; }
+    if (last.type === 'tool' && /not one of your specialists/.test(last.text)) return { calls: [call('task', { subagent_type: worker, description: 'Write the report' })] };
+    if (last.type === 'tool' && REVIEW.test(last.text)) return { text: /APPROVED/.test(last.text) ? 'Review approved.' : 'Not approved: ' + last.text };
+    if (last.type === 'tool') return { calls: [call('record_review', { approved: true, summary: 'Checked.', criteria: criteria(system).map(id => ({ id, passed: true, evidence: 'Present.' })), deliverable: 'Final: ' + toolTexts(messages).join('\n') })] };
+    return { text: 'ok' };
+  }; };
+  const f = fixture({ lead });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done']);
+    assert.ok(tried);
+    const refused = done.events.filter(e => e.type === 'subagent_refused'); assert.equal(refused.length, 1);
+    assert.match(refused[0].message, /"alead", who is not on the team/);
+    assert.equal(done.review.approved, true); assert.equal(done.runs.filter(r => r.role === 'specialist').length, 1, 'only the real specialist ran');
+  } finally { await f.close(); }
+});
+
 test('a task that runs past the time limit is blocked with a plain reason', async () => {
   const f = fixture({ settings: { runTimeoutMinutes: 0.002 }, specialist: () => ({ text: 'Slow.', wait: 1500 }) });
   try { const id = start(f); const job = await until(f.engine, id, ['blocked']); assert.match(job.error, /no progress/); assert.equal(f.engine.notifications.list()[0].kind, 'blocked'); }

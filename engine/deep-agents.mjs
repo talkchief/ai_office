@@ -378,12 +378,12 @@ export class OfficeEngine {
       const { model, provider } = await make('lead', lead, team);
       const spotChecks = this.toolHub ? this.toolHub.toolsFor({ agent: lead, team, provider, evaluation, readOnly: true }).tools : [];
       const graph = this.agentFactory({ name: leadName(team.id), model, systemPrompt: leadPrompt({ office, team, lead, specialists, reworkRounds: reworkRounds(team), toolLabels }),
-        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), ...spotChecks], subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware(), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
+        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), ...spotChecks], subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
       leads.push({ name: leadName(team.id), description: `${team.name} team, led by ${lead.name}.${team.purpose ? ' ' + team.purpose : ''}`.slice(0, 600), runnable: graph });
     }
     const { model } = await make('pm', null, null);
     const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams, toolLabels }),
-      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm')],
+      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.subagentGuard(job.id, 'pm', leads.map(l => l.name), 'lead'), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm')],
       checkpointer: this.saver, interruptOn: job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {} });
     return { pm, models };
   }
@@ -469,6 +469,20 @@ export class OfficeEngine {
       const check = this.resumeCheck(jobId, request.toolCall); if (!check) return handler(request);
       if (check.skip) return new ToolMessage({ tool_call_id: request.toolCall.id, name: 'task', content: check.skip });
       return handler({ ...request, toolCall: { ...request.toolCall, args: { ...request.toolCall.args, description: check.description } } });
+    } });
+  }
+  // A delegation to a name that is not on the caller's team (an Operations lead calling Accounting's lead, a PM naming a person
+  // instead of a lead) is refused with the right names; Deep Agents would otherwise throw and the whole task would block.
+  subagentGuard(jobId, who, names, kind) {
+    const known = new Set(names);
+    return createMiddleware({ name: `subagent_guard_${who.replace(/[^a-zA-Z0-9_]/g, '_')}`, wrapToolCall: async (request, handler) => {
+      if (request.toolCall.name !== 'task') return handler(request);
+      const { subagent } = parseTaskInput(request.toolCall.args); if (known.has(subagent)) return handler(request);
+      this.event(jobId, 'subagent_refused', who, `Tried to delegate to "${subagent}", who is not ${kind === 'lead' ? 'a team lead' : 'on the team'}.`);
+      const content = kind === 'lead'
+        ? `Refused: "${subagent}" is not a team lead. Delegate to one of: ${names.join(', ')}.`
+        : `Refused: "${subagent}" is not one of your specialists. Your team: ${names.join(', ') || 'nobody but you'}. Delegate to one of them; if the work belongs to another team, call hand_to_program_manager and carry on with your own part.`;
+      return new ToolMessage({ tool_call_id: request.toolCall.id, name: 'task', content });
     } });
   }
   // The Program Manager delegates only after it has written a plan: a task call before write_todos is refused, not run.

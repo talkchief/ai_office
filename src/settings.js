@@ -3,6 +3,7 @@
 import { DEPTS } from './data.js';
 import { renderDocument } from './task-output.js';
 import { stateLabel } from './labels.js';
+import { fileIcon } from './fileicon.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const when = value => value ? new Date(value).toLocaleString() : '—';
@@ -416,7 +417,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         <div class="space-actions"><label>Type<select id="artKind"><option value="">All types</option>${data.kinds.map(k => `<option value="${k.id}"${artFilter.kind === k.id ? ' selected' : ''}>${esc(k.label)}</option>`).join('')}</select></label>
         <label>From<input type="date" id="artFrom" value="${esc(artFilter.from)}"></label><label>To<input type="date" id="artTo" value="${esc(artFilter.to)}"></label>
         <label>Search<input type="search" id="artQ" placeholder="file, task or team" value="${esc(artFilter.q)}"></label><span class="space-count">${data.total} file${data.total === 1 ? '' : 's'}</span></div>
-        ${data.artifacts.length ? data.artifacts.map(r => `<div class="audit-item art-item"><time>${when(r.modifiedAt)}</time><span class="art-kind">${esc(kindLabel[r.kind] || r.kind)}</span> <b><a href="${esc(r.url)}" download>${esc(r.name.split('/').pop())}</a></b> <small>${esc(size(r.bytes))}${r.name.includes('/') ? ' · ' + esc(r.name.slice(0, r.name.lastIndexOf('/'))) : ''}</small><div class="art-task"><button type="button" class="space-link" data-open-task="${esc(r.taskId)}">${esc(r.taskTitle.slice(0, 90))}</button> <small>${esc(r.teams.join(', ') || 'Program Manager')}${r.projectId ? ' · project ' + esc(r.projectId) : ''} · ${esc(r.taskState)}</small></div></div>`).join('') : '<div class="space-empty"><h3>No files match.</h3><p>Loosen a filter, or give the teams a task that produces a document.</p></div>'}`;
+        ${data.artifacts.length ? data.artifacts.map(r => `<div class="audit-item art-item"><time>${when(r.modifiedAt)}</time>${fileIcon(r.name)}<b><a href="${esc(r.url)}" download>${esc(r.name.split('/').pop())}</a></b> <small>${esc(size(r.bytes))}${r.name.includes('/') ? ' · ' + esc(r.name.slice(0, r.name.lastIndexOf('/'))) : ''}</small><div class="art-task"><button type="button" class="space-link" data-open-task="${esc(r.taskId)}">${esc(r.taskTitle.slice(0, 90))}</button> <small>${esc(r.teams.join(', ') || 'Program Manager')}${r.projectId ? ' · project ' + esc(r.projectId) : ''} · ${esc(r.taskState)}</small></div></div>`).join('') : '<div class="space-empty"><h3>No files match.</h3><p>Loosen a filter, or give the teams a task that produces a document.</p></div>'}`;
       const apply = () => { artFilter.kind = $('artKind').value; artFilter.from = $('artFrom').value; artFilter.to = $('artTo').value; artFilter.q = $('artQ').value.trim(); showArtifacts(); };
       $('artKind').onchange = apply; $('artFrom').onchange = apply; $('artTo').onchange = apply;
       let timer = null; $('artQ').oninput = () => { clearTimeout(timer); timer = setTimeout(apply, 350); };
