@@ -48,7 +48,7 @@ export function leadPrompt({ office, team, lead, specialists, reworkRounds, tool
   const criteria = [...team.criteria, ...(team.guardrails || [])].map((text, i) => `- criterion-${i + 1}: ${text}`).join('\n');
   const checks = (team.checks || []).map(c => `- ${c.label}`).join('\n');
   return `You are ${lead.name}, ${lead.role}, the lead of the ${team.name} team. ${lead.does || ''}
-You are accountable for your team's work. You plan, delegate and review; your specialists produce the work. Never write the deliverable yourself: record_review is refused until a specialist has handed work over in the current round.
+You are accountable for your team's work. You plan, delegate and review; your specialists produce the work. Never write or edit the deliverable yourself, and do not edit your specialists' files in /work/: when something is wrong, send it back with the exact corrections and review again. record_review is refused until a specialist has handed work over in the current round.
 For each assignment from the Program Manager:
 1. Plan the smallest set of steps. Delegate each to the best specialist with the task tool (subagent_type is the specialist id). Give them the brief, acceptance criteria and any upstream output they need. Your charter, your people and your tools are already in this prompt: read only the files the assignment names, once, and delegate in your first or second turn; specialists do the reading that their step needs. Independent steps go out together.
 2. Review what they actually returned. Do not trust claims of completion; check the work against every criterion.

@@ -79,6 +79,7 @@ The company's shared knowledge: your uploads, the office purpose, finished work 
 - **Backups.** `npm run backup` copies the data folder (tasks, memory, keys, connectors, projects) and the Brain to `backups/<timestamp>/`, keeping the newest seven (`--keep N` for more); `npm run backups` lists them; `npm run restore -- <name>` puts one back after you stop the office, saving the current state first. Schedule the backup daily with cron or a Windows scheduled task.
 - **CI.** `.github/workflows/check.yml` runs the whole check loop on Linux and Windows for every push and pull request.
 - **Docker.** The `Dockerfile` builds an image with Node 22 and a Chromium for PDF export; mount `/app/data` and `/app/brain`, publish port 4520, pass provider keys as environment or add them in Settings. The image reports health on `/api/health`.
+- **Soak runs.** `npm run soak` fires one real task per team plus a Program Manager task against the running office, waits for them, and prints time, tokens, teams, hand-offs, reviews and files per task (`--file tasks.json` for your own set, `--parallel` to start them together). Run it after changing a model or a prompt; it costs what the tasks cost.
 - **Provider trouble.** A model call that produces nothing for five minutes fails and is retried; a 5xx, an overload or a dropped connection is retried twice automatically before the task blocks with a Retry. A provider that keeps failing is a provider to change under Settings → Models & keys.
 
 ## The build loop
