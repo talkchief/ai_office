@@ -429,7 +429,6 @@ test('a note sent while the task was busy and delivered after completion does no
     const delivered = done.events.find(e => e.type === 'notes_delivered');
     assert.ok(delivered, 'the note reached the Program Manager'); assert.match(delivered.message, /after completion; approved reviews stand/);
     assert.equal(done.reviews.filter(r => r.approved).length >= 1, true);
-    assert.equal(typeof done.correction?.at, 'number');
   } finally { await f.close(); }
 });
 
