@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { officeBackend, FILE_PERMISSIONS, SKILL_SOURCES } from './backend.mjs';
 import { ROOT } from '../config.mjs';
 import { programManagerPrompt, leadPrompt, specialistPrompt, leadName } from './prompts.mjs';
-import { exportPdfTool, exportPptxTool, listWorkspaceFiles } from './documents.mjs';
+import { exportPdfTool, exportPptxTool, listWorkspaceFiles, workspaceFile } from './documents.mjs';
 
 // Deep Agents gives every agent that has subagents a built-in "general-purpose" worker with the parent's own tools. In this
 // office every worker is a named person on a team, reviewed by a lead, so that worker is switched off for every provider
@@ -373,19 +373,32 @@ export class OfficeEngine {
         const { model, provider } = await make('specialist', agent, team);
         const set = this.toolHub ? this.toolHub.toolsFor({ agent, team, provider, evaluation }) : { tools: [], interruptOn: {} };
         subagents.push({ name: agent.id, description: `${agent.name}, ${agent.role}. ${agent.does || ''}`.slice(0, 600), systemPrompt: specialistPrompt({ office, team, agent, leadAgent: lead, toolLabels }),
-          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id)], interruptOn: set.interruptOn, middleware: [this.pace(job.id, team, agent.id, signal)] });
+          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id)], interruptOn: set.interruptOn, middleware: [this.pace(job.id, team, agent.id, signal), this.loopGuard(job.id, agent.id)] });
       }
       const { model, provider } = await make('lead', lead, team);
       const spotChecks = this.toolHub ? this.toolHub.toolsFor({ agent: lead, team, provider, evaluation, readOnly: true }).tools : [];
       const graph = this.agentFactory({ name: leadName(team.id), model, systemPrompt: leadPrompt({ office, team, lead, specialists, reworkRounds: reworkRounds(team), toolLabels }),
-        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), ...spotChecks], subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware()] });
+        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), ...spotChecks], subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware(), this.loopGuard(job.id, lead.id)] });
       leads.push({ name: leadName(team.id), description: `${team.name} team, led by ${lead.name}.${team.purpose ? ' ' + team.purpose : ''}`.slice(0, 600), runnable: graph });
     }
     const { model } = await make('pm', null, null);
     const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams, toolLabels }),
-      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id)],
+      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.loopGuard(job.id, 'pm')],
       checkpointer: this.saver, interruptOn: job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {} });
     return { pm, models };
+  }
+  // The same call with the same arguments, over and over, is waiting, not working: an agent listing an empty workspace until
+  // another team's file appears, or re-reading a note it already has. From the fifth repeat the call is refused with what to do instead.
+  loopGuard(jobId, agentId) {
+    const recent = [], LIMIT = 4;
+    return createMiddleware({ name: `loop_guard_${agentId.replace(/[^a-zA-Z0-9_]/g, '_')}`, wrapToolCall: async (request, handler) => {
+      const call = request.toolCall, key = `${call.name}:${JSON.stringify(call.args || {})}`;
+      recent.push(key); if (recent.length > 40) recent.shift();
+      const repeats = recent.filter(k => k === key).length;
+      if (repeats <= LIMIT) return handler(request);
+      this.event(jobId, 'loop_stopped', agentId, `${call.name} was called with the same arguments ${repeats} times; the call was refused.`);
+      return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `Refused: this is the same call for the ${repeats}th time. Whatever you are waiting for will not appear in this run: nobody else writes into your workspace while you wait. Do the work with what you have, or reply now to whoever assigned this with exactly what is missing.` });
+    } });
   }
   // The Program Manager delegates only after it has written a plan: a task call before write_todos is refused, not run.
   planFirst(jobId) {
@@ -438,7 +451,7 @@ export class OfficeEngine {
       schema: z.object({ query: z.string().describe('Keywords to look for'), folder: z.string().optional().describe('Only this folder, e.g. Company or Projects'), k: z.number().int().min(1).max(12).optional() }) });
   }
   reviewTool(id, team) {
-    return tool(async ({ approved, summary, criteria = [], deliverable = '' }) => {
+    return tool(async ({ approved, summary, criteria = [], deliverable = '', deliverablePath = '' }) => {
       const job = this.get(id), current = this.office.team(team.id) || team;
       // The lead reviews; a specialist does the work. No review until someone on the team has handed work over this round.
       const specialists = new Set(this.office.agents().filter(a => a.department === team.id && a.id !== current.lead).map(a => a.id));
@@ -447,21 +460,31 @@ export class OfficeEngine {
         this.event(id, 'review_refused', current.lead, 'No specialist has handed work over in this round.');
         return `Refused: nobody on your team has handed work over in this round. Delegate the work to a specialist with the task tool (subagent_type is the specialist id: ${[...specialists].join(', ')}), then review what they return.`;
       }
+      // The deliverable is the handed-over file under /work/ (the office reads it, the lead does not copy it) or, for a few lines, the text itself.
+      let text = clean(deliverable), file = '', fileProblem = '';
+      if (!text && clean(deliverablePath)) {
+        try {
+          const { abs, rel } = workspaceFile(this.workspaceDir(id), deliverablePath);
+          if (/\.(pdf|pptx|docx|xlsx|png|jpe?g|gif|zip)$/i.test(rel)) fileProblem = `/work/${rel} is not a text file; give the Markdown source the export was made from`;
+          else if (!fs.existsSync(abs)) fileProblem = `there is no file at /work/${rel}; use the path exactly as the specialist handed it over`;
+          else { text = clean(fs.readFileSync(abs, 'utf8')); file = rel; }
+        } catch (e) { fileProblem = e.message; }
+      }
       const list = [...current.criteria, ...(current.guardrails || [])];
-      const checks = checkOutput(clean(deliverable), job.checks.filter(c => !c.team || c.team === team.id));
+      const checks = checkOutput(text, job.checks.filter(c => !c.team || c.team === team.id));
       const covered = coveredCriteria(list.length, criteria);
-      const ok = approved === true && covered.ok && clean(deliverable).length > 0 && checks.every(c => c.passed);
+      const ok = approved === true && covered.ok && text.length > 0 && checks.every(c => c.passed);
       const rounds = (job.reworkRounds?.[team.id] || 0) + (ok ? 0 : 1);
-      const review = { at: Date.now(), agent: current.lead, dept: team.id, approved: ok, summary: clean(summary).slice(0, 5000), criteria, checks, missing: covered.missing };
-      this.update(id, j => { j.reviews.push(review); j.review = review; (j.reviewsByDept ||= {})[team.id] = review; (j.reworkRounds ||= {})[team.id] = rounds; if (ok) (j.deliverables ||= {})[team.id] = clean(deliverable).slice(0, 120000); if (clean(deliverable)) j.result = clean(deliverable).slice(0, 120000); });
+      const review = { at: Date.now(), agent: current.lead, dept: team.id, approved: ok, summary: clean(summary).slice(0, 5000), criteria, checks, missing: covered.missing, file };
+      this.update(id, j => { j.reviews.push(review); j.review = review; (j.reviewsByDept ||= {})[team.id] = review; (j.reworkRounds ||= {})[team.id] = rounds; if (ok) (j.deliverables ||= {})[team.id] = text.slice(0, 120000); if (text) j.result = text.slice(0, 120000); });
       this.event(id, 'review_recorded', current.lead, review.summary || (ok ? 'Approved.' : 'Changes required.'), { approved: ok, checks });
       if (this.get(id).state !== 'cancelled') this.setState(id, 'working');
       if (ok) return 'Review recorded as APPROVED. Report back to the Program Manager with a short summary.';
-      const reasons = [approved !== true ? 'you did not approve it' : '', covered.missing.length ? `criteria without passing evidence: ${covered.missing.join(', ')}` : '', !clean(deliverable) ? 'no final deliverable was included' : '', ...checks.filter(c => !c.passed).map(c => `automated check failed: ${c.label}`)].filter(Boolean);
+      const reasons = [approved !== true ? 'you did not approve it' : '', covered.missing.length ? `criteria without passing evidence: ${covered.missing.join(', ')}` : '', !text ? (fileProblem ? 'deliverable file problem: ' + fileProblem : 'no final deliverable was included: give deliverablePath (the handed-over file under /work/), or the text when it is a few lines') : '', ...checks.filter(c => !c.passed).map(c => `automated check failed: ${c.label}`)].filter(Boolean);
       if (rounds > reworkRounds(current)) return `Review recorded as NOT approved (${reasons.join('; ')}). The rework limit is reached: report to the Program Manager that this needs the CEO’s direction.`;
       return `Review recorded as NOT approved (${reasons.join('; ')}). Send specific corrections to the specialist, then review again.`;
-    }, { name: 'record_review', description: 'Record your review of the team’s actual work. Call once per review round, with evidence for every criterion and the complete final deliverable.',
-      schema: z.object({ approved: z.boolean(), summary: z.string(), criteria: z.array(z.object({ id: z.string(), passed: z.boolean(), evidence: z.string() })), deliverable: z.string().describe('The complete final deliverable in Markdown: the finished content only, with no word counts, file paths, drafting notes or status labels'),
+    }, { name: 'record_review', description: 'Record your review of the team’s actual work. Call once per review round, with evidence for every criterion and the final deliverable: deliverablePath, the handed-over file under /work/ (the office reads it), or deliverable, the text itself when it is a few lines.',
+      schema: z.object({ approved: z.boolean(), summary: z.string(), criteria: z.array(z.object({ id: z.string(), passed: z.boolean(), evidence: z.string() })), deliverablePath: z.string().optional().describe('Path under /work/ of the file that is the final deliverable, exactly as the specialist handed it over, e.g. /work/pros/proposal.md. Do not copy its content.'), deliverable: z.string().optional().describe('The final deliverable text, only when it is a few lines (an email, a short answer): the finished content only, with no word counts, file paths, drafting notes or status labels'),
         changes: z.array(z.object({ specialist: z.string(), feedback: z.string() })).optional() }) });
   }
   completeTool(id) {

@@ -203,6 +203,50 @@ test('cancelling stops the work and nothing is filed', async () => {
   } finally { release(); await f.close(); }
 });
 
+test('an agent that repeats the same call is refused from the fifth time and finishes with what it has', async () => {
+  let n = 0;
+  const f = fixture({ specialist: () => n++ < 7 ? { calls: [call('ls', { path: '/work' })] } : { text: 'Verified result and evidence.' } });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done']);
+    const stopped = done.events.filter(e => e.type === 'loop_stopped');
+    assert.equal(stopped.length, 3, 'the fifth, sixth and seventh identical calls are refused');
+    assert.match(stopped[0].message, /ls was called with the same arguments 5 times/);
+    assert.equal(done.review.approved, true);
+  } finally { await f.close(); }
+});
+
+test('a lead records the review with the handed-over file path and the office reads the deliverable from it', async () => {
+  const lead = workers => { const worker = workers[0]; return ({ last, system }) => {
+    if (last.type === 'human') return { calls: [call('task', { subagent_type: worker, description: 'Write the report to /work/report.md' })] };
+    if (last.type === 'tool' && REVIEW.test(last.text)) return { text: /APPROVED/.test(last.text) ? 'Review approved.' : 'Review not approved: ' + last.text };
+    if (last.type === 'tool') return { calls: [call('record_review', { approved: true, summary: 'Read the file, every criterion holds.', criteria: criteria(system).map(id => ({ id, passed: true, evidence: 'In the file.' })), deliverablePath: '/work/report.md' })] };
+    return { text: 'ok' };
+  }; };
+  const specialist = ({ last }) => last.type === 'human' ? { calls: [call('write_file', { file_path: '/work/report.md', content: '# Report\n\nVerified result and evidence, from the file.' })] } : { text: 'Handed over: /work/report.md holds the report.' };
+  const f = fixture({ lead, specialist });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done']);
+    assert.equal(done.review.approved, true); assert.equal(done.review.file, 'report.md');
+    assert.match(done.result, /^# Report[\s\S]*from the file\.$/, 'the result is the file content, not a copy typed by the lead');
+  } finally { await f.close(); }
+});
+
+test('a review that names a file that does not exist is not approved, and says which path is missing', async () => {
+  const lead = workers => { const worker = workers[0]; return ({ last, system }) => {
+    if (last.type === 'human') return { calls: [call('task', { subagent_type: worker, description: 'Write the report' })] };
+    if (last.type === 'tool' && REVIEW.test(last.text)) return { text: 'Review not approved: ' + last.text };
+    if (last.type === 'tool') return { calls: [call('record_review', { approved: true, summary: 'Looks fine.', criteria: criteria(system).map(id => ({ id, passed: true, evidence: 'Yes.' })), deliverablePath: '/work/missing.md' })] };
+    return { text: 'ok' };
+  }; };
+  const f = fixture({ lead });
+  try {
+    const id = start(f); const job = await until(f.engine, id, ['done', 'blocked', 'escalated', 'awaiting_ceo']);
+    assert.equal(job.reviews[0].approved, false);
+    const said = job.events.find(e => e.type === 'run_finished' && /missing\.md/.test(e.message || ''))?.message || job.runs.find(r => r.role === 'lead')?.output || '';
+    assert.match(said + job.error, /no file at \/work\/missing\.md/);
+  } finally { await f.close(); }
+});
+
 test('a task that runs past the time limit is blocked with a plain reason', async () => {
   const f = fixture({ settings: { runTimeoutMinutes: 0.002 }, specialist: () => ({ text: 'Slow.', wait: 1500 }) });
   try { const id = start(f); const job = await until(f.engine, id, ['blocked']); assert.match(job.error, /no progress/); assert.equal(f.engine.notifications.list()[0].kind, 'blocked'); }
