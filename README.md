@@ -31,6 +31,7 @@ It runs on API keys from any provider: Anthropic, OpenAI, OpenRouter (GLM, Kimi 
 - **Teams & people** — add, rename and remove teams (up to 10; a team is a lead and up to six specialists), each person's job and standing instructions (both required) and model, the team's purpose and working instructions (its charter, required; the six default teams ship with one), review criteria, automated checks, tools, pace, standing rules, and tests.
 - **Models & keys** — provider keys, then the models you activate from each provider's own list (nothing is built in), and who runs on what (office default, Program Manager, leads, specialists, reviews, chat).
 - **Tools & connectors** — MCP servers by URL or local command, sign-in in a new window, which teams may use each, and approval rules per tool.
+- **Vault** — keys, database connections and SSH targets that agents use through the office without ever seeing the secret; see Connectors and approvals below.
 - **Skills** — reusable methods you give to teams or people, typed by you or added from the Agency. See [SKILLS.md](SKILLS.md).
 - **Routines** — tasks the office starts on its own clock, for any team.
 - **Reports & KPIs** — throughput, cycle time, review wait, your response time, rework, overdue work, tokens by model.
@@ -60,6 +61,12 @@ A routine is a task the office starts by itself: "every weekday at 8am, triage t
 ## The Brain
 
 The company's shared knowledge: your uploads, the office purpose, finished work (`Agents Office/`) and daily digests (`Digests/`). The Program Manager, leads and specialists search it before and during work, and each result lists the notes it used. Search is full-text (Zvec, with a SQLite fallback). In production the Brain lives in `data/knowledge`; the sample notes in `brain/` are for a fresh install.
+
+## Connectors and approvals
+
+Connectors are MCP servers the office connects to itself (Manage → Tools & connectors): add one by URL or local command, sign in in a new window, then choose which teams may use it. Any tool that sends, posts, pays, deletes or changes something outside the office pauses for your approval and runs once after it; the office decides from the tool's name and description, and Approval rules override that per tool.
+
+Keys, passwords and SSH credentials live in the **Vault** (Manage → Vault), a secret store like a code host's. An entry is an outside service (a base address, the header it expects, the key), a database connection (Postgres or MySQL: host, port, database, user, password, read-only unless you untick it) or an SSH target (host, port, user, a private key or a password, optionally the command prefixes it may run and its host key fingerprint); each can be limited to some teams. Agents use an entry through the office and never see the value. `api_get` reads from a service; `api_request` and `api_upload` change something there and wait for you. `db_list` shows a team its databases, `db_schema` lists tables and columns, `db_query` runs one read statement (SELECT, WITH … SELECT, SHOW or EXPLAIN; one statement, no comments, at most 200 rows and 100 KB, a SELECT without LIMIT gets LIMIT 200), and `db_write` runs one INSERT, UPDATE or DELETE on a connection you marked writable, after your approval; DROP, ALTER, TRUNCATE, GRANT and the like are never run, whatever you answer. `ssh_list` shows a team its targets and `ssh_run` runs one command on one of them, always after your approval; a target with allowed prefixes runs only commands that start with one of them, and `rm -rf /`, `mkfs`, `dd if=`, `shutdown`, `reboot`, fork bombs and their kind are refused outright. A connection that fails three times in a row is paused for a minute. Every call is written to the task's timeline without the secret, and a secret that shows up in an answer is masked before an agent or a log sees it. The drivers are optional: `npm install pg mysql2 ssh2` adds them; without one, the tool says so.
 
 ## Keys
 
@@ -107,6 +114,7 @@ CHECK_LIVE=1 npm run check   # … plus one real task through your model provide
 | `scheduler.mjs` · `routines.mjs` | Overdue notices, reminders, the daily digest, retention; routines |
 | `knowledge.mjs` · `knowledge-index.mjs` · `documents.mjs` | The Brain, its search index, document text extraction |
 | `office-store.mjs` · `settings.mjs` · `tool-store.mjs` · `audit.mjs` | Teams and people, office settings, connectors, the audit log |
+| `vault.mjs` · `connectors/` | The Vault; the database (`database.mjs`) and SSH (`ssh.mjs`) connectors behind it |
 | `data/` | Everything the office stores (ignored by git): `office.json`, `providers.json`, `settings.json`, `tools.json`, `workflows.sqlite`, `knowledge/` |
 | `deploy/` | Running it as a service ([deploy/README.md](deploy/README.md)) |
 

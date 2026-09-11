@@ -1,7 +1,9 @@
 // The Vault: a secret store like a code host's, for the credentials agents use without ever seeing them. Every entry has a kind:
 //   api       an outside service (base address, the header it expects, the key) that agents call through api_get / api_request
-//   database  a database connection (host, port, database, user, password) for the database connector
-//   ssh       an SSH target (host, port, user, private key or password) for the SSH connector
+//   database  a database connection (engine, host, port, database, user, password; read-only unless the CEO unticks it) that agents
+//             query with db_query and, when writable, change with db_write after the CEO's approval
+//   ssh       an SSH target (host, port, user, private key or password; optional allowed command prefixes and host key fingerprint)
+//             that agents run one command on with ssh_run, after the CEO's approval
 // The CEO adds an entry under Settings → Vault; the office injects the secret where it is needed; the secret never reaches a
 // prompt, a report, a log or the API (which only ever says whether one is stored).
 import fs from 'node:fs';
@@ -9,6 +11,9 @@ import path from 'node:path';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const text = (value, max) => String(value ?? '').trim().slice(0, max);
+const flag = value => !(value === false || value === 0 || /^(false|no|0|off)$/i.test(String(value ?? '').trim()));
+// Command prefixes for an SSH target: an array, or one per line; blanks and repeats dropped.
+const allowList = value => [...new Set((Array.isArray(value) ? value : String(value ?? '').split(/\r?\n/)).map(v => text(v, 200)).filter(Boolean))].slice(0, 50);
 export const VAULT_KINDS = ['api', 'database', 'ssh'];
 
 export class VaultStore {
@@ -39,8 +44,15 @@ export class VaultStore {
       Object.assign(entry, { baseURL: url.origin + url.pathname.replace(/\/+$/, ''), authHeader, authPrefix: input.authPrefix === undefined ? (before?.authPrefix ?? 'Bearer ') : String(input.authPrefix).slice(0, 40) });
     } else {
       const host = text(input.host ?? before?.host, 253); if (!host) fail('Give the host name or address.');
-      const port = Number(input.port ?? before?.port ?? (kind === 'ssh' ? 22 : 5432)); if (!Number.isInteger(port) || port < 1 || port > 65535) fail('Port must be a number between 1 and 65535.');
-      Object.assign(entry, { host, port, username: text(input.username ?? before?.username, 120), ...(kind === 'database' ? { database: text(input.database ?? before?.database, 120), engine: text(input.engine ?? before?.engine, 40) || 'postgres' } : {}) });
+      // Only the engines the connector speaks; the port defaults to the engine's.
+      const engine = kind === 'database' ? (text(input.engine ?? before?.engine, 40) || 'postgres').toLowerCase() : '';
+      if (kind === 'database' && !/^(postgres|postgresql|mysql|mariadb)$/.test(engine)) fail('Engine must be postgres or mysql.');
+      const port = Number(input.port ?? before?.port ?? (kind === 'ssh' ? 22 : /^(mysql|mariadb)$/.test(engine) ? 3306 : 5432)); if (!Number.isInteger(port) || port < 1 || port > 65535) fail('Port must be a number between 1 and 65535.');
+      Object.assign(entry, { host, port, username: text(input.username ?? before?.username, 120) });
+      // A database is read-only unless the CEO unticks it (then db_write may change data, each statement approved by the CEO).
+      if (kind === 'database') Object.assign(entry, { database: text(input.database ?? before?.database, 120), engine, readOnly: input.readOnly === undefined ? before?.readOnly ?? true : flag(input.readOnly) });
+      // An SSH target may allow only some command prefixes (none = any command; the CEO approves every command either way) and may pin its host key.
+      else Object.assign(entry, { allow: allowList(input.allow === undefined ? before?.allow : input.allow), fingerprint: text(input.fingerprint ?? before?.fingerprint, 120) });
     }
     this.value.services = [...this.value.services.filter(s => s.id !== id), entry].sort((a, b) => a.id.localeCompare(b.id));
     this.save();

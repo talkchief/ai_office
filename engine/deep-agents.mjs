@@ -15,6 +15,8 @@ import { ROOT } from '../config.mjs';
 import { programManagerPrompt, leadPrompt, specialistPrompt, leadName } from './prompts.mjs';
 import { exportPdfTool, exportPptxTool, assembleFilesTool, listWorkspaceFiles, workspaceFile } from './documents.mjs';
 import { fetchWithRetries } from '../models.mjs';
+import { DatabasePool, validateQuery, markdownTable, schemaText } from '../connectors/database.mjs';
+import { SshRunner, validateCommand } from '../connectors/ssh.mjs';
 
 // Deep Agents gives every agent that has subagents a built-in "general-purpose" worker with the parent's own tools. In this
 // office every worker is a named person on a team, reviewed by a lead, so that worker is switched off for every provider
@@ -32,8 +34,9 @@ export const TERMINAL = new Set(['done', 'cancelled']);
 const LIVE_EVENTS = new Set(['run_started', 'run_finished', 'review_recorded', 'decision_requested', 'decision', 'question', 'escalated', 'completed', 'blocked']);
 // When the Program Manager chooses the teams, only the leads it actually involved must approve.
 export const involved = job => [...new Set((job.runs || []).filter(r => r.role === 'lead' && r.dept).map(r => r.dept))];
-// Calls that change something outside the office through the Vault pause for the CEO, like every outbound action.
-export const VAULT_APPROVALS = { api_request: { allowedDecisions: ['approve', 'edit', 'reject'] }, api_upload: { allowedDecisions: ['approve', 'reject'] } };
+// Calls that change something outside the office through the Vault pause for the CEO, like every outbound action: a request to an
+// outside service, an upload, a data change on a database, a command on a server. Reads (api_get, db_query, db_schema) are free.
+export const VAULT_APPROVALS = { api_request: { allowedDecisions: ['approve', 'edit', 'reject'] }, api_upload: { allowedDecisions: ['approve', 'reject'] }, db_write: { allowedDecisions: ['approve', 'edit', 'reject'] }, ssh_run: { allowedDecisions: ['approve', 'edit', 'reject'] } };
 export const DEFAULT_SETTINGS = { maxConcurrentJobs: 2, runTimeoutMinutes: 20, escalateAfterHours: 1, outboundTools: [], readOnlyTools: [] };
 const clean = value => String(value ?? '').trim();
 const httpError = (message, status = 400) => Object.assign(new Error(message), { status });
@@ -70,7 +73,7 @@ export function isProviderError(error) {
 }
 
 export class OfficeEngine {
-  constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent, pmSkillsDir = null, toolLabels = () => ({}), memoryFactory = null, projectFor = () => null, brain = null, vault = null }) {
+  constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent, pmSkillsDir = null, toolLabels = () => ({}), memoryFactory = null, projectFor = () => null, brain = null, vault = null, connectors = {} }) {
     fs.mkdirSync(dataDir, { recursive: true });
     this.workspaces = path.join(dataDir, 'workspaces'); this.knowledgeDir = knowledgeDir || path.join(dataDir, 'knowledge');
     this.saver = SqliteSaver.fromConnString(path.join(dataDir, 'workflows.sqlite')); this.db = this.saver.db;
@@ -81,6 +84,8 @@ export class OfficeEngine {
     this.memory = memoryFactory ? memoryFactory(this.db) : null;
     this.notifications = new Notifications({ db: this.db, bus }); this.threads = new Threads({ db: this.db, bus });
     this.running = new Map(); this.waiting = []; this.faults = []; this.brain = brain; this.vault = vault; this.followUps = new Map(); this.gates = new Map(); this.closed = false; this.providerTrouble = [];
+    // The database and SSH connectors behind the Vault's entries; tests inject fakes, the office uses the real ones.
+    this.connectors = { pool: connectors.pool || new DatabasePool(), ssh: connectors.ssh || new SshRunner() };
   }
   settings() { return { ...DEFAULT_SETTINGS, ...(this.settingsFn() || {}) }; }
   /* ---------- records ---------- */
@@ -379,12 +384,12 @@ export class OfficeEngine {
         const { model, provider } = await make('specialist', agent, team);
         const set = this.toolHub ? this.toolHub.toolsFor({ agent, team, provider, evaluation }) : { tools: [], interruptOn: {} };
         subagents.push({ name: agent.id, description: `${agent.name}, ${agent.role}. ${agent.does || ''}`.slice(0, 600), systemPrompt: specialistPrompt({ office, team, agent, leadAgent: lead, toolLabels }),
-          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id), ...this.vaultTools(job.id, team, agent.id)], interruptOn: { ...set.interruptOn, ...VAULT_APPROVALS }, middleware: [this.pace(job.id, team, agent.id, signal), this.loopGuard(job.id, agent.id), this.specialistReadGuard(job.id, agent.id)] });
+          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id), ...this.vaultTools(job.id, team, agent.id), ...this.connectorTools(job.id, team, agent.id)], interruptOn: { ...set.interruptOn, ...VAULT_APPROVALS }, middleware: [this.pace(job.id, team, agent.id, signal), this.loopGuard(job.id, agent.id), this.specialistReadGuard(job.id, agent.id)] });
       }
       const { model, provider } = await make('lead', lead, team);
       const spotChecks = this.toolHub ? this.toolHub.toolsFor({ agent: lead, team, provider, evaluation, readOnly: true }).tools : [];
       const graph = this.agentFactory({ name: leadName(team.id), model, systemPrompt: leadPrompt({ office, team, lead, specialists, reworkRounds: reworkRounds(team), toolLabels }),
-        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), this.brainTool(job.id, lead.id), ...this.vaultTools(job.id, team, lead.id), ...spotChecks], interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...VAULT_APPROVALS }, subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
+        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), this.brainTool(job.id, lead.id), ...this.vaultTools(job.id, team, lead.id), ...this.connectorTools(job.id, team, lead.id), ...spotChecks], interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...VAULT_APPROVALS }, subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
       leads.push({ name: leadName(team.id), description: `${team.name} team, led by ${lead.name}.${team.purpose ? ' ' + team.purpose : ''}`.slice(0, 600), runnable: graph });
     }
     const { model } = await make('pm', null, null);
@@ -470,6 +475,67 @@ export class OfficeEngine {
       } catch (error) { return `The upload of /work/${f.rel} failed: ${String(error?.cause?.message || error?.message || error).slice(0, 200)}`; }
     }, { name: 'api_upload', description: 'Upload one workspace file’s bytes with PUT to an https address you were handed by an outside service (a presigned upload address). This sends data outside the office, so it pauses for the CEO’s approval first.', schema: z.object({ url: z.string().describe('The full https address to PUT to'), file: z.string().describe('The file under /work/ to send'), contentType: z.string().optional() }) });
     return [list, get, request, upload];
+  }
+  // The database and SSH connectors behind the Vault: db_list, db_schema and db_query read (free); db_write changes data on a
+  // connection the CEO marked writable and pauses for the CEO; ssh_run runs one command on a target and always pauses for the CEO.
+  // The office holds the password or key, the agent never sees it, every answer is masked, and every call is on the task's timeline.
+  connectorTools(jobId, team, agentId) {
+    if (!this.vault) return [];
+    const { pool, ssh } = this.connectors;
+    const entryOf = (kind, id) => this.vault.forTeam(team.id, kind).find(e => e.id === clean(id));
+    const mask = text => this.vault.mask(String(text ?? ''));
+    const note = line => this.event(jobId, 'connector_called', agentId, mask(line).slice(0, 300));
+    const missing = (kind, id, listTool) => `Refused: "${id}" is not ${kind === 'ssh' ? 'an SSH target' : 'a database connection'} in the Vault for your team. Call ${listTool}; if it is missing, say in your report that the CEO must add it under Settings → Vault, and stop.`;
+    const noSecret = e => `Refused: the Vault has "${e.id}" but no ${e.kind === 'ssh' ? 'key or password' : 'password'} yet. Report that the CEO must add it under Settings → Vault, and stop.`;
+    const failure = (what, error) => `${what} failed: ${mask(error?.message || error).slice(0, 300)}`;
+    const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+    const dbLine = e => `- ${e.id} (${e.name}): ${e.engine} database "${e.database}" at ${e.host}:${e.port}${e.username ? ' as ' + e.username : ''}, ${e.readOnly === false ? 'writable (db_write pauses for the CEO)' : 'read-only'}${e.secret ? '' : ' — no password stored yet'}${e.notes ? ': ' + e.notes : ''}`;
+    const dbList = tool(async () => {
+      const all = this.vault.forTeam(team.id, 'database'); note(`db_list → ${plural(all.length, 'connection')}`);
+      return all.length ? 'Database connections your team may use (the office holds the password; you never see it):\n' + all.map(dbLine).join('\n') : 'The Vault holds no database connection for your team. If the work needs one, say so in your report: the CEO adds it under Settings → Vault.';
+    }, { name: 'db_list', description: 'List the database connections your team may query through the office Vault: id, engine, host, database, and whether it is read-only or writable. Passwords stay in the Vault; you never see or type one.', schema: z.object({}) });
+    const dbSchema = tool(async ({ database }) => {
+      const e = entryOf('database', database); if (!e) return missing('database', database, 'db_list'); if (!e.secret) return noSecret(e);
+      try {
+        const tables = await pool.schema(e); note(`db_schema ${e.id} → ${plural(tables.length, 'table')}`);
+        const text = schemaText(tables); return mask(text.length > 60000 ? text.slice(0, 60000) + '\n… (cut at 60 KB; ask db_query about information_schema.columns for the rest)' : text);
+      } catch (error) { note(`db_schema ${e.id} failed: ${error?.message || error}`); return failure(`Reading the tables of ${e.id}`, error); }
+    }, { name: 'db_schema', description: 'List the tables and columns (with types) of a database from db_list. Call it before writing SQL.', schema: z.object({ database: z.string().describe('The connection id from db_list') }) });
+    const dbQuery = tool(async ({ database, sql }) => {
+      const e = entryOf('database', database); if (!e) return missing('database', database, 'db_list');
+      const v = validateQuery(sql, { readOnly: e.readOnly !== false }); if (!v.ok) return v.reason;
+      if (v.kind === 'write') return 'Refused: that statement changes data. Call db_write with it; db_write pauses for the CEO’s approval first.';
+      if (!e.secret) return noSecret(e);
+      try { const r = await pool.query(e, v.sql, { timeoutMs: 15000 }); note(`db_query ${e.id}: ${v.sql.slice(0, 120)} → ${plural(r.rowCount, 'row')} in ${r.ms} ms`); return mask(markdownTable(r)); }
+      catch (error) { note(`db_query ${e.id} failed: ${error?.message || error}`); return failure(`The query on ${e.id}`, error); }
+    }, { name: 'db_query', description: 'Run one read statement (SELECT, WITH … SELECT, SHOW or EXPLAIN) on a database from db_list; the office adds the password. One statement, no comments; at most 200 rows and 100 KB come back, and a SELECT without LIMIT gets LIMIT 200. Returns a Markdown table.', schema: z.object({ database: z.string().describe('The connection id from db_list'), sql: z.string().describe('One SQL statement') }) });
+    const dbWrite = tool(async ({ database, sql, why }) => {
+      const e = entryOf('database', database); if (!e) return missing('database', database, 'db_list');
+      if (e.readOnly !== false) return `Refused: "${e.id}" is read-only. If the change is needed, say so in your report; the CEO can allow writes on it under Settings → Vault.`;
+      const v = validateQuery(sql, { readOnly: false }); if (!v.ok) return v.reason;
+      if (v.kind !== 'write') return 'Refused: db_write is for one INSERT, UPDATE or DELETE; use db_query to read.';
+      if (!e.secret) return noSecret(e);
+      try {
+        const r = await pool.query(e, v.sql, { timeoutMs: 30000 }), n = r.affected ?? r.rowCount;
+        note(`db_write ${e.id}: ${v.sql.slice(0, 120)} → ${plural(n, 'row')} in ${r.ms} ms${clean(why) ? ' (' + clean(why).slice(0, 100) + ')' : ''}`);
+        return mask(r.rows.length ? markdownTable(r) : `Done: ${plural(n, 'row')} affected in ${r.ms} ms.`);
+      } catch (error) { note(`db_write ${e.id} failed: ${error?.message || error}`); return failure(`The change on ${e.id}`, error); }
+    }, { name: 'db_write', description: 'Run one INSERT, UPDATE or DELETE on a database the CEO marked writable in the Vault. This changes data outside the office, so it pauses for the CEO’s approval first; say in why what the change is for. DROP, ALTER, TRUNCATE, GRANT and the like are never run, and a read-only connection refuses every write.', schema: z.object({ database: z.string().describe('The connection id from db_list'), sql: z.string().describe('One INSERT, UPDATE or DELETE statement'), why: z.string().optional().describe('One sentence the CEO reads before approving') }) });
+    const sshLine = e => `- ${e.id} (${e.name}): ${e.username ? e.username + '@' : ''}${e.host}:${e.port}, ${e.secret ? (/^-----BEGIN /.test(String(e.secret).trim()) ? 'key stored' : 'password stored') : 'no key or password yet'}, ${e.allow?.length ? 'commands allowed: ' + e.allow.join(', ') : 'any command, each approved by the CEO'}${e.notes ? ': ' + e.notes : ''}`;
+    const sshList = tool(async () => {
+      const all = this.vault.forTeam(team.id, 'ssh'); note(`ssh_list → ${plural(all.length, 'target')}`);
+      return all.length ? 'SSH targets your team may use (the office holds the key or password; you never see it):\n' + all.map(sshLine).join('\n') : 'The Vault holds no SSH target for your team. If the work needs one, say so in your report: the CEO adds it under Settings → Vault.';
+    }, { name: 'ssh_list', description: 'List the SSH targets your team may run commands on through the office Vault: id, user and host, and the command prefixes each allows.', schema: z.object({}) });
+    const sshRun = tool(async ({ target, command }) => {
+      const e = entryOf('ssh', target); if (!e) return missing('ssh', target, 'ssh_list');
+      const v = validateCommand(command, e); if (!v.ok) return v.reason;
+      if (!e.secret) return noSecret(e);
+      try {
+        const r = await ssh.run(e, v.command, { timeoutMs: 60000 }); note(`ssh_run ${e.id}: ${v.command.slice(0, 120)} → exit ${r.code ?? 'none'} in ${r.ms} ms${r.timedOut ? ' (stopped)' : ''}`);
+        return mask(`${r.timedOut ? 'Stopped: the command did not finish in time' : `Exit code ${r.code ?? 'unknown'}`} (${r.ms} ms).${r.stdout.trim() ? '\nOutput:\n' + r.stdout.trim() : '\nNo output.'}${r.stderr.trim() ? '\nErrors:\n' + r.stderr.trim() : ''}${r.truncated ? '\n(output cut at 50 KB)' : ''}`);
+      } catch (error) { note(`ssh_run ${e.id} failed: ${error?.message || error}`); return failure(`The command on ${e.id}`, error); }
+    }, { name: 'ssh_run', description: 'Run one shell command on an SSH target from ssh_list, as the user stored in the Vault. This acts on a machine outside the office, so it always pauses for the CEO’s approval first. One command per call, on one line; wait for the output before the next. A target may allow only some command prefixes; rm -rf /, mkfs, dd if=, shutdown and reboot are never run.', schema: z.object({ target: z.string().describe('The target id from ssh_list'), command: z.string().describe('One shell command') }) });
+    return [dbList, dbSchema, dbQuery, dbWrite, sshList, sshRun];
   }
   // A subagent whose model replies with nothing (no text, no tool call: a provider hiccup) is sent the assignment once more; if it
   // happens twice the caller is told plainly. Deep Agents would otherwise report "Task completed" and the caller would believe it.
@@ -816,5 +882,5 @@ export class OfficeEngine {
     }
     this.pump();
   }
-  async close() { this.closed = true; for (const entry of this.running.values()) entry.controller.abort(new Error('The server is stopping.')); await Promise.allSettled([...this.running.values()].map(e => e.promise)); this.db.close(); }
+  async close() { this.closed = true; for (const entry of this.running.values()) entry.controller.abort(new Error('The server is stopping.')); await Promise.allSettled([...this.running.values()].map(e => e.promise)); try { await this.connectors?.pool?.close?.(); } catch {} this.db.close(); }
 }

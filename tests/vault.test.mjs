@@ -46,7 +46,7 @@ test('agents call an outside service through the office: the key is injected, ne
   const job = engine.create({ dept: 'marketing', text: 'Publish the page.', autoStart: false });
   const [list, get, request, upload] = engine.vaultTools(job.id, office.team('marketing'), 'mlead');
   assert.deepEqual([list.name, get.name, request.name, upload.name], ['vault_list', 'api_get', 'api_request', 'api_upload']);
-  assert.deepEqual(Object.keys(VAULT_APPROVALS), ['api_request', 'api_upload'], 'the two calls that change something outside the office pause for the CEO');
+  assert.deepEqual(Object.keys(VAULT_APPROVALS), ['api_request', 'api_upload', 'db_write', 'ssh_run'], 'the calls that change something outside the office pause for the CEO');
   const listed = await list.invoke({});
   assert.match(listed, /here\.now \(here\.now\) at https:\/\/here\.now\/api\/v1/); assert.ok(!listed.includes('crm'), 'a service limited to Sales is not offered to Marketing'); assert.ok(!listed.includes('sk-live'));
   const calls = []; const realFetch = globalThis.fetch;
