@@ -11,8 +11,8 @@ import { assignOwners } from './migrations.mjs';
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 
 export class TenantRegistry {
-  constructor({ accounts, platform, dir, version = '?', agency = new Agency(), log = console.log, idleMs = 30 * 60000, maxLoaded = 50, now = () => Date.now(), brainTemplate = null, createInstance = createOfficeInstance, cfg = {} }) {
-    Object.assign(this, { accounts, platform, dir, version, agency, log, idleMs, maxLoaded, now, brainTemplate, createInstance, cfg });
+  constructor({ accounts, platform, dir, version = '?', agency = new Agency(), log = console.log, idleMs = 30 * 60000, maxLoaded = 50, now = () => Date.now(), brainTemplate = null, createInstance = createOfficeInstance, cfg = {}, onLoad = null }) {
+    Object.assign(this, { accounts, platform, dir, version, agency, log, idleMs, maxLoaded, now, brainTemplate, createInstance, cfg, onLoad });
     this.instances = new Map(); this.loading = new Map(); this.timer = null; this.lastScan = 0;
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -50,6 +50,7 @@ export class TenantRegistry {
     try { await instance.scheduler.tick(); } catch (error) { console.warn(`scheduler (${tenant.slug}):`, error.message); }
     instance.start();
     this.instances.set(id, { instance, lastUsed: this.now(), loadedAt: this.now() });
+    try { this.onLoad?.(instance); } catch (error) { console.warn('on load:', error.message); }
     this.log(`  office loaded: ${tenant.name} (${tenant.slug})`);
     return instance;
   }

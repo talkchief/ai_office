@@ -192,7 +192,7 @@ await step('tests: the full suite passes', async () => {
 {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ao-hosted-'));
   const port = 4900 + Math.floor(Math.random() * 300), base = `http://127.0.0.1:${port}`;
-  const env = { ...process.env, PORT: String(port), HOST: '127.0.0.1', AO_MODE: 'hosted', AO_TENANTS_DIR: path.join(tmp, 'tenants'), AO_ACCOUNTS: path.join(tmp, 'accounts.sqlite'), AO_PLATFORM_DIR: path.join(tmp, 'platform'), AO_PLATFORM_ADMINS: 'admin@check.test', AO_PUBLIC_ORIGIN: base, AO_MAIL_DRY_RUN: '1', AO_MAIL_DOMAIN: 'check.test', AO_MAIL_PROVIDER: 'postmark', AO_MAIL_WEBHOOK_SECRET: 'check-secret' };
+  const env = { ...process.env, PORT: String(port), HOST: '127.0.0.1', AO_MODE: 'hosted', AO_TENANTS_DIR: path.join(tmp, 'tenants'), AO_ACCOUNTS: path.join(tmp, 'accounts.sqlite'), AO_PLATFORM_DIR: path.join(tmp, 'platform'), AO_PLATFORM_ADMINS: 'admin@check.test', AO_PUBLIC_ORIGIN: base, AO_MAIL_DRY_RUN: '1', AO_MAIL_DOMAIN: 'check.test', AO_MAIL_PROVIDER: 'postmark', AO_MAIL_WEBHOOK_SECRET: 'check-secret', AO_MAIL_OUTBOX: path.join(tmp, 'mail-outbox.json') };
   delete env.AO_DATA; delete env.AO_BRAIN;
   const srv = spawn(NODE, ['serve.mjs'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = ''; srv.stdout.on('data', d => { log += d; }); srv.stderr.on('data', d => { log += d; });
@@ -266,6 +266,27 @@ await step('tests: the full suite passes', async () => {
       const tenants = await call('/api/admin/tenants', 'GET', undefined, 'admin'); if (!tenants.json.tenants.some(t => t.slug === 'check-co' && t.users === 2)) throw new Error('tenants: ' + JSON.stringify(tenants.json).slice(0, 200));
       const prov = await call('/api/admin/providers', 'GET', undefined, 'admin'); if (!prov.ok || !Array.isArray(prov.json.providers)) throw new Error('admin providers: ' + prov.status);
       return `${saved.json.error} · ${tenants.json.tenants.length} offices listed`;
+    });
+    await step('hosted: mail — a verified sender’s message becomes a task with its file; a repeat is one task; a stranger is dropped and audited', async () => {
+      const profile = await call('/api/mail/profile'); if (!profile.ok || !profile.json.address) throw new Error('profile: ' + JSON.stringify(profile.json));
+      const fixture = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'postmark-inbound.json'), 'utf8')), to = profile.json.address;
+      const payload = (from, id) => JSON.stringify({ ...fixture, MessageID: id, From: from, FromFull: { Email: from, Name: 'Sender', MailboxHash: '' }, To: to, ToFull: [{ Email: to, Name: '', MailboxHash: '' }], OriginalRecipient: to });
+      const hook = (body, auth = 'Basic ' + Buffer.from('postmark:check-secret').toString('base64')) => fetch(base + '/api/mail/inbound/postmark', { method: 'POST', headers: { 'content-type': 'application/json', ...(auth ? { authorization: auth } : {}) }, body }).then(async r => ({ status: r.status, json: await r.json().catch(() => null) }));
+      const noAuth = await hook(payload('owner@check.test', 'm-0'), null); if (noAuth.status !== 401) throw new Error('webhook without the secret: ' + noAuth.status);
+      const first = await hook(payload('owner@check.test', 'm-1')); if (first.status !== 202) throw new Error('webhook: ' + first.status + ' ' + JSON.stringify(first.json));
+      const dup = await hook(payload('owner@check.test', 'm-1')); if (dup.status !== 200 || !dup.json?.duplicate) throw new Error('duplicate: ' + dup.status + ' ' + JSON.stringify(dup.json));
+      let task = null; for (let i = 0; i < 40 && !task; i++) { task = (await call('/api/tasks')).json.find(t => t.origin?.channel === 'email'); if (!task) await new Promise(r => setTimeout(r, 250)); }
+      if (!task) throw new Error('no task came out of the email');
+      const detail = await call('/api/tasks/' + task.id);
+      if (!detail.json.files.some(f => /brief\.pdf$/.test(f.name))) throw new Error('files: ' + JSON.stringify(detail.json.files)); if (!detail.json.attachments?.some(a => a.name === 'brief.pdf')) throw new Error('attachments: ' + JSON.stringify(detail.json.attachments));
+      if (detail.json.attachments.some(a => a.name === 'macro.xlsm')) throw new Error('a refused file type was attached');
+      const stranger = await hook(payload('stranger@else.test', 'm-2')); if (stranger.status !== 202) throw new Error('stranger: ' + stranger.status);
+      await new Promise(r => setTimeout(r, 800));
+      const emailTasks = (await call('/api/tasks')).json.filter(t => t.origin?.channel === 'email'); if (emailTasks.length !== 1) throw new Error(`${emailTasks.length} email tasks; expected one`);
+      const audit = await call('/api/audit?area=mail'); if (!audit.json.some(a => /not verified/.test(a.summary))) throw new Error('the dropped mail was not audited: ' + JSON.stringify(audit.json.map(a => a.summary)));
+      const outbox = JSON.parse(fs.readFileSync(path.join(tmp, 'mail-outbox.json'), 'utf8')), receipt = outbox.find(m => /^Received\./.test(m.text));
+      if (!receipt || receipt.inReplyTo !== '<CAF1=abc123@mail.acme.test>' || !/\[AO-[a-z0-9]{8}\]/.test(receipt.subject)) throw new Error('receipt: ' + JSON.stringify(outbox.map(m => [m.subject, m.inReplyTo])));
+      return `“${task.title}” · brief.pdf attached, macro.xlsm refused · repeat ignored · stranger dropped and audited · receipt threaded`;
     });
     await step('hosted: the audit log names the person', async () => {
       const rows = await call('/api/audit'); if (!rows.json.some(a => a.actor === 'owner@check.test')) throw new Error('actors: ' + JSON.stringify(rows.json.map(a => a.actor).slice(0, 5)));

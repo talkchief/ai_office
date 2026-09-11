@@ -130,6 +130,27 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   const banner = (kind, html, actions = '') => `<div class="mg-banner mg-banner-${kind}"><span class="mg-glyph">${{ fail: '✕', warn: '!', ok: '✓', info: 'i' }[kind]}</span><div>${html}</div>${actions ? `<div class="mg-actions">${actions}</div>` : ''}</div>`;
 
   /* ---------- Profile: the company's name and purpose (and, hosted, your own account) ---------- */
+  // Email intake (hosted): the address that turns mail into tasks, who may write to it, and a test message.
+  function mailCard(mail) {
+    if (!mail) return '';
+    const senders = mail.senders || [];
+    return `<div class="mg-card" id="mailCard"><div class="mg-card-head"><h3>Email intake</h3><span class="mg-count">${mail.enabled ? (mail.address ? 'mail to this address becomes a task' : 'no mail domain configured yet') : 'not configured on this platform'}</span></div>
+      ${mail.address ? `<div class="mg-grid">${field('Your office address', `<div class="mg-toolbar" style="margin:0"><code id="mailAlias" style="user-select:all;word-break:break-all;flex:1">${esc(mail.address)}</code><button type="button" class="mg-btn mg-btn-sm" id="mailCopy">Copy</button><button type="button" class="mg-btn mg-btn-sm" id="mailRotate" title="A new random part: the old address stops working">New address</button></div>`, 'The Program Manager takes what you send here as a task: the subject is the title, the body the brief, attachments the task’s files. A question is answered on the same thread. Reply to a receipt to add a note to that task.')}
+        ${field('Who may write to it', `<div>${senders.map(x => `<div class="mg-toolbar" style="margin:0 0 6px"><span style="flex:1">${esc(x.address)} ${x.verifiedAt ? mark('ok', 'Verified') : x.pending ? mark('warn', 'Code sent') : mark('off', 'Code expired')}</span>${x.verifiedAt ? '' : `<input data-code="${esc(x.id)}" inputmode="numeric" maxlength="6" placeholder="6-digit code" style="width:110px"><button type="button" class="mg-btn mg-btn-sm" data-verify="${esc(x.id)}">Verify</button>`}<button type="button" class="mg-btn mg-btn-sm mg-btn-danger" data-remove-sender="${esc(x.id)}">Remove</button></div>`).join('')}
+          <form id="senderForm" class="mg-toolbar" style="margin:6px 0 0"><input name="address" type="email" required placeholder="you@your-other-mail.com" style="flex:1;min-width:200px"><button type="submit" class="mg-btn mg-btn-sm">Add sender</button></form></div>`, `Your account email (${esc(USER.email)}) always may. Any other address gets a six-digit code by mail and works once you enter it here. Mail from anyone else is dropped silently.`)}
+        ${field('Mail me', `<select id="mailPref"><option value="mine" ${mail.prefs.notifyByEmail === 'mine' ? 'selected' : ''}>Results and questions of the tasks I emailed</option><option value="all" ${mail.prefs.notifyByEmail === 'all' ? 'selected' : ''}>Results and questions of all my tasks</option><option value="none" ${mail.prefs.notifyByEmail === 'none' ? 'selected' : ''}>Nothing — I use the office</option></select>`, 'Approvals always happen in the office; a mail tells you one is waiting.')}</div>
+        <div class="mg-toolbar" style="margin:12px 0 0"><button type="button" class="mg-btn" id="mailTest">Send yourself a test</button><span class="mg-muted">A private task’s record, thread and files stay private; its approved result is still filed in the shared Brain, which every agent in the office reads.</span></div>` : '<p class="mg-intro">The platform has not set a mail domain (AO_MAIL_DOMAIN), so there is no address to write to yet.</p>'}</div>`;
+  }
+  function bindMail(mail) {
+    if (!mail || !$('mailCard')) return;
+    $('mailCopy')?.addEventListener('click', () => navigator.clipboard?.writeText(mail.address).then(() => toast('Address copied', { kind: 'ok' })).catch(() => {}));
+    $('mailRotate')?.addEventListener('click', async () => { if (!confirm('Give yourself a new address? Mail to the old one stops arriving.')) return; try { await api('/mail/alias/rotate', 'POST', {}); await showProfile(); } catch (error) { feedback(error.message, true); } });
+    $('mailTest')?.addEventListener('click', async () => { try { const r = await api('/mail/test', 'POST', {}); toast(r.dryRun ? 'Test written to the outbox (dry run)' : `Test sent to ${r.to}`, { kind: 'ok' }); } catch (error) { feedback(error.message, true); } });
+    $('mailPref')?.addEventListener('change', async () => { try { await api('/auth/prefs', 'PUT', { notifyByEmail: $('mailPref').value }); toast('Saved', { kind: 'ok' }); } catch (error) { feedback(error.message, true); } });
+    $('senderForm')?.addEventListener('submit', async event => { event.preventDefault(); try { const r = await api('/mail/senders', 'POST', { address: event.target.elements.address.value.trim() }); toast(r.sent ? `Code sent to ${r.address}` : 'Sender added; the code could not be mailed', { kind: r.sent ? 'ok' : 'error' }); await showProfile(); } catch (error) { feedback(error.message, true); } });
+    content.querySelectorAll('[data-verify]').forEach(b => b.onclick = async () => { const code = content.querySelector(`[data-code="${b.dataset.verify}"]`)?.value.trim(); try { await api(`/mail/senders/${b.dataset.verify}/verify`, 'POST', { code }); toast('Sender verified', { kind: 'ok' }); await showProfile(); } catch (error) { feedback(error.message, true); } });
+    content.querySelectorAll('[data-remove-sender]').forEach(b => b.onclick = async () => { try { await api('/mail/senders/' + b.dataset.removeSender, 'DELETE'); await showProfile(); } catch (error) { feedback(error.message, true); } });
+  }
   function bindAccount() {
     const form = $('setAccount'); if (!form) return;
     form.onsubmit = async event => {
@@ -146,12 +167,13 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     try {
       const [s, health, note] = await Promise.all([api('/settings'), api('/health'), api('/knowledge/note?id=' + encodeURIComponent(PURPOSE_ID)).catch(() => null)]);
       const purpose = note ? note.content.replace(/^#\s+.*(?:\r?\n)?/, '').trim() : '';
+      const mail = HOSTED ? await api('/mail/profile').catch(() => null) : null;
       const account = HOSTED && USER ? `<div class="mg-card"><div class="mg-card-head"><h3>Your account</h3><span class="mg-count">${esc(USER.email)} · ${esc(USER.role)}</span></div>
         <form id="setAccount" novalidate><div class="mg-grid">${field('Your name', `<input name="name" value="${esc(USER.name)}" maxlength="80" required>`)}${field('Current password', '<input name="current" type="password" autocomplete="current-password">')}${field('New password', '<input name="next" type="password" autocomplete="new-password" minlength="10">', 'Leave both blank to keep your password. Changing it signs out your other devices.')}</div>
-        <div class="mg-toolbar" style="margin:0"><button type="submit" class="mg-btn mg-btn-primary">Save account</button></div></form></div>` : '';
+        <div class="mg-toolbar" style="margin:0"><button type="submit" class="mg-btn mg-btn-primary">Save account</button></div></form></div>${mailCard(mail)}` : '';
       if (HOSTED && !isOfficeAdmin()) {
         content.innerHTML = account + `<div class="mg-card"><div class="mg-card-head"><h3>The company</h3><span class="mg-count">${esc(s.officeName || health.name || '')}</span></div><p class="mg-intro">${purpose ? esc(purpose).replace(/\n/g, '<br>') : 'The office owner has not written the office purpose yet.'}</p></div>`;
-        bindAccount(); setMeta(mark('ok', 'Member')); return;
+        bindAccount(); bindMail(mail); setMeta(mark('ok', 'Member')); return;
       }
       content.innerHTML = account + `<form id="setProfile" data-dirty novalidate><div class="mg-card"><div class="mg-card-head"><h3>The company</h3><span class="mg-count">shown across the office and told to every agent</span></div>
         <div class="mg-grid">${field('Office name', `<input name="officeName" value="${esc(s.officeName || health.name || '')}" maxlength="80" placeholder="${esc(health.name || 'Your company')}" required>`, 'The company the teams work for. Agents introduce the office by this name.')}</div></div>
@@ -159,7 +181,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         ${field('The business, who you serve, what the teams should achieve, and the constraints', `<textarea name="purpose" rows="12" placeholder="What the company does, for whom, what good work looks like, and what must never happen.">${esc(purpose)}</textarea>`, 'Kept in the Brain as Knowledge/office-purpose.md. Markdown is fine.')}
         ${saveBar({ hint: 'New work uses the new name and purpose at once.', label: 'Save profile' })}</div></form>`;
       setMeta(purpose ? mark('ok', 'Purpose written') : mark('warn', 'No purpose yet'), note?.updatedAt ? `purpose updated ${esc(when(note.updatedAt))}` : ''); refreshMeta('profile', purpose ? mark('ok', 'Purpose written') : mark('warn', 'No purpose yet'));
-      bindAccount();
+      bindAccount(); bindMail(mail);
       $('setProfile').onsubmit = async event => {
         event.preventDefault(); const form = event.target, name = form.elements.officeName.value.trim(), text = form.elements.purpose.value.trim();
         if (!name) { setBar(barOf(form), 'failed', 'Not saved: the office needs a name'); feedback('Give the office a name.', true); form.elements.officeName.focus(); return; }

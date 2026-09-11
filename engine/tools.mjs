@@ -44,7 +44,7 @@ export async function assertPublicUrl(raw, lookup = dns.lookup) {
   if (!addresses.length || addresses.some(a => PRIVATE.some(p => p.test(a.address)) || a.address === 'localhost')) throw new Error('Private and local network addresses cannot be fetched.');
   return url;
 }
-const toText = html => html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<noscript[\s\S]*?<\/noscript>/gi, ' ').replace(/<br\s*\/?>|<\/(p|div|h\d|li|tr)>/gi, '\n').replace(/<[^>]+>/g, ' ')
+export const toText = html => String(html || '').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<noscript[\s\S]*?<\/noscript>/gi, ' ').replace(/<br\s*\/?>|<\/(p|div|h\d|li|tr)>/gi, '\n').replace(/<[^>]+>/g, ' ')
   .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n\n').trim();
 
 // A page that cannot be fetched is a result the agent reads and works around, never an error that ends the run.

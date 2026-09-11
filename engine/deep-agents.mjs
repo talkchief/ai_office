@@ -5,6 +5,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Command } from '@langchain/langgraph';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
+import { safeFileName } from '../channels/channel.mjs';
 import { HumanMessage, ToolMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { createMiddleware, todoListMiddleware } from 'langchain';
@@ -13,7 +14,7 @@ import { z } from 'zod';
 import { officeBackend, FILE_PERMISSIONS, PM_FILE_PERMISSIONS, SKILL_SOURCES } from './backend.mjs';
 import { ROOT } from '../config.mjs';
 import { programManagerPrompt, leadPrompt, specialistPrompt, leadName } from './prompts.mjs';
-import { exportPdfTool, exportPptxTool, assembleFilesTool, listWorkspaceFiles, workspaceFile } from './documents.mjs';
+import { exportPdfTool, exportPptxTool, assembleFilesTool, listWorkspaceFiles, workspaceFile, mimeOf } from './documents.mjs';
 import { fetchWithRetries } from '../models.mjs';
 import { DatabasePool, validateQuery, markdownTable, schemaText } from '../connectors/database.mjs';
 import { SshRunner, validateCommand } from '../connectors/ssh.mjs';
@@ -182,6 +183,28 @@ export class OfficeEngine {
     const audience = this.audience(input);
     this.bus?.publish('task.removed', { id });
     return this.update(id, j => { Object.assign(j, audience); });
+  }
+  // Files handed to a task (mail attachments, uploads) land under /work/inbox/: basename only, usable names, 25 MB per file and per
+  // call, a numbered copy when a name repeats. They are recorded on the task and the team is told to read them before planning.
+  attach(id, files = []) {
+    const job = this.get(id); if (!job) throw httpError('No such task.', 404);
+    if (!Array.isArray(files) || !files.length) throw httpError('Attach at least one file.');
+    if (files.length > 20) throw httpError('Attach up to 20 files at a time.');
+    const dir = path.join(this.workspaceDir(id), 'inbox'); fs.mkdirSync(dir, { recursive: true });
+    const existing = new Set(fs.readdirSync(dir)), saved = []; let total = 0;
+    for (const f of files) {
+      const safe = safeFileName(f?.name); if (!safe) throw httpError(`The file name “${String(f?.name || '').slice(0, 60)}” is not usable.`);
+      const bytes = Buffer.isBuffer(f.bytes) ? f.bytes : Buffer.from(f.bytes || ''); if (!bytes.length) throw httpError(`${safe} is empty.`);
+      total += bytes.length; if (bytes.length > 25 * 1024 * 1024 || total > 25 * 1024 * 1024) throw httpError('Attachments are limited to 25 MB per file and per message.');
+      let name = safe; const ext = path.extname(safe), stem = safe.slice(0, safe.length - ext.length);
+      for (let n = 2; existing.has(name); n++) name = `${stem}-${n}${ext}`;
+      const target = workspaceFile(this.workspaceDir(id), 'inbox/' + name); fs.writeFileSync(target.abs, bytes); existing.add(name);
+      saved.push({ name, bytes: bytes.length, type: f.contentType || mimeOf(name), at: Date.now() });
+      this.event(id, 'file_saved', null, `/work/inbox/${name} (${bytes.length} bytes)`, { path: 'inbox/' + name });
+    }
+    const updated = this.update(id, j => { j.attachments = [...(j.attachments || []), ...saved]; });
+    this.threads.append(id, { role: 'ceo', kind: 'note', text: `Read the attached files under /work/inbox/ before planning: ${saved.map(x => x.name).join(', ')}.`, jobId: id, delivered: !this.running.has(id) });
+    return { attachments: updated.attachments, saved };
   }
   createTestSuite(dept) {
     const team = this.office.team(dept); if (!team?.tests?.length) throw httpError('Save at least one team test first.');

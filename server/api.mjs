@@ -50,6 +50,14 @@ export function registerApi(router, ctx) {
     return accepted(engine.create({ ...input, kind: 'task', testId: undefined, ownerId: user?.id || null, origin: { channel: 'web' }, ...audience(user, input) }));
   });
   router.on('GET', '/api/tasks/:id', ({ params, user }) => { see(params.id, user); return { ...detailShape(engine.detail(params.id), office.get()), files: engine.files(params.id) }; });
+  // Files for a task before it starts (the composer's documents): they land under /work/inbox/ and, when the task belongs to a project, their text is filed in the project's Brain folder.
+  router.on('POST', '/api/tasks/:id/attach', async ({ req, params, user }) => {
+    const job = see(params.id, user); if (job.startedAt) throw httpError('This task has started; add the file as a note with a Brain upload instead.', 409);
+    const input = await body(req, 36 * 1024 * 1024); if (!input.name || !input.data) throw httpError('Send the file name and its content.');
+    const bytes = Buffer.from(String(input.data), 'base64'), out = engine.attach(job.id, [{ name: input.name, contentType: input.type || '', bytes }]);
+    if (job.projectId) { try { const doc = await extractDocument({ name: out.saved[0].name, data: input.data }); if (doc.content?.trim()) await knowledge.upload({ folder: projects.folder(projects.get(job.projectId)), name: doc.name, content: doc.content }); } catch (error) { console.warn('attachment to Brain:', error.message); } }
+    return { attachments: out.attachments };
+  });
   // Who sees a task: its owner or an office admin may change it. Everyone hears the record left, then those who may see it get it back.
   router.on('POST', '/api/tasks/:id/share', async ({ req, params, user }) => {
     const job = see(params.id, user); if (!canShare(user, job)) throw httpError('Only the task’s owner or an office admin can change who sees it.', 403);

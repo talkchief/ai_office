@@ -14,7 +14,7 @@ import { loadConfig, ROOT } from './config.mjs';
 import { createOfficeAccess, sameOrigin, cookieValue } from './auth.mjs';
 import { createOfficeInstance } from './office-instance.mjs';
 import { Router, json } from './server/routes.mjs';
-import { readJsonBody as body } from './http-body.mjs';
+import { readJsonBody as body, readRawBody } from './http-body.mjs';
 import { RateLimiter } from './server/ratelimit.mjs';
 import * as context from './server/request-context.mjs';
 
@@ -33,7 +33,7 @@ const officeAccess = createOfficeAccess(process.env.AO_ACCESS_KEY);
 const unlockLimiter = new RateLimiter({ max: 10, windowMs: 600000, maxKeys: 2000 });
 
 /* ---------- hosted: accounts, the platform, one office per tenant ---------- */
-let platform = null, accounts = null, registry = null, authRouter = null, controlRouter = null, adminRouter = null;
+let platform = null, accounts = null, registry = null, authRouter = null, controlRouter = null, adminRouter = null, mailer = null, intake = null, inboundFromRequest = null;
 const publicOrigin = () => process.env.AO_PUBLIC_ORIGIN || `http://localhost:${cfg.port}`;
 if (HOSTED) {
   const { PlatformStore } = await import('./platform.mjs');
@@ -45,8 +45,13 @@ if (HOSTED) {
   accounts = new Accounts({ file: process.env.AO_ACCOUNTS || path.join(DATA, 'accounts.sqlite') });
   registry = new TenantRegistry({ accounts, platform, dir: process.env.AO_TENANTS_DIR || path.join(ROOT, 'tenants'), version, cfg, idleMs: (Number(process.env.AO_TENANT_IDLE_MINUTES) || 30) * 60000, maxLoaded: Number(process.env.AO_TENANTS_MAX_LOADED) || 50, brainTemplate: process.env.AO_BRAIN_TEMPLATE || null });
   authRouter = new Router(); controlRouter = new Router(); adminRouter = new Router();
+  // Mail intake: a transactional provider's inbound webhook becomes tasks; the office writes receipts, results and questions back.
+  const { mailerFromEnv } = await import('./mail/outbound.mjs'); const { createIntake } = await import('./mail/intake.mjs'); ({ inboundFromRequest } = await import('./mail/inbound.mjs'));
+  mailer = mailerFromEnv(process.env, { outbox: process.env.AO_MAIL_OUTBOX || path.join(platform.dir, 'mail-outbox.json') });
+  intake = mailer ? createIntake({ accounts, registry, mailer, domain: process.env.AO_MAIL_DOMAIN || '', publicOrigin, log: console.log }) : null;
+  registry.onLoad = instance => intake?.watch(instance);
   registerAuthRoutes(authRouter, { accounts, platform, registry, log: console.log });
-  registerAccountsApi(controlRouter, { accounts, platform, publicOrigin, mailDomain: process.env.AO_MAIL_DOMAIN || '' });
+  registerAccountsApi(controlRouter, { accounts, platform, publicOrigin, mailDomain: process.env.AO_MAIL_DOMAIN || '', mailer, intake });
   registerAdminApi(adminRouter, { accounts, platform, registry });
 }
 const authLimiter = new RateLimiter({ max: 20, windowMs: 600000, maxKeys: 5000 });
@@ -68,6 +73,20 @@ const server = http.createServer(async (req, res) => {
     const local = loopback && !req.headers['x-forwarded-for'] && /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(req.headers.host || '');
     const api = url.pathname.startsWith('/api/');
     if (api) res.setHeader('Cache-Control', 'no-store');
+    // The mail provider's webhook: no cookie, no same-origin check; the shared secret (or the provider's signature over the raw body) is the proof.
+    // It records the message id, answers at once and hands the message to the intake; a repeated delivery is acknowledged and ignored.
+    const hook = HOSTED && req.method === 'POST' && /^\/api\/mail\/inbound\/([a-z]+)$/.exec(url.pathname);
+    if (hook) {
+      if (!mailer || !intake) return json(res, 503, { error: 'Mail intake is not configured on this platform.' });
+      let message;
+      try { message = await inboundFromRequest({ provider: hook[1], req, rawBody: await readRawBody(req, 40 * 1024 * 1024), secret: process.env.AO_MAIL_WEBHOOK_SECRET || '' }); }
+      catch (error) { return json(res, error.status || 400, { error: error.message }); }
+      if (!accounts.recordInbound({ provider: hook[1], providerMessageId: message.providerMessageId })) return json(res, 200, { duplicate: true });
+      json(res, 202, { ok: true });
+      setImmediate(() => intake.handle(message).then(r => accounts.updateInbound(hook[1], message.providerMessageId, { jobId: r.jobId || null, outcome: r.outcome }))
+        .catch(error => { console.warn('mail intake:', error.message); accounts.updateInbound(hook[1], message.providerMessageId, { outcome: 'error: ' + String(error.message).slice(0, 200) }); }));
+      return;
+    }
     if (api && !['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !sameOrigin(req)) return json(res, 403, { error: 'Requests must come from this office.' });
     const cookie = cookieValue(req);
     // Hosted: the viewer, from the session cookie. Single: the access code decides.
@@ -149,6 +168,7 @@ server.listen(cfg.port, process.env.HOST || undefined, () => {
     console.log(`  tasks: ${path.join(DATA, 'workflows.sqlite')}   routines: ${single.loadRoutines().length} loaded`);
     single.start();
   } else {
+    console.log(`  mail: ${mailer ? (mailer.dryRun ? 'dry run → ' + mailer.outbox : mailer.provider + ' · ' + (mailer.domain || 'no domain')) : 'not configured (AO_MAIL_API_KEY or AO_MAIL_DRY_RUN=1)'}`);
     console.log(`  tenants: ${registry.dir}   accounts: ${accounts.file}   platform: ${platform.dir}   models: ${platform.models.ready() ? 'ready' : 'no provider key yet — a platform admin adds one under /api/admin/providers'}   registration: ${platform.get().registration}`);
     registry.start();
   }

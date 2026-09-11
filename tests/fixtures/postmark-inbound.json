@@ -1,0 +1,66 @@
+{
+  "FromName": "Dana Q",
+  "MessageStream": "inbound",
+  "From": "dana@acme.test",
+  "FromFull": {
+    "Email": "dana@acme.test",
+    "Name": "Dana Q",
+    "MailboxHash": ""
+  },
+  "To": "\"Check Co\" <check-co.dana.q.ab23cd@check.test>",
+  "ToFull": [
+    {
+      "Email": "check-co.dana.q.ab23cd@check.test",
+      "Name": "Check Co",
+      "MailboxHash": ""
+    }
+  ],
+  "Cc": "",
+  "CcFull": [],
+  "Bcc": "",
+  "BccFull": [],
+  "OriginalRecipient": "check-co.dana.q.ab23cd@check.test",
+  "Subject": "Fwd: Draft the spring launch brief",
+  "MessageID": "73e6d360-66eb-11e1-8e72-a8904824019b",
+  "ReplyTo": "",
+  "MailboxHash": "",
+  "Date": "Fri, 11 Sep 2026 09:12:00 +0000",
+  "TextBody": "Please draft a one-page brief for the spring launch. The attached PDF has last year's numbers.\n\nThanks,\nDana",
+  "HtmlBody": "<p>Please draft a one-page brief for the spring launch. The attached PDF has last year's numbers.</p><p>Thanks,<br>Dana</p>",
+  "StrippedTextReply": "",
+  "Tag": "",
+  "Headers": [
+    {
+      "Name": "Message-ID",
+      "Value": "<CAF1=abc123@mail.acme.test>"
+    },
+    {
+      "Name": "Authentication-Results",
+      "Value": "spf=pass (sender IP is 203.0.113.5) smtp.mailfrom=acme.test; dkim=pass header.d=acme.test; dmarc=pass"
+    },
+    {
+      "Name": "X-Spam-Status",
+      "Value": "No"
+    }
+  ],
+  "Attachments": [
+    {
+      "Name": "brief.pdf",
+      "Content": "JVBERi0xLjQKJcOkw7zDtsOfCjEgMCBvYmoKPDwvVHlwZS9DYXRhbG9nL1BhZ2VzIDIgMCBSPj4KZW5kb2JqCjIgMCBvYmoKPDwvVHlwZS9QYWdlcy9LaWRzWzMgMCBSXS9Db3VudCAxPj4KZW5kb2JqCjMgMCBvYmoKPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgNjEyIDc5Ml0+PgplbmRvYmoKdHJhaWxlcgo8PC9Sb290IDEgMCBSPj4KJSVFT0YK",
+      "ContentType": "application/pdf",
+      "ContentLength": 220
+    },
+    {
+      "Name": "notes.txt",
+      "Content": "TGFzdCB5ZWFyIHRoZSBzcHJpbmcgbGF1bmNoIHNvbGQgMSwyMDAgdW5pdHMgaW4gc2l4IHdlZWtzOyB0aGUgemFuemliYXIgdGllciBkaWQgYmVzdC4=",
+      "ContentType": "text/plain",
+      "ContentLength": 86
+    },
+    {
+      "Name": "macro.xlsm",
+      "Content": "UEsDBBQAAAAIAA==",
+      "ContentType": "application/vnd.ms-excel.sheet.macroEnabled.12",
+      "ContentLength": 14
+    }
+  ]
+}

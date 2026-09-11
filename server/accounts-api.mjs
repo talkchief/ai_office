@@ -4,6 +4,7 @@ import { readJsonBody as body } from '../http-body.mjs';
 import { httpError } from './routes.mjs';
 import { sessionCookie, clearCookie } from '../auth.mjs';
 import { requireRole } from './visibility.mjs';
+import { RateLimiter } from './ratelimit.mjs';
 
 const publicUser = (u, platform) => u && { id: u.id, email: u.email, name: u.name, role: u.role, platformAdmin: platform.isAdmin(u), tenantId: u.tenantId };
 const text = (value, max = 200) => String(value ?? '').trim().slice(0, max);
@@ -40,7 +41,8 @@ export function registerAuthRoutes(router, { accounts, platform, registry, log =
 }
 
 /** The routes past the gate: who am I, the people of the office, member groups, the profile. */
-export function registerAccountsApi(router, { accounts, platform, publicOrigin = () => '', mailDomain = '' }) {
+export function registerAccountsApi(router, { accounts, platform, publicOrigin = () => '', mailDomain = '', mailer = null, intake = null }) {
+  const codeLimiter = new RateLimiter({ max: 5, windowMs: 3600000 });
   const admin = user => requireRole(user, ['owner', 'admin']);
   const record = (instance, entry) => { try { instance?.audit.record(entry); } catch (error) { console.warn('audit:', error.message); } };
   const memberOut = m => ({ id: m.id, name: m.name, email: m.email, role: m.role, lastLoginAt: m.lastLoginAt, joinedAt: m.joinedAt });
@@ -78,6 +80,34 @@ export function registerAccountsApi(router, { accounts, platform, publicOrigin =
     if (m.id === user.id) throw httpError('You cannot remove yourself. Ask the owner.', 409);
     accounts.removeMember(user.tenantId, params.id); record(instance, { area: 'users', summary: `Removed ${m.email} from the office` }); return { ok: true };
   });
+  /* ---------- email intake: the member's alias, who may write to it, and a test ---------- */
+  const mailProfile = user => ({ enabled: !!mailer?.enabled, domain: mailDomain, address: mailAddress(user), senders: accounts.senders(user.id, user.tenantId), prefs: { notifyByEmail: user.prefs?.notifyByEmail || 'mine' } });
+  router.on('GET', '/api/mail/profile', ({ user }) => mailProfile(user));
+  router.on('POST', '/api/mail/alias/rotate', ({ user, instance }) => { accounts.rotateMailSuffix(user.id, user.tenantId); record(instance, { area: 'mail', summary: `${user.email} rotated their email alias` }); return mailProfile({ ...user }); });
+  // A sender is verified by a six-digit code mailed to that address; the code is never returned to the browser.
+  router.on('POST', '/api/mail/senders', async ({ req, user, instance }) => {
+    if (!mailer?.enabled) throw httpError('Mail is not configured on this platform.', 503);
+    if (!codeLimiter.hit(user.id)) throw httpError('Too many verification codes this hour. Try again later.', 429);
+    const input = await body(req), s = accounts.addSender(user.id, user.tenantId, input.address);
+    let sent = false; try { await mailer.send({ to: s.address, subject: `Your code to write to ${accounts.tenant(user.tenantId)?.name || 'the office'}`, text: `${user.name} is adding ${s.address} as a sender for their office email alias.
+
+The code is ${s.code}. It works for ten minutes.
+
+If this was not you, ignore this message.`, tag: 'verify' }); sent = true; } catch (error) { console.warn('verification mail:', error.message); }
+    record(instance, { area: 'mail', summary: `${user.email} asked to verify the sender ${s.address}` });
+    return { $status: 201, body: { id: s.id, address: s.address, expiresAt: s.expiresAt, sent } };
+  });
+  router.on('POST', '/api/mail/senders/:id/verify', async ({ req, params, user, instance }) => { const input = await body(req); const out = accounts.verifySender(user.id, user.tenantId, params.id, input.code); record(instance, { area: 'mail', summary: `${user.email} verified a sender address` }); return { ...out, senders: accounts.senders(user.id, user.tenantId) }; });
+  router.on('DELETE', '/api/mail/senders/:id', ({ params, user }) => { accounts.removeSender(user.id, user.tenantId, params.id); return { ok: true, senders: accounts.senders(user.id, user.tenantId) }; });
+  router.on('POST', '/api/mail/test', async ({ user }) => {
+    if (!mailer?.enabled) throw httpError('Mail is not configured on this platform.', 503);
+    const address = mailAddress(user), tenant = accounts.tenant(user.tenantId);
+    const r = await mailer.send({ to: user.email, subject: `Your office email address for ${tenant?.name || 'the office'}`, text: `Write to ${address || '(no mail domain is configured yet)'} and the Program Manager takes it as a task: the subject becomes the title, the body the brief, attachments the task's files. A question is answered on the same thread.
+
+Only your account email and the senders you verify under Profile may write to it.`, replyTo: address || undefined, tag: 'test' });
+    return { ok: true, to: user.email, dryRun: !!r.dryRun };
+  });
+
   /* ---------- member groups: people, not AI teams ---------- */
   const groupOut = g => ({ id: g.id, name: g.name, users: g.users, createdAt: g.createdAt });
   router.on('GET', '/api/groups', ({ user }) => ({ groups: accounts.groups(user.tenantId).map(groupOut) }));
