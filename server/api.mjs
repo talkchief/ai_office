@@ -115,6 +115,13 @@ export function registerApi(router, ctx) {
   });
   router.on('POST', '/api/knowledge', async ({ req }) => knowledge.save(await body(req, 512 * 1024)));
   router.on('GET', '/api/knowledge/note', ({ url }) => knowledge.read(url.searchParams.get('id')));
+  // The note as a file, for the links results carry ("Source: /knowledge/…").
+  router.on('GET', '/api/knowledge/file', ({ url, res }) => {
+    const id = url.searchParams.get('id') || ''; let file; try { file = knowledge.resolve(id); } catch (error) { return { $status: 400, body: { error: error.message } }; }
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) return { $status: 404, body: { error: `No note at ${id}.` } };
+    res.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8', 'content-length': fs.statSync(file).size, 'content-disposition': `attachment; filename="${path.basename(id).replace(/[^\w. -]/g, '_')}"`, 'cache-control': 'no-store' });
+    fs.createReadStream(file).pipe(res); return { $handled: true };
+  });
   router.on('DELETE', '/api/knowledge/note', ({ url }) => knowledge.archive(url.searchParams.get('id')));
   /* ---------- the Agency: ready-made people and methods ---------- */
   router.on('GET', '/api/agency', ({ url }) => ({ divisions: ctx.agency.divisions(), personas: ctx.agency.list({ q: url.searchParams.get('q') || '', division: url.searchParams.get('division') || '' }) }));

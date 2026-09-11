@@ -82,6 +82,33 @@ test('a rate-limited provider blocks the task quietly, the office retries it by 
   } finally { await f.close(); }
 });
 
+test('a plain question the Brain answers is answered by the Program Manager alone and filed without a team; the shortcut is refused for a piece of work', async () => {
+  const pm = ({ last }) => last.type === 'human' ? { calls: [call('complete_task', { summary: 'Answered from the Brain.', answer: 'The last task was the November price change pack (see /knowledge/Agents Office/task-0c3b.md).' })] } : { text: 'Done.' };
+  const f = fixture({ pm });
+  try {
+    const id = start(f, { text: 'What was the last task you worked on?' }); const done = await until(f.engine, id, ['done']);
+    assert.equal(done.runs.length, 0, 'no team was engaged'); assert.equal(done.review.direct, true); assert.deepEqual(done.review.sources, ['/knowledge/Agents Office/task-0c3b.md']);
+    assert.match(done.result, /^The last task was the November price change pack/); assert.equal(done.events.filter(e => e.type === 'answered_from_brain').length, 1);
+  } finally { await f.close(); }
+  let tried = false;
+  const g = fixture({ pm: context => { console.error('PMCTX', context.last.type, JSON.stringify(String(context.last.text).slice(0, 70))); if (!tried && context.last.type === 'human') { tried = true; return { calls: [call('complete_task', { summary: 'Done.', answer: 'Here is the report (see /knowledge/x.md).' })] }; } return context.last.type === 'tool' && /^Refused: no department lead/.test(context.last.text) ? defaultPm({ last: { type: 'human', text: 'Write a launch report.' } }) : defaultPm(context); } });
+  try {
+    const id = start(g); const done = await until(g.engine, id, ['done']);
+    assert.ok(done.events.some(e => e.type === 'completion_refused' && /No team has worked on it yet/.test(e.message)), 'a piece of work still goes through a team');
+    assert.equal(done.review.direct, undefined); assert.ok(done.runs.length >= 2);
+  } finally { await g.close(); }
+});
+
+test('an identical read repeated in one run is refused until something is written; a later read of a changed workspace goes through', async () => {
+  let n = 0;
+  const f = fixture({ specialist: () => { n++; if (n === 1 || n === 2) return { calls: [call('ls', { path: '/work' })] }; if (n === 3) return { calls: [call('write_file', { file_path: '/work/note.md', content: 'Verified result and evidence.' })] }; if (n === 4) return { calls: [call('ls', { path: '/work' })] }; return { text: 'Verified result and evidence; see /work/note.md.' }; } });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done']);
+    assert.equal(done.events.filter(e => e.type === 'repeat_refused' && e.agent === f.worker).length, 1, 'the second identical listing was refused, the one after the write went through');
+    assert.equal(done.review.approved, true);
+  } finally { await f.close(); }
+});
+
 test('completing without an approved review is refused, re-prompted once, then escalated to the CEO', async () => {
   const f = fixture({ pm: ({ last }) => last.type === 'human' ? { calls: [call('complete_task', { summary: 'Done already.' })] } : { text: 'I think it is done.' } });
   try {

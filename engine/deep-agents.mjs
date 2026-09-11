@@ -60,6 +60,9 @@ class Gate {
 // Failures that come from the model provider (bad key, no credit, rate limit, outage, unknown model), not from the work.
 const PROVIDER_STATUS = new Set([401, 402, 403, 408, 429, 500, 502, 503, 504, 529]);
 // Worth one automatic retry: the provider or the network failed, not the key, the credit or the model name.
+// A task that reads as a question, and the Brain notes an answer names.
+export const isQuestion = text => { const t = String(text || '').trim(); return /\?\s*$/.test(t) || /^(what|when|who|whom|whose|which|where|why|how|is|are|was|were|did|does|do|has|have|had|can|could|should|will|would)\b/i.test(t); };
+export const citedNotes = text => [...new Set([...String(text || '').matchAll(/\/knowledge\/(?:[^\s)\]"'`,;]|\s(?=[^\s\/)\]"'`,;]+\/))+/g)].map(m => m[0].replace(/[.:]+$/, '')))];
 export function isTransientProviderError(error) {
   const status = Number(error?.status ?? error?.statusCode ?? error?.response?.status ?? error?.error?.status);
   const message = String(error?.message || '');
@@ -420,12 +423,20 @@ export class OfficeEngine {
     console.error(`${kind}:`, text);
   }
   loopGuard(jobId, agentId) {
-    const recent = [], LIMIT = 4;
+    // An identical read repeated within one run, with nothing written or delegated in between, returns what the first read
+    // returned: it is refused, not run again (a specialist once read the same note three times for one question).
+    const recent = [], LIMIT = 4, READS = new Set(['read_file', 'ls', 'glob', 'grep', 'search_knowledge']), CHANGES = new Set(['write_file', 'edit_file', 'assemble_files', 'export_pdf', 'export_pptx', 'task', 'db_write', 'ssh_run', 'api_request', 'api_upload']), done = new Set();
     return createMiddleware({ name: `loop_guard_${agentId.replace(/[^a-zA-Z0-9_]/g, '_')}`, wrapToolCall: async (request, handler) => {
       const call = request.toolCall, key = `${call.name}:${JSON.stringify(call.args || {})}`;
       recent.push(key); if (recent.length > 40) recent.shift();
       const repeats = recent.filter(k => k === key).length;
-      if (repeats <= LIMIT) return handler(request);
+      if (repeats <= LIMIT) {
+        if (READS.has(call.name) && done.has(key)) { this.event(jobId, 'repeat_refused', agentId, `${call.name} repeated with the same arguments; the earlier result stands.`); return new ToolMessage({ tool_call_id: call.id, name: call.name, content: 'Refused: you already made this exact call in this run and nothing has changed since. Use the result you already have.' }); }
+        const out = await handler(request);
+        if (CHANGES.has(call.name)) done.clear();
+        else if (READS.has(call.name) && !/^(Refused|Error|No such file|not found|does not exist|No notes in the Brain)/i.test(String(out?.content ?? out ?? '').trim().slice(0, 80))) done.add(key);
+        return out;
+      }
       this.event(jobId, 'loop_stopped', agentId, `${call.name} was called with the same arguments ${repeats} times; the call was refused.`);
       return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `Refused: this is the same call for the ${repeats}th time. Whatever you are waiting for will not appear in this run: nobody else writes into your workspace while you wait. Do the work with what you have, or reply now to whoever assigned this with exactly what is missing.` });
     } });
@@ -770,25 +781,32 @@ export class OfficeEngine {
         changes: z.array(z.object({ specialist: z.string(), feedback: z.string() })).optional() }) });
   }
   completeTool(id) {
-    return tool(async ({ summary }) => {
+    return tool(async ({ summary, answer = '' }) => {
       const job = this.get(id); if (job.state === 'cancelled') return 'The task was cancelled.';
       const open = this.openHandoffs(job);
       if (open.length) { const office = this.office.get(), name = d => office.teams.find(t => t.id === d)?.name || d; this.event(id, 'completion_refused', 'pm', `Hand-off not delegated: ${open.map(h => name(h.team)).join(', ')}.`); return `Refused: a lead asked for a hand-off that you have not delegated yet: ${open.map(h => `${name(h.from)} needs ${name(h.team)} to ${h.request.slice(0, 200)} (delegate with the task tool to ${leadName(h.team)})`).join('; ')}. Delegate it, wait for that lead's approved review, then complete.`; }
       const stale = this.staleDepts(job);
-      if (stale[0] === '(none yet)') { this.event(id, 'completion_refused', 'pm', 'No team has worked on it yet.'); return 'Refused: no department lead has worked on this yet. Delegate it to the right lead first.'; }
-      if (stale.length) { this.event(id, 'completion_refused', 'pm', `No approved review from ${stale.map(leadName).join(', ')}.`); return `Refused: ${stale.map(leadName).join(', ')} has no approved review of the latest work. Ask the lead to review, then call complete_task again.`; }
+      // A plain question the Brain answers is answered by the Program Manager alone: no team engaged, the task reads as a
+      // question, and the answer names the Brain notes it rests on. It is filed as answered from the Brain, without a review.
+      const cited = citedNotes(answer + ' ' + summary), direct = !job.runs.length && !!clean(answer) && isQuestion(job.text) && cited.length > 0;
+      if (!direct && (stale[0] === '(none yet)' || !job.runs.length)) { this.event(id, 'completion_refused', 'pm', 'No team has worked on it yet.'); return isQuestion(job.text) ? 'Refused: no department lead has worked on this yet. If the Brain answers this question, call complete_task again with the full answer in "answer", naming the /knowledge/ notes you read; otherwise delegate it to the right lead first.' : 'Refused: no department lead has worked on this yet. Delegate it to the right lead first.'; }
+      if (!direct && stale.length) { this.event(id, 'completion_refused', 'pm', `No approved review from ${stale.map(leadName).join(', ')}.`); return `Refused: ${stale.map(leadName).join(', ')} has no approved review of the latest work. Ask the lead to review, then call complete_task again.`; }
       const office = this.office.get(), used = job.autoRoute ? involved(job) : job.depts, parts = used.map(d => job.deliverables?.[d]).filter(Boolean);
-      const result = parts.length === 1 ? parts[0] : used.map(d => `## ${office.teams.find(t => t.id === d)?.name || d}\n\n${job.deliverables?.[d] || ''}`).join('\n\n');
+      const result = direct ? clean(answer) : parts.length === 1 ? parts[0] : used.map(d => `## ${office.teams.find(t => t.id === d)?.name || d}\n\n${job.deliverables?.[d] || ''}`).join('\n\n');
       this.setState(id, 'saving');
       const version = { n: (job.resultVersions?.length || 0) + 1, at: Date.now(), summary: clean(summary).slice(0, 2000), correction: job.correction || null, result };
-      this.update(id, j => { j.result = result; j.resultSummary = version.summary; j.resultVersions = [...(j.resultVersions || []), version]; j.correction = null; });
+      this.update(id, j => {
+        j.result = result; j.resultSummary = version.summary; j.resultVersions = [...(j.resultVersions || []), version]; j.correction = null;
+        if (direct) { j.review = { approved: true, direct: true, lead: 'pm', by: 'pm', at: Date.now(), criteria: [], summary: `Answered by the Program Manager from the Brain, no team engaged: ${cited.join(', ')}.`, sources: cited }; j.sources = [...new Set([...(j.sources || []), ...cited])].slice(0, 60); }
+      });
+      if (direct) this.event(id, 'answered_from_brain', 'pm', `Answered from the Brain: ${cited.join(', ')}.`);
       try { await this.onComplete(this.get(id)); }
       catch (error) { this.setState(id, 'working'); return `Saving the result failed (${clean(error.message).slice(0, 300)}). Call complete_task again.`; }
       this.setState(id, 'done', { doneAt: Date.now(), pendingActions: [], error: null });
       this.event(id, 'completed', 'pm', `Result version ${version.n} saved.`);
       if (job.kind !== 'evaluation') this.notifications.notify({ kind: 'done', title: `Done: ${job.title}`, body: version.summary, jobId: id, dept: job.dept, action: { type: 'open' } });
       return `Task completed and filed as version ${version.n}. End your turn with a one-line confirmation.`;
-    }, { name: 'complete_task', description: 'Complete the task once every involved lead has recorded an approved review of the latest work. Files the result for the CEO.', schema: z.object({ summary: z.string().describe('One paragraph: what was delivered') }) });
+    }, { name: 'complete_task', description: 'Complete the task once every involved lead has recorded an approved review of the latest work; or, for a plain question the Brain answers with no team engaged, file the answer directly. Files the result for the CEO.', schema: z.object({ summary: z.string().describe('One paragraph: what was delivered'), answer: z.string().optional().describe('Only for a question answered from the Brain with no team engaged: the full answer, naming the /knowledge/ notes it rests on') }) });
   }
   askTool(id) {
     return tool(async ({ question }) => {
