@@ -1638,6 +1638,30 @@ body.dark #settingsPage .secondary { background: transparent; color: var(--ink);
   #spaceDialog[data-view=task][open] { width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; padding: 14px 12px 0; }
   .task-actions, .space-task-controls { position: sticky; bottom: 0; background: var(--cream); }
 }
+/* Small screens. The 3D scene stays a picture; the sheet at the bottom carries the detail. Pod cards and name chips are desktop
+   overlays: on a tablet they pile up over the scene and on a phone they cover it, so they go and the Right now list takes over. */
+@media (max-width: 900px) {
+  .badge:not(.brainTag), .say { display: none !important; }
+  .pill { font-size: 9px; padding: 2px 6px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #topbar .brand .ver, #topmodels { display: none; }
+  .space-feed-head { flex-wrap: wrap; gap: 6px; }
+  .space-settings-layout { grid-template-columns: 1fr !important; gap: 12px !important; }
+  .space-settings-nav .space-tabs { flex-direction: row; flex-wrap: wrap; }
+  .space-actions label { display: flex; flex-direction: column; min-width: 0; }
+}
+@media (max-width: 600px) {
+  .pill { display: none !important; }
+  #topbar { padding: 0 10px; gap: 6px; } #topbar .brand { display: none; } /* the Brain chip sits in the bar; the name gives way to it on a phone */
+  #themeBtn .tb-lab, #clock { display: none; } #spaceManage > span:last-child, #inboxBell span { display: none; }
+  #topbar #claudeConnect, #spaceManage { padding: 6px 8px; }
+  .badge.brainTag { transform: scale(.85); transform-origin: top left; }
+  #overviewBtn { font-size: 11px; padding: 6px 8px; }
+  .space-actions { flex-direction: column; align-items: stretch; } .space-actions label, .space-actions select, .space-actions input { width: 100%; box-sizing: border-box; }
+  .art-item, .audit-item, .vault-item { word-break: break-word; } .art-item .space-link { white-space: normal; text-align: left; }
+  .toast-host { left: 8px; right: 8px; transform: none; } .toast { max-width: 100%; }
+  #settingsPage h1, #settingsPage .space-h1 { font-size: 24px; }
+  #settingsPage .space-settings-save { position: static; margin-top: 16px; } /* a sticky bar would cover the form on a phone */
+}
 </style>
 </head>
 <body>
