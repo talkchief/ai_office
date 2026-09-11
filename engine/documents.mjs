@@ -104,13 +104,13 @@ export async function pdfEngineAvailable() { return !!(await browserLaunch()); }
 export async function closeBrowser() { clearTimeout(idleTimer); const b = shared; shared = null; await b?.close().catch(() => {}); }
 export const browserStats = () => ({ launches, open: !!shared });
 
-async function renderPdfWithBrowser({ html, title, out }) {
+async function renderPdfWithBrowser({ html, title, out, scale = 1 }) {
   const browser = await warmBrowser(); if (!browser) return null;
   let page = null;
   try {
     page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'load' });
-    await page.pdf({ path: out, format: 'A4', printBackground: true, preferCSSPageSize: true, displayHeaderFooter: true, headerTemplate: '<span></span>',
+    await page.pdf({ path: out, format: 'A4', scale, printBackground: true, preferCSSPageSize: true, displayHeaderFooter: true, headerTemplate: '<span></span>',
       footerTemplate: `<div style="font-family:Arial,sans-serif;font-size:7.5pt;color:#8A867E;width:100%;padding:0 18mm;display:flex;justify-content:space-between"><span>${esc(title || '')}</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>`,
       margin: { top: '22mm', bottom: '20mm', left: '18mm', right: '18mm' } });
     return { engine: 'browser' };
@@ -229,15 +229,24 @@ export function countPdfPages(file) {
   if (tree.length) return Math.max(...tree);
   return (raw.match(/\/Type\s*\/Page[^s]/g) || []).length || 1;
 }
-// Renders Markdown to a PDF file. Returns { pages, bytes, engine }.
-export async function renderPdf({ markdown, title = '', out, engine = 'auto' }) {
+// Renders Markdown to a PDF file. Returns { pages, bytes, engine, scale }. With fitPages, a print that runs longer than the
+// pages asked for is printed again scaled down (to 60% at most, browser engine only), once.
+export async function renderPdf({ markdown, title = '', out, engine = 'auto', fitPages = 0 }) {
   fs.mkdirSync(path.dirname(out), { recursive: true });
-  let result = null;
-  if (engine !== 'pdfkit') result = await renderPdfWithBrowser({ html: markdownToHtml(markdown, { title }), title, out }).catch(() => null);
-  if (!result) result = await renderPdfWithPdfkit({ markdown, title, out });
-  const bytes = fs.statSync(out).size;
-  const pages = result.pages || countPdfPages(out);
-  return { pages, bytes, engine: result.engine };
+  const html = markdownToHtml(markdown, { title });
+  const once = async scale => {
+    let result = null;
+    if (engine !== 'pdfkit') result = await renderPdfWithBrowser({ html, title, out, scale }).catch(() => null);
+    if (!result) result = await renderPdfWithPdfkit({ markdown, title, out });
+    return { pages: result.pages || countPdfPages(out), bytes: fs.statSync(out).size, engine: result.engine, scale };
+  };
+  let r = await once(1);
+  const wanted = Math.max(0, Math.floor(Number(fitPages) || 0));
+  if (wanted && r.pages > wanted && r.engine === 'browser') {
+    const scale = Math.max(0.6, Math.floor((wanted / r.pages) * 0.95 * 100) / 100);
+    r = await once(scale);
+  }
+  return r;
 }
 
 /* ---------- PowerPoint ---------- */
@@ -350,17 +359,18 @@ export function assembleFilesTool({ workspaceDir, onSaved = () => {} }) {
     schema: z.object({ output: z.string().describe('Where to write the combined document, e.g. /work/Growth-Plan-Launch-Pack.md'), title: z.string().describe('The document’s title'), intro: z.string().optional().describe('An optional opening paragraph before the parts'), parts: z.array(z.object({ path: z.string().describe('A file under /work/'), heading: z.string().optional().describe('The heading for this part; the file’s own title when left out') })).min(1).describe('The parts, in order') }) });
 }
 export function exportPdfTool({ workspaceDir, onSaved = () => {} }) {
-  return tool(async ({ source, output, title }) => {
+  return tool(async ({ source, output, title, pages: fitPages = 0 }) => {
     try {
       const s = sourceOf(workspaceDir, source); if (s.error) return s.error;
       const dest = workspaceFile(workspaceDir, output || s.src.rel.replace(/\.(md|markdown|txt)$/i, '') + '.pdf');
       if (!/\.pdf$/i.test(dest.rel)) return 'The output name must end in .pdf.';
-      const { pages, bytes, engine } = await renderPdf({ markdown: s.markdown, title: title || s.heading, out: dest.abs });
-      onSaved({ file: dest.rel, pages, bytes, engine });
-      return `Saved /work/${dest.rel}: ${pages} page${pages === 1 ? '' : 's'}, ${sizeOf(bytes)}. Name the file in your answer; the CEO downloads it from the task page under Artifacts.`;
+      const { pages, bytes, engine, scale } = await renderPdf({ markdown: s.markdown, title: title || s.heading, out: dest.abs, fitPages });
+      onSaved({ file: dest.rel, pages, bytes, engine, scale });
+      const fit = fitPages ? (pages <= fitPages ? (scale < 1 ? ` Scaled to ${Math.round(scale * 100)}% to fit ${fitPages} page${fitPages === 1 ? '' : 's'}.` : '') : ` Still ${pages} pages after scaling to ${Math.round(scale * 100)}%: shorten the Markdown if the page count matters.`) : '';
+      return `Saved /work/${dest.rel}: ${pages} page${pages === 1 ? '' : 's'}, ${sizeOf(bytes)}.${fit} Name the file in your answer; the CEO downloads it from the task page under Artifacts.`;
     } catch (error) { return `Could not export the PDF: ${error.message}`; }
-  }, { name: 'export_pdf', description: 'Turn a Markdown file in /work/ into a formatted PDF the CEO downloads from the task page. Write the document as Markdown first (a title heading, sections, lists, tables), then call this with its path. Never try to write PDF bytes yourself.',
-    schema: z.object({ source: z.string().describe('Path of the Markdown file, e.g. /work/report.md'), output: z.string().optional().describe('PDF path, default: the same name with .pdf'), title: z.string().optional().describe('Title on the first page and in the footer; default: the first heading') }) });
+  }, { name: 'export_pdf', description: 'Turn a Markdown file in /work/ into a formatted PDF the CEO downloads from the task page. Write the document as Markdown first (a title heading, sections, lists, tables), then call this with its path. When the CEO asked for a page count, pass pages and the office fits the print to it. Never try to write PDF bytes yourself, and never export twice to tune pages.',
+    schema: z.object({ source: z.string().describe('Path of the Markdown file, e.g. /work/report.md'), output: z.string().optional().describe('PDF path, default: the same name with .pdf'), title: z.string().optional().describe('Title on the first page and in the footer; default: the first heading'), pages: z.number().int().min(1).max(50).optional().describe('The page count the CEO asked for, if any: the print is scaled down to fit it (to 60% at most)') }) });
 }
 export function exportPptxTool({ workspaceDir, onSaved = () => {} }) {
   return tool(async ({ source, output, title }) => {

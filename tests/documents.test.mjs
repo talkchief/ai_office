@@ -116,3 +116,18 @@ test('the browser stays warm between exports: two PDFs, one launch; closeBrowser
   await closeBrowser(); assert.equal(browserStats().open, false);
   fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 });
+
+test('export_pdf fits the page count the CEO asked for by scaling the print, and says so', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'talkchief-fit-'));
+  const long = '# Long report\n\n' + Array.from({ length: 60 }, (_, i) => `## Section ${i + 1}\n\nA paragraph of ordinary length that fills a few lines of the page so that the document runs on for several pages when printed at full size.\n`).join('\n');
+  fs.writeFileSync(path.join(dir, 'long.md'), long);
+  const saved = []; const tool = exportPdfTool({ workspaceDir: dir, onSaved: r => saved.push(r) });
+  const plain = await tool.invoke({ source: '/work/long.md' });
+  assert.match(plain, /^Saved \/work\/long\.pdf: \d+ pages/);
+  const { pdfEngineAvailable, closeBrowser } = await import('../engine/documents.mjs');
+  if (!(await pdfEngineAvailable())) { await closeBrowser(); fs.rmSync(dir, { recursive: true, force: true }); return; }
+  const fitted = await tool.invoke({ source: '/work/long.md', output: '/work/long-fit.pdf', pages: 2 });
+  assert.equal(saved.length, 2); assert.ok(saved[1].scale < 1, 'the second print was scaled'); assert.ok(saved[1].pages < saved[0].pages, 'and has fewer pages');
+  assert.match(fitted, /Scaled to \d+% to fit 2 pages|Still \d+ pages after scaling/);
+  await closeBrowser(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+});
