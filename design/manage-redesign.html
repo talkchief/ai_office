@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Northgate Studio — Manage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============ tokens ============ */
+:root{
+  --paper:#FCFCF7; --rail:#F4F4ED; --card:#FFFFFF; --ink:#161514; --grey:#66655F; --mute:#9C9B93;
+  --line:rgba(22,21,20,.12); --line2:rgba(22,21,20,.28); --hover:rgba(22,21,20,.045);
+  --ok:#1E7A55; --ok-bg:#E9F5EE; --fail:#B2382C; --fail-bg:#FBECEA; --warn:#8F6407; --warn-bg:#FBF3DC; --busy:#2E5EA8; --busy-bg:#E8EFFA;
+  --gold:#B9A775; --shadow:0 14px 36px rgba(22,21,20,.10), 0 1px 2px rgba(22,21,20,.06);
+  --serif:"Instrument Serif",Georgia,"Times New Roman",serif; --ui:Inter,-apple-system,"Segoe UI",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme=light]){
+  --paper:#17181B; --rail:#121316; --card:#1E1F23; --ink:#ECEAE2; --grey:#A3A199; --mute:#6E6D67;
+  --line:rgba(236,234,226,.13); --line2:rgba(236,234,226,.32); --hover:rgba(236,234,226,.06);
+  --ok:#5CC292; --ok-bg:rgba(92,194,146,.13); --fail:#F0857A; --fail-bg:rgba(240,133,122,.13); --warn:#E4B75B; --warn-bg:rgba(228,183,91,.13); --busy:#84ADEC; --busy-bg:rgba(132,173,236,.13);
+  --gold:#CDBB86; --shadow:0 18px 44px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.04);
+  color-scheme:dark;
+}}
+:root[data-theme=dark]{
+  --paper:#17181B; --rail:#121316; --card:#1E1F23; --ink:#ECEAE2; --grey:#A3A199; --mute:#6E6D67;
+  --line:rgba(236,234,226,.13); --line2:rgba(236,234,226,.32); --hover:rgba(236,234,226,.06);
+  --ok:#5CC292; --ok-bg:rgba(92,194,146,.13); --fail:#F0857A; --fail-bg:rgba(240,133,122,.13); --warn:#E4B75B; --warn-bg:rgba(228,183,91,.13); --busy:#84ADEC; --busy-bg:rgba(132,173,236,.13);
+  --gold:#CDBB86; --shadow:0 18px 44px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.04);
+  color-scheme:dark;
+}
+
+/* ============ base ============ */
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--paper);color:var(--ink);font:13px/1.55 var(--ui);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:inherit}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--busy);outline-offset:2px;border-radius:6px}
+.mono{font-family:var(--mono)}
+.eyebrow{font:500 10.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--grey)}
+.muted{color:var(--grey)}
+.num{font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ============ status marks: one vocabulary, everywhere ============ */
+.st{display:inline-flex;align-items:center;gap:6px;padding:3px 9px 3px 7px;border-radius:99px;border:1px solid var(--line);font:500 11px/1.2 var(--mono);letter-spacing:.03em;white-space:nowrap;vertical-align:middle}
+.st i{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.st-ok{color:var(--ok);background:var(--ok-bg);border-color:transparent}
+.st-fail{color:var(--fail);background:var(--fail-bg);border-color:transparent}
+.st-warn{color:var(--warn);background:var(--warn-bg);border-color:transparent}
+.st-busy{color:var(--busy);background:var(--busy-bg);border-color:transparent}
+.st-busy i{animation:pulse 1s ease-in-out infinite}
+.st-off{color:var(--grey)}
+.st-off i{background:var(--mute)}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;flex:none}
+.dot-ok{background:var(--ok)} .dot-fail{background:var(--fail)} .dot-warn{background:var(--warn)} .dot-busy{background:var(--busy);animation:pulse 1s infinite} .dot-off{background:var(--mute)}
+
+/* ============ top bar ============ */
+#topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:18px;height:56px;padding:0 20px;background:color-mix(in srgb,var(--paper) 90%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+#topbar .brand{font:21px var(--serif);letter-spacing:.03em}
+#topbar .brand small{font:500 10px var(--mono);letter-spacing:.14em;color:var(--grey);margin-left:12px;text-transform:uppercase}
+#topbar .spacer{flex:1}
+.tb-btn{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:99px;background:transparent;font:500 12px var(--ui)}
+.tb-btn:hover,.tb-btn[aria-expanded=true]{background:var(--hover)}
+.tb-btn .badge{min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:var(--ink);color:var(--paper);font:600 10px/18px var(--mono);text-align:center}
+.tb-btn .badge.att{background:var(--fail);color:#fff}
+#clock{font:20px var(--serif);font-variant-numeric:tabular-nums}
+#manageBtn{border-color:var(--line2)}
+#manageBtn .dot{margin-left:2px}
+
+/* ============ the Directory (Manage menu) ============ */
+.directory{position:fixed;z-index:39;top:64px;right:20px;width:min(920px,calc(100vw - 40px));background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;animation:drop .16s ease-out}
+@keyframes drop{from{transform:translateY(-6px)}to{transform:none}}
+.dir-head{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--rail)}
+.dir-head h2{margin:0;font:22px var(--serif)}
+.dir-head .needs{display:flex;align-items:center;gap:8px;margin-left:auto;font:12px var(--ui);color:var(--grey)}
+.dir-head .needs b{font-weight:600;color:var(--ink)}
+.dir-body{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+.dir-col{padding:14px 10px 16px;border-right:1px solid var(--line)}
+.dir-col:last-child{border-right:0}
+.dir-col .eyebrow{display:block;padding:4px 10px 10px}
+.dir-item{display:grid;grid-template-columns:1fr auto;gap:2px 10px;width:100%;text-align:left;background:transparent;border:0;border-radius:8px;padding:9px 10px;color:var(--ink)}
+.dir-item:hover{background:var(--hover)}
+.dir-item strong{font-weight:500;font-size:13px}
+.dir-item small{grid-column:1;font:11px var(--mono);color:var(--grey);letter-spacing:.01em}
+.dir-item .dot{grid-column:2;grid-row:1;align-self:center;margin-top:2px}
+.dir-foot{display:flex;gap:16px;align-items:center;padding:12px 20px;border-top:1px solid var(--line);font:11.5px var(--ui);color:var(--grey)}
+.dir-foot .st{margin-left:auto}
+.dir-attn{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.attn{display:flex;align-items:center;gap:10px;font:12.5px var(--ui)}
+.attn .when{margin-left:auto;font:11px var(--mono);color:var(--grey)}
+.attn button{border:1px solid var(--line);background:transparent;border-radius:6px;padding:3px 9px;font:500 11.5px var(--ui)}
+.attn button:hover{background:var(--hover)}
+@media (max-width:860px){.dir-body{grid-template-columns:1fr 1fr}.dir-col:nth-child(2){border-right:0}.dir-col{border-bottom:1px solid var(--line)}}
+@media (max-width:560px){.dir-body{grid-template-columns:1fr}.dir-col{border-right:0}}
+
+/* ============ page: rail + sheet ============ */
+.page{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:calc(100vh - 56px)}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:18px 14px 24px;position:sticky;top:56px;height:calc(100vh - 56px);overflow:auto}
+.rail-back{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;text-decoration:none;font:500 12px var(--ui);color:var(--grey);margin-bottom:14px}
+.rail-back:hover{background:var(--hover);color:var(--ink)}
+.rail .eyebrow{display:block;padding:14px 10px 6px}
+.rail-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:0;border-radius:8px;padding:8px 10px;font:13px var(--ui);color:var(--grey)}
+.rail-item:hover{background:var(--hover);color:var(--ink)}
+.rail-item[aria-current=page]{background:var(--card);color:var(--ink);font-weight:500;box-shadow:0 0 0 1px var(--line)}
+.rail-item .dot{margin-left:auto}
+.rail-item .count{margin-left:auto;font:11px var(--mono);color:var(--mute)}
+.rail-item .dot + .count{margin-left:0}
+.rail-office{margin-top:22px;padding:12px 10px;border-top:1px solid var(--line);font:11px/1.6 var(--mono);color:var(--grey)}
+.rail-office b{display:block;font:15px var(--serif);color:var(--ink);letter-spacing:.02em}
+
+.sheet{padding:28px 36px 120px;max-width:1180px}
+.area{display:none}
+.area.on{display:block;animation:fade .18s ease-out}
+@keyframes fade{from{transform:translateY(4px)}to{transform:none}}
+.area-head{display:grid;grid-template-columns:1fr auto;gap:8px 24px;align-items:end;padding-bottom:18px;border-bottom:1px solid var(--line2);margin-bottom:22px}
+.area-head h1{margin:6px 0 4px;font:36px/1.05 var(--serif);letter-spacing:-.005em}
+.area-head p{margin:0;max-width:60ch;color:var(--grey)}
+.area-head .meta{display:flex;flex-direction:column;align-items:flex-end;gap:8px;font:11px var(--mono);color:var(--grey);white-space:nowrap}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 18px}
+.toolbar .spacer{flex:1}
+.search{display:flex;align-items:center;gap:8px;height:34px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);min-width:240px}
+.search input{border:0;background:transparent;outline:0;width:100%;font-size:12.5px}
+.search svg{color:var(--mute)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:8px;border:1px solid var(--line2);background:transparent;font:500 12.5px var(--ui);color:var(--ink);white-space:nowrap}
+.btn:hover{background:var(--hover)}
+.btn-primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn-primary:hover{background:color-mix(in srgb,var(--ink) 86%,var(--paper))}
+.btn-sm{height:28px;padding:0 10px;font-size:11.5px;border-radius:6px}
+.btn-danger{color:var(--fail);border-color:color-mix(in srgb,var(--fail) 40%,transparent)}
+.btn-danger:hover{background:var(--fail-bg)}
+.btn-text{border-color:transparent;padding:0 8px}
+.btn:disabled{opacity:.5;cursor:default}
+.btn .spin{width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* banners */
+.banner{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:10px;border:1px solid;margin:0 0 18px;font-size:12.5px}
+.banner b{font-weight:600}
+.banner .actions{margin-left:auto;display:flex;gap:8px;flex:none}
+.banner-fail{border-color:color-mix(in srgb,var(--fail) 35%,transparent);background:var(--fail-bg);color:var(--ink)}
+.banner-warn{border-color:color-mix(in srgb,var(--warn) 40%,transparent);background:var(--warn-bg)}
+.banner-ok{border-color:color-mix(in srgb,var(--ok) 35%,transparent);background:var(--ok-bg)}
+.banner .glyph{width:18px;height:18px;border-radius:50%;flex:none;display:grid;place-items:center;font:700 11px var(--mono);color:#fff}
+.banner-fail .glyph{background:var(--fail)} .banner-warn .glyph{background:var(--warn)} .banner-ok .glyph{background:var(--ok)}
+
+/* tables — the ledger */
+.ledger{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ledger-wrap{border:1px solid var(--line);border-radius:10px;overflow:auto;background:var(--card)}
+.ledger-wrap .ledger{border:0;border-radius:0}
+.ledger th{font:500 10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--grey);text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--rail);white-space:nowrap}
+.ledger td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:middle;font-size:12.5px}
+.ledger tr:last-child td{border-bottom:0}
+.ledger tbody tr:hover td{background:var(--hover)}
+.ledger td.k{font-family:var(--mono);font-size:12px}
+.ledger td .sub{display:block;font:11px var(--mono);color:var(--grey);margin-top:3px}
+.ledger td.r{text-align:right;white-space:nowrap}
+.ledger .name{font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{display:inline-block;padding:2px 8px;border:1px solid var(--line);border-radius:99px;font:500 10.5px var(--mono);letter-spacing:.04em;color:var(--grey)}
+.chip-ink{color:var(--ink);border-color:var(--line2)}
+.key{font-family:var(--mono);font-size:12px;letter-spacing:.02em}
+.key .mask{color:var(--mute)}
+
+/* forms */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px 24px}
+.field{display:flex;flex-direction:column;gap:6px;position:relative}
+.field > span{font:500 12px var(--ui)}
+.field small{color:var(--grey);font-size:11.5px;line-height:1.5}
+.field input,.field select,.field textarea{width:100%;border:1px solid var(--line2);border-radius:8px;padding:9px 11px;background:var(--card);color:var(--ink);font-size:13px;transition:border-color .12s,box-shadow .12s}
+.field textarea{min-height:96px;resize:vertical;line-height:1.55}
+.field input:focus,.field select:focus,.field textarea:focus{outline:0;border-color:var(--busy);box-shadow:0 0 0 3px var(--busy-bg)}
+.field.changed::before{content:"";position:absolute;left:-14px;top:24px;bottom:0;width:3px;border-radius:2px;background:var(--warn)}
+.field.invalid input,.field.invalid textarea{border-color:var(--fail);box-shadow:0 0 0 3px var(--fail-bg)}
+.field .err{display:none;color:var(--fail);font:12px var(--ui)}
+.field.invalid .err{display:block}
+.field .err::before{content:"✕ ";font-family:var(--mono)}
+.inline{display:flex;align-items:center;gap:10px}
+.switch{position:relative;width:34px;height:20px;border-radius:99px;background:var(--mute);border:0;flex:none;transition:background .15s}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
+.switch[aria-checked=true]{background:var(--ok)}
+.switch[aria-checked=true]::after{transform:translateX(14px)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
+.card + .card{margin-top:16px}
+.card h3{margin:0 0 4px;font:22px var(--serif)}
+.card > p{margin:0 0 16px;color:var(--grey);font-size:12.5px}
+.card-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.card-head h3{margin:0}
+.card-head .st{margin-left:auto}
+.subnav{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 20px}
+.subnav button{background:transparent;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:10px 12px;font:500 12.5px var(--ui);color:var(--grey)}
+.subnav button:hover{color:var(--ink)}
+.subnav button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--ink)}
+.subnav .count{font:11px var(--mono);color:var(--mute);margin-left:6px}
+
+/* save bar — one place that always tells the truth about what is saved */
+.savebar{position:sticky;bottom:18px;z-index:5;display:flex;align-items:center;gap:14px;margin-top:26px;padding:10px 12px 10px 16px;border:1px solid var(--line2);border-radius:12px;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(8px);box-shadow:var(--shadow)}
+.savebar .msg{font-size:12.5px}
+.savebar .msg small{display:block;color:var(--grey);font-size:11.5px}
+.savebar .spacer{flex:1}
+.savebar[data-state=idle]{display:none}
+.savebar[data-state=dirty]{border-color:color-mix(in srgb,var(--warn) 50%,transparent)}
+.savebar[data-state=failed]{border-color:color-mix(in srgb,var(--fail) 55%,transparent)}
+.savebar[data-state=saved]{border-color:color-mix(in srgb,var(--ok) 55%,transparent)}
+
+/* teams */
+.team-strip{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:22px}
+.team-tab{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:132px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);text-align:left}
+.team-tab b{font:500 12.5px var(--ui)}
+.team-tab small{font:11px var(--mono);color:var(--grey)}
+.team-tab:hover{border-color:var(--line2)}
+.team-tab[aria-selected=true]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.team-tab.add{border-style:dashed;justify-content:center;color:var(--grey)}
+.team-head{display:flex;align-items:flex-end;gap:16px;margin-bottom:6px}
+.team-head h2{margin:0;font:30px/1 var(--serif)}
+.team-head .lead{font:12px var(--ui);color:var(--grey)}
+.team-head .lead b{color:var(--ink);font-weight:500}
+.team-head .actions{margin-left:auto;display:flex;gap:8px}
+.person{display:grid;grid-template-columns:44px 1fr auto;gap:4px 14px;align-items:center}
+.avatar{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--rail);border:1px solid var(--line);font:600 10px var(--mono);letter-spacing:.06em;color:var(--grey)}
+.avatar.lead{border-color:var(--gold);color:var(--gold);box-shadow:0 0 0 2px color-mix(in srgb,var(--gold) 25%,transparent)}
+.person .who b{display:block;font:500 13px var(--ui)}
+.person .who span{font:11px var(--mono);color:var(--grey);letter-spacing:.03em}
+.person .does{grid-column:2;color:var(--grey);font-size:12px;max-width:62ch}
+.person .facts{grid-column:3;grid-row:1/3;display:flex;flex-direction:column;align-items:flex-end;gap:6px;font:11px var(--mono);color:var(--grey);white-space:nowrap}
+
+/* routines — a timetable */
+.timetable{display:grid;grid-template-columns:52px repeat(7,1fr);border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card);margin-bottom:18px}
+.timetable .hd{padding:8px 6px;font:500 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--grey);border-bottom:1px solid var(--line);border-right:1px solid var(--line);background:var(--rail);text-align:center}
+.timetable .hd:last-child,.timetable .col:last-child{border-right:0}
+.timetable .hr{font:10.5px var(--mono);color:var(--mute);border-right:1px solid var(--line);padding:0 6px;display:flex;align-items:flex-start;height:34px;justify-content:flex-end}
+.timetable .col{position:relative;border-right:1px solid var(--line);border-bottom:1px solid var(--line);height:34px}
+.timetable .col.wk{background:color-mix(in srgb,var(--rail) 55%,transparent)}
+.rt{position:absolute;left:3px;right:3px;top:3px;height:28px;padding:0 8px;border-radius:6px;display:flex;align-items:center;gap:6px;font:500 10.5px var(--mono);letter-spacing:.02em;overflow:hidden;white-space:nowrap;border:1px solid}
+.rt-ok{background:var(--ok-bg);border-color:color-mix(in srgb,var(--ok) 40%,transparent);color:var(--ok)}
+.rt-warn{background:var(--warn-bg);border-color:color-mix(in srgb,var(--warn) 45%,transparent);color:var(--warn)}
+.rt-fail{background:var(--fail-bg);border-color:color-mix(in srgb,var(--fail) 45%,transparent);color:var(--fail)}
+.rt-off{background:transparent;border-style:dashed;border-color:var(--line2);color:var(--grey)}
+
+/* audit — a ledger with expandable diffs */
+.audit tr.row{cursor:pointer}
+.audit td.diffcell{padding:0;background:var(--rail)}
+.audit pre{margin:0;padding:12px 16px 14px 62px;font:11.5px/1.6 var(--mono);color:var(--grey);white-space:pre-wrap}
+.audit pre .del{color:var(--fail)} .audit pre .add{color:var(--ok)}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters button{border:1px solid var(--line);background:transparent;border-radius:99px;padding:5px 11px;font:500 11.5px var(--ui);color:var(--grey)}
+.filters button[aria-pressed=true]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+/* office settings — a control panel list */
+.controls{border:1px solid var(--line);border-radius:12px;background:var(--card);overflow:hidden}
+.control{display:grid;grid-template-columns:1fr 200px;gap:6px 24px;padding:16px 20px;border-bottom:1px solid var(--line);align-items:center;position:relative}
+.control:last-child{border-bottom:0}
+.control > span{font:500 13px var(--ui)}
+.control small{grid-column:1;color:var(--grey);font-size:11.5px;line-height:1.5}
+.control .ctl{grid-column:2;grid-row:1/3;display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.control input,.control select{width:120px;border:1px solid var(--line2);border-radius:8px;padding:8px 10px;background:var(--paper);color:var(--ink);font:13px var(--mono);text-align:right}
+.control input[type=text],.control input[type=url]{width:200px;text-align:left;font-family:var(--ui)}
+.control input:focus,.control select:focus{outline:0;border-color:var(--busy);box-shadow:0 0 0 3px var(--busy-bg)}
+.control .unit{font:11px var(--mono);color:var(--mute);width:30px}
+.control.changed::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--warn)}
+.control.invalid input{border-color:var(--fail);box-shadow:0 0 0 3px var(--fail-bg)}
+.control .err{display:none;grid-column:1/3;color:var(--fail);font-size:12px}
+.control.invalid .err{display:block}
+.control .err::before{content:"✕ ";font-family:var(--mono)}
+
+/* toasts */
+.toasts{position:fixed;z-index:60;right:20px;top:68px;display:flex;flex-direction:column;gap:10px;width:min(380px,calc(100vw - 40px))}
+.toast{display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:start;padding:12px 12px 12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow);animation:drop .18s ease-out;border-left-width:3px}
+.toast .glyph{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font:700 11px var(--mono);color:#fff;margin-top:1px}
+.toast b{font-weight:600;font-size:12.5px}
+.toast p{grid-column:2;margin:0;color:var(--grey);font-size:12px}
+.toast .x{grid-column:3;grid-row:1;border:0;background:transparent;color:var(--mute);font-size:16px;line-height:1;padding:0 2px}
+.toast .act{grid-column:2;margin-top:6px;display:flex;gap:8px}
+.toast-ok{border-left-color:var(--ok)} .toast-ok .glyph{background:var(--ok)}
+.toast-fail{border-left-color:var(--fail)} .toast-fail .glyph{background:var(--fail)}
+.toast-warn{border-left-color:var(--warn)} .toast-warn .glyph{background:var(--warn)}
+.toast-info{border-left-color:var(--busy)} .toast-info .glyph{background:var(--busy)}
+.toast.out{opacity:0;transform:translateX(12px);transition:.2s}
+
+/* small screens */
+@media (max-width:900px){
+  .page{grid-template-columns:1fr}
+  .rail{position:static;height:auto;display:flex;flex-wrap:wrap;gap:4px;padding:10px 12px}
+  .rail .eyebrow,.rail-office,.rail-back{display:none}
+  .rail-item{width:auto;padding:6px 10px;border:1px solid var(--line);border-radius:99px;font-size:12px}
+  .sheet{padding:20px 16px 100px}
+  .area-head{grid-template-columns:1fr}.area-head .meta{align-items:flex-start}
+  .area-head h1{font-size:30px}
+  .control{grid-template-columns:1fr}.control .ctl{grid-column:1;grid-row:auto;justify-content:flex-start}
+  .person{grid-template-columns:44px 1fr}.person .facts{grid-column:2;grid-row:auto;align-items:flex-start}
+  .timetable{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= top bar ================= -->
+<header id="topbar">
+  <div class="brand">Northgate Studio <small>Cloud AI Office</small></div>
+  <div class="spacer"></div>
+  <button class="tb-btn" type="button" title="Inbox">Inbox <span class="badge att">3</span></button>
+  <button class="tb-btn" id="manageBtn" type="button" aria-expanded="false" aria-controls="directory">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.5" fill="var(--paper)"/><circle cx="15" cy="17" r="2.5" fill="var(--paper)"/></svg>
+    Manage <span class="dot dot-fail" id="manageDot" title="2 things need you"></span>
+  </button>
+  <button class="tb-btn" id="themeBtn" type="button" aria-label="Switch theme">◐</button>
+  <span id="clock" class="num">10:52 am</span>
+</header>
+
+<!-- ================= the Directory (Manage menu, open) ================= -->
+<div class="directory" id="directory" hidden role="dialog" aria-label="Manage the office">
+  <div class="dir-head">
+    <h2>Manage</h2>
+    <span class="eyebrow">Northgate Studio · 6 teams · 37 people</span>
+    <span class="needs"><span class="dot dot-fail"></span><b>2</b>&nbsp;need you</span>
+  </div>
+  <div class="dir-attn">
+    <div class="attn"><span class="st st-fail"><i></i>Sign-in expired</span> Slack stopped answering at 09:14. Sales and Marketing cannot post until you sign in again. <span class="when">09:14</span><button type="button" data-go="tools">Sign in</button></div>
+    <div class="attn"><span class="st st-warn"><i></i>Waits for you</span> Routine <b>&nbsp;Overdue invoice reminders&nbsp;</b> finished and wants your OK before it sends. <span class="when">09:02</span><button type="button" data-go="routines">Review</button></div>
+  </div>
+  <div class="dir-body">
+    <div class="dir-col">
+      <span class="eyebrow">People</span>
+      <button class="dir-item" type="button" data-go="teams"><strong>Teams &amp; people</strong><small>6 teams · 37 people</small></button>
+      <button class="dir-item" type="button" data-go="projects"><strong>Projects</strong><small>2 open · milestone Fri</small></button>
+      <button class="dir-item" type="button" data-go="routines"><strong>Routines</strong><small>3 scheduled · next 08:30</small><span class="dot dot-warn"></span></button>
+    </div>
+    <div class="dir-col">
+      <span class="eyebrow">Knowledge</span>
+      <button class="dir-item" type="button" data-go="brain"><strong>Brain</strong><small>214 notes · index fresh</small></button>
+      <button class="dir-item" type="button" data-go="skills"><strong>Skills</strong><small>2 skills</small></button>
+      <button class="dir-item" type="button" data-go="artifacts"><strong>Office Artifacts</strong><small>18 documents</small></button>
+      <button class="dir-item" type="button" data-go="reports"><strong>Reports &amp; KPIs</strong><small>last 7 days</small></button>
+    </div>
+    <div class="dir-col">
+      <span class="eyebrow">Services</span>
+      <button class="dir-item" type="button" data-go="models"><strong>Models &amp; keys</strong><small>1 of 3 providers keyed · ready</small><span class="dot dot-ok"></span></button>
+      <button class="dir-item" type="button" data-go="tools"><strong>Tools &amp; connectors</strong><small>4 connectors · 1 sign-in expired</small><span class="dot dot-fail"></span></button>
+      <button class="dir-item" type="button" data-go="vault"><strong>Vault</strong><small>3 entries · checked 10:41</small><span class="dot dot-ok"></span></button>
+    </div>
+    <div class="dir-col">
+      <span class="eyebrow">Administration</span>
+      <button class="dir-item" type="button" data-go="office"><strong>Office settings</strong><small>4 tasks at once · digest 18:00</small></button>
+      <button class="dir-item" type="button" data-go="audit"><strong>Audit log</strong><small>27 entries · last 10:41</small></button>
+      <button class="dir-item" type="button"><strong>Claude Code</strong><small>this machine</small><span class="dot dot-ok"></span></button>
+    </div>
+  </div>
+  <div class="dir-foot">Models ready · 2 tasks running · provider answering in 1.4 s <span class="st st-ok"><i></i>Office healthy</span></div>
+</div>
+
+<div class="page">
+<!-- ================= rail ================= -->
+<aside class="rail" aria-label="Manage sections">
+  <a class="rail-back" href="#">← Back to the office</a>
+  <span class="eyebrow">People</span>
+  <button class="rail-item" type="button" data-go="teams" aria-current="page">Teams &amp; people <span class="count">37</span></button>
+  <button class="rail-item" type="button" data-go="projects">Projects <span class="count">2</span></button>
+  <button class="rail-item" type="button" data-go="routines">Routines <span class="dot dot-warn"></span><span class="count">3</span></button>
+  <span class="eyebrow">Knowledge</span>
+  <button class="rail-item" type="button" data-go="brain">Brain <span class="count">214</span></button>
+  <button class="rail-item" type="button" data-go="skills">Skills <span class="count">2</span></button>
+  <button class="rail-item" type="button" data-go="artifacts">Office Artifacts <span class="count">18</span></button>
+  <button class="rail-item" type="button" data-go="reports">Reports &amp; KPIs</button>
+  <span class="eyebrow">Services</span>
+  <button class="rail-item" type="button" data-go="models">Models &amp; keys <span class="dot dot-ok"></span></button>
+  <button class="rail-item" type="button" data-go="tools">Tools &amp; connectors <span class="dot dot-fail"></span></button>
+  <button class="rail-item" type="button" data-go="vault">Vault <span class="dot dot-ok"></span></button>
+  <span class="eyebrow">Administration</span>
+  <button class="rail-item" type="button" data-go="office">Office settings</button>
+  <button class="rail-item" type="button" data-go="audit">Audit log <span class="count">27</span></button>
+  <div class="rail-office"><b>Northgate Studio</b>v3.7.0 · data/ on this machine<br>Claude Code <span class="dot dot-ok"></span> connected</div>
+</aside>
+
+<!-- ================= sheet ================= -->
+<main class="sheet">
+
+<!-- ---------- Teams & people ---------- -->
+<section class="area on" id="area-teams" aria-labelledby="h-teams">
+  <div class="area-head">
+    <div><span class="eyebrow">People</span><h1 id="h-teams">Teams &amp; people</h1><p>Who is on each team, what they do, and the standing instructions they start every task from. A team is a lead and up to six specialists.</p></div>
+    <div class="meta"><span class="st st-ok"><i></i>Saved</span><span>last change 10:41 · you</span></div>
+  </div>
+  <div class="team-strip" role="tablist">
+    <button class="team-tab" role="tab" aria-selected="true" type="button"><b>Emails</b><small>5 people · Emails Lead</small></button>
+    <button class="team-tab" role="tab" aria-selected="false" type="button"><b>Sales</b><small>6 people · Lexi</small></button>
+    <button class="team-tab" role="tab" aria-selected="false" type="button"><b>Marketing</b><small>7 people · Marketing Lead</small></button>
+    <button class="team-tab" role="tab" aria-selected="false" type="button"><b>Operations</b><small>6 people · Operations Lead</small></button>
+    <button class="team-tab" role="tab" aria-selected="false" type="button"><b>Finance</b><small>6 people · CFO</small></button>
+    <button class="team-tab" role="tab" aria-selected="false" type="button"><b>Delivery</b><small>7 people · Delivery Lead</small></button>
+    <button class="team-tab add" type="button">+ Add team</button>
+  </div>
+  <div class="team-head">
+    <h2>Emails</h2>
+    <span class="lead">Led by <b>EMAILS LEAD</b> · 2 runs at once · 3 rework rounds · <span class="st st-off"><i></i>Closes without your OK</span></span>
+    <div class="actions"><button class="btn btn-sm" type="button">Hire from the Agency</button><button class="btn btn-sm btn-danger" type="button">Remove team</button></div>
+  </div>
+  <nav class="subnav" role="tablist" aria-label="Team pages">
+    <button role="tab" aria-selected="false" type="button" data-sub="charter">Charter</button>
+    <button role="tab" aria-selected="true" type="button" data-sub="people">People <span class="count">5</span></button>
+    <button role="tab" aria-selected="false" type="button" data-sub="rules">Standing rules <span class="count">4</span></button>
+    <button role="tab" aria-selected="false" type="button" data-sub="access">Tools &amp; skills</button>
+    <button role="tab" aria-selected="false" type="button" data-sub="review">Review</button>
+    <button role="tab" aria-selected="false" type="button" data-sub="pace">Models &amp; pace</button>
+    <button role="tab" aria-selected="false" type="button" data-sub="tests">Tests</button>
+  </nav>
+
+  <div data-subpage="people">
+    <div class="card">
+      <div class="person">
+        <div class="avatar lead">EL</div>
+        <div class="who"><b>EMAILS LEAD</b><span>INBOX LEAD · LEADS THE TEAM</span></div>
+        <div class="does">Runs the whole inbox: routes every email to the right desk, checks tone, and escalates only what the CEO must see.</div>
+        <div class="facts"><span>model · team default</span><span>tools · inherits 2</span><span>skills · —</span><button class="btn btn-sm" type="button">Edit</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="person">
+        <div class="avatar">CE</div>
+        <div class="who"><b>CLIENT EMAILS</b><span>CLIENT EMAIL AGENT</span></div>
+        <div class="does">Answers every client email from the Brain — scope, timelines, results — and never lets one wait past the day.</div>
+        <div class="facts"><span>model · team default</span><span>tools · inherits 2</span><span>skills · —</span><button class="btn btn-sm" type="button">Edit</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="person">
+        <div class="avatar">IE</div>
+        <div class="who"><b>INTERNAL EMAILS</b><span>INTERNAL EMAIL AGENT</span></div>
+        <div class="does">Keeps the team inbox moving — triage, summaries of long threads, calendar holds, and the weekly digest.</div>
+        <div class="facts"><span>model · team default</span><span>tools · Google_Calendar +2</span><span>skills · —</span><button class="btn btn-sm" type="button">Edit</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="person">
+        <div class="avatar">VE</div>
+        <div class="who"><b>VENDOR EMAILS</b><span>VENDOR EMAIL AGENT</span></div>
+        <div class="does">Handles every supplier thread — quotes, renewals, SLAs, outages — and flags anything that changes a cost.</div>
+        <div class="facts"><span>model · z-ai/glm-5.3</span><span>tools · inherits 2</span><span>skills · —</span><button class="btn btn-sm" type="button">Edit</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="person">
+        <div class="avatar">KE</div>
+        <div class="who"><b>CONTRACTOR EMAILS</b><span>CONTRACTOR EMAIL AGENT</span></div>
+        <div class="does">Talks to the freelancers — briefs out, hours in, invoice questions answered against the contract.</div>
+        <div class="facts"><span>model · team default</span><span>tools · inherits 2</span><span>skills · —</span><button class="btn btn-sm" type="button">Edit</button></div>
+      </div>
+    </div>
+    <div class="toolbar" style="margin-top:14px"><button class="btn" type="button">+ Add a person</button><span class="muted">Room for 1 more specialist on this team.</span></div>
+  </div>
+
+  <div data-subpage="charter" hidden>
+    <form class="card" data-form="teams" novalidate>
+      <div class="form-grid">
+        <label class="field"><span>Team name</span><input name="name" value="EMAILS"></label>
+        <label class="field"><span>Accountable lead</span><select name="lead"><option>EMAILS LEAD</option><option>CLIENT EMAILS</option><option>INTERNAL EMAILS</option></select><small>Reviews every result against the criteria before it is filed in the Brain.</small></label>
+      </div>
+      <label class="field" style="margin-top:16px"><span>Purpose</span><textarea name="purpose" rows="2">Own every inbox the company runs: client, internal, vendor and contractor mail. Nothing waits, nothing goes out off-tone, and the CEO only sees what needs a decision.</textarea><small>What this team owns and what a good result looks like. Read before every assignment.</small></label>
+      <label class="field"><span>Working instructions</span><textarea name="instructions" rows="6">Read the whole thread and search the Brain before replying; never answer from memory.
+Every fact, price, date or commitment in a reply comes from a Brain note or a document; if it is not there, ask rather than guess.
+Write in the company voice: short, warm, specific, one ask per email. Match the language of the sender.
+Anything that changes a cost, a date or a scope is escalated to the CEO with a one-line recommendation.</textarea><small>Process, tone, sources and boundaries. Steps with a template belong in a skill instead.</small></label>
+    </form>
+  </div>
+  <div data-subpage="rules" hidden><div class="card"><h3>Standing rules</h3><p>Your own words, kept as you wrote them. Every task for this team starts from them.</p>
+    <table class="ledger"><tbody>
+      <tr><td>Always quote prices in USD, never in EUR, even to European clients.</td><td class="k muted">whole team · from “Reply to the Meridian quote”</td><td class="r"><button class="btn btn-sm btn-text" type="button">Remove</button></td></tr>
+      <tr><td>Never promise a delivery date without checking the Delivery team's calendar first.</td><td class="k muted">whole team · added by you</td><td class="r"><button class="btn btn-sm btn-text" type="button">Remove</button></td></tr>
+      <tr><td>Contractor invoices are questioned only against the signed contract in the Brain.</td><td class="k muted">CONTRACTOR EMAILS</td><td class="r"><button class="btn btn-sm btn-text" type="button">Remove</button></td></tr>
+      <tr><td>Vendor renewals over 5,000 USD go to the CEO before any reply.</td><td class="k muted">VENDOR EMAILS · from “Renew the Twilio plan”</td><td class="r"><button class="btn btn-sm btn-text" type="button">Remove</button></td></tr>
+    </tbody></table>
+    <div class="toolbar" style="margin-top:14px"><div class="search" style="flex:1"><input placeholder="Add a rule, e.g. Always sign off with the team name"></div><button class="btn" type="button">Add rule</button></div>
+  </div></div>
+  <div data-subpage="access" hidden><div class="card"><h3>Tools &amp; skills</h3><p>Everything this team may use. A person inherits these unless limited on their own page.</p>
+    <table class="ledger"><thead><tr><th>Tool</th><th>Kind</th><th>State</th><th class="r">Access</th></tr></thead><tbody>
+      <tr><td class="name">Web search &amp; fetch</td><td class="k">built in</td><td><span class="st st-ok"><i></i>Always available</span></td><td class="r"><button class="switch" role="switch" aria-checked="true" aria-label="Web search access"></button></td></tr>
+      <tr><td class="name">Google_Calendar</td><td class="k">MCP · remote</td><td><span class="st st-ok"><i></i>Signed in</span></td><td class="r"><button class="switch" role="switch" aria-checked="true" aria-label="Calendar access"></button></td></tr>
+      <tr><td class="name">Slack</td><td class="k">MCP · remote</td><td><span class="st st-fail"><i></i>Sign-in expired</span></td><td class="r"><button class="switch" role="switch" aria-checked="false" aria-label="Slack access"></button></td></tr>
+      <tr><td class="name">Financial Analyst <span class="chip">skill · v1</span></td><td class="k">skill</td><td><span class="st st-off"><i></i>Not given</span></td><td class="r"><button class="switch" role="switch" aria-checked="false" aria-label="Skill access"></button></td></tr>
+    </tbody></table></div></div>
+  <div data-subpage="review" hidden><div class="card"><h3>Review</h3><p>What the lead checks before approving. Guardrails are hard stops; criteria are the bar.</p><div class="form-grid"><label class="field"><span>Guardrails — one per line</span><textarea rows="3">No external send without CEO approval.
+No price, date or commitment without a Brain source.</textarea></label><label class="field"><span>Lead's review criteria — one per line</span><textarea rows="3">Reply answers every question in the thread.
+Tone matches the sender and the company voice.
+One clear next step.</textarea></label></div></div></div>
+  <div data-subpage="pace" hidden><div class="card"><h3>Models &amp; pace</h3><p>Which model each role on this team runs on, and how much the team does at once.</p><div class="form-grid"><label class="field"><span>Lead</span><select><option>Office default · google/gemini-3.8-flash</option><option>z-ai/glm-5.3</option></select></label><label class="field"><span>Specialists</span><select><option>Office default · google/gemini-3.8-flash</option><option>z-ai/glm-5.3-flash</option></select></label><label class="field"><span>Review</span><select><option>Office default · google/gemini-3.8-flash</option></select></label><label class="field"><span>Runs at once</span><input type="number" value="2" min="1" max="4"><small>1 to 4.</small></label><label class="field"><span>Rework rounds before it blocks</span><input type="number" value="3" min="0" max="5"></label><label class="field inline" style="flex-direction:row;align-items:center;margin-top:22px"><button class="switch" role="switch" aria-checked="false" type="button"></button><span>Ask my OK before a task closes</span></label></div></div></div>
+  <div data-subpage="tests" hidden><div class="card"><h3>Tests</h3><p>A prompt and the text a good answer must contain. Run them after changing a brief or a skill.</p><table class="ledger"><thead><tr><th>Test</th><th>Last run</th><th>Result</th><th class="r"></th></tr></thead><tbody><tr><td class="name">Client asks for a delivery date<span class="sub">must contain: “check with Delivery”</span></td><td class="k">yesterday 17:02</td><td><span class="st st-ok"><i></i>Passed</span></td><td class="r"><button class="btn btn-sm" type="button">Run</button></td></tr><tr><td class="name">Vendor renewal at 8,000 USD<span class="sub">must contain: “needs the CEO”</span></td><td class="k">yesterday 17:02</td><td><span class="st st-fail"><i></i>Failed · missing “needs the CEO”</span></td><td class="r"><button class="btn btn-sm" type="button">Run</button></td></tr></tbody></table></div></div>
+
+  <div class="savebar" data-state="idle" data-savebar="teams">
+    <span class="st st-warn" data-mark><i></i>Not saved</span>
+    <div class="msg" data-msg>2 changes not saved<small>New tasks keep using the last saved charter until you save.</small></div>
+    <span class="spacer"></span>
+    <button class="btn" type="button" data-discard>Discard</button>
+    <button class="btn btn-primary" type="button" data-save>Save changes</button>
+  </div>
+</section>
+
+<!-- ---------- Models & keys ---------- -->
+<section class="area" id="area-models" aria-labelledby="h-models">
+  <div class="area-head">
+    <div><span class="eyebrow">Services</span><h1 id="h-models">Models &amp; keys</h1><p>Save a provider key, activate the models the office may use, and pick who runs on what. Keys stay on the server and are never shown again.</p></div>
+    <div class="meta"><span class="st st-ok"><i></i>Ready · teams can work</span><span>last change 10:41 · you</span></div>
+  </div>
+  <div class="banner banner-warn"><span class="glyph">!</span><div><b>Anthropic has no key.</b> Refusal fallback is on for this provider, so a refused call has nowhere to go until a key is saved.</div><div class="actions"><button class="btn btn-sm" type="button" data-focus="anthropicKey">Add key</button></div></div>
+  <div class="card">
+    <div class="card-head"><h3>Providers</h3><span class="muted">3 configured · 1 keyed</span></div>
+    <div class="ledger-wrap"><table class="ledger"><thead><tr><th>Provider</th><th>Key</th><th>State</th><th>Models activated</th><th class="r"></th></tr></thead><tbody>
+      <tr><td class="name">OpenRouter<span class="sub">https://openrouter.ai/api/v1</span></td><td class="key"><span class="mask">sk-or-v1-••••••••••••••••</span> 3f9c</td><td><span class="st st-ok" data-status="openrouter"><i></i>Connected · 1.4 s</span></td><td>5 of 312 <span class="chip">office default</span></td><td class="r"><button class="btn btn-sm" type="button" data-test="openrouter">Test</button> <button class="btn btn-sm" type="button">Replace key</button></td></tr>
+      <tr><td class="name">Anthropic<span class="sub">https://api.anthropic.com</span></td><td class="key" id="anthropicKey"><span class="mask">no key saved</span></td><td><span class="st st-warn" data-status="anthropic"><i></i>Not set</span></td><td>0</td><td class="r"><button class="btn btn-sm" type="button" data-test="anthropic">Test</button> <button class="btn btn-sm" type="button">Add key</button></td></tr>
+      <tr><td class="name">OpenAI<span class="sub">https://api.openai.com/v1</span></td><td class="key"><span class="mask">from environment · OPENAI_API_KEY</span></td><td><span class="st st-fail" data-status="openai"><i></i>Key rejected · 401</span></td><td>0</td><td class="r"><button class="btn btn-sm" type="button" data-test="openai">Test</button> <button class="btn btn-sm" type="button">Replace key</button></td></tr>
+    </tbody></table></div>
+    <div class="toolbar" style="margin:14px 0 0"><button class="btn" type="button">+ Add a provider</button><span class="muted">Anthropic, OpenAI, OpenRouter or any OpenAI-compatible endpoint.</span></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3>Who runs on what</h3><span class="muted">A team or a person can override these on their own page.</span></div>
+    <form data-form="models" novalidate><div class="form-grid">
+      <label class="field"><span>Office default</span><select name="office"><option>google/gemini-3.8-flash · OpenRouter</option><option>z-ai/glm-5.3 · OpenRouter</option><option>deepseek/deepseek-v4.1-flash · OpenRouter</option></select><small>Used wherever nothing more specific is set.</small></label>
+      <label class="field"><span>Program Manager</span><select name="pm"><option>Office default</option><option>z-ai/glm-5.3 · OpenRouter</option></select></label>
+      <label class="field"><span>Team leads</span><select name="lead"><option>Office default</option><option>z-ai/glm-5.3 · OpenRouter</option></select></label>
+      <label class="field"><span>Specialists</span><select name="spec"><option>Office default</option><option>z-ai/glm-5.3-flash · OpenRouter</option></select></label>
+      <label class="field"><span>Review</span><select name="review"><option>Office default</option><option>z-ai/glm-5.3 · OpenRouter</option></select></label>
+    </div></form>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3>Activated models</h3><div class="search" style="margin-left:auto;min-width:220px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input placeholder="Find a model in OpenRouter's list"></div></div>
+    <table class="ledger"><thead><tr><th>Model</th><th>Provider</th><th>Supports</th><th>Used by</th><th class="r">Active</th></tr></thead><tbody>
+      <tr><td class="k">google/gemini-3.8-flash</td><td>OpenRouter</td><td class="chips"><span class="chip">tools</span><span class="chip">reasoning</span></td><td>office default</td><td class="r"><button class="switch" role="switch" aria-checked="true" aria-label="Active"></button></td></tr>
+      <tr><td class="k">z-ai/glm-5.3</td><td>OpenRouter</td><td class="chips"><span class="chip">tools</span><span class="chip">effort</span></td><td>VENDOR EMAILS</td><td class="r"><button class="switch" role="switch" aria-checked="true" aria-label="Active"></button></td></tr>
+      <tr><td class="k">z-ai/glm-5.3-flash</td><td>OpenRouter</td><td class="chips"><span class="chip">tools</span></td><td class="muted">—</td><td class="r"><button class="switch" role="switch" aria-checked="true" aria-label="Active"></button></td></tr>
+      <tr><td class="k">google/gemini-3.1-flash-lite</td><td>OpenRouter</td><td class="chips"><span class="chip">tools</span></td><td class="muted">—</td><td class="r"><button class="switch" role="switch" aria-checked="true" aria-label="Active"></button></td></tr>
+      <tr><td class="k">deepseek/deepseek-v4.1-flash</td><td>OpenRouter</td><td class="chips"><span class="chip">tools</span><span class="chip">reasoning</span></td><td class="muted">—</td><td class="r"><button class="switch" role="switch" aria-checked="true" aria-label="Active"></button></td></tr>
+    </tbody></table>
+  </div>
+  <div class="savebar" data-state="idle" data-savebar="models">
+    <span class="st st-warn" data-mark><i></i>Not saved</span>
+    <div class="msg" data-msg>1 change not saved<small>Running tasks finish on the model they started with.</small></div>
+    <span class="spacer"></span>
+    <button class="btn" type="button" data-discard>Discard</button>
+    <button class="btn btn-primary" type="button" data-save>Save changes</button>
+  </div>
+</section>
+
+<!-- ---------- Tools & connectors ---------- -->
+<section class="area" id="area-tools" aria-labelledby="h-tools">
+  <div class="area-head">
+    <div><span class="eyebrow">Services</span><h1 id="h-tools">Tools &amp; connectors</h1><p>The outside services the office connects to itself. A connector is separate from permission: sign in here, then choose which teams may use it.</p></div>
+    <div class="meta"><span class="st st-fail"><i></i>1 sign-in expired</span><span>checked 10:52 · every 20 s</span></div>
+  </div>
+  <div class="banner banner-fail" id="slackBanner"><span class="glyph">✕</span><div><b>Slack stopped answering at 09:14: the sign-in expired.</b> Sales and Marketing have 2 tasks waiting on it. Signing in again resumes them.</div><div class="actions"><button class="btn btn-sm btn-primary" type="button" data-signin="slack">Sign in again</button><button class="btn btn-sm" type="button">Details</button></div></div>
+  <div class="toolbar"><div class="search"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input placeholder="Find a connector or a tool"></div><span class="spacer"></span><button class="btn" type="button">Import from Claude Code</button><button class="btn btn-primary" type="button">+ Add connector</button></div>
+  <div class="ledger-wrap"><table class="ledger"><thead><tr><th>Connector</th><th>Kind</th><th>Sign-in</th><th>Teams with access</th><th>Approval</th><th class="r"></th></tr></thead><tbody>
+    <tr><td class="name">Web search &amp; fetch<span class="sub">built into the office</span></td><td class="k">built in</td><td><span class="st st-ok"><i></i>Always available</span></td><td class="chips"><span class="chip chip-ink">Emails</span><span class="chip chip-ink">Sales</span><span class="chip chip-ink">Marketing</span><span class="chip chip-ink">Finance</span><span class="chip">+2</span></td><td class="muted">reads only</td><td class="r"><button class="btn btn-sm" type="button">Team access</button></td></tr>
+    <tr><td class="name">Google_Calendar<span class="sub">https://calendar.mcp.google.com</span></td><td class="k">MCP · remote</td><td><span class="st st-ok"><i></i>Signed in</span><span class="sub">as yazan@ · expires in 6 days</span></td><td class="chips"><span class="chip chip-ink">Emails</span><span class="chip chip-ink">Sales</span><span class="chip chip-ink">Operations</span><span class="chip">+3</span></td><td>create_event <span class="chip">waits for you</span></td><td class="r"><button class="btn btn-sm" type="button">Team access</button> <button class="btn btn-sm" type="button">Sign out</button></td></tr>
+    <tr id="slackRow"><td class="name">Slack<span class="sub">https://mcp.slack.com/mcp</span></td><td class="k">MCP · remote</td><td><span class="st st-fail" data-status="slack"><i></i>Sign-in expired</span><span class="sub" data-sub="slack">since 09:14 · 2 tasks waiting</span></td><td class="chips"><span class="chip chip-ink">Sales</span><span class="chip chip-ink">Marketing</span></td><td>post_message <span class="chip">waits for you</span></td><td class="r"><button class="btn btn-sm btn-primary" type="button" data-signin="slack">Sign in</button> <button class="btn btn-sm" type="button">Team access</button></td></tr>
+    <tr><td class="name">GitHub<span class="sub">npx @modelcontextprotocol/server-github</span></td><td class="k">MCP · local command</td><td><span class="st st-off"><i></i>Signed out</span></td><td class="chips"><span class="chip chip-ink">Delivery</span></td><td>create_issue <span class="chip">waits for you</span></td><td class="r"><button class="btn btn-sm" type="button">Sign in</button> <button class="btn btn-sm" type="button">Team access</button></td></tr>
+    <tr><td class="name">Postgres · prod-replica<span class="sub">from the Vault</span></td><td class="k">database</td><td><span class="st st-ok"><i></i>Connected · read-only</span></td><td class="chips"><span class="chip chip-ink">Finance</span><span class="chip chip-ink">Operations</span></td><td>db_write <span class="chip">never</span></td><td class="r"><button class="btn btn-sm" type="button" data-go="vault">Open in Vault</button></td></tr>
+  </tbody></table></div>
+  <div class="toolbar" style="margin-top:16px"><button class="btn" type="button" data-check-all>Check all connections</button><button class="btn" type="button">Approval rules for actions</button><span class="muted">Any tool that sends, posts, pays, deletes or changes something outside the office waits for your OK.</span></div>
+</section>
+
+<!-- ---------- Vault ---------- -->
+<section class="area" id="area-vault" aria-labelledby="h-vault">
+  <div class="area-head">
+    <div><span class="eyebrow">Services</span><h1 id="h-vault">Vault</h1><p>Outside-service keys, database connections and SSH targets. Agents never see a secret; the office injects it and the audit log records every use.</p></div>
+    <div class="meta"><span class="st st-ok"><i></i>3 entries · all reachable</span><span>checked 10:41</span></div>
+  </div>
+  <div class="toolbar"><div class="filters"><button type="button" aria-pressed="true">All</button><button type="button" aria-pressed="false">Outside services</button><button type="button" aria-pressed="false">Databases</button><button type="button" aria-pressed="false">SSH targets</button></div><span class="spacer"></span><button class="btn btn-primary" type="button">+ Add entry</button></div>
+  <div class="ledger-wrap"><table class="ledger"><thead><tr><th>Entry</th><th>Kind</th><th>Secret</th><th>State</th><th>Teams</th><th class="r"></th></tr></thead><tbody>
+    <tr><td class="name">here.now (website hosting)<span class="sub">https://here.now/api/v1 · Authorization: Bearer</span></td><td class="k">api</td><td class="key"><span class="mask">•••••••••••</span> set 10:41</td><td><span class="st st-ok" data-status="herenow"><i></i>Reachable · 200</span></td><td class="chips"><span class="chip">every team</span></td><td class="r"><button class="btn btn-sm" type="button" data-test="herenow">Check</button> <button class="btn btn-sm" type="button">Edit</button></td></tr>
+    <tr><td class="name">prod-replica<span class="sub">postgres · db.internal:5432/northgate · user reporting</span></td><td class="k">database</td><td class="key"><span class="mask">•••••••••••</span> set 3 Sep</td><td><span class="st st-ok" data-status="pg"><i></i>Connected · read-only</span></td><td class="chips"><span class="chip chip-ink">Finance</span><span class="chip chip-ink">Operations</span></td><td class="r"><button class="btn btn-sm" type="button" data-test="pg">Check</button> <button class="btn btn-sm" type="button">Edit</button></td></tr>
+    <tr><td class="name">web-01<span class="sub">ssh · deploy@203.0.113.8:22 · key · allows: systemctl status, tail, df</span></td><td class="k">ssh</td><td class="key">key · fingerprint <span class="mask">SHA256:…</span>9Qk</td><td><span class="st st-warn" data-status="ssh"><i></i>Host key not yet verified</span></td><td class="chips"><span class="chip chip-ink">Delivery</span></td><td class="r"><button class="btn btn-sm" type="button" data-test="ssh">Check</button> <button class="btn btn-sm" type="button">Edit</button></td></tr>
+  </tbody></table></div>
+  <p class="muted" style="margin-top:14px">Reads run at once. <span class="mono">api_request</span>, <span class="mono">api_upload</span>, <span class="mono">db_write</span> and <span class="mono">ssh_run</span> pause for your approval. A connection that fails three times is paused for a minute.</p>
+</section>
+
+<!-- ---------- Routines ---------- -->
+<section class="area" id="area-routines" aria-labelledby="h-routines">
+  <div class="area-head">
+    <div><span class="eyebrow">People</span><h1 id="h-routines">Routines</h1><p>Tasks the office starts on its own clock, run through the team lead like any other. Anything that sends, posts or pays waits for you regardless.</p></div>
+    <div class="meta"><span class="st st-warn"><i></i>1 waits for you</span><span>next run 08:30 tomorrow</span></div>
+  </div>
+  <div class="banner banner-warn"><span class="glyph">!</span><div><b>Overdue invoice reminders finished at 09:02 and wants your OK.</b> 4 reminders drafted, nothing sent yet.</div><div class="actions"><button class="btn btn-sm btn-primary" type="button" data-approve>Review and approve</button><button class="btn btn-sm" type="button">Open the task</button></div></div>
+  <div class="timetable" aria-hidden="true">
+    <div class="hd"></div><div class="hd">Mon</div><div class="hd">Tue</div><div class="hd">Wed</div><div class="hd">Thu</div><div class="hd">Fri</div><div class="hd">Sat</div><div class="hd">Sun</div>
+    <div class="hr">08:00</div><div class="col wk"><span class="rt rt-ok">08:30 Inbox digest</span></div><div class="col wk"><span class="rt rt-ok">08:30 Inbox digest</span></div><div class="col wk"><span class="rt rt-ok">08:30 Inbox digest</span></div><div class="col wk"><span class="rt rt-ok">08:30 Inbox digest</span></div><div class="col wk"><span class="rt rt-ok">08:30 Inbox digest</span></div><div class="col"></div><div class="col"></div>
+    <div class="hr">09:00</div><div class="col wk"><span class="rt rt-warn">09:00 Overdue invoices</span></div><div class="col wk"></div><div class="col wk"></div><div class="col wk"></div><div class="col wk"></div><div class="col"></div><div class="col"></div>
+    <div class="hr">12:00</div><div class="col wk"></div><div class="col wk"></div><div class="col wk"></div><div class="col wk"></div><div class="col wk"></div><div class="col"></div><div class="col"></div>
+    <div class="hr">16:00</div><div class="col wk"></div><div class="col wk"></div><div class="col wk"></div><div class="col wk"><span class="rt rt-fail">16:00 Pipeline review</span></div><div class="col wk"></div><div class="col"></div><div class="col"></div>
+    <div class="hr">18:00</div><div class="col wk"><span class="rt rt-off">18:00 Daily digest</span></div><div class="col wk"><span class="rt rt-off">18:00 Daily digest</span></div><div class="col wk"><span class="rt rt-off">18:00 Daily digest</span></div><div class="col wk"><span class="rt rt-off">18:00 Daily digest</span></div><div class="col wk"><span class="rt rt-off">18:00 Daily digest</span></div><div class="col"><span class="rt rt-off">18:00 Daily digest</span></div><div class="col"><span class="rt rt-off">18:00 Daily digest</span></div>
+  </div>
+  <div class="ledger-wrap"><table class="ledger"><thead><tr><th>Routine</th><th>When</th><th>Runs as</th><th>Last run</th><th>Next</th><th class="r"></th></tr></thead><tbody>
+    <tr><td class="name">Inbox digest<span class="sub">Summarise every inbox and list what needs the CEO.</span></td><td class="k">weekdays 08:30</td><td>INTERNAL EMAILS<span class="sub">Emails</span></td><td><span class="st st-ok"><i></i>Passed</span><span class="sub">today 08:31 · 4 min</span></td><td class="k">tomorrow 08:30</td><td class="r"><button class="btn btn-sm" type="button" data-run>Run now</button> <button class="switch" role="switch" aria-checked="true" aria-label="Scheduled"></button></td></tr>
+    <tr><td class="name">Overdue invoice reminders<span class="sub">List the overdue invoices and draft the reminders.</span></td><td class="k">Mon 09:00</td><td>CFO<span class="sub">Finance</span></td><td><span class="st st-warn"><i></i>Waits for you</span><span class="sub">today 09:02 · 4 drafts</span></td><td class="k">Mon 09:00</td><td class="r"><button class="btn btn-sm" type="button" data-run>Run now</button> <button class="switch" role="switch" aria-checked="true" aria-label="Scheduled"></button></td></tr>
+    <tr><td class="name">Pipeline review<span class="sub">Stage every open deal and flag the stale ones.</span></td><td class="k">Thu 16:00</td><td>Lexi<span class="sub">Sales</span></td><td><span class="st st-fail"><i></i>Failed</span><span class="sub">Thu 16:00 · Slack sign-in expired</span></td><td class="k">Thu 16:00</td><td class="r"><button class="btn btn-sm" type="button" data-run>Run now</button> <button class="switch" role="switch" aria-checked="true" aria-label="Scheduled"></button></td></tr>
+    <tr><td class="name">Daily digest<span class="sub">Built in · lands in your inbox and the Brain under Digests.</span></td><td class="k">daily 18:00</td><td>Program Manager</td><td><span class="st st-ok"><i></i>Passed</span><span class="sub">yesterday 18:00</span></td><td class="k">today 18:00</td><td class="r"><button class="btn btn-sm" type="button" data-go="office">Change time</button></td></tr>
+  </tbody></table></div>
+  <div class="toolbar" style="margin-top:16px"><button class="btn btn-primary" type="button">+ New routine</button><span class="muted">Say when and what: “Every Monday at 9, list the overdue invoices.”</span></div>
+</section>
+
+<!-- ---------- Office settings ---------- -->
+<section class="area" id="area-office" aria-labelledby="h-office">
+  <div class="area-head">
+    <div><span class="eyebrow">Administration</span><h1 id="h-office">Office settings</h1><p>How the whole office runs. Choices for one team live under Teams &amp; people.</p></div>
+    <div class="meta"><span class="st st-ok"><i></i>Saved</span><span>last change 3 Sep · you</span></div>
+  </div>
+  <form data-form="office" novalidate>
+  <div class="controls">
+    <div class="control"><span>Tasks running at once</span><small>Across all teams. Each team also has its own pace.</small><div class="ctl"><input type="number" name="maxConcurrentJobs" value="4" min="1" max="8"><span class="unit">tasks</span></div></div>
+    <div class="control"><span>Stop a run after this long without progress</span><small>A run that makes no progress for this long stops and tells you. A long task that keeps working is never stopped by this.</small><div class="ctl"><input type="number" name="runTimeoutMinutes" value="20" min="1" max="480"><span class="unit">min</span></div></div>
+    <div class="control"><span>Remind me again after</span><small>When something needs you and you have not acted.</small><div class="ctl"><input type="number" name="escalateAfterHours" value="4" min="0.25" max="72" step="0.25"><span class="unit">h</span></div></div>
+    <div class="control"><span>Brain notes handed to planners</span><small>Agents can always search the Brain for more.</small><div class="ctl"><input type="number" name="knowledgeSeedNotes" value="6" min="0" max="20"><span class="unit">notes</span></div></div>
+    <div class="control"><span>Daily digest time</span><small>The digest lands in your inbox and in the Brain under Digests.</small><div class="ctl"><input type="time" name="digestTime" value="18:00"></div></div>
+    <div class="control"><span>Public address</span><small>Used for connector sign-in links. Leave blank to use this page's address.</small><div class="ctl"><input type="url" name="publicOrigin" value="" placeholder="https://office.example.com"></div><span class="err">Must start with https:// and have no path.</span></div>
+  </div>
+  </form>
+  <div class="savebar" data-state="idle" data-savebar="office">
+    <span class="st st-warn" data-mark><i></i>Not saved</span>
+    <div class="msg" data-msg>1 change not saved<small>New work uses these settings once saved.</small></div>
+    <span class="spacer"></span>
+    <button class="btn" type="button" data-discard>Discard</button>
+    <button class="btn btn-primary" type="button" data-save>Save changes</button>
+  </div>
+</section>
+
+<!-- ---------- Audit log ---------- -->
+<section class="area" id="area-audit" aria-labelledby="h-audit">
+  <div class="area-head">
+    <div><span class="eyebrow">Administration</span><h1 id="h-audit">Audit log</h1><p>Every change made through the office, by you or by an agent, with what it was before. Nothing here can be edited.</p></div>
+    <div class="meta"><span class="st st-off"><i></i>27 entries</span><span>last 10:41</span></div>
+  </div>
+  <div class="toolbar"><div class="filters"><button type="button" aria-pressed="true">All</button><button type="button" aria-pressed="false">Teams</button><button type="button" aria-pressed="false">Models</button><button type="button" aria-pressed="false">Tools</button><button type="button" aria-pressed="false">Vault</button><button type="button" aria-pressed="false">Routines</button><button type="button" aria-pressed="false">Approvals</button></div><span class="spacer"></span><div class="search"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input placeholder="Search entries"></div></div>
+  <div class="ledger-wrap"><table class="ledger audit"><thead><tr><th>#</th><th>When</th><th>Who</th><th>Area</th><th>What changed</th><th class="r"></th></tr></thead><tbody>
+    <tr class="row" data-toggle="d27"><td class="k muted">27</td><td class="k">10:41</td><td>you</td><td><span class="chip">vault</span></td><td>Saved api entry <b>here.now</b></td><td class="r muted">▾</td></tr>
+    <tr id="d27" hidden><td class="diffcell" colspan="6"><pre><span class="add">+ [here.now] kind: api · name: here.now (website hosting) · baseURL: https://here.now/api/v1 · auth: Bearer · secret: [redacted]</span></pre></td></tr>
+    <tr class="row" data-toggle="d26"><td class="k muted">26</td><td class="k">09:59</td><td>you</td><td><span class="chip">models</span></td><td>Updated models and keys · office default changed</td><td class="r muted">▾</td></tr>
+    <tr id="d26" hidden><td class="diffcell" colspan="6"><pre><span class="add">+ models[google/gemini-3.8-flash] enabled · tools, reasoning</span>
+<span class="del">- roleDefaults.office: deepseek/deepseek-v4.1-flash</span>
+<span class="add">+ roleDefaults.office: google/gemini-3.8-flash</span></pre></td></tr>
+    <tr class="row" data-toggle="d25"><td class="k muted">25</td><td class="k">09:14</td><td>office</td><td><span class="chip">tools</span></td><td>Slack sign-in expired · 2 tasks paused</td><td class="r muted">▾</td></tr>
+    <tr id="d25" hidden><td class="diffcell" colspan="6"><pre><span class="del">- tools[slack].auth: signed in as yazan@ (token expired 09:14)</span>
+paused: "Post the launch thread" (Marketing) · "Reply to the Meridian quote" (Sales)</pre></td></tr>
+    <tr class="row" data-toggle="d24"><td class="k muted">24</td><td class="k">09:02</td><td>CFO</td><td><span class="chip">routines</span></td><td>Routine <b>Overdue invoice reminders</b> finished · waits for your OK</td><td class="r muted">▾</td></tr>
+    <tr id="d24" hidden><td class="diffcell" colspan="6"><pre>4 reminders drafted · nothing sent · approval pending since 09:02</pre></td></tr>
+    <tr class="row" data-toggle="d23"><td class="k muted">23</td><td class="k">yesterday 17:20</td><td>you</td><td><span class="chip">teams</span></td><td>Emails · standing rule added for VENDOR EMAILS</td><td class="r muted">▾</td></tr>
+    <tr id="d23" hidden><td class="diffcell" colspan="6"><pre><span class="add">+ rules[vmail]: "Vendor renewals over 5,000 USD go to the CEO before any reply." (from “Renew the Twilio plan”)</span></pre></td></tr>
+    <tr class="row" data-toggle="d22"><td class="k muted">22</td><td class="k">yesterday 16:48</td><td>you</td><td><span class="chip">approvals</span></td><td>Approved <b>create_event</b> for INTERNAL EMAILS · “Hold Thursday 14:00 for the Meridian call”</td><td class="r muted">▾</td></tr>
+    <tr id="d22" hidden><td class="diffcell" colspan="6"><pre>Google_Calendar.create_event · ran once after approval · event id evt_7f3…</pre></td></tr>
+  </tbody></table></div>
+  <div class="toolbar" style="margin-top:14px"><button class="btn" type="button">Load older entries</button><span class="muted">Showing 6 of 27.</span></div>
+</section>
+
+<!-- ---------- the rest: same patterns ---------- -->
+<section class="area" id="area-projects"><div class="area-head"><div><span class="eyebrow">People</span><h1>Projects</h1><p>The big pieces of work: charter, owning teams, milestones and the Brain folder each one keeps.</p></div><div class="meta"><span class="st st-ok"><i></i>2 open</span></div></div><div class="card"><h3>Same pattern</h3><p>A ledger of projects with owning teams as chips, the next milestone as a date in mono, and a status mark: On track · Milestone overdue · Archived.</p></div></section>
+<section class="area" id="area-brain"><div class="area-head"><div><span class="eyebrow">Knowledge</span><h1>Brain</h1><p>The company's shared knowledge. Every agent searches it before and during work and cites what it used.</p></div><div class="meta"><span class="st st-ok"><i></i>Index fresh · 214 notes</span></div></div><div class="card"><h3>Same pattern</h3><p>Folders as a rail on the left, a note ledger with last-edited in mono, and the index state as a status mark with a Rebuild action that goes Working → Passed.</p></div></section>
+<section class="area" id="area-skills"><div class="area-head"><div><span class="eyebrow">Knowledge</span><h1>Skills</h1><p>How a kind of work is done: steps, the shape of the result and the rules. Tasks keep the skill version they started with.</p></div><div class="meta"><span class="st st-off"><i></i>2 skills</span></div></div><div class="card"><h3>Same pattern</h3><p>A ledger of skills with the revision in mono, who has it as chips, and the editor as a document, not a form.</p></div></section>
+<section class="area" id="area-artifacts"><div class="area-head"><div><span class="eyebrow">Knowledge</span><h1>Office Artifacts</h1><p>Everything the teams have produced, newest first.</p></div><div class="meta"><span class="st st-off"><i></i>18 documents</span></div></div><div class="card"><h3>Same pattern</h3><p>Type filters as chips, a ledger of documents with the task and the team, and download on the row.</p></div></section>
+<section class="area" id="area-reports"><div class="area-head"><div><span class="eyebrow">Knowledge</span><h1>Reports &amp; KPIs</h1><p>What the office did in the last 7 days, by team and by person.</p></div><div class="meta"><span class="st st-off"><i></i>last 7 days</span></div></div><div class="card"><h3>Same pattern</h3><p>Figures in mono, one chart per question, and every number linked to the tasks behind it.</p></div></section>
+
+</main>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+  const clock = () => { const d = new Date(); $('#clock').textContent = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toLowerCase(); };
+  clock(); setInterval(clock, 15000);
+  const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  /* theme */
+  const root = document.documentElement;
+  $('#themeBtn').onclick = () => { const dark = root.dataset.theme === 'dark' || (!root.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches); root.dataset.theme = dark ? 'light' : 'dark'; };
+
+  /* toasts */
+  const glyph = { ok: '✓', fail: '✕', warn: '!', info: 'i' };
+  window.toast = (kind, title, detail, action) => {
+    const t = document.createElement('div'); t.className = 'toast toast-' + kind; t.setAttribute('role', kind === 'fail' ? 'alert' : 'status');
+    t.innerHTML = `<span class="glyph">${glyph[kind]}</span><b>${title}</b><button class="x" aria-label="Dismiss">×</button>${detail ? `<p>${detail}</p>` : ''}${action ? `<div class="act"><button class="btn btn-sm">${action}</button></div>` : ''}`;
+    $('#toasts').appendChild(t);
+    const kill = () => { t.classList.add('out'); setTimeout(() => t.remove(), 220); };
+    t.querySelector('.x').onclick = kill; t.querySelector('.act .btn')?.addEventListener('click', kill);
+    if (kind !== 'fail') setTimeout(kill, 6500);
+  };
+
+  /* directory */
+  const dir = $('#directory'), btn = $('#manageBtn');
+  const openDir = on => { dir.hidden = !on; btn.setAttribute('aria-expanded', on); };
+  btn.onclick = () => openDir(dir.hidden);
+  document.addEventListener('click', e => { if (!dir.hidden && !dir.contains(e.target) && !btn.contains(e.target)) openDir(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !dir.hidden) { openDir(false); btn.focus(); } });
+
+  /* areas */
+  const go = id => {
+    if (!$('#area-' + id)) return;
+    $$('.area').forEach(a => a.classList.toggle('on', a.id === 'area-' + id));
+    $$('.rail-item').forEach(b => b.dataset.go === id ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
+    openDir(false); history.replaceState(null, '', '#/manage/' + id); scrollTo({ top: 0 });
+  };
+  document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) go(b.dataset.go); });
+  const m = location.hash.match(/#\/manage\/(\w+)/); if (m) go(m[1]);
+
+  /* team sub pages */
+  $$('.subnav [data-sub]').forEach(b => b.onclick = () => {
+    $$('.subnav [data-sub]').forEach(x => x.setAttribute('aria-selected', x === b));
+    $$('[data-subpage]').forEach(p => p.hidden = p.dataset.subpage !== b.dataset.sub);
+  });
+  $$('.team-tab[role=tab]').forEach(b => b.onclick = () => { $$('.team-tab[role=tab]').forEach(x => x.setAttribute('aria-selected', x === b)); $('.team-head h2').textContent = b.querySelector('b').textContent; });
+
+  /* switches */
+  document.addEventListener('click', e => { const s = e.target.closest('.switch'); if (s) { s.setAttribute('aria-checked', s.getAttribute('aria-checked') !== 'true'); markDirty(s.closest('.area')); } });
+
+  /* dirty tracking + save bar: the one place that always tells the truth */
+  const bar = area => area.querySelector('.savebar');
+  const setBar = (area, state, text, sub, mark) => {
+    const b = bar(area); if (!b) return; b.dataset.state = state;
+    const mk = b.querySelector('[data-mark]'); mk.className = 'st ' + { dirty: 'st-warn', saving: 'st-busy', saved: 'st-ok', failed: 'st-fail' }[state];
+    mk.innerHTML = '<i></i>' + mark; b.querySelector('[data-msg]').innerHTML = text + (sub ? `<small>${sub}</small>` : '');
+    b.querySelector('[data-save]').disabled = state === 'saving'; b.querySelector('[data-save]').textContent = state === 'failed' ? 'Try again' : 'Save changes';
+  };
+  const changedCount = area => {
+    let n = 0;
+    area.querySelectorAll('.field, .control').forEach(f => {
+      const el = f.querySelector('input, select, textarea'); if (!el) return;
+      const changed = el.tagName === 'SELECT' ? el.selectedIndex !== [...el.options].findIndex(o => o.defaultSelected) && !(el.selectedIndex === 0 && ![...el.options].some(o => o.defaultSelected)) : el.value !== el.defaultValue;
+      f.classList.toggle('changed', changed); if (changed) n++;
+    });
+    n += area.querySelectorAll('.switch.touched').length; return n;
+  };
+  const markDirty = area => { if (!area || !bar(area)) return; const n = changedCount(area); if (n) setBar(area, 'dirty', `${n} change${n > 1 ? 's' : ''} not saved`, bar(area).dataset.savebar === 'office' ? 'New work uses these settings once saved.' : 'New tasks keep using the last saved version until you save.', 'Not saved'); else bar(area).dataset.state = 'idle'; };
+  document.addEventListener('input', e => markDirty(e.target.closest('.area')));
+  document.addEventListener('click', e => { const s = e.target.closest('.switch'); if (s) s.classList.toggle('touched'); });
+
+  const validate = area => {
+    let ok = true;
+    area.querySelectorAll('input[type=url]').forEach(el => { const f = el.closest('.control, .field'); const bad = el.value && !/^https:\/\/[^\/\s]+\/?$/.test(el.value); f.classList.toggle('invalid', bad); if (bad) ok = false; });
+    area.querySelectorAll('input[type=number]').forEach(el => { const f = el.closest('.control, .field'); const bad = el.value === '' || +el.value < +el.min || +el.value > +el.max; f.classList.toggle('invalid', bad); if (bad) { ok = false; let err = f.querySelector('.err'); if (!err) { err = document.createElement('span'); err.className = 'err'; f.appendChild(err); } err.textContent = `Between ${el.min} and ${el.max}.`; } });
+    return ok;
+  };
+  document.addEventListener('click', e => {
+    const save = e.target.closest('[data-save]'), discard = e.target.closest('[data-discard]');
+    const area = e.target.closest('.area'); if (!area) return;
+    if (discard) { area.querySelectorAll('input, textarea').forEach(el => el.value = el.defaultValue); area.querySelectorAll('select').forEach(el => el.selectedIndex = Math.max(0, [...el.options].findIndex(o => o.defaultSelected))); area.querySelectorAll('.switch.touched').forEach(s => { s.classList.remove('touched'); s.setAttribute('aria-checked', s.getAttribute('aria-checked') !== 'true'); }); area.querySelectorAll('.invalid').forEach(f => f.classList.remove('invalid')); markDirty(area); toast('info', 'Changes discarded', 'Everything is back to the last saved version.'); }
+    if (save) {
+      if (!validate(area)) { setBar(area, 'failed', 'Not saved: one field needs attention', 'Fix the field marked in red and save again.', 'Refused'); toast('fail', 'Not saved', 'The public address must start with https:// and have no path.'); area.querySelector('.invalid input')?.focus(); return; }
+      setBar(area, 'saving', 'Saving…', '', 'Saving');
+      setTimeout(() => {
+        area.querySelectorAll('input, textarea').forEach(el => el.defaultValue = el.value); area.querySelectorAll('select').forEach(el => [...el.options].forEach(o => o.defaultSelected = o.selected)); area.querySelectorAll('.switch.touched').forEach(s => s.classList.remove('touched'));
+        area.querySelectorAll('.changed').forEach(f => f.classList.remove('changed'));
+        setBar(area, 'saved', `Saved at ${now()}`, 'New work uses these settings. Running tasks finish on what they started with.', 'Saved');
+        const meta = area.querySelector('.area-head .meta'); if (meta) { meta.querySelector('.st').className = 'st st-ok'; meta.querySelector('.st').innerHTML = '<i></i>Saved'; meta.querySelector('span:last-child').textContent = `last change ${now()} · you`; }
+        toast('ok', 'Saved', 'Recorded in the audit log as entry #28.', 'Undo');
+        setTimeout(() => { if (bar(area).dataset.state === 'saved') bar(area).dataset.state = 'idle'; }, 5000);
+      }, 900);
+    }
+  });
+
+  /* test / check connections */
+  const outcomes = { openrouter: ['ok', 'Connected · 1.2 s'], anthropic: ['fail', 'Failed · no key saved'], openai: ['fail', 'Key rejected · 401'], herenow: ['ok', 'Reachable · 200'], pg: ['ok', 'Connected · read-only'], ssh: ['ok', 'Host key verified'] };
+  const names = { openrouter: 'OpenRouter', anthropic: 'Anthropic', openai: 'OpenAI', herenow: 'here.now', pg: 'prod-replica', ssh: 'web-01' };
+  const test = id => new Promise(res => {
+    const st = document.querySelector(`[data-status="${id}"]`), b = document.querySelector(`[data-test="${id}"]`);
+    st.className = 'st st-busy'; st.innerHTML = '<i></i>Testing…'; if (b) { b.disabled = true; b.innerHTML = '<span class="spin"></span>Testing'; }
+    setTimeout(() => { const [k, label] = outcomes[id]; st.className = 'st st-' + k; st.innerHTML = '<i></i>' + label; if (b) { b.disabled = false; b.textContent = b.dataset.test === id && ['herenow', 'pg', 'ssh'].includes(id) ? 'Check' : 'Test'; } res([k, label]); }, 900 + Math.random() * 700);
+  });
+  document.addEventListener('click', async e => {
+    const b = e.target.closest('[data-test]'); if (!b) return;
+    const id = b.dataset.test, [k, label] = await test(id);
+    k === 'ok' ? toast('ok', `${names[id]}: ${label.split(' · ')[0].toLowerCase()}`, label.includes('·') ? label.split(' · ')[1] : '') : toast('fail', `${names[id]}: ${label.split(' · ')[0].toLowerCase()}`, id === 'anthropic' ? 'Add a key, then test again.' : 'The provider refused the key. Replace it and test again.', 'Replace key');
+  });
+  document.addEventListener('click', async e => {
+    if (!e.target.closest('[data-check-all]')) return;
+    toast('info', 'Checking 4 connections…'); await Promise.all(['pg'].map(test));
+    toast('warn', '1 of 4 connections is failing', 'Slack: sign-in expired since 09:14.', 'Sign in');
+  });
+
+  /* sign in */
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-signin]'); if (!b) return;
+    const st = document.querySelector('[data-status="slack"]'), sub = document.querySelector('[data-sub="slack"]');
+    st.className = 'st st-busy'; st.innerHTML = '<i></i>Signing in…'; sub.textContent = 'finish in the window that opened';
+    toast('info', 'Finish signing in to Slack in the new window', 'This page updates when you are done.');
+    setTimeout(() => {
+      st.className = 'st st-ok'; st.innerHTML = '<i></i>Signed in'; sub.textContent = `as yazan@ · expires in 30 days`;
+      $('#slackBanner').hidden = true; $('#slackRow .btn-primary')?.replaceWith(Object.assign(document.createElement('button'), { className: 'btn btn-sm', textContent: 'Sign out', type: 'button' }));
+      $$('.dot-fail').forEach(d => { d.className = d.className.replace('dot-fail', 'dot-ok'); }); $('#manageDot').className = 'dot dot-warn';
+      $('#area-tools .meta .st').className = 'st st-ok'; $('#area-tools .meta .st').innerHTML = '<i></i>All signed in';
+      toast('ok', 'Slack: signed in', '2 waiting tasks resumed: “Post the launch thread”, “Reply to the Meridian quote”.', 'Open tasks');
+    }, 2200);
+  });
+
+  /* routines */
+  document.addEventListener('click', e => {
+    const r = e.target.closest('[data-run]'); if (r) { const cell = r.closest('tr').querySelector('td:nth-child(4)'); cell.innerHTML = '<span class="st st-busy"><i></i>Working</span><span class="sub">started just now</span>'; toast('info', 'Routine started', 'It runs through the team lead like any other task.'); setTimeout(() => { cell.innerHTML = `<span class="st st-ok"><i></i>Passed</span><span class="sub">today ${now()} · 3 min</span>`; toast('ok', 'Routine finished', 'The result is filed in the Brain.', 'Open'); }, 3000); }
+    const a = e.target.closest('[data-approve]'); if (a) { a.closest('.banner').hidden = true; toast('ok', 'Approved', '4 reminders sent. Recorded in the audit log.'); $('#area-routines .meta .st').className = 'st st-ok'; $('#area-routines .meta .st').innerHTML = '<i></i>All clear'; }
+  });
+
+  /* audit diffs, filters */
+  document.addEventListener('click', e => { const r = e.target.closest('[data-toggle]'); if (r) { const d = document.getElementById(r.dataset.toggle); d.hidden = !d.hidden; r.querySelector('td:last-child').textContent = d.hidden ? '▾' : '▴'; } const f = e.target.closest('.filters button'); if (f) f.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b === f)); });
+
+  /* focus a key field from a banner */
+  document.addEventListener('click', e => { const b = e.target.closest('[data-focus]'); if (b) { const el = document.getElementById(b.dataset.focus); el.scrollIntoView({ block: 'center' }); el.style.outline = '2px solid var(--busy)'; setTimeout(() => el.style.outline = '', 1200); } });
+})();
+</script>
+</body>
+</html>

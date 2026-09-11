@@ -3,6 +3,7 @@ import { officeReady } from './auth.js';
 import { initSettings } from './settings.js';
 import { unseenResult } from './activity.js';
 import { initInbox } from './inbox.js';
+import { mark, dot, officeSummary } from './status.js';
 import { connectLive } from './sse.js';
 // The new engine's states, shown with the interface's vocabulary; realState keeps the exact one.
 const UI_STATE = { awaiting_ceo: 'waiting', escalated: 'blocked', awaiting_lead_review: 'reviewing', executing: 'working' };
@@ -24,12 +25,12 @@ async function api(path, method = 'GET', body) {
 
 export function initOfficeWork(ctx) {
   const { R, deptRT, onLive, onUsage, getFocused } = ctx;
-  let jobs = [], config = null, tools = [], selectedTeam = DEPT_KEYS.includes('marketing') ? 'marketing' : DEPT_KEYS[0], filter = 'all', refreshing = false, agentOpen = null, modalKind = '', modalTask = null;
+  let jobs = [], config = null, tools = [], selectedTeam = 'auto', filter = 'all', refreshing = false, agentOpen = null, modalKind = '', modalTask = null;
   let reportDays = 7, reportFetchCounter = 0, taskFetchCounter = 0, taskDirty = false, connectionStale = false;
   let taskCurrent = null, taskTab = 'work', taskTabTouched = false, taskSignature = '';
   let taskExpanded = new Map(), taskScroll = {}, taskInputDraft = {};
   const activityByAgent = new Map();
-  let settingsDraft = null, settingsTeam = selectedTeam, settingsSection = 'overview', toolPoll = null;
+  let settingsDraft = null, settingsTeam = DEPT_KEYS[0], settingsSection = 'overview', toolPoll = null;
   const panel = document.getElementById('tpanel');
   panel.innerHTML = `<button type="button" id="tpanelHandle" aria-label="Expand or collapse the work panel"></button><form class="space-command">
     <div class="space-team-picker"><button id="spaceDept" type="button" aria-expanded="false" aria-controls="spaceTeamMenu"><i style="background:${teamChip(selectedTeam).chip}"></i><span>${esc(teamChip(selectedTeam).name)}</span><span class="space-chevron">⌄</span></button><div id="spaceTeamMenu" hidden><button type="button" data-pick-team="auto"><i style="background:#465B70"></i>Let the Program Manager choose</button>${DEPT_KEYS.map(k => `<button type="button" data-pick-team="${k}"><i style="background:${DEPTS[k].chip}"></i>${esc(DEPTS[k].name)}</button>`).join('')}</div></div>
@@ -69,13 +70,28 @@ export function initOfficeWork(ctx) {
   const fillProjects = () => { const sel = $('spaceProject'); if (!sel) return; const current = sel.value; sel.innerHTML = '<option value="">None</option>' + projectsOpen.map(p => `<option value="${esc(p.id)}">${esc(p.name)}${p.status === 'paused' ? ' (paused)' : ''}</option>`).join(''); if (projectsOpen.some(p => p.id === current)) sel.value = current; };
   const reloadForRoster = () => { if (!rosterChanged || settings.isOpen() || dialog.open || taskDirty) return; rosterChanged = false; $('spaceHint').textContent = 'The roster changed. Refreshing the office…'; setTimeout(() => location.reload(), 600); };
   const settings = initSettings({ api, openTask: id => { settings.close(); showTask(id); }, brain: ctx.brain, syncBrain, onShow: () => { if (dialog.open) close(); inbox?.close(); }, onHide: () => setTimeout(reloadForRoster, 50) });
+  // The Manage menu is a directory: every area with a one-line status, and what needs the owner at the top.
   const manage = document.createElement('div'); manage.className = 'space-manage';
-  manage.innerHTML = `<button id="spaceManage" type="button" aria-label="Manage office" aria-expanded="false" aria-controls="spaceManageMenu"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.5" fill="var(--cream)"/><circle cx="15" cy="17" r="2.5" fill="var(--cream)"/></svg><span>Manage</span></button><div id="spaceManageMenu" hidden><span class="space-menu-label">YOUR OFFICE</span><button id="spaceProjects" type="button">Projects <span>↗</span></button><button id="spaceArtifacts" type="button">Office Artifacts <span>↗</span></button><button id="spaceTeams" type="button">Teams <span>↗</span></button><button id="spaceTools" type="button">Tools & MCPs <span>↗</span></button><button id="spaceSkills" type="button">Skills <span>↗</span></button><button id="spaceReports" type="button">Reports <span>↗</span></button><button id="spaceBrain" type="button">Brain <span>↗</span></button><div class="space-menu-divider"></div></div>`;
-  $('claudeConnect').before(manage); $('spaceManageMenu').appendChild($('claudeConnect'));
-  for (const [id, label] of [['spaceModels', 'Models & keys'], ['spaceVault', 'Vault'], ['spaceRoutines', 'Routines'], ['spaceOfficeSettings', 'Office settings'], ['spaceAudit', 'Audit log']]) if (!$(id)) { const b = document.createElement('button'); b.id = id; b.type = 'button'; b.innerHTML = `${label} <span>↗</span>`; $('spaceManageMenu').insertBefore(b, $('claudeConnect')); }
+  manage.innerHTML = `<button id="spaceManage" type="button" aria-label="Manage office" aria-expanded="false" aria-controls="spaceManageMenu"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.5" fill="var(--cream)"/><circle cx="15" cy="17" r="2.5" fill="var(--cream)"/></svg><span>Manage</span><span class="mg-dot mg-dot-off" id="spaceManageDot" hidden></span></button><div id="spaceManageMenu" hidden role="dialog" aria-label="Manage the office"></div>`;
+  $('claudeConnect').before(manage);
+  const DIRECTORY = [['People', [['projects', 'Projects'], ['teams', 'Teams & people'], ['routines', 'Routines']]], ['Knowledge', [['brain', 'Brain'], ['skills', 'Skills'], ['artifacts', 'Office Artifacts'], ['reports', 'Reports & KPIs']]], ['Services', [['models', 'Models & keys'], ['tools', 'Tools & connectors'], ['vault', 'Vault']]], ['Administration', [['office', 'Office settings'], ['audit', 'Audit log']]]];
+  const goArea = id => { if (id === 'inbox') return inbox.open(); if (id === 'projects') return projectUI.open(); settings.open(id); };
+  const renderDirectory = s => {
+    const a = id => s?.areas?.[id] || {};
+    const item = ([id, label]) => `<button type="button" class="mg-dir-item" data-go="${id}">${esc(label)}${a(id).line ? `<small>${esc(a(id).line)}</small>` : ''}${a(id).dot ? dot(a(id).dot) : ''}</button>`;
+    const connect = $('claudeConnect');
+    $('spaceManageMenu').innerHTML = `<div class="mg-dir-head"><h2>Manage</h2><span class="mg-eyebrow">${esc(s?.name || 'Your office')}${s ? ' · ' + esc(s.areas.teams.line) : ''}</span><span class="mg-needs">${s ? (s.attention.length ? `${dot(s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn')}<b>${s.attention.length}</b>&nbsp;need${s.attention.length === 1 ? 's' : ''} you` : `${dot('ok')}Nothing needs you`) : 'Checking…'}</span></div>
+      <div class="mg-dir-attn">${(s?.attention || []).slice(0, 4).map(x => `<div class="mg-attn">${mark(x.kind, x.label)}<span>${esc(x.text)}</span><button type="button" data-go="${x.go}">${esc(x.action)}</button></div>`).join('')}</div>
+      <div class="mg-dir-body">${DIRECTORY.map(([group, items], i) => `<div class="mg-dir-col"><span class="mg-eyebrow">${group}</span>${items.map(item).join('')}${i === 3 ? '<div id="claudeConnectSlot"></div>' : ''}</div>`).join('')}</div>
+      <div class="mg-dir-foot">${s ? esc(s.foot) : 'Reading the office…'}${s ? mark(s.healthy ? 'ok' : (s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn'), s.healthy ? 'Office healthy' : (s.attention.some(x => x.kind === 'fail') ? 'Something failed' : 'Needs attention')) : ''}</div>`;
+    $('claudeConnectSlot').replaceWith(connect); // the unlock / models shortcut keeps the label auth.js gives it
+    const d = $('spaceManageDot'); if (s) { d.hidden = !s.attention.length; d.className = 'mg-dot mg-dot-' + (s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn'); d.title = s.attention.length + ' need you'; }
+  };
+  renderDirectory(null);
   const toggleMenu = (button, menu, visible) => { $(menu).hidden = !visible; $(button).setAttribute('aria-expanded', String(visible)); };
-  $('spaceManage').onclick = () => toggleMenu('spaceManage', 'spaceManageMenu', $('spaceManageMenu').hidden);
-  for (const [id, action] of [['spaceProjects', () => projectUI.open()], ['spaceArtifacts', () => settings.open('artifacts')], ['spaceTeams', () => settings.open('teams')], ['spaceTools', () => settings.open('tools')], ['spaceSkills', () => settings.open('skills')], ['spaceReports', () => settings.open('reports')], ['spaceBrain', () => settings.open('brain')], ['spaceModels', () => settings.open('models')], ['spaceRoutines', () => settings.open('routines')], ['spaceVault', () => settings.open('vault')], ['spaceOfficeSettings', () => settings.open('office')], ['spaceAudit', () => settings.open('audit')]]) if ($(id)) $(id).onclick = () => { toggleMenu('spaceManage','spaceManageMenu',false); action(); };
+  $('spaceManage').onclick = async () => { const open = $('spaceManageMenu').hidden; toggleMenu('spaceManage', 'spaceManageMenu', open); if (open) { try { renderDirectory(await officeSummary(api)); } catch {} } };
+  $('spaceManageMenu').addEventListener('click', event => { const b = event.target.closest('[data-go]'); if (!b) return; toggleMenu('spaceManage', 'spaceManageMenu', false); goArea(b.dataset.go); });
+  officeSummary(api).then(renderDirectory).catch(() => {}); setInterval(() => { if (document.hidden) return; officeSummary(api, { force: true }).then(s => { if ($('spaceManageMenu').hidden) renderDirectory(s); }).catch(() => {}); }, 60000);
   $('claudeConnect').addEventListener('click', () => toggleMenu('spaceManage','spaceManageMenu',false));
   if ($('spaceArtifactsQuick')) $('spaceArtifactsQuick').onclick = () => settings.open('artifacts');
   $('spaceDept').onclick = () => toggleMenu('spaceDept','spaceTeamMenu',$('spaceTeamMenu').hidden);

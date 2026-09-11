@@ -25,7 +25,7 @@ It runs on API keys from any provider: Anthropic, OpenAI, OpenRouter (GLM, Kimi 
 
 ## Settings
 
-**Manage** opens a full settings page (the office pauses behind it):
+**Manage** opens the directory: every area in four groups (People, Knowledge, Services, Administration) with a one-line status under each, and whatever needs you (an expired sign-in, a missing key, a task waiting for your decision) listed at the top with the action that fixes it. Each area is a full page (the office pauses behind it) that speaks one status vocabulary, Connected · Signed in · Signed out · Failed · Not set · Waits for you · Saved, keeps its failures in a banner and its confirmations in a toast, and has one save bar that says what is saved and when. Light and dark follow the office theme.
 
 - **Office** — tasks running at once, how long a run may go without progress before it is stopped, when to remind you again, the digest time.
 - **Teams & people** — add, rename and remove teams (up to 10; a team is a lead and up to six specialists), each person's job and standing instructions (both required) and model, the team's purpose and working instructions (its charter, required; the six default teams ship with one), review criteria, automated checks, tools, pace, standing rules, and tests.
