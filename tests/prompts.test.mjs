@@ -34,6 +34,7 @@ test('the Program Manager sees the whole company: every team, its people, its pu
   assert.match(prompt, /call assemble_files with the files in order/, 'a combined document is assembled by the office, not by hand');
   assert.match(prompt, /turn the charter's constraints into acceptance criteria in each lead's brief/, 'the charter binds every lead');
   assert.match(prompt, /vault_list shows which services your team may use[\s\S]*You never see, type or ask for a key/, 'the Vault is explained: use it, never see it');
+  assert.match(prompt, /db_list shows the database connections your team may use[\s\S]*db_write runs one INSERT, UPDATE or DELETE on a connection the CEO marked writable and pauses for the CEO first[\s\S]*ssh_run runs one command on one of them, always pausing for the CEO first/, 'the database and SSH connectors are explained: reads are free, writes and commands wait for the CEO');
   assert.match(prompt, /that assembly and export is a work package like any other[\s\S]*\/work\/ is read-only for you/, 'assembling a document is delegated, never done by the PM');
   assert.match(prompt, /SALES[\s\S]*Tools: none besides the Brain/, 'a team without connectors is told so');
   assert.ok(prompt.includes('a tool only another team has'), 'hand-offs cover missing tools, not just expertise');
@@ -61,6 +62,7 @@ test('a specialist is told its tools, and to stop rather than substitute a tool 
   const prompt = specialistPrompt({ office, team, agent: riley, leadAgent: lead, toolLabels: labels });
   assert.ok(prompt.includes('Tools you can call: Google Calendar.'));
   assert.ok(prompt.includes('never use another tool as a substitute'));
+  assert.ok(prompt.includes('Never put a password or a key in a statement or a command'), 'a specialist is told the connector rules too');
   const sales = office.teams.find(t => t.id === 'sales'), piper = office.agents.find(a => a.id === 'piper');
   assert.ok(specialistPrompt({ office, team: sales, agent: piper, leadAgent: null, toolLabels: labels }).includes('Tools you can call: none besides the Brain'));
 });
