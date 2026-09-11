@@ -47,3 +47,11 @@ test('result view leads with the deliverable and review view names the actual re
   const result=renderTaskWorkspace(job,'result');assert.match(result, /space-deliverable/);assert.match(result, /<h2[^>]*>Recommended action/);assert.doesNotMatch(result, /Activity timeline|criterion-1|model calls/);
   const review=renderTaskWorkspace(job,'review');assert.match(review,/Cite supplied facts/);assert.doesNotMatch(review,/Run the pilot/);assert.match(review,/3\/8 model calls/);
 });
+
+test('paths in a result are links: a Brain note opens in the Brain and downloads, a workspace file downloads from the task', () => {
+  const { html } = renderDocument('Prices hold (Source: `/knowledge/Agents Office/task-1.md`). The pack is at /work/pack/growth.pdf, see /knowledge/10-Business/offer-ladder.md.', 'r', { taskId: 't1' });
+  assert.match(html, /<a class="space-ref" href="\/api\/knowledge\/file\?id=Agents%20Office%2Ftask-1\.md" data-ref-note="Agents Office\/task-1\.md" title="Open this note in the Brain">\/knowledge\/Agents Office\/task-1\.md<\/a><a class="space-ref-dl" href="\/api\/knowledge\/file\?id=Agents%20Office%2Ftask-1\.md" download/);
+  assert.match(html, /<a class="space-ref" href="\/api\/tasks\/t1\/file\?path=pack%2Fgrowth\.pdf" download title="Download this file from the task">\/work\/pack\/growth\.pdf<\/a>,/);
+  assert.match(html, /data-ref-note="10-Business\/offer-ladder\.md"[^>]*>\/knowledge\/10-Business\/offer-ladder\.md<\/a><a class="space-ref-dl"[^>]*>↓<\/a>\./, 'the closing full stop stays outside the link');
+  assert.ok(!renderDocument('A file at /work/x.md', 'r', {}).html.includes('<a'), 'no task, no workspace link');
+});

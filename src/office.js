@@ -487,8 +487,10 @@ export function initOfficeWork(ctx) {
       $('spaceFindNote').oninput=list;list();$('spaceNewNote').onclick=()=>editNote();$('spacePurpose').onclick=()=>editNote('Knowledge/office-purpose.md',true);$('spaceGraph').onclick=()=>{close();ctx.brain.toggle();};
     }catch(error){feedback(error.message,true);}
   }
+  // "Source: /knowledge/…" in a result: the note opens in the Brain (the link's own address downloads it).
+  document.addEventListener('click', event => { const link = event.target.closest('a[data-ref-note]'); if (!link) return; event.preventDefault(); open('brain', 'Brain — shared memory'); viewNote(link.dataset.refNote); });
   async function viewNote(id) {
-    try{const note=await api('/knowledge/note?id='+encodeURIComponent(id));content.innerHTML=`<div class="space-actions"><button class="secondary" id="spaceBackMemory">← Shared memory</button><button class="secondary" id="spaceEditMemory">Edit note</button></div><p class="space-footnote">${esc(id)} · Updated ${when(note.updatedAt)}</p><article class="space-document">${renderDocument(note.content,'memory').html}</article>`;$('spaceBackMemory').onclick=showKnowledge;$('spaceEditMemory').onclick=()=>editNote(id);}catch(error){feedback(error.message,true);}
+    try{const note=await api('/knowledge/note?id='+encodeURIComponent(id));content.innerHTML=`<div class="space-actions"><button class="secondary" id="spaceBackMemory">← Shared memory</button><button class="secondary" id="spaceEditMemory">Edit note</button></div><p class="space-footnote">${esc(id)} · Updated ${when(note.updatedAt)}</p><article class="space-document">${renderDocument(note.content,'memory',{}).html}</article>`;$('spaceBackMemory').onclick=showKnowledge;$('spaceEditMemory').onclick=()=>editNote(id);}catch(error){feedback(error.message,true);}
   }
   async function editNote(id, purpose=false) {
     let note={content:'',id};

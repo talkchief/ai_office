@@ -13,6 +13,21 @@ md.renderer.rules.link_open = (tokens, index, options, env, renderer) => {
   tokens[index].attrSet('rel', 'noopener noreferrer');
   return renderer.renderToken(tokens, index, options);
 };
+// A path in a result is a link. A Brain note (/knowledge/…) opens in the Brain and has a download beside it; a workspace file
+// (/work/…) downloads from the task the result belongs to. A folder name may hold a space ("Agents Office").
+const PATH_RE = /\/(knowledge|work)\/(?:[^\s()\]"'`,;<>]|\s(?=[^\s\/()\]"'`,;<>]+\/))+/g;
+let currentEnv = {};
+export function linkPaths(text, env = currentEnv) {
+  return escapeHTML(text).replace(PATH_RE, found => {
+    const shown = found.replace(/[.:]+$/, ''), tail = found.slice(shown.length);
+    if (shown.startsWith('/knowledge/')) { const id = shown.slice('/knowledge/'.length), enc = encodeURIComponent(id); return `<a class="space-ref" href="/api/knowledge/file?id=${enc}" data-ref-note="${id}" title="Open this note in the Brain">${shown}</a><a class="space-ref-dl" href="/api/knowledge/file?id=${enc}" download title="Download this note">↓</a>${tail}`; }
+    if (!env?.taskId) return found;
+    const rel = shown.slice('/work/'.length);
+    return `<a class="space-ref" href="/api/tasks/${encodeURIComponent(env.taskId)}/file?path=${encodeURIComponent(rel)}" download title="Download this file from the task">${shown}</a>${tail}`;
+  });
+}
+md.renderer.rules.text = (tokens, index, options, env) => linkPaths(tokens[index].content, env);
+md.renderer.rules.code_inline = (tokens, index, options, env) => `<code>${linkPaths(tokens[index].content, env)}</code>`;
 md.renderer.rules.image = (tokens, index) => `<span class="space-image-description">${escapeHTML(tokens[index].content || 'Image reference')}</span>`;
 md.renderer.rules.table_open = () => '<div class="space-document-table" tabindex="0" role="region" aria-label="Result table"><table>';
 md.renderer.rules.table_close = () => '</table></div>';
@@ -31,7 +46,7 @@ md.core.ruler.after('inline', 'output_checklists', state => {
 });
 md.renderer.rules.output_checkbox = (tokens, index) => `<span class="space-checklist-box" role="img" aria-label="${tokens[index].meta.checked ? 'Checked' : 'Unchecked'}">${tokens[index].meta.checked ? '☑' : '☐'}</span>`;
 
-export function renderDocument(value, prefix = 'output') {
+export function renderDocument(value, prefix = 'output', env = currentEnv) {
   const tokens = md.parse(String(value || ''), {}), sections = [];
   const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '');
   for (let i = 0; i < tokens.length; i++) {
@@ -41,7 +56,7 @@ export function renderDocument(value, prefix = 'output') {
     const title = md.renderer.renderInlineAsText(tokens[i + 1]?.children || [], md.options, {});
     sections.push({ id, title, level: Number(tokens[i].tag.slice(1)) });
   }
-  return { html: md.renderer.render(tokens, md.options, {}), sections };
+  return { html: md.renderer.render(tokens, md.options, env || {}), sections };
 }
 
 export function outputExcerpt(value, limit = 160) {
@@ -69,6 +84,7 @@ const prose = (text, prefix) => `<div class="space-document">${renderDocument(te
 const empty = (title, text) => `<div class="space-output-empty"><span aria-hidden="true">○</span><h3>${esc(title)}</h3><p>${esc(text)}</p></div>`;
 
 export function renderTaskWorkspace(job, tab, actions = '') {
+  currentEnv = { taskId: job.id };
   const name = id => job.agents.find(a => a.id === id)?.name || id || 'Unassigned';
   const status = resultState(job);
   const total = job.subtasks.length, submitted = job.subtasks.filter(s => s.state === 'done').length;
