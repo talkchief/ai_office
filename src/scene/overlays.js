@@ -155,7 +155,12 @@ export function makeOverlays({ hud, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, onDept, on
       // the thin line under the sentence follows the lead's own progress bar
       const leadBar = lead && lead.pill && lead.pill.querySelector('.p-bar'), pct = leadBar && leadBar.style.display !== 'none' && !stuck && isOn(lead) ? leadBar.firstElementChild.style.width : '';
       if (d.barPct !== pct) { d.barPct = pct; d.barEl.style.display = pct ? '' : 'none'; d.barEl.firstElementChild.style.width = pct || '0%'; }
-      if (focused === k) { d.badge.style.display = 'none'; continue; } // docked in the rail
+      if (focused === k) {
+        d.badge.style.display = 'none'; // docked in the rail: the header is a live copy of the card
+        const rh = document.getElementById('railHeader');
+        if (rh && rh.dataset.dept === k) { if (rh.dataset.sig !== d.sig) { rh.innerHTML = d.badge.innerHTML; rh.dataset.sig = d.sig; } const bar = rh.querySelector('.b-bar'); if (bar && bar.dataset.pct !== pct) { bar.dataset.pct = pct; bar.style.display = pct ? '' : 'none'; bar.firstElementChild.style.width = pct || '0%'; } }
+        continue;
+      }
       d.badge.style.display = '';
       let [sx, sy] = toScreen(d.badgeAnchor);
       const bh = (d.badge.offsetHeight - d.moreEl.offsetHeight) * badgeScale, bw = d.badge.offsetWidth * badgeScale;

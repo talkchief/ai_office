@@ -198,20 +198,19 @@ function exitFocus(flyOut = true) {
   syncOverviewBtn();
 }
 function buildDeptRail(k) {
-  const dept = DEPTS[k];
-  const n = AGENTS.filter(a => a.dept === k).length;
+  // the docked header is the team card itself, kept live by the overlay tick while the team is open
   const rh = document.getElementById('railHeader');
   rh.classList.remove('show');
-  rh.innerHTML = `
-    <div class="b-name"><span class="dot" style="background:${dept.chip}"></span>${esc(dept.name)}<span class="live"></span></div>
-    <div class="b-count"><span class="b-num">${n}</span><span class="b-lab">AGENTS</span></div>
-    <div class="b-metrics"></div>
-    ${tasks ? tasks.rowHTML(k) : ''}
-    <div class="b-appr" style="display:${stuckIn(k).length ? 'flex' : 'none'}">⚠ <span class="ap-n">${stuckIn(k).length}</span> WAITING APPROVAL</div>`;
-  const trow = rh.querySelector('.b-tasks');
-  if (trow && DEMO) trow.addEventListener('click', () => tasks.toggle());
-  rh.querySelector('.b-appr').addEventListener('click', () => { const s = stuckIn(k)[0]; if (s) openAgentRail(s.a.id); });
+  rh.innerHTML = deptRT[k] && deptRT[k].badge ? deptRT[k].badge.innerHTML : '';
+  rh.dataset.dept = k; rh.dataset.sig = (deptRT[k] && deptRT[k].sig) || '';
 }
+document.getElementById('railHeader').addEventListener('click', (e) => {
+  const k = e.currentTarget.dataset.dept; if (!k) return;
+  if (e.target.closest('.b-appr')) { const s = stuckIn(k)[0]; if (s) openAgentRail(s.a.id); return; }
+  const who = e.target.closest('[data-agent], [data-seat]'); if (who) { openAgentRail(who.dataset.agent || who.dataset.seat); return; }
+  if (e.target.closest('[data-act="task"]')) { window.dispatchEvent(new CustomEvent('office:compose', { detail: k })); return; }
+  if (e.target.closest('.b-tasks') && DEMO && tasks) tasks.toggle();
+});
 /* the floating card physically FLIES and docks as the rail header */
 function flyBillboardIntoRail(k) {
   const badge = deptRT[k].badge;
@@ -293,6 +292,7 @@ function openAgent(id, tab = DEMO ? 'chat' : 'activity') {
   enterFocus(dept, id);
 }
 function setTab(tab) {
+  if (!DEMO && tab === 'chat') tab = 'activity'; // the live office talks inside the task, not with the team
   modalTab = tab;
   document.querySelectorAll('#rail .mtabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   document.getElementById('mChat').style.display = tab === 'chat' ? 'flex' : 'none';

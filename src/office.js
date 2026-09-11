@@ -34,7 +34,7 @@ export function initOfficeWork(ctx) {
   const panel = document.getElementById('tpanel');
   panel.innerHTML = `<button type="button" id="tpanelHandle" aria-label="Expand or collapse the work panel"></button><form class="space-command">
     <div class="space-team-picker"><button id="spaceDept" type="button" aria-expanded="false" aria-controls="spaceTeamMenu"><i style="background:${teamChip(selectedTeam).chip}"></i><span>${esc(teamChip(selectedTeam).name)}</span><span class="space-chevron">⌄</span></button><div id="spaceTeamMenu" hidden><button type="button" data-pick-team="auto"><i style="background:#465B70"></i>Let the Program Manager choose</button>${DEPT_KEYS.map(k => `<button type="button" data-pick-team="${k}"><i style="background:${DEPTS[k].chip}"></i>${esc(DEPTS[k].name)}</button>`).join('')}</div></div>
-    <textarea id="spaceBrief" rows="2" aria-label="Task brief" placeholder="What needs to get done?" required></textarea>
+    <textarea id="spaceBrief" rows="2" aria-label="Task brief" placeholder="What needs to get done? Enter sends, Shift+Enter for a new line" required></textarea>
     <details class="space-options" id="spaceOptions"><summary>Assign · due date · more teams · documents</summary><div class="space-options-grid"><label>For<select id="spaceAssignee"></select></label><label>Due<input type="datetime-local" id="spaceDue"></label><label>Priority<select id="spacePriority"><option value="1">Normal</option><option value="2">High</option><option value="0">Low</option></select></label><label>Documents<input type="file" id="spaceFiles" multiple accept=".pdf,.docx,.txt,.md,.csv"></label><label>Project<select id="spaceProject"><option value="">None</option></select></label><div class="space-involve" id="spaceInvolve"></div></div></details>
     <div class="space-command-actions"><span>Lead-reviewed work</span><button type="submit" class="space-save-draft" data-backlog="true" title="Save without starting agents">Save idea</button><button type="submit">Add task <span aria-hidden="true">↗</span></button></div><p id="spaceHint" role="status"></p></form>
     <div class="space-now-head"><span class="space-h2">Right now</span></div>
@@ -64,6 +64,12 @@ export function initOfficeWork(ctx) {
     refresh: async () => {},
     activity: () => { const j = jobs.find(j => j.autoRoute && ['planning', 'working', 'reviewing'].includes(j.state)); return j ? { state: 'running', title: j.title } : null; },
   };
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' || event.shiftKey || event.isComposing || !(event.target instanceof HTMLTextAreaElement)) return;
+    const t = event.target;
+    if (t.id === 'spaceBrief') { event.preventDefault(); t.form?.querySelector('button[type=submit]:not(.space-save-draft)')?.click(); }
+    else if (t.id === 'spaceRevision') { event.preventDefault(); (t.closest('details, .space-owner-approval') || t.parentElement)?.querySelector('button[data-action]:not(.space-text-action)')?.click(); }
+  }, true);
   const inbox = initInbox({ api, openTask: id => showTask(id), openNote: id => settings.openNote(id), retryTask: id => api(`/tasks/${id}/retry`, 'POST', {}) });
   let rosterChanged = false, projectsOpen = [], providerHealth = null;
   // Open projects for the task form; refreshed with the board.
