@@ -48,6 +48,8 @@ if (HOSTED) {
   if (!fs.existsSync(path.join(platformDir, 'providers.json')) && fs.existsSync(path.join(DATA, 'providers.json'))) { fs.mkdirSync(platformDir, { recursive: true }); fs.copyFileSync(path.join(DATA, 'providers.json'), path.join(platformDir, 'providers.json')); try { fs.chmodSync(path.join(platformDir, 'providers.json'), 0o600); } catch {} console.log('  platform: took the models and keys from the single office providers.json'); }
   platform = new PlatformStore({ dir: platformDir, env: process.env, adminEmails: cfg.platformAdmins });
   accounts = new Accounts({ file: process.env.AO_ACCOUNTS || path.join(DATA, 'accounts.sqlite') });
+  // The platform administrator: a dedicated sign-in from the configuration (office.config.local.json → platformAdmin, or AO_PLATFORM_ADMIN_EMAIL / _PASSWORD).
+  if (cfg.platformAdmin.email && cfg.platformAdmin.password) { try { accounts.ensurePlatformAdmin(cfg.platformAdmin); } catch (error) { console.warn('platform admin:', error.message); } }
   registry = new TenantRegistry({ accounts, platform, dir: process.env.AO_TENANTS_DIR || path.join(ROOT, 'tenants'), version, cfg, brainTemplate: process.env.AO_BRAIN_TEMPLATE || null });
   authRouter = new Router(); controlRouter = new Router(); adminRouter = new Router();
   // Mail intake: a transactional provider's inbound webhook becomes tasks; the office writes receipts, results and questions back.
@@ -61,7 +63,7 @@ if (HOSTED) {
   registerAdminApi(adminRouter, { accounts, platform, registry, mail, publicOrigin });
 }
 const authLimiter = new RateLimiter({ max: 20, windowMs: 600000, maxKeys: 5000 });
-const publicUser = u => u && { id: u.id, email: u.email, name: u.name, role: u.role, platformAdmin: platform.isAdmin(u), tenantId: u.tenantId };
+const publicUser = u => u && { id: u.id, email: u.email, name: u.name, role: u.role, platform: !!u.platform, platformAdmin: !!u.platform, tenantId: u.tenantId };
 const modelsReady = () => (HOSTED ? platform.models : single.models).ready();
 
 // Runs a matched route: the handler sees the request, the viewer and the office; its return value becomes the response.
@@ -120,7 +122,7 @@ const server = http.createServer(async (req, res) => {
     }
     // The office of this request: the one office, or the signed-in person's tenant (built on first use).
     let instance = single;
-    if (HOSTED && user) {
+    if (HOSTED && user && !user.platform) {
       const tenant = accounts.tenant(user.tenantId);
       if (!tenant || tenant.suspendedAt) { if (api) return json(res, 403, { error: 'This office is suspended. Contact the platform administrator.' }); }
       else instance = await registry.get(tenant.id);
@@ -148,10 +150,11 @@ const server = http.createServer(async (req, res) => {
     if (HOSTED) {
       const adminMatch = url.pathname.startsWith('/api/admin/') && adminRouter.match(req.method, url.pathname);
       if (adminMatch?.notAllowed) return json(res, 405, { error: 'Method not allowed.' });
-      if (adminMatch) { if (!platform.isAdmin(user)) return json(res, 403, { error: 'Platform administrators only.' }); return await respond(adminMatch, { ...args, params: adminMatch.params }, res); }
+      if (adminMatch) { if (!user.platform) return json(res, 403, { error: 'Platform administrators only: sign in with the platform account.' }); return await respond(adminMatch, { ...args, params: adminMatch.params }, res); }
       const control = controlRouter.match(req.method, url.pathname);
       if (control?.notAllowed) return json(res, 405, { error: 'Method not allowed.' });
-      if (control) return await respond(control, { ...args, params: control.params }, res);
+      if (control && (!user.platform || ['/api/auth/me', '/api/auth/logout'].includes(url.pathname))) return await respond(control, { ...args, params: control.params }, res);
+      if (user.platform) return json(res, 403, { error: 'This account manages the platform only; an office needs its own sign-in.' });
       if (!instance) return json(res, 403, { error: 'This office is suspended. Contact the platform administrator.' });
     }
     const match = instance.router.match(req.method, url.pathname);
@@ -175,6 +178,7 @@ server.listen(cfg.port, process.env.HOST || undefined, () => {
     single.start();
   } else {
     console.log(`  mail: ${mail.mailer ? (mail.mailer.dryRun ? 'dry run → ' + mail.mailer.outbox : mail.mailer.provider + ' · ' + (mail.mailer.domain || 'no domain')) : 'not configured — a platform admin sets it under Platform → Mail'}`);
+    console.log(`  platform admin: ${cfg.platformAdmin.email && cfg.platformAdmin.password ? cfg.platformAdmin.email : 'not configured (office.config.local.json → platformAdmin { email, password })'}`);
     console.log(`  tenants: ${registry.dir}   accounts: ${accounts.file}   platform: ${platform.dir}   models: ${platform.models.ready() ? 'ready' : 'no provider key yet — a platform admin adds one under /api/admin/providers'}   registration: ${platform.get().registration}`);
     registry.start();
   }

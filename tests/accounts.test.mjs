@@ -41,6 +41,22 @@ test('a company registers: the person owns the office, signs in, and the session
   } finally { done(dir, accounts); }
 });
 
+test('the platform administrator is its own account: created from the configuration, signed in to the platform, not to an office', () => {
+  const { dir, accounts } = open();
+  try {
+    const admin = accounts.ensurePlatformAdmin({ email: 'Admin@Platform.test', password: 'first-password' });
+    assert.equal(admin.platformAdmin, true); assert.equal(admin.email, 'admin@platform.test');
+    assert.equal(accounts.ensurePlatformAdmin({ email: 'admin@platform.test', password: 'first-password' }).id, admin.id, 'the same account every start');
+    accounts.ensurePlatformAdmin({ email: 'admin@platform.test', password: 'second-password' });
+    assert.equal(accounts.verifyLogin('admin@platform.test', 'first-password'), null); assert.ok(accounts.verifyLogin('admin@platform.test', 'second-password'), 'a changed configuration changes the password');
+    const s = accounts.createSession(admin.id, 'platform');
+    const viewer = accounts.sessionUser(s.id);
+    assert.equal(viewer.platform, true); assert.equal(viewer.role, 'platform'); assert.equal(viewer.tenantId, null); assert.deepEqual(accounts.tenantsOf(admin.id), []);
+    const plain = accounts.createUser({ email: 'p@x.test', name: 'P', password: 'a long enough password' });
+    assert.equal(accounts.sessionUser(accounts.createSession(plain.id, 'platform').id), null, 'a platform session needs a platform administrator');
+  } finally { done(dir, accounts); }
+});
+
 test('invitations: a token joins a new person as a member; the owner cannot be removed; roles are bounded', () => {
   let clock = 5_000_000; const { dir, accounts } = open(() => clock);
   try {

@@ -17,6 +17,7 @@ export const slugOf = name => text(name, 80).toLowerCase().replace(/[^a-z0-9]+/g
 export const normEmail = value => { const e = text(value, 254).toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) fail('Enter a valid email address.'); return e; };
 const sha = value => crypto.createHash('sha256').update(String(value)).digest('hex');
 export const ROLES = ['owner', 'admin', 'member'];
+export const PLATFORM_SESSION = 'platform';
 export const SESSION_MS = 7 * 86400000, INVITE_MS = 7 * 86400000, CODE_MS = 10 * 60000;
 
 export function hashPassword(password, { N = 16384, r = 8, p = 1 } = {}) {
@@ -86,6 +87,16 @@ export class Accounts {
     if (!row || !row.password_hash || !verifyPassword(password, row.password_hash)) return null;
     this.prep('UPDATE users SET last_login_at = ? WHERE id = ?').run(this.now(), row.id); return this.userRow(row);
   }
+  // The platform administrator account: created (or its password kept current) from the configuration at every start.
+  ensurePlatformAdmin({ email, password, name = 'Platform administrator' }) {
+    const e = normEmail(email); let u = this.userByEmail(e);
+    if (!u) u = this.createUser({ email: e, name, password: password || null, platformAdmin: true });
+    else {
+      if (!u.platformAdmin) this.setPlatformAdmin(u.id, true);
+      if (password && !verifyPassword(password, this.prep('SELECT password_hash FROM users WHERE id = ?').get(u.id)?.password_hash)) { this.prep('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(checkPassword(password)), u.id); this.revokeSessions(u.id); }
+    }
+    return this.user(u.id);
+  }
   setPlatformAdmin(id, flag) { this.prep('UPDATE users SET platform_admin = ? WHERE id = ?').run(flag ? 1 : 0, id); return this.user(id); }
   platformAdmins() { return this.prep('SELECT * FROM users WHERE platform_admin = 1 ORDER BY email').all().map(r => this.userRow(r)); }
   users({ q = '', limit = 100 } = {}) {
@@ -154,10 +165,16 @@ export class Accounts {
     return { id, expiresAt: now + SESSION_MS };
   }
   // The viewer for one request: the user, the office the session is in and the role there. Null when the cookie is unknown or expired.
+  // A platform session (tenant 'platform') belongs to a platform administrator and to no office: it sees the Platform page only.
   sessionUser(cookieValue, { touchEveryMs = 5 * 60000 } = {}) {
     if (!cookieValue) return null;
     const row = this.prep('SELECT * FROM sessions WHERE id_hash = ?').get(sha(cookieValue)), now = this.now();
     if (!row || row.expires_at <= now) { if (row) this.prep('DELETE FROM sessions WHERE id_hash = ?').run(row.id_hash); return null; }
+    if (row.tenant_id === PLATFORM_SESSION) {
+      const user = this.user(row.user_id); if (!user?.platformAdmin) { this.prep('DELETE FROM sessions WHERE id_hash = ?').run(row.id_hash); return null; }
+      if (now - (row.last_seen_at || 0) >= touchEveryMs) this.prep('UPDATE sessions SET last_seen_at = ? WHERE id_hash = ?').run(now, row.id_hash);
+      return { id: user.id, email: user.email, name: user.name, prefs: user.prefs, platformAdmin: true, platform: true, tenantId: null, role: 'platform', groups: [] };
+    }
     const m = this.membership(row.user_id, row.tenant_id); if (!m) { this.prep('DELETE FROM sessions WHERE id_hash = ?').run(row.id_hash); return null; }
     if (now - (row.last_seen_at || 0) >= touchEveryMs) this.prep('UPDATE sessions SET last_seen_at = ? WHERE id_hash = ?').run(now, row.id_hash);
     const user = this.user(row.user_id);

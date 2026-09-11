@@ -107,7 +107,9 @@ activates under the Platform panel (Manage → Platform, or `/api/admin/*`). The
 setting lives: the limits (maximum AI teams per office, maximum agents per team), whether registration is open or
 invitation-only, the public address, how long an idle office stays loaded, and the **mail set-up** (provider, API key, mail
 domain, From address, webhook secret, dry run). It is kept in `platform.json` (mode 0600; secrets are write-only and never
-shown again). Platform administrators are the emails in `AO_PLATFORM_ADMINS` (and anyone flagged in the panel).
+shown again). The platform administrator is a dedicated account that belongs to no office: set `"platformAdmin": { "email": …, "password": … }`
+in `office.config.local.json` (or `AO_PLATFORM_ADMIN_EMAIL` / `AO_PLATFORM_ADMIN_PASSWORD`); the account is created or its password kept current
+at every start, and signing in with it opens the Platform page and nothing else. Office accounts never see the panel.
 
 The environment names where things are and seeds the first `platform.json`; after that first start the panel is the truth and
 the seeding variables are ignored.

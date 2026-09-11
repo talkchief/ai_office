@@ -10,7 +10,7 @@ import { toast } from './toast.js';
 import { mark, dot, clock, ago, toolState, officeSummary, dropSummary } from './status.js';
 import { MANAGE_CSS } from './manage.css.js';
 import { searchAgency } from './agency-search.js';
-import { HOSTED, USER, LIMITS, MANAGED_MODELS, isOfficeAdmin, canOpenArea } from './session.js';
+import { HOSTED, USER, LIMITS, MANAGED_MODELS, PLATFORM_ONLY, isOfficeAdmin, canOpenArea } from './session.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const when = value => value ? new Date(value).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
@@ -45,7 +45,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   const page = document.createElement('section');
   page.id = 'settingsPage'; page.className = 'mg'; page.hidden = true; page.setAttribute('aria-label', 'Manage');
   const label = id => SECTIONS.find(s => s[0] === id)[1];
-  page.innerHTML = `<nav class="mg-rail" aria-label="Manage sections"><a href="#" class="mg-back" id="settingsBack">← Back to the office</a>
+  page.innerHTML = `<nav class="mg-rail" aria-label="Manage sections"><a href="#" class="mg-back" id="settingsBack">${PLATFORM_ONLY ? 'Sign out' : '← Back to the office'}</a>
       ${RAIL.map(([group, ids]) => `<span class="mg-eyebrow">${group}</span>${ids.map(id => `<a href="#/settings/${id}" data-section="${id}">${label(id)}<span class="mg-meta" data-rail-meta="${id}"></span></a>`).join('')}`).join('')}
       <div class="mg-rail-office" id="settingsRailOffice"></div></nav>
     <div class="settings-main"><div class="mg-area-head"><div><span class="mg-eyebrow" id="settingsGroup"></span><h1 id="settingsTitle"></h1><p id="settingsIntro"></p></div><div class="mg-area-meta" id="settingsMeta"></div></div><p id="settingsMessage" role="status"></p><div id="settingsContent"></div></div>`;
@@ -67,6 +67,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     if (section === next) setMeta(status, last);
   }
   async function refreshRail() {
+    if (PLATFORM_ONLY) { $('settingsRailOffice').innerHTML = `<b>Platform</b>${esc(USER?.email || '')}<br>${dot('ok')} platform administrator`; return; }
     try {
       const s = await officeSummary(api);
       for (const [id, a] of Object.entries(s.areas)) { const el = page.querySelector(`[data-rail-meta="${id}"]`); if (el) el.innerHTML = `${a.dot ? dot(a.dot) : ''}${a.count != null && a.count !== '' ? `<span>${Number(a.count).toLocaleString()}</span>` : ''}`; }
@@ -94,14 +95,14 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     dirty = true; const bar = barOf(form); if (bar && bar.dataset.state !== 'saving') setBar(bar, 'dirty', 'Changes not saved', bar.dataset.hint || '');
     const field = event.target.closest('.mg-field, .mg-control'); if (field && 'defaultValue' in event.target && event.target.type !== 'checkbox') field.classList.toggle('changed', event.target.value !== event.target.defaultValue);
   });
-  page.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Escape' && !event.target.closest('input,textarea,select')) close(); });
-  $('settingsBack').onclick = event => { event.preventDefault(); close(); };
+  page.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Escape' && !PLATFORM_ONLY && !event.target.closest('input,textarea,select')) close(); });
+  $('settingsBack').onclick = async event => { event.preventDefault(); if (PLATFORM_ONLY) { try { await api('/auth/logout', 'POST', {}); } catch {} location.replace(location.pathname); return; } close(); };
   const RENDER = { profile: showProfile, office: showOffice, teams: showTeams, models: showModels, tools: showTools, vault: showVault, skills: showSkills, projects: showProjects, artifacts: showArtifacts, routines: showRoutines, reports: showReports, brain: showBrain, audit: showAudit, users: showUsers, admin: showAdmin };
 
   function route() {
     const match = location.hash.match(/^#\/settings(?:\/([\w-]+))?/);
     if (!match) { if (!page.hidden) hide(); return; }
-    const next = RENDER[match[1]] && canOpenArea(match[1]) ? match[1] : canOpenArea('office') ? 'office' : 'profile';
+    const next = PLATFORM_ONLY ? 'admin' : RENDER[match[1]] && canOpenArea(match[1]) ? match[1] : canOpenArea('office') ? 'office' : 'profile';
     if (dirty && section && next !== section && !confirm('You have unsaved changes. Leave this page without saving them?')) { history.replaceState(null, '', '#/settings/' + section); return; }
     show(next);
   }

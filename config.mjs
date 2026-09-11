@@ -25,6 +25,10 @@ export function loadConfig() {
   if (process.env.AO_MODEL) c.model = process.env.AO_MODEL;
   c.mode = ['single', 'hosted'].includes(process.env.AO_MODE || c.mode) ? process.env.AO_MODE || c.mode : 'single';
   c.platformAdmins = [...(Array.isArray(c.platformAdmins) ? c.platformAdmins : []), ...String(process.env.AO_PLATFORM_ADMINS || '').split(',')].map(s => String(s).trim().toLowerCase()).filter(Boolean);
+  // The platform administrator's own sign-in (hosted mode): an account that belongs to no office and sees the Platform page only.
+  const pa = c.platformAdmin && typeof c.platformAdmin === 'object' ? c.platformAdmin : {};
+  c.platformAdmin = { email: String(process.env.AO_PLATFORM_ADMIN_EMAIL || pa.email || c.platformAdmins[0] || '').trim().toLowerCase(), password: String(process.env.AO_PLATFORM_ADMIN_PASSWORD || pa.password || '') };
+  if (c.platformAdmin.email && !c.platformAdmins.includes(c.platformAdmin.email)) c.platformAdmins.push(c.platformAdmin.email);
   c.port = +c.port || 4520;
   c.brainPath = path.resolve(ROOT, c.brain);
   return c;
