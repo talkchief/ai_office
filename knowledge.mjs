@@ -65,7 +65,7 @@ export class KnowledgeStore {
     }).filter(note => note.score > 0 || note.id.endsWith('office-purpose.md')).sort((a,b)=>b.score-a.score || b.updatedAt-a.updatedAt).slice(0,limit);
     return { notes: ranked.map(n=>n.id), text: ranked.map(n=>`--- Shared memory: ${n.id}; updated ${new Date(n.updatedAt).toISOString()} ---\n${n.content}`).join('\n\n') };
   }
-  read(id) { const file = this.resolve(id); return { id, content: fs.readFileSync(file, 'utf8'), updatedAt: fs.statSync(file).mtimeMs }; }
+  read(id) { const file = this.resolve(id); if (!fs.existsSync(file)) throw Object.assign(new Error(`No note at ${id}.`), { status: 404 }); return { id, content: fs.readFileSync(file, 'utf8'), updatedAt: fs.statSync(file).mtimeMs }; }
   async save({ id, title, content, updatedAt }) {
     if (typeof content !== 'string' || content.length > 60000) throw new Error('Notes must be text under 60000 characters.');
     id ||= `Knowledge/${String(title || 'note').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60) || 'note'}-${randomUUID().slice(0, 8)}.md`;
