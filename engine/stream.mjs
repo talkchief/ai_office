@@ -1,5 +1,20 @@
 // Turns Deep Agents stream events into what the CEO sees: runs, states, tools, live drafts and token use.
 const flat = content => typeof content === 'string' ? content : Array.isArray(content) ? content.map(p => typeof p === 'string' ? p : p?.type === 'text' ? p.text || '' : '').join('') : '';
+// A lead delegates by writing the whole instruction. The run's title is the ask itself: the persona preamble and the
+// "your task is to" scaffolding come off, the first sentence stays, and the full text is kept as the run's brief.
+export function runTitle(description) {
+  let t = String(description || '').replace(/\r/g, '').trim();
+  t = t.replace(/^\s*you are\b[^.\n]{0,160}[.\n]\s*/i, '');
+  t = t.replace(/^\s*(your\s+)?(task|assignment|job|brief)\s*(is)?\s*(to|:)\s*/i, '');
+  t = t.split(/\n\s*\n/)[0].split('\n')[0].trim();
+  const stop = t.search(/[.!?](\s|$)/);
+  if (stop > 24) t = t.slice(0, stop);
+  t = t.replace(/[\s:;,.-]+$/, '').trim();
+  if (!t) return 'Assignment';
+  if (t.length > 90) t = t.slice(0, 89).replace(/\s+\S*$/, '').replace(/[s:;,.-]+$/, '') + '…';
+  return t[0].toUpperCase() + t.slice(1);
+}
+
 export function parseTaskInput(input) {
   let value = input;
   if (value && typeof value.input === 'string') { try { value = JSON.parse(value.input); } catch { value = {}; } }
@@ -50,11 +65,11 @@ export class RunTracker {
   }
   startRun(event) {
     const engine = this.engine, { subagent, description } = parseTaskInput(event.data?.input), { isLead, dept, agent } = this.target(subagent);
-    const title = description.slice(0, 300) || 'Assignment', job = engine.get(this.id);
+    const title = runTitle(description), job = engine.get(this.id);
     // Resuming after an approval re-enters the same delegation; keep one run for it.
     const paused = job.runs.find(r => r.state === 'paused' && r.agent === agent && r.title === title);
     if (paused) { engine.update(this.id, j => { j.runs.find(r => r.id === paused.id).state = 'working'; }); return; }
-    const run = { id: `${Date.now().toString(36)}-${++this.seq}`, agent, role: isLead ? 'lead' : 'specialist', dept, by: this.agentOf(event), title, state: 'working', startedAt: Date.now(), tools: [], model: this.models[agent] || null };
+    const run = { id: `${Date.now().toString(36)}-${++this.seq}`, agent, role: isLead ? 'lead' : 'specialist', dept, by: this.agentOf(event), title, brief: String(description || '').slice(0, 2000), state: 'working', startedAt: Date.now(), tools: [], model: this.models[agent] || null };
     engine.update(this.id, j => { j.runs.push(run); });
     engine.event(this.id, 'run_started', agent, title, { run: run.id, role: run.role });
     if (job.state === 'planning' || (run.role === 'specialist' && ['awaiting_lead_review', 'reviewing'].includes(job.state))) engine.setState(this.id, 'working');
@@ -67,7 +82,7 @@ export class RunTracker {
       engine.update(this.id, j => { const r = j.runs.find(r => r.agent === agent && r.state === 'working'); if (r) r.state = 'paused'; });
       return;
     }
-    const output = toolOutputText(failed ? event.data?.error : event.data?.output), title = description.slice(0, 300) || 'Assignment';
+    const output = toolOutputText(failed ? event.data?.error : event.data?.output), title = runTitle(description);
     let finished = null;
     engine.update(this.id, j => {
       const r = j.runs.find(r => r.agent === agent && r.state === 'working' && r.title === title) || j.runs.find(r => r.agent === agent && r.state === 'working'); if (!r) return;

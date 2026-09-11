@@ -314,9 +314,9 @@
     font-size: 17px; line-height: 1; color: var(--ink); transition: all .3s var(--ease);
   }
   #railBack:hover { background: var(--ink); color: var(--cream); }
-  #rail .mh { display: flex; align-items: center; gap: 10px; padding: 14px 16px 0; }
-  #rail .mh-dot { width: 11px; height: 11px; border-radius: 50%; flex: none; }
-  #rail .mh-name { font-family: var(--serif); font-size: 22px; letter-spacing: .02em; }
+  #rail .mh { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px 0; }
+  #rail .mh-dot { width: 11px; height: 11px; border-radius: 50%; flex: none; margin-top: 7px; }
+  #rail .mh-name { font-family: var(--serif); font-size: 22px; line-height: 1.15; letter-spacing: .02em; }
   #rail .mh-name .star { color: #C8A438; font-size: 16px; }
   #rail .mh-role { font-size: 10.5px; letter-spacing: .14em; color: var(--grey); text-transform: uppercase; }
   #rail .mh-tag { padding: 4px 18px 0; font-size: 12px; color: var(--grey); line-height: 1.35; }
@@ -1190,7 +1190,7 @@ body.dark #topbar .badge.brainTag { background: #1E1F24; }
 :is(.badge,#railHeader) .b-more { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .28s var(--ease); }
 :is(.badge:hover, .badge.open, #railHeader) .b-more { grid-template-rows: 1fr; }
 :is(.badge,#railHeader) .b-more-in { overflow: hidden; min-height: 0; }
-:is(.badge,#railHeader) .b-counts .b-tasks { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hairline); justify-content: space-between; gap: 8px; font-size: 8.5px; letter-spacing: .08em; }
+:is(.badge,#railHeader) .b-counts .b-tasks { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hairline); justify-content: space-between; gap: 8px; font: 600 8.5px var(--ui); letter-spacing: .1em; color: color-mix(in srgb, var(--ink) 58%, transparent); }
 :is(.badge,#railHeader) .b-counts .b-tasks b { font-size: 17px; margin: 0 5px 0 0; }
 :is(.badge,#railHeader) .b-counts .b-tasks span { display: flex; flex-direction: row-reverse; align-items: baseline; }
 :is(.badge,#railHeader) .b-rows { padding: 6px 0 0; }
@@ -1199,7 +1199,7 @@ body.dark #topbar .badge.brainTag { background: #1E1F24; }
 :is(.badge,#railHeader) .b-rows .who { font-weight: 600; white-space: nowrap; }
 :is(.badge,#railHeader) .b-rows .what { color: var(--grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
 :is(.badge,#railHeader) .b-rows button:hover .what { color: var(--ink); }
-:is(.badge,#railHeader) .b-free { font: 10.5px ui-monospace, Menlo, Consolas, monospace; color: var(--grey); padding: 6px 0 2px; letter-spacing: 0; }
+:is(.badge,#railHeader) .b-free { font: 500 10.5px ui-monospace, Menlo, Consolas, monospace; color: color-mix(in srgb, var(--ink) 55%, transparent); padding: 7px 0 2px; letter-spacing: 0; }
 :is(.badge,#railHeader) .b-foot { display: flex; gap: 6px; padding: 10px 0 0; }
 :is(.badge,#railHeader) .b-foot button { flex: 1; border: 1px solid rgba(21,20,20,.28); background: transparent; color: var(--ink); border-radius: 8px; padding: 7px 8px; font: 500 11px var(--ui); cursor: pointer; letter-spacing: 0; }
 :is(.badge,#railHeader) .b-foot button:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
@@ -1219,12 +1219,12 @@ body.dark :is(.badge,#railHeader) .b-appr { background: rgba(228,183,91,.14); bo
 body.dark :is(.badge,#railHeader) .b-foot button { border-color: rgba(236,234,226,.32); }
 :is(.badge,#railHeader) .b-jobs { padding: 8px 0 0; }
 :is(.badge,#railHeader) .b-jobs:empty { display: none; }
-:is(.badge,#railHeader) .b-eye { font: 500 9px ui-monospace, Menlo, Consolas, monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--grey); padding: 2px 0 4px; }
+:is(.badge,#railHeader) .b-eye { font: 600 9.5px ui-monospace, Menlo, Consolas, monospace; letter-spacing: .1em; text-transform: uppercase; color: color-mix(in srgb, var(--ink) 58%, transparent); padding: 4px 0 5px; }
 :is(.badge,#railHeader) .b-jobs button { display: flex; align-items: center; gap: 9px; width: 100%; border: 0; background: transparent; padding: 5px 0; text-align: left; cursor: pointer; color: var(--ink); font: 12px/1.35 var(--ui); letter-spacing: 0; border-radius: 6px; }
 :is(.badge,#railHeader) .b-jobs button:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
 :is(.badge,#railHeader) .b-jobs .seat { width: 9px; height: 9px; box-shadow: none; flex: none; }
 :is(.badge,#railHeader) .b-jobs .what { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-:is(.badge,#railHeader) .b-jobs .st { flex: none; font: 10px ui-monospace, Menlo, Consolas, monospace; color: var(--grey); max-width: 40%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:is(.badge,#railHeader) .b-jobs .st { flex: none; font: 500 10px ui-monospace, Menlo, Consolas, monospace; color: color-mix(in srgb, var(--ink) 58%, transparent); max-width: 40%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #railHeader { padding: 13px 16px 13px; }
 #railHeader .b-more { grid-template-rows: 1fr; }
 #railHeader .b-foot [data-act="open"] { display: none; }

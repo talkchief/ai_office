@@ -175,7 +175,9 @@ function enterFocus(k, pendingAgentId) {
   buildDeptRail(k);
   rail.className = RAIL_SIDE[k];
   rail.style.display = 'block';
-  const first = pendingAgentId || (AGENTS.find(x => x.dept === k && x.lead) || AGENTS.find(x => x.dept === k)).id;
+  // land on whoever is working, so the team's live task is the first thing in the rail
+  const atWork = Object.values(R).find(r => r.a.dept === k && ['working', 'planning', 'verifying', 'reviewing', 'helping'].includes(r.livePhase)) || Object.values(R).find(r => r.a.dept === k && r.state === 'stuck');
+  const first = pendingAgentId || atWork?.a.id || (AGENTS.find(x => x.dept === k && x.lead) || AGENTS.find(x => x.dept === k)).id;
   openAgentRail(first, pendingAgentId ? pendingTab : (DEMO ? 'chat' : 'activity'), false);
   document.getElementById('overviewBtn').classList.toggle('right', RAIL_SIDE[k] === 'left');
   const reveal = () => { if (focused !== k || rail.classList.contains('open')) return; rail.classList.add('open'); flyBillboardIntoRail(k); };
