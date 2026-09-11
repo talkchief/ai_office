@@ -42,14 +42,17 @@ export function initOfficeWork(ctx) {
     <div class="space-feed-head"><h2>Work & results</h2><button type="button" id="spaceArtifactsQuick" class="space-feed-link" title="Every file every task produced, filtered by type and date">Office Artifacts ↗</button></div>
     <div id="spaceFilters" class="space-filters"></div><div id="spaceOffline" class="space-offline" hidden></div><div id="spaceProvider" class="space-offline space-provider" hidden></div><div id="spaceJobs" class="space-jobs"></div>`;
   const dialog = document.createElement('dialog'); dialog.id = 'spaceDialog';
-  dialog.innerHTML = '<header><h2 id="spaceTitle"></h2><button type="button" id="spaceClose" aria-label="Close">×</button></header><p id="spaceMessage" role="status"></p><div id="spaceContent"></div>';
+  dialog.innerHTML = '<header><h2 id="spaceTitle"></h2><button type="button" id="spaceExpand" aria-label="Full screen" title="Full screen">⤢</button><button type="button" id="spaceClose" aria-label="Close">×</button></header><p id="spaceMessage" role="status"></p><div id="spaceContent"></div>';
   document.body.appendChild(dialog);
   const $ = id => document.getElementById(id), content = $('spaceContent');
   // The handle cycles the sheet: half (the default) → tall → peek (only the handle) → half. Body classes let the scene controls make room.
   $('tpanelHandle').onclick = () => { const next = panel.classList.contains('tall') ? 'peek' : panel.classList.contains('peek') ? 'half' : 'tall'; panel.classList.remove('tall', 'peek'); if (next !== 'half') panel.classList.add(next); document.body.classList.toggle('sheet-peek', next === 'peek'); document.body.classList.toggle('sheet-tall', next === 'tall'); };
   for(const event of ['input','change'])content.addEventListener(event,e=>{if(modalKind==='task'&&e.target.matches('input,textarea,select')){taskDirty=true;if(e.target.id)taskInputDraft[e.target.id]=e.target.value;}});
   const feedback = (text, error = false) => { $('spaceMessage').textContent = text; $('spaceMessage').classList.toggle('error', error); };
-  function open(kind, title) { modalKind = kind; dialog.dataset.view = kind; $('spaceTitle').textContent = title; feedback(''); if (!dialog.open) dialog.showModal(); requestAnimationFrame(()=>{dialog.scrollTop=0;content.scrollTop=0;}); }
+  // The task view can fill the screen; the choice is remembered.
+  const setFull = on => { dialog.classList.toggle('full', on); const b = $('spaceExpand'); b.textContent = on ? '⤡' : '⤢'; b.title = b.ariaLabel = on ? 'Exit full screen' : 'Full screen'; try { localStorage.setItem('ao.task.full', on ? '1' : ''); } catch {} };
+  $('spaceExpand').onclick = () => setFull(!dialog.classList.contains('full'));
+  function open(kind, title) { modalKind = kind; dialog.dataset.view = kind; $('spaceTitle').textContent = title; feedback(''); let full = false; try { full = kind === 'task' && localStorage.getItem('ao.task.full') === '1'; } catch {} setFull(full); if (!dialog.open) dialog.showModal(); requestAnimationFrame(()=>{dialog.scrollTop=0;content.scrollTop=0;}); }
   function close() { dialog.close(); modalKind = ''; if (toolPoll) { clearInterval(toolPoll); toolPoll = null; } }
   $('spaceClose').onclick = close; dialog.addEventListener('cancel', close); dialog.addEventListener('keydown', event => event.stopPropagation());
   // The Program Manager takes work for any team and picks the leads itself.

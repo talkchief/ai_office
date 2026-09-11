@@ -308,6 +308,12 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #spaceDialog[data-view=task] #spaceTitle{display:none}
 #spaceDialog[data-view=task] #spaceClose{position:absolute;top:12px;right:16px;z-index:4;width:32px;height:32px;border-radius:50%;font-size:22px;line-height:1;display:grid;place-items:center;color:var(--grey)}
 #spaceDialog[data-view=task] #spaceClose:hover{background:var(--mg-hover);color:var(--ink)}
+#spaceDialog #spaceExpand{display:none}
+#spaceDialog[data-view=task] #spaceExpand{display:grid;place-items:center;position:absolute;top:12px;right:52px;z-index:4;width:32px;height:32px;border-radius:50%;border:0;background:transparent;color:var(--grey);font:16px/1 var(--ui);cursor:pointer;padding:0}
+#spaceDialog[data-view=task] #spaceExpand:hover{background:var(--mg-hover);color:var(--ink)}
+#spaceDialog[data-view=task].full[open]{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;margin:0;border-radius:0;border:0;padding:24px clamp(24px,5vw,72px) 0}
+#spaceDialog[data-view=task].full .tv-doc{max-width:84ch}
+#spaceDialog[data-view=task].full .tv-two{grid-template-columns:minmax(0,1fr) 260px;gap:36px}
 #spaceDialog[data-view=task] #spaceContent{padding:2px 8px 28px 0;font:13px/1.5 var(--ui)}
 #spaceDialog[data-view=task] .tv-head{padding:2px 36px 0 0}
 #spaceDialog[data-view=task] .tv-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
