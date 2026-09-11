@@ -10,7 +10,7 @@ import { httpError } from './routes.mjs';
 import { officeReport, kpis } from '../reporting.mjs';
 import { collectArtifacts, filterArtifacts, ARTIFACT_KINDS } from './artifacts.mjs';
 import { extractDocument } from '../documents.mjs';
-import { planProject, applyPlan, loadPlanningSkills, loadCatalogueMethods } from '../project-planner.mjs';
+import { planProject, applyPlan, loadPlanningSkills, loadCatalogueMethods, startNextMilestone } from '../project-planner.mjs';
 import { ROOT } from '../config.mjs';
 import { registerProviderRoutes } from './providers-api.mjs';
 import { canSeeJob, canSeeProject, canShare, visibleJobs, requireRole, isAdmin, notificationVisible, sseFilter, INVISIBLE } from './visibility.mjs';
@@ -45,7 +45,7 @@ export function registerApi(router, ctx) {
   /* ---------- tasks ---------- */
   router.on('GET', '/api/tasks', ({ user }) => { const o = office.get(); return mine(user).map(j => listShape(j, o)); });
   // The task form's project picker: open projects only.
-  router.on('GET', '/api/projects/open', ({ user }) => projects.list().filter(p => ['active', 'paused'].includes(p.status) && canSeeProject(user, p)).map(p => ({ id: p.id, name: p.name, status: p.status })));
+  router.on('GET', '/api/projects/open', ({ user }) => projects.list().filter(p => ['active', 'paused'].includes(p.status) && canSeeProject(user, p)).map(p => ({ id: p.id, name: p.name, status: p.status, dueAt: p.dueAt || null, milestones: (p.milestones || []).map(m => ({ id: m.id, title: m.title, done: !!m.done, dueAt: m.dueAt || null })) })));
   router.on('POST', '/api/tasks', async ({ req, user }) => {
     const input = await body(req); if (!String(input.text || '').trim()) throw httpError('Describe the task first.', 400); if (!input.backlog) ready();
     if (input.projectId) project(String(input.projectId), user);
@@ -199,7 +199,10 @@ export function registerApi(router, ctx) {
   router.on('PUT', '/api/projects/:id', async ({ req, params, user }) => {
     const before = project(params.id, user); projectEditor(before, user); const input = await body(req, 256 * 1024);
     const p = projects.update(params.id, { ...input, ...(input.visibility !== undefined || input.sharedWith !== undefined ? audience(user, input, before) : {}) });
-    record({ area: 'projects', summary: `Updated project “${p.name}”` }); ctx.syncProject?.(p.id); bus.publish('office.updated', { area: 'projects' }); return projectOut(p, user);
+    // A milestone switched on by hand starts the next milestone's work, as an achieved one does.
+    const reached = (p.milestones || []).filter(m => m.done && !(before.milestones || []).find(b => b.id === m.id)?.done);
+    const started = reached.length && p.status === 'active' ? startNextMilestone({ project: p, projects, engine }) : [];
+    record({ area: 'projects', summary: `Updated project “${p.name}”${reached.length ? `; milestone${reached.length === 1 ? '' : 's'} reached: ${reached.map(m => m.title).join(', ')}` : ''}${started.length ? `; the next milestone's ${started.length} task${started.length === 1 ? '' : 's'} queued` : ''}` }); ctx.syncProject?.(p.id); bus.publish('office.updated', { area: 'projects' }); return projectOut(p, user);
   });
   router.on('POST', '/api/projects/:id/status', async ({ req, params, user }) => { projectEditor(project(params.id, user), user); const { status } = await body(req); const p = projects.setStatus(params.id, status); record({ area: 'projects', summary: `Project “${p.name}” is now ${p.status}` }); ctx.syncProject?.(p.id); bus.publish('office.updated', { area: 'projects' }); return projectOut(p, user); });
   // Deleting a project: refused while it has open work; finished tasks are detached and kept; the files stay in the Brain; the page is archived.

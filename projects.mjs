@@ -90,9 +90,12 @@ export class ProjectStore {
   }
   // A finished task marks its milestones achieved: the one it was created for (the next one at the time) and any the Program
   // Manager named in complete_task. Returns the milestones marked now, so the caller can say so.
-  recordCompletion(job) {
+  // A milestone is achieved when every task of it is done: the task created for it finishing, or the Program Manager naming it,
+  // counts only once no other task of that milestone is still open (`tasks`: the project's tasks as the engine lists them).
+  recordCompletion(job, { tasks = [] } = {}) {
     const project = this.items.find(p => p.id === job?.projectId); if (!project || job.state !== 'done') return [];
-    const wanted = new Set([...(Array.isArray(job.milestonesDone) ? job.milestonesDone : []), job.milestoneId].filter(Boolean));
+    const busy = new Set(tasks.filter(t => t.id !== job.id && t.projectId === project.id && t.milestoneId && !['done', 'cancelled'].includes(t.state)).map(t => t.milestoneId));
+    const wanted = new Set([...(Array.isArray(job.milestonesDone) ? job.milestonesDone : []), job.milestoneId].filter(id => id && !busy.has(id)));
     const marked = [];
     for (const m of project.milestones || []) if (wanted.has(m.id) && !m.done) { m.done = true; m.doneAt = job.doneAt || Date.now(); m.taskId = job.id; marked.push(m); }
     if (marked.length) { project.updatedAt = Date.now(); this.changed(project); }

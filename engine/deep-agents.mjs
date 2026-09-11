@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { Command } from '@langchain/langgraph';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import { safeFileName } from '../channels/channel.mjs';
@@ -39,6 +40,10 @@ export const involved = job => [...new Set((job.runs || []).filter(r => r.role =
 // outside service, an upload, a data change on a database, a command on a server. Reads (api_get, db_query, db_schema) are free.
 export const VAULT_APPROVALS = { api_request: { allowedDecisions: ['approve', 'edit', 'reject'] }, api_upload: { allowedDecisions: ['approve', 'reject'] }, db_write: { allowedDecisions: ['approve', 'edit', 'reject'] }, ssh_run: { allowedDecisions: ['approve', 'edit', 'reject'] } };
 export const DEFAULT_SETTINGS = { maxConcurrentJobs: 4, runTimeoutMinutes: 20, escalateAfterHours: 1, outboundTools: [], readOnlyTools: [], fastLane: true };
+// Every run starts in a clean async context. A task started from inside another run (the Program Manager's completion tool queues
+// the next milestone's work) would otherwise inherit that run's LangChain configuration through AsyncLocalStorage, its abort
+// signals included, and LangGraph would stop the new run with "Abort" the moment the first one ended.
+const detached = AsyncLocalStorage.snapshot();
 const clean = value => String(value ?? '').trim();
 const httpError = (message, status = 400) => Object.assign(new Error(message), { status });
 const bounded = (value, fallback, min, max) => { const n = Number(value); return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.round(n))) : fallback; };
@@ -114,6 +119,7 @@ export class OfficeEngine {
     this.db.pragma('journal_mode = WAL'); this.db.pragma('busy_timeout = 5000');
     this.db.exec('CREATE TABLE IF NOT EXISTS office_jobs (id TEXT PRIMARY KEY, body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS office_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL, body TEXT NOT NULL); CREATE INDEX IF NOT EXISTS office_events_job ON office_events(job_id, seq);');
     Object.assign(this, { office, models, toolHub, knowledgeIndex, bus, settingsFn: settings, onComplete, onChange, name, agentFactory, pmSkillsDir, toolLabels, projectFor });
+    this.foreignAbortDelay = 5000;
     // Long-term memory shares the task database; null when the office runs without it (tests, older set-ups).
     this.memory = memoryFactory ? memoryFactory(this.db) : null;
     this.notifications = new Notifications({ db: this.db, bus }); this.threads = new Threads({ db: this.db, bus });
@@ -301,7 +307,7 @@ export class OfficeEngine {
     if (this.running.has(id)) return this.running.get(id).promise;
     const controller = new AbortController(), entry = { controller, promise: null };
     this.running.set(id, entry);
-    entry.promise = (async () => {
+    entry.promise = detached(async () => {
       const minutes = Number(this.settings().runTimeoutMinutes) || 20;
       // The limit is on progress, not on length: a run that goes this long without a single event (a hung provider, a stuck tool) is
       // stopped; a long project that keeps working is not. There is no cap on tokens: a big task is allowed to be big.
@@ -337,7 +343,14 @@ export class OfficeEngine {
         if (this.closed || !job || TERMINAL.has(job.state)) return this.detail(id);
         const reason = stalled ? `The task made no progress for ${minutes} minutes and was stopped. Retry to continue from where it stopped, or raise the no-progress limit in Settings.` : clean(error?.message) || 'The task stopped unexpectedly.';
         if (!stalled && (isTransientProviderError(error) || isProviderError(error))) { this.providerTrouble.push({ at: Date.now(), reason: reason.slice(0, 160), task: job.title }); if (this.providerTrouble.length > 200) this.providerTrouble.splice(0, 100); }
-        if (!stalled && isTransientProviderError(error) && (job.autoRetries || 0) < this.providerRetryDelays.length) {
+        // LangGraph says "Abort" when a signal it composed was aborted. When it was not ours, the run was stopped from outside it (a
+        // stale context, a disposed stream): start again at once and quietly, twice at most, rather than block the task on one word.
+        if (!stalled && !signal.aborted && /^abort(ed)?\.?$/i.test(clean(error?.message)) && (job.foreignAborts || 0) < 2) {
+          this.update(id, j => { j.foreignAborts = (j.foreignAborts || 0) + 1; }, { touch: false });
+          this.block(id, 'The run was stopped by a stale signal; starting again.', { quiet: true });
+          this.event(id, 'provider_retry', null, `The run was stopped by a stale signal (LangGraph: Abort). Starting again in ${Math.round(this.foreignAbortDelay / 1000)} seconds.`);
+          setTimeout(() => { try { if (this.get(id)?.state === 'blocked') this.retry(id, undefined, { automatic: true }); } catch {} }, this.foreignAbortDelay).unref?.();
+        } else if (!stalled && isTransientProviderError(error) && (job.autoRetries || 0) < this.providerRetryDelays.length) {
           // Quietly, with a longer pause each time (half a minute, then 1½, 3 and 5 minutes): the CEO hears about it only when the
           // provider is still failing after that. The count starts again once a review is recorded, so a long project survives
           // several separate rate-limit episodes.
@@ -356,7 +369,7 @@ export class OfficeEngine {
         if (!this.closed) queueMicrotask(() => this.pump());
       }
       return this.detail(id);
-    })();
+    });
     return entry.promise;
   }
   // After the Program Manager's turn ends: park for the CEO, deliver notes, re-prompt once, or escalate.

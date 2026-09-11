@@ -33,7 +33,7 @@ export function makeDeskScreenTexture(chip) {
   c.width = 256; c.height = 160;
   const x = c.getContext('2d');
   let scroll = 0;
-  const colors = { idle: '#FDFFF8', working: '#BBE8FF', planning: '#FFE6A0', verifying: '#D9C4FF', submitted: '#DAECDC', done: '#63DBA2', blocked: '#FFE3B3' };
+  const colors = { idle: '#FDFFF8', working: '#BBE8FF', planning: '#FFE6A0', verifying: '#D9C4FF', submitted: '#F4D9EC', done: '#63DBA2', blocked: '#FFE3B3' };
   const draw = (lines, status = 'working', now = 0) => {
     x.fillStyle = colors[status] || '#FDFFF8'; x.fillRect(0, 0, 256, 160);
     x.fillStyle = status === 'idle' ? '#E5E8E1' : colors[status] || chip; x.fillRect(0, 0, 256, 26);

@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { OfficeStore } from '../office-store.mjs';
 import { loadRoster } from '../roster.mjs';
 import { OfficeEngine } from '../engine/deep-agents.mjs';
+import { AsyncLocalStorageProviderSingleton } from '@langchain/core/singletons';
 import { ScriptedModel, call } from './helpers/fake-model.mjs';
 
 const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'talkchief-engine-'));
@@ -917,5 +918,29 @@ test('quick lane: a lead that wrote the deliverable but kept tuning it is told t
     const id = start(f, { text: 'Make a one-page summary of the plan note.' }); const done = await until(f.engine, id, ['done'], 30000);
     assert.equal(done.lane, 'quick'); assert.equal(done.review.self, true); assert.equal(done.runs.length, 1, 'no promotion');
     assert.ok(done.events.some(e => e.type === 'steps_capped' && /only the review is open/.test(e.message)));
+  } finally { await f.close(); }
+});
+
+test('a task started from inside another run’s LangChain context runs in a clean one: the finishing run’s abort signal is not inherited', async () => {
+  const f = fixture();
+  try {
+    // What the Program Manager's completion tool sees when it queues the next milestone: a running graph (a read key) whose signal has ended.
+    const stale = { configurable: { __pregel_read: () => {}, __pregel_abort_signals: { externalAbortSignal: AbortSignal.abort(new Error('the first run ended')) } } };
+    const id = await AsyncLocalStorageProviderSingleton.runWithConfig(stale, async () => { const job = f.engine.create({ dept: 'marketing', text: 'Write a launch report.' }); await new Promise(r => setTimeout(r, 0)); return job.id; });
+    const done = await until(f.engine, id, ['done', 'blocked']);
+    assert.equal(done.state, 'done', done.error || ''); assert.equal(done.foreignAborts, undefined, 'no restart was needed');
+  } finally { await f.close(); }
+});
+
+test('a run stopped by a signal that was not ours ("Abort") starts again by itself, quietly, twice at most', async () => {
+  let aborts = 0;
+  const pm = context => { if (context.last.type === 'human' && aborts < 1) { aborts++; throw new Error('Abort'); } return defaultPm(context); };
+  const f = fixture({ pm });
+  try {
+    f.engine.foreignAbortDelay = 20;
+    const id = start(f); const done = await until(f.engine, id, ['done']);
+    assert.equal(done.state, 'done', done.error || ''); assert.equal(done.foreignAborts, 1);
+    assert.ok(f.engine.events(id).some(e => e.type === 'provider_retry' && /stale signal/.test(e.message)), 'the restart is on the record');
+    assert.ok(!f.engine.notifications.list({ limit: 200 }).some(n => n.kind === 'blocked' && n.jobId === id), 'no inbox item for a restart');
   } finally { await f.close(); }
 });

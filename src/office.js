@@ -188,6 +188,35 @@ export function initOfficeWork(ctx) {
   setInterval(renderNow, 1500);
   const involves = (j, key) => (!j.autoRoute && (j.dept === key || (j.depts || []).includes(key))) || (j.runs || []).some(r => r.role === 'lead' && r.dept === key);
   function scopedJobs() { const dept = getFocused(); return dept && dept !== 'brain' ? jobs.filter(j => involves(j, dept)) : jobs; }
+  // A project is one card on the board: its tasks stay off the lists and add up to one progress line; blocked work turns the card red.
+  const PROJECT_STATES = { blocked: ['blocked'], waiting: ['waiting'], active: ['queued', 'planning', 'working', 'reviewing', 'saving'] };
+  function projectSummaries() {
+    const dept = getFocused();
+    return projectsOpen.map(p => {
+      const tasks = jobs.filter(j => j.projectId === p.id), counted = tasks.filter(j => j.state !== 'cancelled');
+      if (dept && dept !== 'brain' && tasks.length && !tasks.some(j => involves(j, dept))) return null;
+      const milestones = p.milestones || [], reached = milestones.filter(m => m.done).length, next = milestones.find(m => !m.done) || null;
+      const count = states => tasks.filter(j => states.includes(j.state)).length, done = count(['done']);
+      // Progress follows the milestones: each an equal share, an open one counted by its tasks done (a task without a milestone belongs to the current one); without milestones, the tasks.
+      const share = m => { if (m.done) return 1; const own = counted.filter(j => (j.milestoneId || next?.id) === m.id); return own.length ? own.filter(j => j.state === 'done').length / own.length : 0; };
+      const complete = milestones.length ? milestones.every(m => m.done) : counted.length > 0 && done === counted.length;
+      const state = count(PROJECT_STATES.blocked) ? 'blocked' : count(PROJECT_STATES.waiting) ? 'waiting' : count(PROJECT_STATES.active) ? 'active' : p.status === 'paused' ? 'paused' : complete ? 'done' : 'idle';
+      const percent = milestones.length ? Math.round(milestones.reduce((sum, m) => sum + share(m), 0) / milestones.length * 100) : counted.length ? Math.round(done / counted.length * 100) : 0;
+      return { ...p, milestones, tasks, state, percent, done, reached, next, working: count(PROJECT_STATES.active), blocked: count(PROJECT_STATES.blocked), waiting: count(PROJECT_STATES.waiting), backlog: count(['backlog']), unseen: tasks.some(unseenResult), updatedAt: Math.max(0, ...tasks.map(j => j.doneAt || j.updatedAt || j.createdAt || 0)) };
+    }).filter(Boolean);
+  }
+  const projectMatches = (id, p) => id === 'all' || (id === 'active' ? p.state === 'active' : id === 'waiting' ? p.state === 'waiting' : id === 'blocked' ? p.state === 'blocked' : id === 'done' ? p.state === 'done' : false);
+  function projectCard(p) {
+    const label = { blocked: 'Blocked', waiting: 'Your call', active: 'In progress', done: 'Complete', paused: 'Paused', idle: 'Nothing running' }[p.state];
+    const first = states => p.tasks.find(j => states.includes(j.state));
+    const line = [p.done ? `${p.done} done` : '', p.working ? `${p.working} in progress` : '', p.waiting ? `${p.waiting} for you` : '', p.blocked ? `${p.blocked} blocked` : '', p.backlog ? `${p.backlog} to come` : ''].filter(Boolean).join(' · ') || 'No tasks yet';
+    const milestone = p.milestones.length ? `Milestone ${Math.min(p.reached + 1, p.milestones.length)} of ${p.milestones.length}${p.next ? ' · ' + esc(p.next.title) : ' · all achieved'}` : 'No milestones yet';
+    const problem = p.state === 'blocked' && first(PROJECT_STATES.blocked)?.error ? ` · ${esc(String(first(PROJECT_STATES.blocked).error).slice(0, 90))}` : '';
+    const actions = p.state === 'blocked' ? `<span class="space-card-actions"><button type="button" data-inline="retry-project" data-project-id="${esc(p.id)}">RETRY</button><button type="button" class="space-text-action" data-inline="read" data-job-id="${esc(first(PROJECT_STATES.blocked).id)}">Open ↗</button></span>`
+      : p.state === 'waiting' ? `<span class="space-card-actions"><button type="button" class="space-text-action" data-inline="read" data-job-id="${esc(first(PROJECT_STATES.waiting).id)}">Read ↗</button></span>` : '';
+    const when = p.updatedAt ? new Date(p.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+    return `<div class="space-job space-project ${p.state}" data-project-card="${esc(p.id)}" role="button" tabindex="0" title="Open the project"><span class="space-card-top"><span class="space-state">${p.unseen ? '<i class="space-unread" title="New results, not opened yet"></i>' : ''}Project · ${label}</span><time>${esc(when)}</time></span><strong>${esc(p.name)}</strong><span class="space-progress" role="progressbar" aria-valuenow="${p.percent}" aria-valuemin="0" aria-valuemax="100" title="${p.done} of ${p.tasks.filter(j => j.state !== 'cancelled').length} tasks done · ${p.reached} of ${p.milestones.length} milestones achieved"><span class="space-bar"><i style="width:${p.percent}%"></i></span><b class="space-pct">${p.percent}%</b><span class="space-ms" title="${p.next ? esc(p.next.title) : ''}">${milestone}</span></span><span class="space-card-foot"><span>${esc(line)}${problem}</span>${actions}</span></div>`;
+  }
   function render() {
     activityByAgent.clear();
     for (const job of [...jobs].reverse()) {
@@ -201,9 +230,9 @@ export function initOfficeWork(ctx) {
       if (job.state==='working') for (const r of job.runs||[]) if (r.role==='lead'&&r.state==='working'&&r.agent&&!(job.runs||[]).some(x=>x.role==='specialist'&&x.state==='working'&&x.dept===r.dept)) activityByAgent.set(r.agent,{phase:'working',title:job.title,jobId:job.id});
       if (!['cancelled','done'].includes(job.state)) for (const step of job.subtasks) if (step.state==='working'&&step.agent) activityByAgent.set(step.agent,{phase:'working',title:step.title,jobId:job.id});
     }
-    const scope = scopedJobs();
+    const scope = scopedJobs().filter(j => !j.projectId), projectCards = projectSummaries();
     $('spaceFilters').innerHTML = [['all', 'All'], ['backlog', 'Ideas'], ['active', 'Active'], ['waiting', 'Review'], ['blocked', 'Blocked'], ['done', 'Results']].map(([id, name]) => {
-      const count = scope.filter(j => id === 'all' || (id === 'active' ? ['queued', 'planning', 'working', 'reviewing', 'saving'].includes(j.state) : j.state === id)).length;
+      const count = scope.filter(j => id === 'all' || (id === 'active' ? ['queued', 'planning', 'working', 'reviewing', 'saving'].includes(j.state) : j.state === id)).length + projectCards.filter(p => projectMatches(id, p)).length;
       return `<button class="${filter === id ? 'selected' : ''}" data-filter="${id}">${name} <b>${count}</b></button>`;
     }).join('');
     $('spaceFilters').querySelectorAll('button').forEach(b => b.onclick = () => { filter = b.dataset.filter; render(); });
@@ -237,11 +266,15 @@ export function initOfficeWork(ctx) {
       if (id === 'history' && filter === 'all') return `<details class="space-closed-tasks" data-task-history ${historyOpen ? 'open' : ''}><summary>${title} <span>${items.length}</span></summary>${cards}</details>`;
       return `<section class="space-feed-group" aria-label="${title}">${filter === 'all' ? `<div class="space-group-heading">${title}<span>${items.length}</span></div>` : ''}${cards}${more}</section>`;
     }).join('') || (filter === 'all' ? `<div class="space-empty"><h3>The office is quiet.</h3><p>${Object.keys(R).length} agents at their desks, nothing assigned. Three things this office is good at, to get started:</p><div class="space-starters">${[['emails', 'Triage the inbox and tell me what needs me'], ['fin', 'List overdue invoices and draft the reminders'], ['sales', 'Summarise this week’s inbound leads']].filter(([k]) => DEPTS[k]).map(([k, t]) => `<button type="button" data-starter="${k}" data-text="${esc(t)}"><b style="color:${DEPTS[k].ink}">${esc(DEPTS[k].short)}</b>${esc(t)}</button>`).join('')}</div></div>` : '<div class="space-empty"><p>Nothing here right now.</p></div>');
+    const shownProjects = projectCards.filter(p => projectMatches(filter, p)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    if (shownProjects.length) { $('spaceJobs').querySelector('.space-empty')?.remove(); $('spaceJobs').insertAdjacentHTML('afterbegin', `<section class="space-feed-group" aria-label="Projects">${filter === 'all' ? `<div class="space-group-heading">Projects<span>${shownProjects.length}</span></div>` : ''}${shownProjects.map(projectCard).join('')}</section>`); }
+    $('spaceJobs').querySelectorAll('[data-project-card]').forEach(b => { b.onclick = e => { if (e.target.closest('[data-inline]')) return; settings.openProject(b.dataset.projectCard); }; b.onkeydown = e => { if (e.key === 'Enter') settings.openProject(b.dataset.projectCard); }; });
     $('spaceJobs').querySelectorAll('[data-starter]').forEach(b => b.onclick = () => { selectedTeam = b.dataset.starter; setTimeout(fillOptions); $('spaceDept').innerHTML = `<i style="background:${teamChip(selectedTeam).chip}"></i><span>${esc(teamChip(selectedTeam).name)}</span><span class="space-chevron">⌄</span>`; $('spaceBrief').value = b.dataset.text; $('spaceBrief').focus(); });
     $('spaceJobs').querySelectorAll('[data-more]').forEach(b => b.onclick = () => { filter = b.dataset.more; render(); });
     $('spaceJobs').querySelectorAll('[data-inline]').forEach(b => b.onclick = async e => {
       e.stopPropagation(); const id = b.dataset.jobId, act = b.dataset.inline;
       if (act === 'read') return showTask(id);
+      if (act === 'retry-project') { b.disabled = true; try { for (const j of jobs.filter(x => x.projectId === b.dataset.projectId && PROJECT_STATES.blocked.includes(x.state))) await api(`/tasks/${j.id}/retry`, 'POST', { feedback: '' }); await refresh(); } catch (error) { feedback(error.message, true); b.disabled = false; } return; }
       if (act === 'changes') { await showTask(id); const d = content.querySelector('[data-detail-key="revision"]'); if (d) { d.open = true; d.querySelector('textarea')?.focus(); } return; }
       if (act === 'cancel' && !confirm('Cancel this task?')) return;
       b.disabled = true;

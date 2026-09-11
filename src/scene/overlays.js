@@ -8,7 +8,7 @@ import { smooth, clamp } from './materials.js';
 
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const STATE_WORD = { idle: 'IDLE', working: 'WORKING', planning: 'PLANNING', verifying: 'VERIFYING', reviewing: 'VERIFYING', submitted: 'SUBMITTED', done: 'DONE', blocked: 'BLOCKED', stuck: 'NEEDS YOU', helping: 'HELPING', stale: 'STALE' };
-const STATE_COL = { working: '#287657', planning: '#B4830B', verifying: '#684C91', reviewing: '#684C91', submitted: '#287657', done: '#248267', blocked: '#B4830B', stuck: '#B4830B', helping: '#A08A1E', idle: '#5A5A5A', stale: '#5A5A5A' };
+const STATE_COL = { working: '#2A6DB5', planning: '#B4830B', verifying: '#684C91', reviewing: '#684C91', submitted: '#A8408A', done: '#248267', blocked: '#B4830B', stuck: '#B4830B', helping: '#A08A1E', idle: '#5A5A5A', stale: '#5A5A5A' };
 
 export function makeOverlays({ hud, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, onDept, onAgent, onApproval, onBrain, onPM }) {
   const badges = {};

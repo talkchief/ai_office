@@ -51,7 +51,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     <div class="settings-main"><div class="mg-area-head"><div><span class="mg-eyebrow" id="settingsGroup"></span><h1 id="settingsTitle"></h1><p id="settingsIntro"></p></div><div class="mg-area-meta" id="settingsMeta"></div></div><p id="settingsMessage" role="status"></p><div id="settingsContent"></div></div>`;
   document.body.appendChild(page);
   const $ = id => document.getElementById(id), content = $('settingsContent'), main = page.querySelector('.settings-main');
-  let section = null, dirty = false, config = null, tools = [], providers = { models: [] }, draft = null, team = null, teamSection = 'overview', reportDays = 7, pendingNote = null, toolPoll = null, statusPoll = null, statusTries = 0, metaStatus = '';
+  let section = null, dirty = false, config = null, tools = [], providers = { models: [] }, draft = null, team = null, teamSection = 'overview', reportDays = 7, pendingNote = null, pendingProject = null, toolPoll = null, statusPoll = null, statusTries = 0, metaStatus = '';
 
   /* ---------- feedback: a failure stays on the page and in a toast; a success is a toast ---------- */
   const feedback = (text, error = false, extra = {}) => {
@@ -571,6 +571,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   async function showProjects() {
     try {
       const data = await api('/projects');
+      if (pendingProject) { const id = pendingProject; pendingProject = null; if (data.projects.some(p => p.id === id)) return editProject(id, data.teams); }
       const list = data.projects.filter(p => p.status !== 'archived'), archived = data.projects.filter(p => p.status === 'archived');
       setMeta(list.length ? mark(list.some(p => p.next?.dueAt && p.next.dueAt < Date.now()) ? 'warn' : 'ok', `${list.length} open`) : mark('off', 'No projects'));
       content.innerHTML = `<div class="mg-toolbar"><span class="mg-count">${list.length} open · ${archived.length} archived</span><span class="mg-spacer"></span><button id="spaceNewProject" type="button" class="mg-btn mg-btn-primary">+ New project</button></div>
@@ -987,5 +988,5 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   }
 
   route();
-  return { open, close, isOpen: () => !page.hidden, onEvent: (type, data) => { if (type === 'office.updated' && data?.area === 'tools' && section === 'tools' && $('spaceRefreshTools') && $('spaceToolEditor')?.hidden) showTools(); }, openNote: id => { pendingNote = id; open('brain'); if (section === 'brain') showBrain(); } };
+  return { open, close, isOpen: () => !page.hidden, onEvent: (type, data) => { if (type === 'office.updated' && data?.area === 'tools' && section === 'tools' && $('spaceRefreshTools') && $('spaceToolEditor')?.hidden) showTools(); }, openNote: id => { pendingNote = id; open('brain'); if (section === 'brain') showBrain(); }, openProject: id => { pendingProject = id; open('projects'); if (section === 'projects') showProjects(); } };
 }

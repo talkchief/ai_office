@@ -67,3 +67,16 @@ test('a finished task marks its milestones: the one it was created for and any t
   assert.deepEqual(store.recordCompletion({ id: 't2', projectId: p.id, state: 'done', milestoneId: scope }), [], 'a milestone is achieved once');
   assert.equal(store.summary({ tasks: () => [{ projectId: p.id, state: 'done' }, { projectId: p.id, state: 'working' }] })[0].done, 1);
 });
+
+test('a milestone is achieved when all its tasks are done: one finishing while a sibling is still open does not reach it', () => {
+  const { store } = setup();
+  const p = store.create({ name: 'Portal launch', description: 'Ship the portal.', milestones: [{ title: 'Scope', dueAt: '2026-09-30' }, { title: 'Beta', dueAt: '2026-10-31' }] });
+  const [scope, beta] = p.milestones.map(m => m.id);
+  const tasks = [{ id: 'a', projectId: p.id, milestoneId: scope, state: 'done' }, { id: 'b', projectId: p.id, milestoneId: scope, state: 'working' }, { id: 'c', projectId: p.id, milestoneId: beta, state: 'backlog' }];
+  assert.deepEqual(store.recordCompletion({ id: 'a', projectId: p.id, state: 'done', milestoneId: scope, milestonesDone: [beta] }, { tasks }), [], 'a sibling still working, and Beta’s task not started: nothing is achieved yet');
+  tasks[1].state = 'done';
+  assert.deepEqual(store.recordCompletion({ id: 'b', projectId: p.id, state: 'done', doneAt: 5, milestoneId: scope }, { tasks }).map(m => [m.title, m.taskId]), [['Scope', 'b']], 'the last task of the milestone reaches it');
+  tasks[2].state = 'cancelled';
+  assert.deepEqual(store.recordCompletion({ id: 'b', projectId: p.id, state: 'done', milestonesDone: [beta] }, { tasks }).map(m => m.title), ['Beta'], 'a cancelled task does not hold a milestone back');
+  assert.equal(store.nextMilestone(store.get(p.id)), null);
+});
