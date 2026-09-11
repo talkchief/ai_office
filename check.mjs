@@ -111,7 +111,8 @@ await step('tests: the full suite passes', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ao-check-')), data = path.join(tmp, 'data'), brain = path.join(tmp, 'brain');
   fs.mkdirSync(data); fs.cpSync(path.join(ROOT, 'brain'), brain, { recursive: true });
   const port = 4600 + Math.floor(Math.random() * 300);
-  const env = { ...process.env, PORT: String(port), HOST: '127.0.0.1', AO_DATA: data, AO_BRAIN: brain };
+  // The smoke runs the single office whatever this machine's office.config.local.json says.
+  const env = { ...process.env, PORT: String(port), HOST: '127.0.0.1', AO_DATA: data, AO_BRAIN: brain, AO_MODE: 'single' };
   const srv = spawn(NODE, ['serve.mjs'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = ''; srv.stdout.on('data', d => { log += d; }); srv.stderr.on('data', d => { log += d; });
   const base = `http://127.0.0.1:${port}`;
@@ -192,7 +193,7 @@ await step('tests: the full suite passes', async () => {
 {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ao-hosted-'));
   const port = 4900 + Math.floor(Math.random() * 300), base = `http://127.0.0.1:${port}`;
-  const env = { ...process.env, PORT: String(port), HOST: '127.0.0.1', AO_MODE: 'hosted', AO_TENANTS_DIR: path.join(tmp, 'tenants'), AO_ACCOUNTS: path.join(tmp, 'accounts.sqlite'), AO_PLATFORM_DIR: path.join(tmp, 'platform'), AO_PLATFORM_ADMINS: 'admin@check.test', AO_PLATFORM_ADMIN_PASSWORD: 'admin-password-1', AO_PUBLIC_ORIGIN: base, AO_MAIL_OUTBOX: path.join(tmp, 'mail-outbox.json') };
+  const env = { ...process.env, PORT: String(port), HOST: '127.0.0.1', AO_MODE: 'hosted', AO_TENANTS_DIR: path.join(tmp, 'tenants'), AO_ACCOUNTS: path.join(tmp, 'accounts.sqlite'), AO_PLATFORM_DIR: path.join(tmp, 'platform'), AO_PLATFORM_ADMINS: 'admin@check.test', AO_PLATFORM_ADMIN_EMAIL: 'admin@check.test', AO_PLATFORM_ADMIN_PASSWORD: 'admin-password-1', AO_PUBLIC_ORIGIN: base, AO_MAIL_OUTBOX: path.join(tmp, 'mail-outbox.json') };
   delete env.AO_DATA; delete env.AO_BRAIN;
   const srv = spawn(NODE, ['serve.mjs'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = ''; srv.stdout.on('data', d => { log += d; }); srv.stderr.on('data', d => { log += d; });
