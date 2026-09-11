@@ -67,7 +67,23 @@ No coordinator agent. The scheduler becomes the steward:
 
 Engine (scripted models): a quick-lane task completes with the lead alone (no specialist run, `review.self`, result filed, `lane_chosen`); budget promotion (9 tool calls → promoted, standard lane completes, files kept); `needs_the_team` promotion; a lead that ends without a review is re-prompted once, then promoted; triage rules (project block → standard, pinned lane honoured, model failure → standard); effort: the specialist's model is built with the effort the lead chose, a CEO pin wins, `run.effort` recorded; a lead's gate admits four calls at once; `record_review` in the standard lane still refuses a lead's own work. Prompts: `quickLeadPrompt` names the tools and the review. Settings: `fastLane`, `maxConcurrentJobs` default 4. Scheduler: outcome tracking, `missed`, two failures flag, digest section.
 
-## 8. Order
+## 8. What the trials changed (built and measured on 2026-09-11, evening)
+
+Five runs of the same quick task on a trial office (Gemini 3.8 Flash direct): "Make a one-page PDF summary of the November 2026 Growth plan price change pack filed in the Brain", a 204 KB source note.
+
+| Run | Lane | Time to done | What it taught |
+|---|---|---|---|
+| 1 | standard (triage answer cut off) | failed at 100 s | Gemini's thinking counts against the triage output cap; the read-back of the exported PDF became a "file" content part Google rejects (400) |
+| 2 | quick → promoted at 80 s, done at 3 min | 3.1 min | the lead spent its 14 calls re-exporting to force one page and never reviewed |
+| 3 | quick | 62 s | first PDF export paid a 15 s Chrome launch; one allowed re-export used |
+| 4 | quick | 34 s | warm browser: export in 0.9 s; the page count came out at two |
+| 5 | quick | 35 s | export_pdf fits the requested page count itself: one page |
+
+Changes: the triage cap leaves room for reasoning (1,500 tokens) and a non-JSON answer is named in the event; a guard refuses reading binary exports back for every role (`binary_read_refused`); past the quick budget only `record_review` and `needs_the_team` stay open for three more calls (a lead that wrote the deliverable finishes in the lane); every role exports once, never a test export; the browser stays warm between exports (closed after ninety seconds idle and with the office); `export_pdf` takes the page count the CEO asked for and scales the print to fit (60% at most); the effort guidance counts copying existing figures as low. The Program Manager also gets `assemble_files`, `export_pdf` and `export_pptx` for approved files (convert and combine, never author), so a pack or a PDF of approved parts needs no extra lead package; and a finished project task marks its milestones achieved.
+
+Where the 35 seconds go now: triage 3 s; the lead's reads 12 s (the note is 204 KB, so it greps its way through); writing 8 s; export 1 s; review 5 s; filing 1 s. A note of ordinary size takes 15 to 25 s.
+
+## 9. Order
 
 1. Quick lane with the lean lead, self-review, engine completion, budget and promotion, lane events and label.
 2. Effort: lane base, delegation effort, bounds, report.
