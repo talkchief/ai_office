@@ -52,3 +52,28 @@ test('retention runs once a day and clears only work finished more than 30 days 
     assert.ok(engine.get(old).prunedAt); assert.equal(engine.get(recent).prunedAt, undefined);
   } finally { await engine.close(); fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('the routines steward: done clears the count, a blocked or overdue task is a miss (once per task), cancellations are neither, and the digest says so', async () => {
+  const { steward, MISS_FLOOR } = await import('../routines.mjs');
+  const r = { id: 'reminders', title: 'Overdue reminders', dept: 'fin', paused: false, when: { kind: 'daily', at: '09:00' } };
+  const at = Date.UTC(2026, 8, 11, 9), st = { reminders: { lastAt: at, nextAt: at + 86400000, lastTaskId: 't1', runs: 1 } };
+  let out = steward([r], st, [{ id: 't1', state: 'working' }], at + 60000);
+  assert.deepEqual([out.changed, out.notices.length, st.reminders.lastOutcome], [true, 0, 'running']);
+  out = steward([r], st, [{ id: 't1', state: 'blocked', error: 'The provider stopped answering.' }], at + 120000);
+  assert.equal(out.notices.length, 1); assert.match(out.notices[0].reason, /the task stopped: The provider stopped answering/); assert.deepEqual([st.reminders.lastOutcome, st.reminders.failures, st.reminders.missedTaskId], ['missed', 1, 't1']);
+  out = steward([r], st, [{ id: 't1', state: 'blocked' }], at + 180000);
+  assert.equal(out.notices.length, 0, 'a miss is counted once per task');
+  st.reminders.lastTaskId = 't2'; st.reminders.lastAt = at + 86400000; st.reminders.nextAt = at + 2 * 86400000;
+  out = steward([r], st, [{ id: 't2', state: 'working' }], at + 86400000 + MISS_FLOOR - 1000);
+  assert.equal(out.notices.length, 0, 'not overdue before the floor');
+  out = steward([r], st, [{ id: 't2', state: 'working' }], at + 86400000 + 2 * 3600000 + 1000);
+  assert.equal(out.notices.length, 1); assert.equal(st.reminders.failures, 2); assert.match(out.notices[0].reason, /still working after 120 minutes/);
+  st.reminders.lastTaskId = 't3';
+  out = steward([r], st, [{ id: 't3', state: 'cancelled' }], at + 3 * 86400000);
+  assert.deepEqual([out.notices.length, st.reminders.lastOutcome, st.reminders.failures], [0, 'cancelled', 2]);
+  st.reminders.lastTaskId = 't4';
+  out = steward([r], st, [{ id: 't4', state: 'done' }], at + 4 * 86400000);
+  assert.deepEqual([st.reminders.lastOutcome, st.reminders.failures], ['done', 0]);
+  const report = digest({ jobs: [], office: { teams: [] }, since: 0, now: at, routines: [{ title: 'Overdue reminders', lastAt: at, lastOutcome: 'missed', failures: 2 }, { title: 'Inbox triage', lastAt: at, lastOutcome: 'done', lastLate: true }, { title: 'Weekly numbers', lastAt: at, lastOutcome: 'waiting' }, { title: 'Paused one', paused: true, lastOutcome: 'missed' }] });
+  assert.match(report.markdown, /## Routines\n- ✕ Overdue reminders: did not complete \(2 in a row\)\n- ✓ Inbox triage: ran late\n- ○ Weekly numbers: waits for your OK/); assert.ok(!/Paused one/.test(report.markdown)); assert.match(report.headline, /1 routine missed/);
+});

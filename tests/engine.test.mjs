@@ -856,3 +856,17 @@ test('the lane effort is the base for the Program Manager and the leads unless t
     assert.ok(!f.instances.some(i => i.model === 'specialist' && i.effort === 'high'), 'specialists take the delegator\'s choice, not the lane base');
   } finally { await f.close(); }
 });
+
+test('a person may be in four model calls at once across tasks by default; the CEO can set it per person; four tasks run at once', async () => {
+  const f = fixture({ configure: c => { const w = c.agents.filter(a => a.department === 'marketing' && a.id !== c.teams.find(t => t.id === 'marketing').lead)[0]; w.concurrency = 1; c.agents.find(a => a.id === 'mlead').concurrency = 99; } });
+  try {
+    const team = f.office.team('marketing'), people = f.office.agents();
+    assert.equal(people.find(a => a.id === f.worker).concurrency, 1); assert.equal(people.find(a => a.id === 'mlead').concurrency, 8, 'clamped to eight');
+    assert.equal(people.find(a => a.department === 'sales')?.concurrency ?? people.find(a => a.id !== f.worker && a.id !== 'mlead').concurrency, 4, 'four by default');
+    const controller = new AbortController();
+    f.engine.pace('job-1', team, 'mlead', controller.signal); f.engine.pace('job-1', team, f.worker, controller.signal); f.engine.pace('job-1', team, people.find(a => a.department === 'sales' && a.id !== f.office.team('sales').lead).id, controller.signal);
+    assert.equal(f.engine.gates.get('agent:mlead').size, 8); assert.equal(f.engine.gates.get('agent:' + f.worker).size, 1);
+    assert.equal([...f.engine.gates.entries()].find(([k]) => k.startsWith('agent:') && !k.endsWith('mlead') && !k.endsWith(f.worker))[1].size, 4);
+    assert.equal(f.engine.settings().maxConcurrentJobs, 4);
+  } finally { await f.close(); }
+});

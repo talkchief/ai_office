@@ -45,6 +45,7 @@ export function validate(r, agents, existing = []) {
   if (!valid(out.when)) problems.push(`${out.id}: the schedule is not complete (${JSON.stringify(r.when || null)}) — see src/when.js`);
   out.needsOk = r.needsOk !== false;
   out.paused = r.paused === true;
+  out.followUp = r.followUp === true; // after two missed runs in a row, the team gets a follow-up task
   if (r.ownerId) out.ownerId = String(r.ownerId).slice(0, 40); // the member who made it, in a hosted office
   if (Array.isArray(r.plan)) out.plan = r.plan.slice(0, 4).map(String);
   if (r.model !== undefined && r.model !== '' && r.model !== null) out.model = String(r.model).trim().slice(0, 120); // any model configured in Settings → Models
@@ -69,7 +70,7 @@ export function load(brainPath, agents) {
 export function save(brainPath, routines) {
   const p = file(brainPath);
   fs.mkdirSync(path.dirname(p), { recursive: true });
-  const clean = routines.map(r => ({ id: r.id, dept: r.dept, agent: r.agent, title: r.title, text: r.text, when: r.when, needsOk: r.needsOk, paused: r.paused, ...(r.model ? { model: r.model } : {}), ...(r.effort ? { effort: r.effort } : {}), ...(r.plan ? { plan: r.plan } : {}), ...(r.ownerId ? { ownerId: r.ownerId } : {}) }));
+  const clean = routines.map(r => ({ id: r.id, dept: r.dept, agent: r.agent, title: r.title, text: r.text, when: r.when, needsOk: r.needsOk, paused: r.paused, ...(r.model ? { model: r.model } : {}), ...(r.effort ? { effort: r.effort } : {}), ...(r.plan ? { plan: r.plan } : {}), ...(r.followUp ? { followUp: true } : {}), ...(r.ownerId ? { ownerId: r.ownerId } : {}) }));
   fs.writeFileSync(p, JSON.stringify({ routines: clean }, null, 2) + '\n');
   return p;
 }
@@ -84,7 +85,7 @@ export function withState(routines, st, now = Date.now()) {
   const out = routines.map(r => {
     const s = st[r.id] || (st[r.id] = {});
     if (!s.nextAt || s.when !== JSON.stringify(r.when)) { s.nextAt = nextRun(r.when, now); s.when = JSON.stringify(r.when); changed = true; }
-    return { ...r, desc: describe(r.when), nextAt: r.paused ? null : s.nextAt, lastAt: s.lastAt || null, runs: s.runs || 0, lastTaskId: s.lastTaskId || null, lastLate: !!s.lastLate };
+    return { ...r, desc: describe(r.when), nextAt: r.paused ? null : s.nextAt, lastAt: s.lastAt || null, runs: s.runs || 0, lastTaskId: s.lastTaskId || null, lastLate: !!s.lastLate, lastOutcome: s.lastOutcome || null, failures: s.failures || 0, missedAt: s.missedAt || null };
   });
   for (const id of Object.keys(st)) if (!routines.some(r => r.id === id)) { delete st[id]; changed = true; } // deleted routines drop their state
   return { list: out, changed };
@@ -107,6 +108,30 @@ export function advance(st, r, now = Date.now(), taskId = null, late = false) {
   s.lastAt = now; s.runs = (s.runs || 0) + 1; s.lastTaskId = taskId; s.lastLate = late;
   s.nextAt = nextRun(r.when, now);
   return s;
+}
+
+/** The steward: what became of each routine's last firing. A task that is done clears the count; one that blocked, escalated or
+ * is still not done by the deadline (the next due time or two hours, whichever is first, never under fifteen minutes) is a
+ * miss, counted once per task, with a notice for the CEO. A task the CEO cancelled is neither. Returns { changed, notices }. */
+export const MISS_AFTER = 2 * 3600000, MISS_FLOOR = 15 * 60000;
+export function steward(list, st, jobs, now = Date.now()) {
+  let changed = false; const notices = [];
+  for (const r of list) {
+    const s = st[r.id]; if (!s?.lastTaskId) continue;
+    const job = jobs.find(j => j.id === s.lastTaskId); if (!job) continue;
+    const set = (outcome, extra = {}) => { if (s.lastOutcome !== outcome || Object.keys(extra).length) { Object.assign(s, { lastOutcome: outcome }, extra); changed = true; } };
+    if (job.state === 'done') { set('done', s.failures ? { failures: 0 } : {}); continue; }
+    if (job.state === 'cancelled') { set('cancelled'); continue; }
+    if (job.state === 'awaiting_ceo') { set('waiting'); continue; }
+    const deadline = Math.max(MISS_FLOOR, Math.min(MISS_AFTER, (s.nextAt || now) - (s.lastAt || now)));
+    const stopped = ['blocked', 'escalated'].includes(job.state), overdue = now - (s.lastAt || now) >= deadline;
+    if ((stopped || overdue) && s.missedTaskId !== job.id) {
+      const reason = stopped ? `the task ${job.state === 'blocked' ? 'stopped' : 'is waiting for your direction'}${job.error ? ': ' + String(job.error).slice(0, 160) : ''}` : `the task is still ${job.state} after ${Math.round((now - s.lastAt) / 60000)} minutes`;
+      set('missed', { missedAt: now, missedTaskId: job.id, failures: (s.failures || 0) + 1 });
+      notices.push({ routine: r, job, failures: s.failures, reason });
+    } else if (!stopped && !overdue) set('running');
+  }
+  return { changed, notices };
 }
 
 /** Guess whether a task text is outbound (needs the owner's OK) when Claude has not said. */

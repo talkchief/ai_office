@@ -38,11 +38,13 @@ export const involved = job => [...new Set((job.runs || []).filter(r => r.role =
 // Calls that change something outside the office through the Vault pause for the CEO, like every outbound action: a request to an
 // outside service, an upload, a data change on a database, a command on a server. Reads (api_get, db_query, db_schema) are free.
 export const VAULT_APPROVALS = { api_request: { allowedDecisions: ['approve', 'edit', 'reject'] }, api_upload: { allowedDecisions: ['approve', 'reject'] }, db_write: { allowedDecisions: ['approve', 'edit', 'reject'] }, ssh_run: { allowedDecisions: ['approve', 'edit', 'reject'] } };
-export const DEFAULT_SETTINGS = { maxConcurrentJobs: 2, runTimeoutMinutes: 20, escalateAfterHours: 1, outboundTools: [], readOnlyTools: [], fastLane: true };
+export const DEFAULT_SETTINGS = { maxConcurrentJobs: 4, runTimeoutMinutes: 20, escalateAfterHours: 1, outboundTools: [], readOnlyTools: [], fastLane: true };
 const clean = value => String(value ?? '').trim();
 const httpError = (message, status = 400) => Object.assign(new Error(message), { status });
 const bounded = (value, fallback, min, max) => { const n = Number(value); return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.round(n))) : fallback; };
 export const parallelRuns = team => bounded(team?.maxParallelRuns ?? team?.concurrency, 2, 1, 4);
+// How many model calls a person may be in at once, across tasks: four by default, set per person in Manage → Teams & people.
+export const personConcurrency = agent => bounded(agent?.concurrency, 4, 1, 8);
 export const reworkRounds = team => bounded(team?.maxReworkRounds ?? team?.maxRevisions, 3, 0, 5);
 const typeMatches = (value, type) => (Array.isArray(type) ? type : [type]).some(t => t === 'array' ? Array.isArray(value) : t === 'integer' ? Number.isInteger(value) : t === 'null' ? value === null : typeof value === (t === 'object' ? 'object' : t));
 
@@ -440,9 +442,10 @@ export class OfficeEngine {
   }
   /* ---------- the org chart for one task ---------- */
   gate(key, size) { let g = this.gates.get(key); if (!g) { g = new Gate(size); this.gates.set(key, g); } g.size = size; return g; }
-  // A team works on at most `maxParallelRuns` things at once per task; a person does one thing at a time across tasks.
+  // A team works on at most `maxParallelRuns` things at once per task; a person may be in as many model calls at once, across
+  // tasks, as their concurrency allows (four by default).
   pace(jobId, team, agentId, signal) {
-    const teamGate = this.gate(`${jobId}:${team.id}`, parallelRuns(team)), personGate = this.gate(`agent:${agentId}`, 1);
+    const teamGate = this.gate(`${jobId}:${team.id}`, parallelRuns(team)), personGate = this.gate(`agent:${agentId}`, personConcurrency(this.office.agents().find(a => a.id === agentId)));
     return createMiddleware({ name: `pace_${agentId.replace(/[^a-zA-Z0-9_]/g, '_')}`, wrapModelCall: async (request, handler) => {
       await teamGate.acquire(signal);
       try { await personGate.acquire(signal); try { return await handler(request); } finally { personGate.release(); } } finally { teamGate.release(); }

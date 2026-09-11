@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const SETTINGS_DEFAULTS = { maxConcurrentJobs: 2, runTimeoutMinutes: 20, escalateAfterHours: 1, outboundTools: [], readOnlyTools: [], digestTime: '08:00', knowledgeSeedNotes: 6, publicOrigin: '', officeName: '', fastLane: true };
+export const SETTINGS_DEFAULTS = { maxConcurrentJobs: 4, runTimeoutMinutes: 20, escalateAfterHours: 1, outboundTools: [], readOnlyTools: [], digestTime: '08:00', knowledgeSeedNotes: 6, publicOrigin: '', officeName: '', fastLane: true };
 const fail = message => { throw Object.assign(new Error(message), { status: 400 }); };
 const number = (value, fallback, min, max, label) => {
   if (value === undefined || value === null || value === '') return fallback;

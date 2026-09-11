@@ -24,7 +24,7 @@ Every change through the API is validated (a bad edit is refused with a sentence
 
 ## Changing teams and people
 
-For a running office, read `GET /api/office`, change what the owner asked for, and send the whole object back with `PUT /api/office`. A person has `id, department, name, role, does, brief, model, effort, tools, inheritTools, skills, rules`; a team has `id, name, lead, purpose, instructions, criteria, guardrails, checks, tools, skills, models {lead, specialist, review}, maxParallelRuns (1–4), maxReworkRounds (0–5), completionApproval, rules, tests`.
+For a running office, read `GET /api/office`, change what the owner asked for, and send the whole object back with `PUT /api/office`. A person has `id, department, name, role, does, brief, model, effort, concurrency (1–8, default 4: how many things they may do at once across tasks), tools, inheritTools, skills, rules`; a team has `id, name, lead, purpose, instructions, criteria, guardrails, checks, tools, skills, models {lead, specialist, review}, maxParallelRuns (1–4), maxReworkRounds (0–5), completionApproval, rules, tests`.
 
 - `does` is the person's job description, read before every assignment. `brief` is the owner's standing instructions to that person (up to 2,000 characters). Both are required: a person without them is refused with a sentence. Anything longer, or with steps and a template, is a skill.
 - A team's `purpose` and `instructions` are required too (its charter). The six default teams ship with charters in `office-charters.mjs` and every default seat ships with a brief in `office.agents.json`; an older office gets them filled once, only where a field was empty. When the CEO adds a team or a person, they write these; hiring from the Agency fills them from the persona.
@@ -75,6 +75,9 @@ A project (Settings → Projects, or `POST/PUT /api/projects`, stored in `data/p
 - `dept` is a team id; `agent` a person in that team (default: the lead). Say which one you chose.
 - `when`: `{"kind":"daily","at":"HH:MM"}` · `{"kind":"weekdays","at":"HH:MM"}` · `{"kind":"weekly","days":[1,4],"at":"HH:MM"}` (0 = Sunday) · `{"kind":"hourly","every":1,"from":"09:00","to":"17:00","weekdaysOnly":true}`. Local 24-hour time.
 - `needsOk` (default true): the owner approves before the result is closed. Actions that send, post, pay or change things outside the office always wait for the owner regardless.
+- `followUp` (default false): after two missed runs in a row the team gets a follow-up task to find out why and get the work done.
+
+The scheduler is the routines' steward (`steward` in routines.mjs, run every minute): each firing's outcome is tracked (`lastOutcome`: done, running, waiting, missed, cancelled; `failures` in a row), a run whose task blocked, escalated or is still not done by its deadline (the next due time or two hours, never under fifteen minutes) is marked missed with one inbox item ("Routine did not complete", "Routine missed twice") and an event on the task, Settings → Routines shows the outcome, and the daily digest carries a Routines section.
 
 The server re-reads the file every 20 seconds. Run state lives in `data/routines.json`, never in the Brain.
 

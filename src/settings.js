@@ -249,7 +249,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     t.tools = [...form.querySelectorAll('[data-teamtool]:checked')].map(el => el.dataset.teamtool);
     form.querySelectorAll('[data-agent-editor]').forEach(fieldset => {
       const a = draft.agents.find(x => x.id === fieldset.dataset.agentEditor);
-      for (const name of ['name', 'role', 'does', 'brief', 'model', 'effort']) a[name] = fieldset.querySelector(`[data-field="${name}"]`).value;
+      for (const name of ['name', 'role', 'does', 'brief', 'model', 'effort', 'concurrency']) a[name] = fieldset.querySelector(`[data-field="${name}"]`).value;
       a.skills = [...fieldset.querySelectorAll('[data-agentskill]:checked')].map(el => el.dataset.agentskill);
       a.inheritTools = fieldset.querySelector('[data-field="inheritTools"]').checked;
       a.tools = [...fieldset.querySelectorAll('[data-agenttool]:checked')].map(el => el.dataset.agenttool);
@@ -271,7 +271,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         <div class="mg-toolbar" style="margin:16px 0 6px"><span class="mg-eyebrow">The job</span><span class="mg-spacer"></span><button type="button" class="mg-assist" data-assist="person" data-agent="${a.id}">✦ Draft with AI</button></div>
         ${field('What they do', `<textarea data-field="does" required rows="3" placeholder="What this person does, and does not do.">${esc(a.does)}</textarea>`, 'Read before every assignment.')}
         ${field('Standing instructions', `<textarea data-field="brief" required rows="5" placeholder="How you want this person to work: sources, tone, boundaries, when to stop and ask.">${esc(a.brief)}</textarea>`, 'Up to 2,000 characters. Steps and templates belong in a skill.')}
-        <span class="mg-eyebrow" style="display:block;margin:16px 0 8px">Model</span><div class="mg-grid">${field('Model for this person', `<select data-field="model">${models(a.model, 'Use the team or role default')}</select>`)}${field('Effort', `<select data-field="effort">${['', 'low', 'medium', 'high', 'xhigh', 'max'].map(e => `<option value="${e}" ${e === (a.effort || '') ? 'selected' : ''}>${e || 'Role default'}</option>`).join('')}</select>`)}</div>
+        <span class="mg-eyebrow" style="display:block;margin:16px 0 8px">Model</span><div class="mg-grid">${field('Model for this person', `<select data-field="model">${models(a.model, 'Use the team or role default')}</select>`)}${field('Effort', `<select data-field="effort">${['', 'low', 'medium', 'high', 'xhigh', 'max'].map(e => `<option value="${e}" ${e === (a.effort || '') ? 'selected' : ''}>${e || 'Role default'}</option>`).join('')}</select>`)}${field('At once', `<input type="number" data-field="concurrency" min="1" max="8" step="1" value="${a.concurrency || 4}">`, 'How many things this person may work on at the same time, across tasks.')}</div>
         <span class="mg-eyebrow" style="display:block;margin:16px 0 8px">Skills</span><div class="mg-picks">${skillChoices(a.skills, 'agentskill') || '<span class="mg-muted">No skills in the library yet.</span>'}</div>
         <span class="mg-eyebrow" style="display:block;margin:16px 0 8px">Tools</span>${check(`<input type="checkbox" class="mg-switch" data-field="inheritTools" ${a.inheritTools !== false ? 'checked' : ''}>`, 'Use the team’s tools', 'Switch off to limit this person to the tools ticked below.')}<div class="mg-picks">${toolChoices(a.tools, 'agenttool') || '<span class="mg-muted">No connectors yet.</span>'}</div>
         <div class="mg-toolbar" style="margin:12px 0 0"><span class="mg-muted">Changes apply when the team is saved.</span><span class="mg-spacer"></span><button class="mg-btn mg-btn-sm mg-btn-danger" type="button" data-remove-agent="${a.id}">Remove person</button></div>
@@ -716,7 +716,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     const cells = []; // { day 0-6, at 'HH:MM', label, kind }
     for (const r of routines) {
       const w = r.when || {}; if (!w.kind) continue;
-      const kind = r.paused ? 'off' : r.lastLate ? 'warn' : r.lastAt && !r.lastTaskId ? 'fail' : 'ok';
+      const kind = r.paused ? 'off' : r.lastOutcome === 'missed' ? 'fail' : r.lastOutcome === 'waiting' || r.lastLate ? 'warn' : r.lastAt && !r.lastTaskId ? 'fail' : 'ok';
       const days = w.kind === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : w.kind === 'weekdays' || (w.kind === 'hourly' && w.weekdaysOnly) ? [1, 2, 3, 4, 5] : w.kind === 'weekly' ? (w.days || []) : [0, 1, 2, 3, 4, 5, 6];
       const at = w.kind === 'hourly' ? (w.from || '00:00') : (w.at || '09:00'), text = w.kind === 'hourly' ? `${at} every ${w.every || 1} h to ${w.to || '23:59'}` : `${at} ${r.title}`;
       for (const d of days) cells.push({ day: d, at, text, kind });
@@ -731,7 +731,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       const [data, office] = await Promise.all([api('/routines'), api('/office')]); config = office;
       const teamName = id => office.teams.find(t => t.id === id)?.name || DEPTS[id]?.name || id, personName = id => office.agents.find(a => a.id === id)?.name || id;
       const rs = data.routines, next = rs.filter(r => r.nextAt).sort((a, b) => a.nextAt - b.nextAt)[0];
-      const lastMark = r => !r.lastAt ? mark('off', 'Never ran') : r.lastLate ? mark('warn', 'Ran late') : mark('ok', 'Ran');
+      const lastMark = r => !r.lastAt ? mark('off', 'Never ran') : r.lastOutcome === 'missed' ? mark('fail', r.failures >= 2 ? `Missed ${r.failures} in a row` : 'Did not complete') : r.lastOutcome === 'waiting' ? mark('warn', 'Waits for your OK') : r.lastOutcome === 'cancelled' ? mark('off', 'Cancelled') : r.lastLate ? mark('warn', 'Ran late') : r.lastOutcome === 'done' ? mark('ok', 'Ran') : mark('busy', 'Running');
       setMeta(rs.length ? (rs.some(r => r.lastLate) ? mark('warn', 'One ran late') : mark('ok', `${rs.length} scheduled`)) : mark('off', 'None yet'), next ? `next run ${esc(when(next.nextAt))}` : ''); refreshMeta('routines', $('settingsMeta').firstElementChild?.outerHTML || '');
       content.innerHTML = `${data.problems?.length ? banner('fail', `<b>Some routines could not be read.</b><br>${data.problems.map(esc).join('<br>')}`) : ''}
         ${timetable(rs)}

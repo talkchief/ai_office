@@ -7,7 +7,7 @@ const day = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.
 const hours = ms => { const h = ms / 3600000; return h < 1 ? `${Math.round(h * 60)} minutes` : h < 48 ? `${Math.round(h)} hour${Math.round(h) === 1 ? '' : 's'}` : `${Math.round(h / 24)} days`; };
 
 // A plain summary of the office, built from records only (no model call, no cost).
-export function digest({ jobs, office, since, now = Date.now() }) {
+export function digest({ jobs, office, since, now = Date.now(), routines = [] }) {
   const tasks = jobs.filter(j => j.kind !== 'evaluation');
   const lines = [], counts = { done: 0, active: 0, needsYou: 0, overdue: 0 };
   for (const team of office.teams) {
@@ -18,13 +18,17 @@ export function digest({ jobs, office, since, now = Date.now() }) {
     if (!done.length && !active.length && !needs.length && !overdue.length) continue;
     lines.push(`## ${team.name}`, ...done.map(j => `- Done: ${j.title}`), ...active.map(j => `- In progress: ${j.title}${j.progressLine ? ' — ' + j.progressLine : ''}`), ...needs.map(j => `- Needs you: ${j.title}${j.error ? ' — ' + String(j.error).slice(0, 160) : ''}`), ...overdue.map(j => `- Overdue since ${day(j.dueAt)}: ${j.title}`), '');
   }
-  const headline = `${counts.done} done since yesterday · ${counts.active} in progress · ${counts.needsYou} need you${counts.overdue ? ` · ${counts.overdue} overdue` : ''}`;
+  // Routines: what ran since yesterday and how it went, and anything missed that is still unresolved.
+  const ran = routines.filter(r => !r.paused && ((r.lastAt || 0) >= since || r.lastOutcome === 'missed'));
+  counts.routinesMissed = ran.filter(r => r.lastOutcome === 'missed').length;
+  if (ran.length) lines.push('## Routines', ...ran.map(r => r.lastOutcome === 'missed' ? `- ✕ ${r.title}: did not complete${r.failures >= 2 ? ` (${r.failures} in a row)` : ''}` : r.lastOutcome === 'waiting' ? `- ○ ${r.title}: waits for your OK` : r.lastOutcome === 'done' ? `- ✓ ${r.title}: ran ${r.lastLate ? 'late' : 'on time'}` : `- · ${r.title}: ${r.lastOutcome === 'cancelled' ? 'cancelled' : 'still running'}`));
+  const headline = `${counts.done} done since yesterday · ${counts.active} in progress · ${counts.needsYou} need you${counts.overdue ? ` · ${counts.overdue} overdue` : ''}${counts.routinesMissed ? ` · ${counts.routinesMissed} routine${counts.routinesMissed === 1 ? '' : 's'} missed` : ''}`;
   return { date: day(now), headline, counts, markdown: `# Daily digest — ${day(now)}\n\n${headline}\n\n${lines.join('\n') || 'Nothing happened in the office.'}\n` };
 }
 
 export class Scheduler {
-  constructor({ engine, office, settings, now = () => Date.now(), onDigest = async () => {}, viewers = null, projectFor = () => null }) {
-    Object.assign(this, { engine, office, settings, now, onDigest, viewers, projectFor }); this.timer = null;
+  constructor({ engine, office, settings, now = () => Date.now(), onDigest = async () => {}, viewers = null, projectFor = () => null, routines = () => [] }) {
+    Object.assign(this, { engine, office, settings, now, onDigest, viewers, projectFor, routines }); this.timer = null;
     engine.db.exec('CREATE TABLE IF NOT EXISTS office_meta (key TEXT PRIMARY KEY, value TEXT)');
   }
   meta(key, value) {
@@ -51,7 +55,7 @@ export class Scheduler {
     const [hh, mm] = String(s.digestTime || '08:00').split(':').map(Number), now = new Date(t);
     if (this.meta('lastDigest') !== day(t) && (now.getHours() > hh || (now.getHours() === hh && now.getMinutes() >= mm))) {
       this.meta('lastDigest', day(t));
-      const report = digest({ jobs: engine.list(), office: this.office.get(), since: t - 86400000, now: t });
+      const report = digest({ jobs: engine.list(), office: this.office.get(), since: t - 86400000, now: t, routines: this.routines() });
       await this.onDigest(report);
       // Members who are not office admins: a digest of what they can see, kept to their own inbox (the shared note would show other people's titles).
       for (const v of (this.viewers?.() || []).filter(v => !ADMIN_ROLES.has(v.role))) {

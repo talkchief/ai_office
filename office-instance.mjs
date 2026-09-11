@@ -74,7 +74,7 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
 
   const audit = new AuditLog({ db: engine.db, bus });
   // The minute clock: overdue notices, reminders for anything waiting on the CEO, and the daily digest (built from records, no model cost).
-  const scheduler = new Scheduler({ engine, office, settings: () => settings.get(), viewers: tenant?.viewers || null, projectFor: id => projects.get(id), onDigest: async report => {
+  const scheduler = new Scheduler({ engine, office, settings: () => settings.get(), viewers: tenant?.viewers || null, projectFor: id => projects.get(id), routines: () => { try { return loadRoutines(); } catch { return []; } }, onDigest: async report => {
     const id = `Digests/${report.date}.md`;
     await knowledge.save({ id, content: report.markdown });
     engine.notifications.notify({ kind: 'digest', title: `Daily digest · ${report.date}`, body: report.headline, action: { type: 'note', id } });
@@ -96,6 +96,14 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
     if (!models.ready()) return;
     let list; try { list = loadRoutines(); } catch (e) { console.warn('routines:', e.message); return; }
     for (const { routine, due, late } of routines.due(list, RSTATE)) fire(routine, { due, late });
+    // The steward: what became of the last firing of each routine.
+    const { changed, notices } = routines.steward(list, RSTATE, engine.list(), Date.now());
+    if (changed) routines.saveState(DATA, RSTATE);
+    for (const n of notices) {
+      engine.event(n.job.id, 'routine_missed', null, `Routine “${n.routine.title}” did not complete: ${n.reason}.`);
+      engine.notifications.notify({ kind: 'routine_failed', title: `${n.failures >= 2 ? 'Routine missed twice' : 'Routine did not complete'}: ${n.routine.title}`, body: `${n.reason}. Open the task and fix what stopped it, or run the routine now under Settings → Routines.`, jobId: n.job.id, dept: n.routine.dept, dedupe: `routine-missed:${n.routine.id}:${n.job.id}`, action: { type: 'open' }, userId: n.routine.ownerId || tenant?.ownerId || null });
+      if (n.routine.followUp && n.failures >= 2) { try { engine.create({ dept: n.routine.dept, text: `Routine "${n.routine.title}" did not complete twice in a row (last time: ${n.reason}). Find out why, get the work done, and say what should change so it runs on schedule.`, title: `Follow up: ${n.routine.title}`.slice(0, 100), priority: 2, ownerId: n.routine.ownerId || tenant?.ownerId || null, origin: { channel: 'routine', routineId: n.routine.id, followUp: 'true' } }); } catch (error) { console.warn('routine follow-up:', error.message); } }
+    }
   }
   const edit = (id, patch) => { const r = rlist.routines.find(x => x.id === id); if (!r) throw httpError('No such routine.', 404); Object.assign(r, patch); routines.save(BRAIN, rlist.routines); return loadRoutines().find(x => x.id === id); };
   // A routine is changed by whoever made it or an office admin; a single office has one owner.
