@@ -1,190 +1,171 @@
-# Client Portal Project: Handover Checklist
+# Client Portal Project: Comprehensive Handover Checklist
 
-The purpose of this handover checklist is to govern the transition of the self-service client portal from Delivery build and QA into operational ownership across Delivery, Operations, Finance, and Marketing, targeting a structured progression from Kickoff (2026-09-14), Scope Sign-off (2026-09-30), Build Completion (2026-10-23), QA Pass (2026-10-28), 3-Client Beta Gate (2026-10-31), Launch Comms Sign-off (2026-11-20), Full Handover & Go-Live (2026-11-30), through post-launch Day-7 Check-in (2026-12-07). It establishes unambiguous verification criteria, assigned ownership, and strict governance to ensure that no client data leaves internal systems, brand standards are strictly enforced, and support volume targets (halving status/invoice queries and achieving 80% client login within 30 days) are met.
+This handover checklist governs the end-to-end operational transition of the self-service client portal from Delivery build and Quality Assurance into production ownership across Delivery, Operations, Finance, and Marketing. Adhering to the project lifecycle from Kickoff (2026-09-14) through Day-7 Check-in (2026-12-07), this checklist enforces measurable acceptance criteria across all system domains to guarantee that no client data leaves internal infrastructure, brand standards remain uncompromised, and post-launch targets—including an 80% client login rate within 30 days and a 50% reduction in status and invoice support inquiries—are achieved.
 
 ---
 
 ## 1. Master Milestone Timeline & Governance Framework
 
+The portal implementation follows the standard Delivery project plan framework (`/knowledge/70-Delivery/project-plan-template.md`). Team hours are logged weekly, and any scope modifications require an immediate same-day re-cut of the plan and formal reporting of schedule impact.
+
 | Milestone Stage | Target Date | Governing Lead | Gateway Description & Handover Dependencies |
 |---|---|---|---|
-| **Kickoff** | 2026-09-14 | Delivery Lead / Program Manager | Project kick-off, confirm workstream owners, select 3 beta client candidates, align handoff points. |
-| **Design Round 1** | 2026-09-23 | Technical Lead / Delivery | Initial screen mockups and interaction flows (status view, deliverable download, invoice view, login). |
-| **Scope & Design Sign-off** | 2026-09-30 | Program Manager / CEO | Approval of scope, build plan, client first actions, interim beta gate structure, and exclusions. |
-| **Build Completion** | 2026-10-23 | Technical Lead | Engineering freeze; all core modules, finals-only validation, and client theming built in staging. |
-| **QA Checklist Pass** | 2026-10-28 | QA Checker | 100% verification across links, numbers ledger alignment, spelling, brand styling, and core user flows. |
-| **Beta Gate (3 Clients)** | 2026-10-31 | Operations Lead | Conditional live beta release for 3 selected clients upon Operations interim data-protection clearance. |
-| **Launch Comms Sign-off** | 2026-11-20 | Marketing Lead / CEO | Formal approval of the Launch Announcement email and Onboarding Guide; prerequisite for outreach. |
-| **Full Handover & Go-Live** | 2026-11-30 | Operations Lead / Delivery Lead | Final data-protection review sign-off, support runbook handover, migration of all 14 active clients. |
-| **Day-7 Check-in** | 2026-12-07 | Delivery Lead / Operations Lead | Post-launch evaluation: login uptake (tracking to 80% / 12 clients), support ticket trends, beta bug log. |
+| **Kickoff** | 2026-09-14 | Delivery Lead / Program Manager | Project kick-off, confirmation of workstream owners, selection of 3 beta client candidates, and alignment of inter-team handoff interfaces. |
+| **Design Round 1** | 2026-09-23 | Technical Lead / Delivery | Delivery of initial interaction mockups and interface designs for status view, asset repository, invoice view, and client authentication. |
+| **Scope & Design Sign-off** | 2026-09-30 | Program Manager / CEO | Formal executive approval of the scope package, architecture boundaries, client first actions, interim beta gate structure, and explicit exclusions. |
+| **Build Completion** | 2026-10-23 | Technical Lead | Engineering freeze; completion of all core feature modules, automated finals-only validation, and per-client dynamic accent theming in staging. |
+| **QA Checklist Pass** | 2026-10-28 | QA Checker | 100% verification across links, numbers ledger alignment, spelling, brand styling, and client first-action user flows. Zero open Sev-1/Sev-2 defects. |
+| **Beta Gate (3 Clients)** | 2026-10-31 | Operations Lead | Conditional live beta deployment for 3 selected clients upon issuance of the Operations interim data-protection clearance. |
+| **Launch Comms Sign-off** | 2026-11-20 | Marketing Lead / CEO | Executive approval of the Launch Announcement email copy and the Client Onboarding Guide; hard prerequisite for external outreach. |
+| **Full Handover & Go-Live** | 2026-11-30 | Operations Lead / Delivery Lead | Final data-protection review sign-off, operations support runbook handover, and migration/activation of all 14 active clients. |
+| **Day-7 Check-in** | 2026-12-07 | Delivery Lead / Operations Lead | Post-launch evaluation: verification of client login uptake (tracking toward 80% / 12 clients), support ticket volume vs. baseline, and resolution of beta feedback. |
 
 ---
 
 ## 2. Comprehensive Handover Checklist by Domain
 
-### 2.1 Architecture & Infrastructure
+### Domain 1: Architecture, Infrastructure & Hosting
 
-| ID | Item / Work Package Name | Category | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
-|---|---|---|---|---|---|---|
-| **INF-01** | Production & Staging Hosting Environment | Architecture & Infrastructure | Technical Lead | Portal deployed exclusively on company-owned infrastructure per vendor list (`/knowledge/50-Emails/vendor-list.md`). No external serverless runtimes or unauthorized multi-cloud dependencies. | Infrastructure topology diagram, server configuration dump, DNS zone records. | Operations Lead |
-| **INF-02** | Custom Domain & TLS/SSL Hardening | Architecture & Infrastructure | Technical Lead | Portal served over HTTPS with TLS 1.3 enforced, HSTS header active (`max-age=31536000`), Qualys SSL Labs rating 'A' or higher, automated Let's Encrypt / CA certificate renewal verified. | SSL Labs audit report, curl header inspection log showing strict transport security. | Operations Lead |
-| **INF-03** | Database Isolation & Multi-Tenant Data Boundaries | Architecture & Infrastructure | Technical Lead | Strict logical database partitioning ensuring client records, invoices, files, and status data cannot cross-contaminate between client IDs. Query-level tenant filtering strictly enforced. | Automated penetration test log, multi-tenant SQL isolation audit report signed by engineering. | QA Checker & Operations Lead |
-| **INF-04** | Performance & Concurrency Load Profiling | Architecture & Infrastructure | Technical Lead | Core portal pages load in under 1.5 seconds on standard broadband/mobile for all 14 client profiles concurrently; 99th percentile response time < 500ms for status and invoice APIs. | Load testing benchmark report (k6 or Apache Bench summary log under simulated 50-user load). | Delivery Lead |
-| **INF-05** | Production Uptime Monitoring & Health Checks | Architecture & Infrastructure | Technical Lead | Automated uptime monitor pinging `/healthz` endpoint every 60 seconds. Synthetic checks alerting directly to `operations@` and emergency SMS with zero false positives. | Monitoring dashboard configuration export, synthetic failure test alert incident log. | Operations Lead |
-
----
-
-### 2.2 Authentication, Access Control & Tenant Security
-
-| ID | Item / Work Package Name | Category | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
-|---|---|---|---|---|---|---|
-| **AUT-01** | First-Time Login & Secure Password Setup | Authentication & Access | Technical Lead | Single-use cryptographically secure activation tokens (valid 24 hours). Mandatory password strength enforcement (minimum 12 chars, mixed case, numbers, symbols) with salt hashing (Argon2id or bcrypt). | Password policy test execution log, sample activation token lifecycle verification audit. | QA Checker |
-| **AUT-02** | Local Identity & Session Management | Authentication & Access | Technical Lead | Identity managed locally within internal systems; zero third-party auth services (no Auth0, Okta, Firebase). Session cookies configured with `Secure`, `HttpOnly`, `SameSite=Strict`, 8-hour expiry. | Cookie security header dump, architectural authentication trace proving local internal storage. | Operations Lead |
-| **AUT-03** | Role-Based Access Control (RBAC) Enforcement | Authentication & Access | Technical Lead | Distinct roles enforced: `Client Admin`, `Client Viewer`, `Studio Admin`, `Studio Operator`. Clients restricted strictly to their own tenant record; Studio Admins restricted per role definitions. | Access control matrix verification log, negative privilege escalation test results. | QA Checker |
-| **AUT-04** | Consent Capture on Initial Onboarding Form | Authentication & Access | Technical Lead | Registration/activation form contains explicit consent wording compliant with company standard (`/knowledge/90-Operations/compliance-checklist.md`). Timestamped consent record stored in database. | Database schema record showing consent timestamp/IP, UI screenshot of active consent checkbox. | Operations Lead |
+| Item ID & Work Package | Category / Domain | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
+|---|---|---|---|---|---|
+| **INF-01: Production & Staging Infrastructure** | Architecture & Hosting | Technical Lead | Portal deployed strictly on company-owned infrastructure per the vendor list (`/knowledge/50-Emails/vendor-list.md`). No unauthorized public cloud runtimes, external serverless functions, or unapproved third-party dependencies exist. | System architecture topology diagram, server configuration manifests, and DNS zone verification logs. | Operations Lead |
+| **INF-02: Domain & TLS/SSL Hardening** | Architecture & Hosting | Technical Lead | Portal served over HTTPS with TLS 1.3 enforced. HSTS header active with `max-age=31536000; includeSubDomains`. Qualys SSL Labs rating 'A' or higher achieved. Automated certificate renewal configured and tested. | Qualys SSL Labs audit report and cURL header inspection dump showing strict transport security headers. | Operations Lead |
+| **INF-03: Multi-Tenant Database Isolation** | Architecture & Hosting | Technical Lead | Strict logical database partitioning implemented. SQL queries enforce tenant filtering (`client_id`) at the data access layer. Cross-tenant data leakage is cryptographically and architecturally prevented. | Automated security penetration testing report and multi-tenant SQL isolation audit signed by engineering. | QA Checker & Operations Lead |
+| **INF-04: Concurrency & Performance Profiling** | Architecture & Hosting | Technical Lead | Portal pages achieve full interactive render in under 1.5 seconds on standard broadband and mobile viewports across all 14 client profiles concurrently. Status and invoice API p99 latency remains under 500ms. | Load-testing benchmark report (k6 / Apache Bench execution log under simulated 50 concurrent client sessions). | Delivery Lead |
+| **INF-05: Infrastructure Health & Uptime Monitoring** | Architecture & Hosting | Technical Lead | Automated synthetic monitoring configured to poll the `/healthz` endpoint every 60 seconds. Critical failure alerts route directly to `operations@` and emergency SMS with zero false positives. | Monitoring dashboard configuration export and synthetic failure drill incident log demonstrating active paging. | Operations Lead |
 
 ---
 
-### 2.3 Client UI & Core Feature Modules
+### Domain 2: Authentication, Access Control & Tenant Security
+
+| Item ID & Work Package | Category / Domain | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
+|---|---|---|---|---|---|
+| **AUT-01: First-Time Login & Password Configuration** | Authentication & Security | Technical Lead | Activation invites generate single-use, cryptographically secure tokens valid for 24 hours. Password policy enforces a minimum of 12 characters with mixed case, numbers, and symbols, hashed via Argon2id or bcrypt. | Password complexity unit test execution logs and token lifecycle expiration audit trail. | QA Checker |
+| **AUT-02: Local Identity & Session Management** | Authentication & Security | Technical Lead | Identity management handled strictly within local internal systems without external identity providers (no Auth0, Okta, or Firebase). Session cookies configured with `Secure`, `HttpOnly`, `SameSite=Strict`, and an 8-hour idle timeout. | Cookie header inspection report and network trace proving zero authentication calls to outside servers. | Operations Lead |
+| **AUT-03: Role-Based Access Control (RBAC)** | Authentication & Security | Technical Lead | Distinct roles enforced: `Client Admin`, `Client Viewer`, `Studio Admin`, and `Studio Operator`. Client roles strictly limited to their own organization's records; Studio roles bounded by administrative policy. | Privilege escalation test suite logs and RBAC permission assignment audit sheet. | QA Checker |
+| **AUT-04: Onboarding Form Consent Capture** | Authentication & Security | Technical Lead | First-time onboarding registration form captures explicit consent in full alignment with the company compliance checklist (`/knowledge/90-Operations/compliance-checklist.md`). Consent timestamp and IP address recorded immutably. | Database schema record showing consent logging fields and UI screenshot of active consent checkbox. | Operations Lead |
+
+---
+
+### Domain 3: Client UI & Core Feature Modules
 
 #### Module A: Project Status View
-| ID | Item / Work Package Name | Category | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
-|---|---|---|---|---|---|---|
-| **MOD-01** | Live Milestone & Progress Dashboard | Client UI & Features | Delivery Lead | Displays live milestone schedule, current active stage, completed sign-offs, and upcoming actions matching the Delivery template (`/knowledge/70-Delivery/project-plan-template.md`). | UI screenshot comparison against active project milestone plan; functional review log. | Operations Lead |
-| **MOD-02** | Client Next Action & Blocker Notification | Client UI & Features | Delivery Lead | Clear display of "What you need to decide" or "Client next action" cards, eliminating ambiguity and directly replacing recurring weekly status email threads. | Live UI walkthrough, client view validation for all 3 beta test client configurations. | Delivery Lead |
+| Item ID & Work Package | Category / Domain | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
+|---|---|---|---|---|---|
+| **MOD-01: Live Milestone & Stage Tracker** | Client UI & Features | Delivery Lead | Live dashboard displays real-time milestone schedules, active project stages, completed deliverables, and target completion dates matching the delivery plan template (`/knowledge/70-Delivery/project-plan-template.md`). | Functional UI inspection across all active client accounts cross-referenced with active delivery milestone plans. | Operations Lead |
+| **MOD-02: Action Item & Decision Notifications** | Client UI & Features | Delivery Lead | Dedicated "Client Next Action" and "Decisions Required" interface panels present outstanding approvals, directly replacing recurring status email threads. | Live UI walkthrough and acceptance confirmation across the 3 beta client profiles. | Delivery Lead |
 
 #### Module B: Deliverable & Asset Hub
-| ID | Item / Work Package Name | Category | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
-|---|---|---|---|---|---|---|
-| **MOD-03** | Deliverable Download & Finals-Only Check | Client UI & Features | Technical Lead / QA Checker | Clients can view and download final files. Strict automated server validation: files marked as draft, WIP, or unapproved cannot be uploaded or downloaded (`/knowledge/70-Delivery/asset-conventions.md`). | Automated negative test attempt uploading draft file; verified file download audit log. | QA Checker |
-| **MOD-04** | Asset Naming Convention Enforcement | Client UI & Features | Delivery Lead | Every deliverable file complies with the directory and naming structure: `client / project / type / version`. Logos strictly available in all 4 mandatory formats: SVG, PNG, PDF, and favicon. | Asset directory audit report across all client folders; file type validation check. | Delivery Lead |
-| **MOD-05** | Local Asset Serving Architecture | Client UI & Features | Technical Lead | Assets served directly from company hosting storage endpoints; zero third-party storage links (e.g., Dropbox, Box, Google Drive, AWS public S3 buckets) exposed to clients. | Network inspector HAR log confirming local origin domain on all download links. | Operations Lead |
+| Item ID & Work Package | Category / Domain | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
+|---|---|---|---|---|---|
+| **MOD-03: Finals-Only Asset Repository & Validation** | Client UI & Features | Technical Lead / QA Checker | Clients can view and download approved final assets. Server-side validation strictly blocks any file flagged as draft, WIP, or unapproved from being uploaded or displayed (`/knowledge/70-Delivery/asset-conventions.md`). | Automated negative upload test rejecting draft assets and verified download logs for final files. | QA Checker |
+| **MOD-04: Asset Naming & Format Standard Compliance** | Client UI & Features | Delivery Lead | All uploaded client files strictly follow directory and naming conventions: `client / project / type / version`. Logos are systematically provided in all 4 mandatory file formats: SVG, PNG, PDF, and favicon. | Asset repository audit report confirming 100% path convention adherence across all active client repositories. | Delivery Lead |
+| **MOD-05: Local File Delivery Architecture** | Client UI & Features | Technical Lead | Deliverable files are served directly from internal company hosting storage. Zero external file storage links (e.g. Dropbox, Google Drive, Box, AWS public buckets) are exposed to clients. | Network inspector HAR log demonstrating local origin domain URLs for 100% of asset downloads. | Operations Lead |
 
 #### Module C: Invoice View & Payment Module
-| ID | Item / Work Package Name | Category | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
-|---|---|---|---|---|---|---|
-| **MOD-06** | Invoicing Schedule & Status Alignment | Client UI & Features | Finance Lead | Invoices displayed matching ledger rules: retainers on the 1st of month; project builds 50% upfront, 50% at handover (`/knowledge/80-Finance/invoicing-rules.md`). Status flags: Paid, Due, Overdue. | Cross-check reconciliation sheet between Finance invoicing ledger and portal invoice table. | Finance Lead |
-| **MOD-07** | Automated Reminder Cadence Display | Client UI & Features | Finance Lead | Display reflects the standard Day 7, Day 14, and Day 21 invoice reminder lifecycle. Credit notes, adjustments, and owner approvals display accurately per Finance rules. | Portal view test on simulated overdue invoice matching notification timestamps. | Finance Lead |
-| **MOD-08** | In-Portal Payment Gateway / Bank Rail Handling | Client UI & Features | Technical Lead / Finance Lead | Scope-governed implementation: If payment provider approved by CEO, secure embedded checkout compliant with data boundaries; if deferred, clear manual transfer instructions (BACS/ACH rails). | Code inspection of payment modal OR verified static wire transfer instruction panel. | Finance Lead & Operations Lead |
+| Item ID & Work Package | Category / Domain | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
+|---|---|---|---|---|---|
+| **MOD-06: Invoicing Schedule & Ledger Synchronization** | Client UI & Features | Finance Lead | Invoices display accurate billing schedules per finance rules (`/knowledge/80-Finance/invoicing-rules.md`): retainers on the 1st of the month; project builds 50% upfront, 50% at handover. Status tags: Paid, Due, Overdue. | Reconciliation audit sheet matching portal invoice lists against the internal accounting ledger. | Finance Lead |
+| **MOD-07: Payment Reminder Lifecycle Display** | Client UI & Features | Finance Lead | Overdue notices and invoice schedules adhere to the standard Day 7, Day 14, and Day 21 reminder lifecycle. Credit notes display only after explicit owner approval per invoicing rules. | Functional test of simulated aging invoices demonstrating correct lifecycle display flags and credit note logs. | Finance Lead |
+| **MOD-08: In-Portal Payment Handling / Bank Instructions** | Client UI & Features | Technical Lead / Finance Lead | Scope-governed implementation: If an inbound gateway is approved by the CEO, embedded checkout functions without data leakage; if deferred, clear BACS/wire transfer rail instructions and remittance details are displayed. | Code audit of payment modal OR screenshot inspection of bank transfer details panel. | Finance Lead & Operations Lead |
 
 #### Module D: Client Onboarding Flow
-| ID | Item / Work Package Name | Category | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
-|---|---|---|---|---|---|---|
-| **MOD-09** | Guided First-Session Interactive Flow | Client UI & Features | Technical Lead / Marketing Lead | Guided 3-step walkthrough on initial login: (1) Confirm account & set password, (2) Navigate project status view, (3) Inspect invoice & download sample final asset. Completed in < 10 mins. | Video screen-recording of complete first-time user journey from invitation email to completion. | Delivery Lead |
+| Item ID & Work Package | Category / Domain | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
+|---|---|---|---|---|---|
+| **MOD-09: Guided Interactive First Session** | Client UI & Features | Technical Lead / Marketing Lead | Guided 3-step walkthrough on initial login: (1) Confirm account and establish secure password, (2) Review project status view, (3) Inspect invoice and download sample final asset. Flow completes in under 10 minutes. | Video recording of complete first-time user journey from invitation email click through completion of all 3 actions. | Delivery Lead |
 
 ---
 
-### 2.4 Admin Dashboard & Operations Controls
+### Domain 4: Admin Dashboard & Operations Controls
 
-| ID | Item / Work Package Name | Category | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
-|---|---|---|---|---|---|---|
-| **ADM-01** | Client Account Provisioning & Deprovisioning | Admin & Operations | Technical Lead | Admin UI allows Operations staff to provision new client tenants, assign client accent colors, invite client users, and instantly suspend/deprovision accounts upon project completion or contract termination. | Operational test execution log provisioning a test client account and verifying revocation. | Operations Lead |
-| **ADM-02** | Deliverable Upload & Release Approval Pipeline | Admin & Operations | Delivery Lead | Upload interface with mandatory metadata inputs (`client`, `project`, `type`, `version`), required "Mark as Final" approval checkbox, and draft file rejection. | Screenshots of upload UI, release approval log signed by Delivery Lead. | Operations Lead |
-| **ADM-03** | Immutable Security & System Audit Logging | Admin & Operations | Technical Lead | Tamper-proof logging of all administrative actions, logins, asset downloads, password resets, and permission changes. Logs retained locally for 3 years per retention policy. | Log export sample demonstrating RFC 5424 compliance and local retention storage proof. | Operations Lead |
-
----
-
-### 2.5 Data Protection, Security & Compliance
-
-| ID | Item / Work Package Name | Category | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
-|---|---|---|---|---|---|---|
-| **SEC-01** | "No Client Data Leaves Our Systems" Enforcement | Data Protection & Compliance | Operations Lead | Comprehensive data-flow mapping proving client credentials, project status, deliverable files, invoice records, and theming settings are stored and processed strictly within internal company systems. | Data Flow Architecture Diagram & signed Operations Compliance Review statement. | Operations Lead & CEO |
-| **SEC-02** | 3-Year-Then-Delete Data Retention Automation | Data Protection & Compliance | Operations Lead / Technical Lead | Automated cron routine flagging and purging client records, logs, and deliverable archives precisely 36 months after contract close, logged in compliance register (`/knowledge/90-Operations/compliance-checklist.md`). | Script execution log, scheduled job configuration, database purge unit test record. | Operations Lead |
-| **SEC-03** | Master Agreement & Terms Coverage Verification | Data Protection & Compliance | Operations Lead | 100% of onboarded active clients (all 14 active clients as of 1 Sep 2026) have an executed Master Agreement on file covering portal access, liability caps, and confidentiality (`/knowledge/90-Operations/legal-basics.md`). | Executed contract audit register cross-referenced with active client ledger. | Operations Lead |
-| **SEC-04** | Backup Integrity & Disaster Recovery Run-Through | Data Protection & Compliance | Technical Lead | Daily automated encrypted database and asset backups stored in isolated local repository. Successful test recovery executed from backup archive to staging environment in < 30 minutes. | Backup recovery test log with timestamped restoration proof and database checksum match. | Operations Lead |
+| Item ID & Work Package | Category / Domain | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
+|---|---|---|---|---|---|
+| **ADM-01: Tenant Lifecycle Management** | Admin & Operations | Technical Lead | Internal management interface allows Operations staff to provision new client tenants, configure client accent colors, issue user invitations, and instantly suspend/deprovision accounts upon project completion or contract termination. | Operational test execution log showing successful client provisioning, access modification, and instant deprovisioning. | Operations Lead |
+| **ADM-02: Asset Staging & Release Workflow** | Admin & Operations | Delivery Lead | Administrative publishing interface enforces mandatory metadata (`client`, `project`, `type`, `version`), requires explicit "Mark as Final" approval checkbox, and rejects non-compliant file names. | Interface screengrabs and signed release approval audit records for initial staging deliverables. | Operations Lead |
+| **ADM-03: Security & Activity Audit Logging** | Admin & Operations | Technical Lead | Immutable system logging captures all administrative operations, user logins, asset downloads, password changes, and permission edits. Logs are stored locally and retained for 3 years (`/knowledge/90-Operations/compliance-checklist.md`). | Sample RFC 5424 structured log export and proof of write-protected local archive storage. | Operations Lead |
 
 ---
 
-### 2.6 QA & Operational Readiness
+### Domain 5: Data Protection, Privacy & Legal Compliance
 
-| ID | Item / Work Package Name | Category | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
-|---|---|---|---|---|---|---|
-| **QAR-01** | Full Link Integrity & Navigation Sweep | QA & Operational Readiness | QA Checker | Zero 404s, broken anchors, dead redirects, or external tracking beacon requests across all portal views, navigation menus, and downloadable asset links (`/knowledge/70-Delivery/qa-checklist.md`). | Automated crawler report (e.g. Broken Link Checker report) with 0 errors detected. | Delivery Lead |
-| **QAR-02** | Numbers Ledger Verification & Financial Consistency | QA & Operational Readiness | QA Checker / Finance Lead | Every financial and client metric displayed in the portal reconciles exactly with `/knowledge/00-Meta/numbers-ledger.md` (e.g., $38,400 MRR, active client counts, retainer and project milestones). | Reconciliation audit sign-off sheet comparing portal display figures against ledger. | Finance Lead |
-| **QAR-03** | Content, Typography & Copy Quality Pass | QA & Operational Readiness | QA Checker | Zero spelling, punctuation, or grammatical errors across all UI copy, error alerts, automated email templates, tooltips, and onboarding modals. | Completed QA content checklist signed by QA Checker. | Delivery Lead |
-| **QAR-04** | Brand Visual Identity & Dynamic Accent Styling | QA & Operational Readiness | QA Checker | Strict compliance with Brand visual identity (`/knowledge/20-Brand/visual-identity.md`): base theme "Ink on Cream", typography strictly adhered to, exactly one custom accent color correctly applied per client tenant. | Visual QA inspection report across 5 distinct client tenant views with CSS color validation. | Delivery Lead |
-| **QAR-05** | Three First Actions End-to-End User Flow Pass | QA & Operational Readiness | QA Checker | Flawless completion of the 3 fundamental actions: (1) Account activation & password setup, (2) Project status check, (3) Invoice inspection/payment, tested across desktop and mobile viewports. | End-to-end QA test execution matrix showing passes across Safari, Chrome, Firefox, iOS, Android. | Delivery Lead |
-
----
-
-### 2.7 Documentation & Operational Runbooks
-
-| ID | Item / Work Package Name | Category | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
-|---|---|---|---|---|---|---|
-| **DOC-01** | Operations Support Runbook | Runbooks & Ops Procedures | Operations Lead | Detailed SOP addressing common client inquiries: password resets, asset download failures, invoice disputes, milestone updates, and access revocation. Step-by-step resolution paths documented. | Approved Operations Runbook document in `/work/operations-support-runbook.md`. | Operations Lead |
-| **DOC-02** | Support Email Baseline & Triage SLA Setup | Runbooks & Ops Procedures | Operations Lead | Pre-launch support inquiry volume benchmark established from email inbox. Shared support queue configured with 1-hour first-response SLA for active portal clients ("clients first, within the hour"). | Baseline volume report, helpdesk/inbox routing configuration export, SLA rule confirmation. | Operations Lead |
-| **DOC-03** | Technical Maintenance & Incident Escalation Runbook | Runbooks & Ops Procedures | Technical Lead | Technical recovery playbook documenting server restart procedures, database maintenance, deployment rollback steps, and emergency developer escalation contact chain. | Maintenance SOP filed in operational repo, reviewed and signed off by Technical Lead. | Operations Lead |
+| Item ID & Work Package | Category / Domain | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
+|---|---|---|---|---|---|
+| **SEC-01: Data Boundary Enforcement** | Data Protection & Compliance | Operations Lead | Formal data-flow audit proving client credentials, project status, deliverables, invoices, and theming settings are stored and processed strictly within internal systems, satisfying the charter rule "No client data leaves our systems". | Data Flow Architecture Diagram and signed Operations Compliance Review statement. | Operations Lead & CEO |
+| **SEC-02: Automated 3-Year Retention & Purge Routine** | Data Protection & Compliance | Operations Lead / Technical Lead | Automated cron routine configured to flag and purge client records, system logs, and deliverable files exactly 36 months after contract termination, with audit entries written to the compliance register (`/knowledge/90-Operations/compliance-checklist.md`). | Cron job configuration file, scheduled script dry-run log, and database automated deletion unit test results. | Operations Lead |
+| **SEC-03: Master Agreement Coverage Verification** | Data Protection & Compliance | Operations Lead | 100% of onboarded active clients (all 14 active clients as of 1 Sep 2026 per `/knowledge/00-Meta/numbers-ledger.md`) have an executed Master Agreement on file covering portal access terms, liability caps, and confidentiality (`/knowledge/90-Operations/legal-basics.md`). | Master Agreement audit registry cross-referenced against the active client roster. | Operations Lead |
+| **SEC-04: Backup Integrity & Disaster Recovery Drill** | Data Protection & Compliance | Technical Lead | Automated daily encrypted database and asset backups stored in an isolated local backup repository. Successful disaster recovery restoration executed from backup to staging environment in under 30 minutes. | Restoration execution log with timestamped staging verification and cryptographic database checksum match. | Operations Lead |
 
 ---
 
-### 2.8 Client Communications, Onboarding & Training
+### Domain 6: Quality Assurance & Operational Readiness
 
-| ID | Item / Work Package Name | Category | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
-|---|---|---|---|---|---|---|
-| **COM-01** | Marketing Launch Announcement Email Draft | Client Comms & Onboarding | Marketing Lead | Launch email drafted per approved tone (`/knowledge/Agents Office/task-de60d80d-8b69-46cf-b374-3f930e376b34.md`), emphasizing finals-only files, internal data security, and instant access. | Final copy document with subject line variants, approved by Marketing Lead. | CEO |
-| **COM-02** | Client Onboarding Guide Document | Client Comms & Onboarding | Marketing Lead | Production of "Your client portal: up and running in ten minutes", containing plain-language instructions, single-screen screenshots for the 3 first actions, and support contacts. | Final formatted PDF guide attached to launch pack. | CEO |
-| **COM-03** | Internal Staff Training on Portal Administration | Client Comms & Onboarding | Delivery Lead | 45-minute recorded training session conducted for Delivery and Operations staff covering client provisioning, deliverable publishing, and ticket escalation. | Training attendance sheet, slide deck, and video recording link archived. | Operations Lead |
-
----
-
-### 2.9 Final Handover Sign-Offs & Governance
-
-| ID | Item / Work Package Name | Category | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
-|---|---|---|---|---|---|---|
-| **GOV-01** | Interim Beta Gate Sign-off (3 Clients) | Governance & Sign-off | Operations Lead | Conditional gate approval for releasing the portal to 3 selected beta clients on 2026-10-31 upon verification of local hosting, finals-only rules, and absence of external data leaks. | Formally executed Beta Gate Approval Certificate signed by Operations Lead. | Program Manager |
-| **GOV-02** | CEO Launch Communications Sign-off | Governance & Sign-off | CEO | Formal written approval from the CEO authorising the release of the Launch Announcement email and Onboarding Guide to all 14 active clients. | Signed CEO decision memo or approved task card sign-off. | Marketing Lead |
-| **GOV-03** | Delivery-to-Operations Formal Handover Sign-off | Governance & Sign-off | Delivery Lead & Operations Lead | Joint sign-off confirming full transfer of system maintenance, support triage, and client administrative rights from the project build team to standing Operations. | Fully executed Handover Sign-Off Certificate signed by Delivery Lead and Operations Lead. | Program Manager |
-| **GOV-04** | Day-7 Post-Launch Review & Adoption Check-in | Governance & Sign-off | Delivery Lead & Operations Lead | Post-launch assessment conducted on 2026-12-07 evaluating: client login uptake (targeting 80% / at least 12 of 14 active clients), support ticket metrics, and system defect logs. | Day-7 Post-Launch Evaluation Report published to `/work/`. | Program Manager & CEO |
+| Item ID & Work Package | Category / Domain | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
+|---|---|---|---|---|---|
+| **QAR-01: Link Integrity & External Tracker Audit** | QA & Readiness | QA Checker | 100% of internal links, anchors, and download buttons functional with zero 404 errors. Absolute absence of external tracking beacons, third-party analytics pixels, or unauthorized remote scripts. | Automated crawler report (0 broken links) and browser network inspection trace verifying zero external requests. | Delivery Lead |
+| **QAR-02: Numbers Ledger Metric Alignment** | QA & Readiness | QA Checker / Finance Lead | All displayed financial and operational numbers reconcile perfectly with `/knowledge/00-Meta/numbers-ledger.md` (e.g., active client counts, retainer fees, project build 50/50 splits, and invoice amounts). | Metric reconciliation sign-off sheet comparing portal production data against the numbers ledger. | Finance Lead |
+| **QAR-03: Copy, Spelling & Grammar Inspection** | QA & Readiness | QA Checker | Zero spelling, punctuation, or grammatical errors across all UI copy, error alerts, notification emails, and guided onboarding modals. | Comprehensive QA copy sign-off checklist signed by QA Checker. | Delivery Lead |
+| **QAR-04: Visual Identity & Client Accent Styling** | QA & Readiness | QA Checker | Full adherence to brand standards (`/knowledge/20-Brand/visual-identity.md`): base styling strictly "Ink on Cream", approved typography, and exactly one designated accent color correctly applied per client tenant view. | Visual inspection audit across 5 distinct client tenant views with CSS color variable validation. | Delivery Lead |
+| **QAR-05: Three First Actions Validation Suite** | QA & Readiness | QA Checker | Seamless end-to-end execution of the 3 mandatory client actions: (1) Set password, (2) View project status, (3) Inspect invoice / download asset, tested across Safari, Chrome, Firefox, iOS, and Android. | Cross-browser and device test execution matrix with 100% pass rate. | Delivery Lead |
+| **QAR-06: Operations Support Runbook Handover** | QA & Readiness | Operations Lead | Comprehensive Standard Operating Procedure (SOP) addressing common client inquiries: credential resets, asset download troubleshooting, invoice questions, and access revocation. | Finalized Operations Support Runbook published to `/work/operations-support-runbook.md`. | Operations Lead |
+| **QAR-07: Support Triage SLA & Baseline Measurement** | QA & Readiness | Operations Lead | Pre-launch support inquiry baseline measured from existing inbox. Shared queue configured with a 1-hour first-response SLA for active portal clients ("clients first, within the hour"). | Pre-launch baseline volume report and helpdesk queue SLA routing configuration sheet. | Operations Lead |
+| **QAR-08: Technical Maintenance & Recovery SOP** | QA & Readiness | Technical Lead | Technical maintenance runbook detailing application restart procedures, database re-indexing, deployment rollback steps, and emergency developer escalation contact hierarchy. | Technical Maintenance Playbook archived in operational repository and signed off by Technical Lead. | Operations Lead |
+| **QAR-09: Internal Operational Staff Training** | QA & Readiness | Delivery Lead | 45-minute training session delivered to Delivery and Operations personnel covering tenant provisioning, asset release verification, and ticket escalation workflows. | Training attendance log, presentation materials, and session recording archive link. | Operations Lead |
 
 ---
 
-## 3. Operational Acceptance & Sign-off Matrix
+### Domain 7: Client Onboarding, Marketing & Post-Launch Support
 
-| Phase Gate | Mandatory Prerequisites | Handover Artifact / Proof Required | Approver / Authority | Gate Status |
+| Item ID & Work Package | Category / Domain | Specific Owner | What "Done" Looks Like (Measurable Criteria) | Verification / Evidence Required | Handover Recipient / Sign-off Authority |
+|---|---|---|---|---|---|
+| **COM-01: Launch Announcement Email Finalization** | Onboarding & Marketing | Marketing Lead | Launch announcement email drafted in accordance with approved voice and tone guidelines, emphasizing finals-only asset delivery, strict data protection, and self-service speed. | Final copy document with subject line variants approved by Marketing Lead. | CEO |
+| **COM-02: Client Onboarding Guide Documentation** | Onboarding & Marketing | Marketing Lead | Production of the guide: "Your client portal: up and running in ten minutes", featuring concise instructions, single-screen walkthroughs for the 3 first actions, and support contacts. | Final formatted PDF guide packaged for distribution. | CEO |
+| **COM-03: Beta Client Recruitment & Feedback Loop** | Onboarding & Marketing | Delivery Lead / Operations Lead | Three active clients onboarded into live beta on 2026-10-31 (representing 1 retainer client, 1 project client, and 1 asset-intensive client). Structured feedback collected weekly. | Beta client onboarding confirmation memo and consolidated beta feedback log. | Delivery Lead |
+| **COM-04: Client Login Adoption Tracking (80% Target)** | Onboarding & Marketing | Delivery Lead / Operations Lead | Telemetry dashboard tracking individual client activations toward the milestone goal of 80% of active clients (at least 12 of 14 active clients) logged in within 30 days of launch. | Weekly adoption report detailing login timestamps and outreach log for pending clients. | Program Manager |
+| **COM-05: Support Inquiry Reduction Evaluation** | Onboarding & Marketing | Operations Lead | Support inbox ticket tracking evaluating status and invoice inquiry volume against pre-launch baseline, measuring progress toward the 50% inquiry reduction target. | Monthly support volume comparative analytics report. | Delivery Lead & Operations Lead |
+
+---
+
+## 3. Operational Sign-off & Handover Approvals Matrix
+
+Formal progression through project gates requires written authorization from designated department leads. No milestone gate may be bypassed without explicit executive approval.
+
+| Phase Gate / Decision Milestone | Mandatory Exit Criteria | Handover Artifact / Proof Required | Approving Authority | Approval Status |
 |---|---|---|---|---|
-| **Milestone 1: Scope Sign-Off (2026-09-30)** | Complete scope agreement, exclusions affirmed, client first actions confirmed, milestone timeline approved. | Scope & Design Sign-off Package (`/work/client-portal-launch/scope-and-design-signoff-package.pdf`). | Program Manager & CEO | Pending Sign-Off |
-| **Milestone 2: QA Pass (2026-10-28)** | 100% test pass on links, numbers ledger trace, brand styling, finals-only checks, and 3 first actions. | QA Verification Test Matrix signed by QA Checker. | QA Checker & Delivery Lead | Queued for Build Freeze |
-| **Milestone 3: Beta Gate (2026-10-31)** | Interim Operations clearance, 3 beta clients picked, consent wording live, in-portal payment isolated. | Executed Interim Beta Clearance Certificate. | Operations Lead | Conditional Approval |
-| **Milestone 4: Launch Comms (2026-11-20)** | Launch announcement copy polished, onboarding guide completed, CEO quote confirmed. | Approved Marketing Launch Pack & PDF Onboarding Guide. | CEO & Marketing Lead | Scheduled |
-| **Milestone 5: Full Handover (2026-11-30)** | Full data protection sign-off, support runbook in place, staff training completed, 14 active clients provisioned. | Delivery-to-Operations Formal Handover Certificate. | Operations Lead & Delivery Lead | Scheduled |
-| **Milestone 6: Day-7 Review (2026-12-07)** | 7 days live operational data, login adoption tracking, support email ticket metrics vs baseline. | Day-7 Post-Launch Assessment Report. | Program Manager & Operations Lead | Scheduled |
+| **Gate 1: Scope & Design Sign-off (2026-09-30)** | Complete functional scope agreement, out-of-scope exclusions affirmed, 3 first actions confirmed, and milestone build schedule approved. | Scope & Design Sign-off Package (`/work/client-portal-launch/scope-and-design-signoff-package.pdf`). | Program Manager & CEO | Pending Sign-Off |
+| **Gate 2: QA Checklist Pass (2026-10-28)** | 100% test pass on links, numbers ledger alignment, typography, brand styling, finals-only asset checks, and 3 first actions. | QA Verification Test Matrix signed by QA Checker. | QA Checker & Delivery Lead | Queued for Build Freeze |
+| **Gate 3: Beta Release Gate (2026-10-31)** | Interim Operations clearance issued, 3 beta clients confirmed, consent wording live in registration form, payment flows isolated. | Executed Interim Beta Clearance Certificate. | Operations Lead | Conditional Approval |
+| **Gate 4: Launch Comms Sign-off (2026-11-20)** | Launch announcement copy polished, onboarding guide completed, CEO quote confirmed, and delivery schedule approved. | Approved Marketing Launch Pack & PDF Onboarding Guide. | Marketing Lead & CEO | Scheduled |
+| **Gate 5: Full Handover & Go-Live (2026-11-30)** | Full data-protection compliance review signed off, support runbook operational, staff training complete, all 14 client tenants provisioned. | Delivery-to-Operations Formal Handover Certificate. | Delivery Lead & Operations Lead | Scheduled |
+| **Gate 6: Day-7 Post-Launch Review (2026-12-07)** | 7 days of live production telemetry, login adoption tracking toward 80% (12 clients), support volume compared to baseline. | Day-7 Post-Launch Evaluation Report. | Delivery Lead & Operations Lead | Scheduled |
 
 ---
 
-## 4. Material Assumptions, Missing Inputs & CEO Decisions
+## 4. Material Assumptions & Governance Constraints
 
-### 4.1 CEO Decisions Required
-1. **Confirmation of Payment Provider & Existing Rails**:
+### 4.1 Executive Decisions Required (CEO / Legal)
+1. **Confirmation of Inbound Payment Rails**:
    - *Status*: Open CEO decision.
-   - *Detail*: Finance confirmed (memo 2026-09-10) that no inbound client payment provider or gateway exists on record. The CEO must confirm whether an unrecorded payment merchant account exists or formally confirm that existing client payments arrive strictly via bank transfer (BACS/wire).
-2. **In-Portal Payment Scope & Vendor Authorization**:
+   - *Detail*: Finance records confirm that no merchant gateway or automated inbound client payment provider is currently registered. The CEO must determine whether an unrecorded gateway exists or confirm that existing client payments arrive strictly via BACS/wire transfer.
+2. **In-Portal Automated Payment Scope**:
    - *Status*: Open CEO decision.
-   - *Detail*: The CEO must decide whether in-portal automated payment remains in scope for general launch (2026-11-30) or is deferred to Phase 2. If kept in scope, the CEO must approve the provider procurement route and authorize associated platform/transaction spend.
+   - *Detail*: The CEO must formally confirm whether automated in-portal payment processing remains in scope for the 2026-11-30 general launch or is deferred to Phase 2. If retained in scope, the provider selection, commercial terms, and spend authorization require executive approval.
 3. **Data-Protection Definition of Hosting Infrastructure**:
    - *Status*: Open CEO & Legal Counsel decision.
-   - *Detail*: Operations requires an executive and legal ruling on whether data resident on our third-party hosting server (per `/knowledge/50-Emails/vendor-list.md`, renewing March) complies with the charter constraint *"no client data leaves our systems"*. If the hosting contract is silent on data processing, counsel review is required.
-4. **Marketing Launch Communications & Quote Sign-off**:
+   - *Detail*: Operations requires an executive and legal ruling affirming that hosting client records and assets on the company's existing server (per `/knowledge/50-Emails/vendor-list.md`, renewing March) complies with the charter constraint *"no client data leaves our systems"*. If the hosting agreement lacks explicit data processing terms, legal review must be conducted prior to the 2026-11-30 full launch.
+4. **Marketing Launch Communications & Leadership Attribution**:
    - *Status*: Open CEO approval (due 2026-11-20).
-   - *Detail*: Approval of the final Launch Announcement text, onboarding guide, and confirmation of the placeholder CEO quote (`"We built Growth for owners who do not have time to run marketing..."` / portal equivalent).
+   - *Detail*: Formal sign-off on the Launch Announcement email text, Onboarding Guide PDF, and confirmed attribution for the executive quote.
 
-### 4.2 Material Assumptions
+### 4.2 Material Operational Assumptions
 1. **Active Client Baseline**:
-   - *Source*: `/knowledge/00-Meta/numbers-ledger.md` (as of 1 Sep 2026).
-   - *Assumption*: Active client roster is exactly 14 clients, representing $38,400 MRR. The 80% 30-day login target therefore requires at least 12 individual client organizations successfully activated.
-2. **Support Volume Baseline**:
-   - *Source*: Delivery build plan assumption (`/knowledge/Agents Office/task-de60d80d-8b69-46cf-b374-3f930e376b34.md`).
-   - *Assumption*: Operations maintains a measurable pre-launch baseline of status and invoice inquiry email volume in the primary support inbox, against which the "halving" target will be evaluated during the Day-7 review.
-3. **Beta Client Selection Criteria**:
-   - *Source*: Delivery proposed build plan.
-   - *Assumption*: The 3 beta clients selected at Kickoff will comprise: (1) one retainer client (testing the 1st-of-month invoice cycle), (2) one project client (testing 50/50 invoicing), and (3) one asset-heavy client (testing high-volume deliverable downloads).
-
-### 4.3 Missing Inputs & Inter-Team Dependencies
-1. **Bank Feed Arrival Rail Documentation**:
-   - *Owner*: Finance Lead.
-   - *Required Input*: Direct access to live bank-feed records to document and verify how incoming client invoice payments clear today, closing Step 4 of the Finance reconciliation memo.
-2. **Form Consent Copy Finalization**:
-   - *Owner*: Marketing Lead & Operations Lead.
-   - *Required Input*: Agreed legal consent wording for the first-time activation form, required before the 2026-10-31 beta release rather than waiting for the 2026-11-20 onboarding guide launch.
-3. **Per-Client Accent Styling Palette**:
-   - *Owner*: Delivery / Design Team.
-   - *Required Input*: Confirmed single accent color code (HEX/RGB) for all 14 active clients, required before the build freeze on 2026-10-23.
+   - *Evidence*: `/knowledge/00-Meta/numbers-ledger.md` (verified as of 1 Sep 2026).
+   - *Assumption*: The active client base consists of exactly 14 client organizations, representing $38,400 MRR. Achieving the 80% 30-day login adoption goal requires successful first-time activation by at least 12 distinct client organizations.
+2. **Support Inquiry Volume Baseline**:
+   - *Evidence*: Delivery build plan charter (`/knowledge/Agents Office/task-de60d80d-8b69-46cf-b374-3f930e376b34.md`).
+   - *Assumption*: Operations maintains a measurable pre-launch baseline of status and invoice inquiry email volume in the primary support inbox, against which the 50% volume reduction target will be evaluated at the Day-7 review.
+3. **Beta Client Distribution Criteria**:
+   - *Evidence*: Delivery project plan guidelines.
+   - *Assumption*: The 3 beta clients selected at Kickoff will comprise: (1) one retainer client (evaluating the 1st-of-month invoice cycle), (2) one project client (evaluating the 50/50 invoicing milestone structure), and (3) one asset-heavy client (evaluating high-volume deliverable downloads).
+4. **Scope Freeze Governance**:
+   - *Evidence*: Project plan template (`/knowledge/70-Delivery/project-plan-template.md`).
+   - *Assumption*: Any functional changes or out-of-scope requests (e.g. mobile applications, billing terms adjustments) introduced after the 2026-09-30 Scope Sign-off will immediately require a formal plan re-cut, recalculation of delivery hours, and CEO sign-off.

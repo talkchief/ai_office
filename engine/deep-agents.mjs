@@ -384,12 +384,12 @@ export class OfficeEngine {
         const { model, provider } = await make('specialist', agent, team);
         const set = this.toolHub ? this.toolHub.toolsFor({ agent, team, provider, evaluation }) : { tools: [], interruptOn: {} };
         subagents.push({ name: agent.id, description: `${agent.name}, ${agent.role}. ${agent.does || ''}`.slice(0, 600), systemPrompt: specialistPrompt({ office, team, agent, leadAgent: lead, toolLabels }),
-          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id), ...this.vaultTools(job.id, team, agent.id), ...this.connectorTools(job.id, team, agent.id)], interruptOn: { ...set.interruptOn, ...VAULT_APPROVALS }, middleware: [this.pace(job.id, team, agent.id, signal), this.loopGuard(job.id, agent.id), this.specialistReadGuard(job.id, agent.id)] });
+          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id), ...this.vaultTools(job.id, team, agent.id), ...this.connectorTools(job.id, team, agent.id)], interruptOn: { ...set.interruptOn, ...VAULT_APPROVALS }, middleware: [this.stepGuard(job.id, agent.id, 'specialist'), this.pace(job.id, team, agent.id, signal), this.loopGuard(job.id, agent.id), this.specialistReadGuard(job.id, agent.id)] });
       }
       const { model, provider } = await make('lead', lead, team);
       const spotChecks = this.toolHub ? this.toolHub.toolsFor({ agent: lead, team, provider, evaluation, readOnly: true }).tools : [];
       const graph = this.agentFactory({ name: leadName(team.id), model, systemPrompt: leadPrompt({ office, team, lead, specialists, reworkRounds: reworkRounds(team), toolLabels }),
-        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), this.brainTool(job.id, lead.id), ...this.vaultTools(job.id, team, lead.id), ...this.connectorTools(job.id, team, lead.id), ...spotChecks], interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...VAULT_APPROVALS }, subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
+        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), this.brainTool(job.id, lead.id), ...this.vaultTools(job.id, team, lead.id), ...this.connectorTools(job.id, team, lead.id), ...spotChecks], interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...VAULT_APPROVALS }, subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [this.stepGuard(job.id, lead.id, 'lead'), todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
       leads.push({ name: leadName(team.id), description: `${team.name} team, led by ${lead.name}.${team.purpose ? ' ' + team.purpose : ''}`.slice(0, 600), runnable: graph });
     }
     const { model } = await make('pm', null, null);
@@ -639,6 +639,21 @@ export class OfficeEngine {
       if (n <= limit) return handler(request);
       this.event(jobId, 'reads_capped', agentId, `${call.name} refused: ${limit} files or searches already opened in this run.`);
       return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `Refused: you have already opened ${limit} files or searches in this run; that is the ceiling. Write the deliverable with what you have read, state what you could not check, and hand it over.` });
+    } });
+  }
+  // A step budget per run. A specialist that has made 40 tool calls, or a lead 30, is thrashing (in one soak a specialist made 115
+  // read calls for one reminder letter): from then on reading, searching and listing are refused and only finishing is open:
+  // writing the deliverable, exporting it, handing over, reviewing, handing off, reporting progress. It is the outermost guard, so
+  // it counts every call, including the ones the other guards refuse.
+  stepGuard(jobId, agentId, role) {
+    const LIMIT = role === 'lead' ? 30 : 40, FINISH = new Set(['write_file', 'edit_file', 'export_pdf', 'export_pptx', 'assemble_files', 'record_review', 'hand_to_program_manager', 'report_progress', 'update_brain_note', 'task', 'write_todos']);
+    const counts = new Map();
+    return createMiddleware({ name: `step_guard_${agentId.replace(/[^a-zA-Z0-9_]/g, '_')}`, wrapToolCall: async (request, handler) => {
+      const call = request.toolCall, job = this.get(jobId), run = job?.runs.filter(r => r.agent === agentId).at(-1), key = run?.id || 'none';
+      const n = (counts.get(key) || 0) + 1; counts.set(key, n);
+      if (n <= LIMIT || FINISH.has(call.name)) return handler(request);
+      if (n === LIMIT + 1) this.event(jobId, 'steps_capped', agentId, `${LIMIT} tool calls in one run; reading is closed, only finishing is open.`);
+      return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `Refused: you have made ${LIMIT} tool calls in this run, which is the budget. Reading, searching and listing are closed now. Write the deliverable with what you have, say what you could not check, and hand over.` });
     } });
   }
   // The Program Manager delegates only after it has written a plan: a task call before write_todos is refused, not run.

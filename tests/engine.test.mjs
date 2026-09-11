@@ -432,6 +432,18 @@ test('a note sent while the task was busy and delivered after completion does no
   } finally { await f.close(); }
 });
 
+test('a specialist that thrashes hits the step budget: reads are refused, writing and handing over still work', async () => {
+  let n = 0;
+  const f = fixture({ specialist: () => { n++; if (n <= 43) return { calls: [call('read_file', { file_path: `/knowledge/note-${n}.md` })] }; if (n === 44) return { calls: [call('write_file', { file_path: '/work/report.md', content: 'Verified result and evidence.' })] }; return { text: 'Verified result and evidence; handed over /work/report.md.' }; } });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done']);
+    assert.equal(done.events.filter(e => e.type === 'steps_capped' && e.agent === f.worker).length, 1);
+    assert.equal(done.events.filter(e => e.type === 'reads_capped' && e.agent === f.worker).length, 40 - 12, 'the read cap refused reads 13 to 40; from 41 the step budget refused first');
+    assert.ok(fs.existsSync(path.join(f.engine.workspaceDir(id), 'report.md')), 'the write past the step budget went through');
+    assert.equal(done.review.approved, true);
+  } finally { await f.close(); }
+});
+
 test('a task that runs past the time limit is blocked with a plain reason', async () => {
   const f = fixture({ settings: { runTimeoutMinutes: 0.002 }, specialist: () => ({ text: 'Slow.', wait: 1500 }) });
   try { const id = start(f); const job = await until(f.engine, id, ['blocked']); assert.match(job.error, /no progress/); assert.equal(f.engine.notifications.list()[0].kind, 'blocked'); }
