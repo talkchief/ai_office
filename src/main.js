@@ -207,7 +207,8 @@ function buildDeptRail(k) {
 document.getElementById('railHeader').addEventListener('click', (e) => {
   const k = e.currentTarget.dataset.dept; if (!k) return;
   if (e.target.closest('.b-appr')) { const s = stuckIn(k)[0]; if (s) openAgentRail(s.a.id); return; }
-  const who = e.target.closest('[data-agent], [data-seat]'); if (who) { openAgentRail(who.dataset.agent || who.dataset.seat); return; }
+  const task = e.target.closest('[data-task]'); if (task) { window.dispatchEvent(new CustomEvent('office:open-task', { detail: task.dataset.task })); return; }
+  const who = e.target.closest('[data-seat]'); if (who) { openAgentRail(who.dataset.seat); return; }
   if (e.target.closest('[data-act="task"]')) { window.dispatchEvent(new CustomEvent('office:compose', { detail: k })); return; }
   if (e.target.closest('.b-tasks') && DEMO && tasks) tasks.toggle();
 });
