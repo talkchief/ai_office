@@ -114,7 +114,7 @@ the seeding variables are ignored.
 
 | Variable | Meaning |
 |---|---|
-| `AO_MODE` | `single` (default: one office, the access code) or `hosted` |
+| `AO_MODE` | `single` (default: one office, the access code) or `hosted`. The same as `"mode": "hosted"` in `office.config.local.json`, which also takes `"platformAdmins": ["you@example.com"]`. A single office turned hosted hands its provider keys to the platform on the first start |
 | `AO_TENANTS_DIR` | Where each company's `data/` and `brain/` live (default `tenants/`, one folder per tenant id) |
 | `AO_ACCOUNTS` | The accounts database (users, offices, memberships, groups, sessions, invites, mail identities; default `data/accounts.sqlite`) |
 | `AO_PLATFORM_DIR` | `platform.json` (limits, registration, admin emails) and the platform's `providers.json` (default `data/platform/`) |

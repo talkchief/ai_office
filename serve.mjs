@@ -22,7 +22,7 @@ const cfg = loadConfig();
 const HTML = process.env.AO_HTML || path.join(ROOT, 'dist', 'command-centre-v2.html');
 const DATA = process.env.AO_DATA || path.join(ROOT, 'data');
 const BRAIN = cfg.brainPath;
-const HOSTED = process.env.AO_MODE === 'hosted';
+const HOSTED = cfg.mode === 'hosted'; // office.config(.local).json → mode, or AO_MODE
 const version = (() => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version; } catch { return '?'; } })();
 const oauthPage = (title, text) => `<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font:15px system-ui;padding:40px;max-width:520px"><h1 style="font-size:20px">${title}</h1><p>${text}</p><p><a href="/">Back to the office</a></p><script>setTimeout(()=>{if(window.opener){window.opener.postMessage('connector-signed-in','*');window.close();}},1200)</script>`;
 const peerOf = (req, loopback) => (loopback && req.headers['x-real-ip']) || req.socket.remoteAddress;
@@ -43,7 +43,10 @@ if (HOSTED) {
   const { TenantRegistry } = await import('./tenant-registry.mjs');
   const { registerAuthRoutes, registerAccountsApi } = await import('./server/accounts-api.mjs');
   const { registerAdminApi } = await import('./server/admin-api.mjs');
-  platform = new PlatformStore({ dir: process.env.AO_PLATFORM_DIR || path.join(DATA, 'platform'), env: process.env, adminEmails: String(process.env.AO_PLATFORM_ADMINS || '').split(',').map(s => s.trim()).filter(Boolean) });
+  const platformDir = process.env.AO_PLATFORM_DIR || path.join(DATA, 'platform');
+  // A single office turned hosted: the platform inherits its provider keys and models the first time, so nothing has to be typed again.
+  if (!fs.existsSync(path.join(platformDir, 'providers.json')) && fs.existsSync(path.join(DATA, 'providers.json'))) { fs.mkdirSync(platformDir, { recursive: true }); fs.copyFileSync(path.join(DATA, 'providers.json'), path.join(platformDir, 'providers.json')); try { fs.chmodSync(path.join(platformDir, 'providers.json'), 0o600); } catch {} console.log('  platform: took the models and keys from the single office providers.json'); }
+  platform = new PlatformStore({ dir: platformDir, env: process.env, adminEmails: cfg.platformAdmins });
   accounts = new Accounts({ file: process.env.AO_ACCOUNTS || path.join(DATA, 'accounts.sqlite') });
   registry = new TenantRegistry({ accounts, platform, dir: process.env.AO_TENANTS_DIR || path.join(ROOT, 'tenants'), version, cfg, brainTemplate: process.env.AO_BRAIN_TEMPLATE || null });
   authRouter = new Router(); controlRouter = new Router(); adminRouter = new Router();
