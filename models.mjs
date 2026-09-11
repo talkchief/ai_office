@@ -139,11 +139,53 @@ export function silenceGuard(fetchImpl, ms = CALL_TIMEOUT_MS, { onWait } = {}) {
     return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
   };
 }
+// Gemini 3 returns a thought signature with every function call and wants it back with that call in every later turn; Google's
+// compatible endpoint carries it as extra_content.google.thought_signature on the tool call, which the client drops when it
+// rebuilds the history. The signatures are remembered by tool call id as they arrive (streamed or not) and put back on the way
+// out; a call whose signature is gone (a task resumed after a restart) gets the bypass value Google documents for that case.
+export const SIGNATURE_BYPASS = 'skip_thought_signature_validator';
+export function thoughtSignatures(fetchImpl, store = new Map()) {
+  const remember = (id, sig) => { if (!id || !sig) return; store.set(id, sig); if (store.size > 5000) store.delete(store.keys().next().value); };
+  const harvest = (payload, slots) => {
+    for (const choice of payload?.choices || []) for (const tc of (choice.message || choice.delta)?.tool_calls || []) {
+      const key = tc.index ?? tc.id, slot = slots.get(key) || {}; if (tc.id) slot.id = tc.id; const sig = tc.extra_content?.google?.thought_signature; if (sig) slot.sig = sig;
+      slots.set(key, slot); if (slot.id && slot.sig) remember(slot.id, slot.sig);
+    }
+  };
+  return async (url, init) => {
+    if (typeof init?.body === 'string' && init.body.includes('"tool_calls"')) {
+      try {
+        const json = JSON.parse(init.body); let changed = false;
+        for (const msg of json.messages || []) if (msg?.role === 'assistant' && Array.isArray(msg.tool_calls)) for (const tc of msg.tool_calls) {
+          if (tc?.extra_content?.google?.thought_signature) continue;
+          tc.extra_content = { ...(tc.extra_content || {}), google: { ...(tc.extra_content?.google || {}), thought_signature: store.get(tc.id) || SIGNATURE_BYPASS } }; changed = true;
+        }
+        if (changed) { const headers = new Headers(init.headers || {}); headers.delete('content-length'); init = { ...init, headers, body: JSON.stringify(json) }; }
+      } catch {}
+    }
+    const res = await fetchImpl(url, init);
+    if (!res.ok || !res.body) return res;
+    const type = res.headers.get('content-type') || '';
+    if (/application\/json/.test(type)) { const text = await res.text(); try { harvest(JSON.parse(text), new Map()); } catch {} return new Response(text, { status: res.status, statusText: res.statusText, headers: res.headers }); }
+    if (!/text\/event-stream/.test(type)) return res;
+    const slots = new Map(), decoder = new TextDecoder(); let carry = '';
+    const body = res.body.pipeThrough(new TransformStream({
+      transform(chunk, controller) {
+        controller.enqueue(chunk);
+        carry += decoder.decode(chunk, { stream: true }); const lines = carry.split('\n'); carry = lines.pop();
+        for (const line of lines) if (line.startsWith('data:') && line.includes('"tool_calls"')) { try { harvest(JSON.parse(line.slice(5)), slots); } catch {} }
+      },
+    }));
+    return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
+  };
+}
 export class ModelRegistry {
   constructor({ dataDir, env = process.env, factory = defaultFactory, fetchImpl = globalThis.fetch }) {
     this.file = path.join(dataDir, 'providers.json'); this.env = env; this.factory = factory; this.fetch = fetchImpl; this.modelCache = new Map();
     // Told each time a call waits for a rate-limited or overloaded provider (the engine counts these for the health page).
     this.onWait = null;
+    // Gemini's thought signatures, by tool call id, for the calls in flight (see thoughtSignatures).
+    this.signatures = new Map();
     fs.mkdirSync(dataDir, { recursive: true });
     this.value = this.validate(fs.existsSync(this.file) ? JSON.parse(fs.readFileSync(this.file, 'utf8')) : structuredClone(DEFAULT_REGISTRY), null);
     // A built-in provider added in a later version joins an office that already has a providers file (it can be disabled, it is never removed).
@@ -226,8 +268,10 @@ export class ModelRegistry {
       return { type: 'anthropic', options };
     }
     const reasoningEffort = effort ? (['xhigh', 'max'].includes(effort) ? 'high' : effort) : '';
+    const guarded = silenceGuard(this.fetch, CALL_TIMEOUT_MS, { onWait: info => this.onWait?.(info) });
+    const fetch = /generativelanguage\.googleapis\.com/.test(provider.baseURL || '') ? thoughtSignatures(guarded, this.signatures) : guarded;
     const options = { model: model.id, apiKey: key || 'not-needed', streaming, streamUsage: true, timeout: CALL_TIMEOUT_MS, ...(maxTokens ? { maxTokens } : {}),
-      configuration: { fetch: silenceGuard(this.fetch, CALL_TIMEOUT_MS, { onWait: info => this.onWait?.(info) }), ...(provider.baseURL ? { baseURL: provider.baseURL } : {}), ...(Object.keys(provider.headers || {}).length ? { defaultHeaders: provider.headers } : {}) } };
+      configuration: { fetch, ...(provider.baseURL ? { baseURL: provider.baseURL } : {}), ...(Object.keys(provider.headers || {}).length ? { defaultHeaders: provider.headers } : {}) } };
     if (reasoningEffort && (provider.type === 'openai' || model.supports.reasoning)) options.reasoning = { effort: reasoningEffort };
     return { type: 'openai', options };
   }
