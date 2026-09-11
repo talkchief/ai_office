@@ -21,7 +21,7 @@ test('passwords are scrypt hashes that verify and never match a different passwo
 test('a company registers: the person owns the office, signs in, and the session expires on the clock', () => {
   let clock = 1_000_000; const { dir, accounts } = open(() => clock);
   try {
-    assert.throws(() => accounts.createUser({ email: 'ceo@acme.test', name: 'Dana', password: 'short' }), /at least 10/);
+    assert.throws(() => accounts.createUser({ email: 'ceo@acme.test', name: 'Dana', password: 'short' }), /at least 8/);
     const user = accounts.createUser({ email: 'CEO@Acme.test', name: 'Dana', password: 'a long enough password' });
     assert.equal(user.email, 'ceo@acme.test');
     assert.throws(() => accounts.createUser({ email: 'ceo@acme.test', name: 'Again', password: 'a long enough password' }), /already exists/);

@@ -30,7 +30,7 @@ export function verifyPassword(password, stored) {
   try { const candidate = crypto.scryptSync(String(password), salt, 64, { N: +N, r: +r, p: +p }); const known = Buffer.from(hash, 'base64url'); return candidate.length === known.length && crypto.timingSafeEqual(candidate, known); }
   catch { return false; }
 }
-export const checkPassword = password => { if (typeof password !== 'string' || password.length < 10) fail('Use a password of at least 10 characters.'); if (password.length > 200) fail('That password is too long.'); return password; };
+export const checkPassword = password => { if (typeof password !== 'string' || password.length < 8) fail('Use a password of at least 8 characters.'); if (password.length > 200) fail('That password is too long.'); return password; };
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, password_hash TEXT, platform_admin INTEGER NOT NULL DEFAULT 0, prefs TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL, last_login_at INTEGER);

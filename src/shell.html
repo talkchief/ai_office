@@ -887,7 +887,8 @@
 #claudeDialog p { font:14px/1.5 var(--ui); }
 #claudeDialog .auth-help { font-size:12px; opacity:.75; }
 #claudeDialog label { display:block; margin:18px 0 7px; font:600 12px var(--ui); }
-#claudeDialog input { box-sizing:border-box; width:100%; padding:12px; margin-bottom:12px; border:1px solid var(--hairline); border-radius:8px; background:var(--paper, #fff); color:var(--ink); font:14px var(--ui); }
+#claudeDialog input { box-sizing:border-box; width:100%; padding:12px; margin-bottom:12px; border:1px solid var(--hairline); border-radius:8px; background:#fff; color:#1a1a17; caret-color:#1a1a17; font:14px var(--ui); } /* the fields stay white in the dark theme, so the text stays dark */
+#claudeDialog input::placeholder { color:#8a8a83; }
 #claudeDialog button, #claudeDialog .auth-primary { display:inline-block; padding:11px 16px; border:0; border-radius:9px; background:var(--ink); color:var(--cream); font:600 13px var(--ui); cursor:pointer; text-decoration:none; }
 #claudeDialog button:disabled { opacity:.45; cursor:wait; }
 #claudeDialog .auth-secondary { margin-top:16px; background:transparent; color:var(--ink); border:1px solid var(--hairline); }

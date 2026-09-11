@@ -20,14 +20,14 @@ export const officeReady = new Promise(resolve => {
       <label for="regOffice">Company or office name</label><input id="regOffice" maxlength="80" required>
       <label for="regName">Your name</label><input id="regName" maxlength="80" required>
       <label for="regEmail">Email</label><input id="regEmail" type="email" autocomplete="username" required>
-      <label for="regPassword">Password</label><input id="regPassword" type="password" autocomplete="new-password" minlength="10" required>
+      <label for="regPassword">Password</label><input id="regPassword" type="password" autocomplete="new-password" minlength="8" required>
       <p class="auth-help">You become the office’s owner. Invite your colleagues from Manage → Users & groups; the models are provided by the platform.</p>
       <button type="submit">Create the office</button>
     </form>
     <form id="authAccept" hidden>
       <p id="acceptWho" class="auth-help"></p>
       <label for="accName" id="accNameLabel">Your name</label><input id="accName" maxlength="80">
-      <label for="accPassword" id="accPasswordLabel">Choose a password</label><input id="accPassword" type="password" autocomplete="new-password" minlength="10" required>
+      <label for="accPassword" id="accPasswordLabel">Choose a password</label><input id="accPassword" type="password" autocomplete="new-password" minlength="8" required>
       <button type="submit">Join the office</button>
     </form>` : `
     <div class="auth-head"><h2 id="authTitle">Unlock your office</h2></div>
