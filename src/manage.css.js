@@ -314,7 +314,9 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #spaceDialog[data-view=task].full[open]{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;margin:0;border-radius:0;border:0;padding:24px clamp(24px,5vw,72px) 0}
 #spaceDialog[data-view=task].full .tv-doc{max-width:84ch}
 #spaceDialog[data-view=task].full .tv-two{grid-template-columns:minmax(0,1fr) 260px;gap:36px}
-#spaceDialog[data-view=task] #spaceContent{padding:2px 8px 28px 0;font:13px/1.5 var(--ui)}
+#spaceDialog[data-view=task] #spaceContent{padding:2px 8px 28px 0;font:13px/1.5 var(--ui);scrollbar-width:none;scrollbar-gutter:auto}
+#spaceDialog[data-view=task] #spaceContent::-webkit-scrollbar{display:none}
+#spaceDialog[data-view=task]{scrollbar-width:none}#spaceDialog[data-view=task]::-webkit-scrollbar{display:none}
 #spaceDialog[data-view=task] .tv-head{padding:2px 36px 0 0}
 #spaceDialog[data-view=task] .tv-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 #spaceDialog[data-view=task] .tv-title{margin:8px 0 6px;font:400 28px/1.15 var(--serif);letter-spacing:0;max-width:820px}
@@ -346,8 +348,13 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #spaceDialog[data-view=task] .tv-inline select{width:auto;margin:0;padding:6px 8px;border:1px solid var(--mg-line2);border-radius:6px;background:var(--mg-card);color:var(--ink);font:12px var(--ui)}
 #spaceDialog[data-view=task] .tv-remember{display:inline-flex;align-items:center;gap:8px;font:12px var(--ui);color:var(--grey)}
 #spaceDialog[data-view=task] .tv-remember input{width:16px;height:16px;accent-color:var(--mg-ok);margin:0}
-#spaceDialog[data-view=task] .tv-more{margin-top:8px}
-#spaceDialog[data-view=task] .tv-more>summary{font:500 12px var(--ui);color:var(--ink);cursor:pointer;list-style:none;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--mg-line2)}
+#spaceDialog[data-view=task] .tv-more{margin:10px 0 0;border:0;padding:0;background:transparent}
+#spaceDialog[data-view=task] .tv-more>summary{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:8px;border:1px solid var(--ink);background:var(--mg-card);font:500 12.5px var(--ui);color:var(--ink);cursor:pointer;list-style:none;text-decoration:none}
+#spaceDialog[data-view=task] .tv-more>summary::after{content:"";width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translateY(-2px);transition:transform .15s}
+#spaceDialog[data-view=task] .tv-more>summary:hover{background:var(--ink);color:var(--cream)}
+#spaceDialog[data-view=task] .tv-more[open]>summary{background:var(--ink);color:var(--cream)}
+#spaceDialog[data-view=task] .tv-more[open]>summary::after{transform:rotate(-135deg) translateY(-2px)}
+#spaceDialog[data-view=task] .tv-more>.tv-field,#spaceDialog[data-view=task] .tv-more>.tv-act{margin-left:0}
 #spaceDialog[data-view=task] .tv-more>summary::-webkit-details-marker{display:none}
 #spaceDialog[data-view=task] .tv-pending{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
 #spaceDialog[data-view=task] .tv-pend{border:1px solid var(--hairline);border-radius:8px;padding:8px 10px;background:var(--mg-card);font-size:12px}
