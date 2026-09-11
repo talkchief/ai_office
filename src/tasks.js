@@ -253,7 +253,7 @@ export function initTasks(ctx) {
       <span>NEXT<b data-tk="${k}-next">${deptTasks(k, 'next').length}</b></span>
       <span>DONE<b data-tk="${k}-done">${doneCount[k]}</b></span></div>`;
   }
-  for (const k of DEPT_KEYS) deptRT[k].apprRow.insertAdjacentHTML('beforebegin', rowHTML(k));
+  for (const k of DEPT_KEYS) (deptRT[k].counts || deptRT[k].apprRow).insertAdjacentHTML(deptRT[k].counts ? 'beforeend' : 'beforebegin', rowHTML(k));
   function syncBadges() {
     for (const k of DEPT_KEYS) {
       const vals = { doing: deptTasks(k, 'doing').length, next: deptTasks(k, 'next').length, done: doneCount[k] };

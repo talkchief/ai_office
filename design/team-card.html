@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team card</title>
+<style>
+:root{--cream:#FDFFF8;--ink:#151414;--grey:#5F5E59;--hairline:rgba(21,20,20,.12);--card:#FFFFFF;--rail:#F4F4ED;--mute:#9C9B93;--line2:rgba(22,21,20,.28);
+  --ok:#1E7A55;--ok-bg:#E9F5EE;--warn:#8F6407;--warn-bg:#FBF3DC;--fail:#B2382C;--fail-bg:#FBECEA;--busy:#2E5EA8;--gold:#B9A775;
+  --serif:"Instrument Serif",Georgia,serif;--ui:Inter,-apple-system,"Segoe UI",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --shadow:0 14px 36px rgba(22,21,20,.12),0 1px 2px rgba(22,21,20,.06)}
+body.dark{--cream:#15161A;--ink:#ECEAE3;--grey:#A3A098;--hairline:rgba(236,234,227,.14);--card:#1E1F24;--rail:#121316;--mute:#6E6D67;--line2:rgba(236,234,226,.32);
+  --ok:#5CC292;--ok-bg:rgba(92,194,146,.14);--warn:#E4B75B;--warn-bg:rgba(228,183,91,.14);--fail:#F0857A;--fail-bg:rgba(240,133,122,.14);--busy:#84ADEC;--gold:#CDBB86;--shadow:0 18px 44px rgba(0,0,0,.55)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(120% 90% at 50% 30%,var(--cream) 55%,color-mix(in srgb,var(--cream) 92%,#000) 100%);color:var(--ink);font:13px/1.5 var(--ui);-webkit-font-smoothing:antialiased}
+.stage{display:flex;flex-wrap:wrap;gap:60px 48px;align-items:flex-start;justify-content:center;padding:70px 40px 120px}
+.note{position:fixed;top:16px;left:20px;right:20px;display:flex;gap:14px;align-items:center;font:12px var(--ui);color:var(--grey)}
+.note button{margin-left:auto;border:1px solid var(--line2);background:transparent;color:var(--ink);border-radius:99px;padding:6px 12px;font:500 12px var(--ui);cursor:pointer}
+.cap{font:500 10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--grey);text-align:center;margin-bottom:12px}
+
+/* ================= the team card ================= */
+.tc{position:relative;width:250px;background:color-mix(in srgb,var(--card) 96%,transparent);border:1px solid var(--hairline);border-radius:16px;box-shadow:var(--shadow);backdrop-filter:blur(8px);padding:12px 14px 10px;cursor:default;transition:box-shadow .25s,transform .25s;outline:0}
+.tc:hover,.tc:focus-within,.tc.open{box-shadow:0 22px 56px rgba(21,20,20,.2);transform:translateY(-2px)}
+body.dark .tc:hover,body.dark .tc:focus-within,body.dark .tc.open{box-shadow:0 22px 60px rgba(0,0,0,.65)}
+.tc-head{display:flex;align-items:center;gap:8px}
+.tc-chip{width:9px;height:9px;border-radius:50%;flex:none}
+.tc-name{font:600 11.5px var(--ui);letter-spacing:.16em;text-transform:uppercase}
+.tc-state{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:3px 8px 3px 7px;border-radius:99px;font:500 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;border:1px solid transparent}
+.tc-state i{width:6px;height:6px;border-radius:50%;background:currentColor}
+.tc-state.idle{color:var(--grey);border-color:var(--hairline)}
+.tc-state.working{color:var(--ok);background:var(--ok-bg)} .tc-state.working i{animation:pulse 1.1s ease-in-out infinite}
+.tc-state.blocked{color:var(--warn);background:var(--warn-bg)}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.7)}}
+
+/* the roster strip: one avatar per person, lit by what they are doing */
+.tc-roster{display:flex;align-items:center;gap:0;margin:12px 0 10px;height:30px}
+.av{position:relative;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--rail);border:2px solid var(--card);box-shadow:0 0 0 1px var(--hairline);font:600 9px var(--mono);letter-spacing:.04em;color:var(--grey);margin-left:-7px;transition:transform .2s,box-shadow .2s;cursor:pointer;flex:none}
+.av:first-child{margin-left:0}
+.av.lead{box-shadow:0 0 0 1.5px var(--gold);color:var(--gold)}
+.av.on{box-shadow:0 0 0 1.5px var(--ok);color:var(--ok);background:var(--ok-bg)}
+.av.on.lead{box-shadow:0 0 0 1.5px var(--ok),0 0 0 3.5px color-mix(in srgb,var(--gold) 55%,transparent)}
+.av.stuck{box-shadow:0 0 0 1.5px var(--warn);color:var(--warn);background:var(--warn-bg)}
+.av.on::after{content:"";position:absolute;right:-1px;bottom:-1px;width:8px;height:8px;border-radius:50%;background:var(--ok);border:2px solid var(--card);animation:pulse 1.1s ease-in-out infinite}
+.av:hover,.av:focus-visible{transform:translateY(-3px) scale(1.08);z-index:2;outline:0}
+.av[data-tip]:hover::before,.av[data-tip]:focus-visible::before{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--ink);color:var(--cream);font:11px var(--ui);padding:5px 9px;border-radius:6px;pointer-events:none;z-index:5}
+.tc-sum{margin-left:auto;font:11px var(--mono);color:var(--grey);white-space:nowrap;padding-left:10px}
+.tc-sum b{font:400 20px var(--serif);color:var(--ink);margin-right:2px}
+
+/* the now line: what the lead is doing, with a bar when a task is in flight */
+.tc-now{display:grid;grid-template-columns:auto 1fr;gap:3px 8px;align-items:center;font:12px var(--ui)}
+.tc-now .star{width:16px;height:16px;border-radius:50%;border:1px solid var(--gold);color:var(--gold);display:grid;place-items:center;font-size:9px;grid-row:1/3}
+.tc-now .who{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-now .who b{font-weight:600}
+.tc-now .bar{grid-column:2;height:3px;border-radius:2px;background:var(--hairline);overflow:hidden}
+.tc-now .bar i{display:block;height:100%;width:0;background:var(--ok);border-radius:2px;transition:width .6s}
+.tc-now.blocked .bar i{background:var(--warn)}
+
+/* counts: three tappable segments */
+.tc-counts{display:grid;grid-template-columns:1fr 1fr 1fr;margin:10px -14px -10px;border-top:1px solid var(--hairline);border-radius:0 0 16px 16px;overflow:hidden}
+.tc-counts button{border:0;border-right:1px solid var(--hairline);background:transparent;padding:7px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;color:var(--grey);font:500 8.5px var(--mono);letter-spacing:.14em;text-transform:uppercase}
+.tc-counts button:last-child{border-right:0}
+.tc-counts button:hover{background:color-mix(in srgb,var(--ink) 5%,transparent);color:var(--ink)}
+.tc-counts b{font:400 17px/1.1 var(--serif);color:var(--ink)}
+.tc-counts b.flash{animation:flash 1.2s}
+@keyframes flash{0%{color:var(--ok)}100%{color:var(--ink)}}
+
+/* waits for you: a real row, not a warning line */
+.tc-wait{display:flex;align-items:center;gap:8px;margin:10px -14px 0;padding:8px 14px;background:var(--warn-bg);border-top:1px solid color-mix(in srgb,var(--warn) 30%,transparent);font:12px var(--ui);color:var(--ink)}
+.tc-wait .k{font:500 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--warn)}
+.tc-wait button{margin-left:auto;border:0;background:var(--ink);color:var(--cream);border-radius:99px;padding:4px 10px;font:600 10px var(--ui);letter-spacing:.06em;cursor:pointer}
+.tc-wait + .tc-counts{margin-top:0;border-top:0}
+
+/* the expansion: the roster as rows. opens on hover, focus, or tap */
+.tc-more{display:grid;grid-template-rows:0fr;transition:grid-template-rows .28s cubic-bezier(.2,.8,.2,1)}
+.tc:hover .tc-more,.tc:focus-within .tc-more,.tc.open .tc-more{grid-template-rows:1fr}
+.tc-more>div{overflow:hidden;min-height:0}
+.tc-rows{border-top:1px solid var(--hairline);margin-top:10px;padding-top:6px}
+.tc-row{display:grid;grid-template-columns:22px 1fr auto;gap:2px 8px;align-items:center;padding:5px 0;border:0;background:transparent;width:100%;text-align:left;cursor:pointer;color:var(--ink);border-radius:6px}
+.tc-row:hover{background:color-mix(in srgb,var(--ink) 4%,transparent)}
+.tc-row .av{width:22px;height:22px;margin:0;font-size:7.5px;border-width:1.5px;cursor:pointer;grid-row:1/3}
+.tc-row .av::after{width:6px;height:6px;border-width:1.5px}
+.tc-row .n{font:500 11.5px var(--ui);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-row .t{grid-column:2;font:11px var(--ui);color:var(--grey);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-row .t:empty{display:none}
+.tc-row .ph{grid-column:3;grid-row:1/3;font:500 9.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--grey)}
+.tc-row .ph.on{color:var(--ok)} .tc-row .ph.stuck{color:var(--warn)}
+.tc-foot{display:flex;gap:6px;padding:8px 0 4px}
+.tc-foot button{flex:1;border:1px solid var(--line2);background:transparent;color:var(--ink);border-radius:8px;padding:7px 8px;font:500 11px var(--ui);cursor:pointer}
+.tc-foot button:hover{background:color-mix(in srgb,var(--ink) 5%,transparent)}
+.tc-foot button.p{background:var(--ink);color:var(--cream);border-color:var(--ink)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="note">Hover or tap a card to open its roster. Hover an avatar for who and what. <button type="button" onclick="document.body.classList.toggle('dark')">◐ Dark</button></div>
+<div class="stage">
+
+<div><div class="cap">Idle · at rest</div>
+<div class="tc" tabindex="0">
+  <div class="tc-head"><span class="tc-chip" style="background:#8FD3F4"></span><span class="tc-name">Delivery</span><span class="tc-state idle"><i></i>Idle</span></div>
+  <div class="tc-roster">
+    <span class="av lead" tabindex="0" data-tip="DELIVERY LEAD · free">DL</span><span class="av" tabindex="0" data-tip="PROJECT CO-ORDINATOR · free">PC</span><span class="av" tabindex="0" data-tip="BUSINESS ANALYST · free">BA</span><span class="av" tabindex="0" data-tip="DESIGNER · free">DE</span><span class="av" tabindex="0" data-tip="ENGINEER · free">EN</span><span class="av" tabindex="0" data-tip="QA CHECKER · free">QA</span><span class="av" tabindex="0" data-tip="CLIENT REPORTS · free">CR</span>
+    <span class="tc-sum"><b>0</b>of 7</span>
+  </div>
+  <div class="tc-now"><span class="star">★</span><span class="who"><b>DELIVERY LEAD</b> — free</span><span class="bar"><i></i></span></div>
+  <div class="tc-more"><div>
+    <div class="tc-rows">
+      <button class="tc-row"><span class="av lead">DL</span><span class="n">DELIVERY LEAD</span><span class="t">Plans and reviews the team’s work</span><span class="ph">free</span></button>
+      <button class="tc-row"><span class="av">PC</span><span class="n">PROJECT CO-ORDINATOR</span><span class="t"></span><span class="ph">free</span></button>
+      <button class="tc-row"><span class="av">BA</span><span class="n">BUSINESS ANALYST</span><span class="t"></span><span class="ph">free</span></button>
+      <button class="tc-row"><span class="av">DE</span><span class="n">DESIGNER</span><span class="t"></span><span class="ph">free</span></button>
+      <button class="tc-row"><span class="av">EN</span><span class="n">ENGINEER</span><span class="t"></span><span class="ph">free</span></button>
+      <button class="tc-row"><span class="av">QA</span><span class="n">QA CHECKER</span><span class="t"></span><span class="ph">free</span></button>
+      <button class="tc-row"><span class="av">CR</span><span class="n">CLIENT REPORTS</span><span class="t"></span><span class="ph">free</span></button>
+    </div>
+    <div class="tc-foot"><button type="button">Open team</button><button type="button" class="p">Give a task</button></div>
+  </div></div>
+  <div class="tc-counts"><button type="button">Active<b>0</b></button><button type="button">Queued<b>0</b></button><button type="button">Approved<b>7</b></button></div>
+</div></div>
+
+<div><div class="cap">Working · 3 of 6</div>
+<div class="tc" tabindex="0">
+  <div class="tc-head"><span class="tc-chip" style="background:#EADC8F"></span><span class="tc-name">Sales</span><span class="tc-state working"><i></i>Working</span></div>
+  <div class="tc-roster">
+    <span class="av lead on" tabindex="0" data-tip="LEXI · verifying the Meridian quote">LX</span><span class="av on" tabindex="0" data-tip="PROPOSALS · Draft the 12-seat proposal">PR</span><span class="av on" tabindex="0" data-tip="FOLLOW-UPS · Chase the three stale leads">FU</span><span class="av" tabindex="0" data-tip="LEAD ENRICHER · free">LE</span><span class="av" tabindex="0" data-tip="PRICING · free">PC</span><span class="av" tabindex="0" data-tip="RENEWALS · free">RN</span>
+    <span class="tc-sum"><b>3</b>of 6</span>
+  </div>
+  <div class="tc-now"><span class="star">★</span><span class="who"><b>LEXI</b> verifying the Meridian quote</span><span class="bar"><i style="width:64%"></i></span></div>
+  <div class="tc-more"><div>
+    <div class="tc-rows">
+      <button class="tc-row"><span class="av lead on">LX</span><span class="n">LEXI</span><span class="t">Verifying: Reply to the Meridian quote</span><span class="ph on">verifying</span></button>
+      <button class="tc-row"><span class="av on">PR</span><span class="n">PROPOSALS</span><span class="t">Draft the 12-seat proposal · 14 min</span><span class="ph on">working</span></button>
+      <button class="tc-row"><span class="av on">FU</span><span class="n">FOLLOW-UPS</span><span class="t">Chase the three stale leads · 3 min</span><span class="ph on">working</span></button>
+      <button class="tc-row"><span class="av">LE</span><span class="n">LEAD ENRICHER</span><span class="t"></span><span class="ph">free</span></button>
+      <button class="tc-row"><span class="av">PC</span><span class="n">PRICING</span><span class="t"></span><span class="ph">free</span></button>
+      <button class="tc-row"><span class="av">RN</span><span class="n">RENEWALS</span><span class="t"></span><span class="ph">free</span></button>
+    </div>
+    <div class="tc-foot"><button type="button">Open team</button><button type="button" class="p">Give a task</button></div>
+  </div></div>
+  <div class="tc-counts"><button type="button">Active<b>2</b></button><button type="button">Queued<b>1</b></button><button type="button">Approved<b class="flash">5</b></button></div>
+</div></div>
+
+<div><div class="cap">Blocked · one waits for you</div>
+<div class="tc" tabindex="0">
+  <div class="tc-head"><span class="tc-chip" style="background:#98A5EF"></span><span class="tc-name">Finance</span><span class="tc-state blocked"><i></i>Needs you</span></div>
+  <div class="tc-roster">
+    <span class="av lead stuck" tabindex="0" data-tip="CHIEF FINANCIAL OFFICER · waiting on you">CF</span><span class="av" tabindex="0" data-tip="ACCOUNTS PAYABLE · free">AP</span><span class="av" tabindex="0" data-tip="ACCOUNTS RECEIVABLE · free">AR</span><span class="av on" tabindex="0" data-tip="FINANCIAL ANALYST · Q4 cash forecast">FA</span><span class="av" tabindex="0" data-tip="RECONCILIATION · free">RC</span><span class="av" tabindex="0" data-tip="INVOICING · free">IN</span>
+    <span class="tc-sum"><b>1</b>of 6</span>
+  </div>
+  <div class="tc-now blocked"><span class="star">★</span><span class="who"><b>CFO</b> — waiting on you</span><span class="bar"><i style="width:100%"></i></span></div>
+  <div class="tc-more"><div>
+    <div class="tc-rows">
+      <button class="tc-row"><span class="av lead stuck">CF</span><span class="n">CHIEF FINANCIAL OFFICER</span><span class="t">Overdue invoice reminders · 4 drafts</span><span class="ph stuck">waits for you</span></button>
+      <button class="tc-row"><span class="av on">FA</span><span class="n">FINANCIAL ANALYST</span><span class="t">Q4 cash forecast · 9 min</span><span class="ph on">working</span></button>
+      <button class="tc-row"><span class="av">AP</span><span class="n">ACCOUNTS PAYABLE</span><span class="t"></span><span class="ph">free</span></button>
+      <button class="tc-row"><span class="av">AR</span><span class="n">ACCOUNTS RECEIVABLE</span><span class="t"></span><span class="ph">free</span></button>
+      <button class="tc-row"><span class="av">RC</span><span class="n">RECONCILIATION</span><span class="t"></span><span class="ph">free</span></button>
+      <button class="tc-row"><span class="av">IN</span><span class="n">INVOICING</span><span class="t"></span><span class="ph">free</span></button>
+    </div>
+    <div class="tc-foot"><button type="button">Open team</button><button type="button" class="p">Give a task</button></div>
+  </div></div>
+  <div class="tc-wait"><span class="k">Waits for you</span>Send 4 overdue reminders?<button type="button">Review</button></div>
+  <div class="tc-counts"><button type="button">Active<b>1</b></button><button type="button">Queued<b>0</b></button><button type="button">Approved<b>6</b></button></div>
+</div></div>
+
+</div>
+<script>
+// tap toggles on touch screens; hover does it on a desktop
+document.querySelectorAll('.tc').forEach(c => c.addEventListener('click', e => { if (!e.target.closest('button,.av') && matchMedia('(hover: none)').matches) c.classList.toggle('open'); }));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.tc.open').forEach(c => c.classList.remove('open')); });
+</script>
+</body>
+</html>

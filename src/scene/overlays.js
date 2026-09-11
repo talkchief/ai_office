@@ -19,16 +19,23 @@ export function makeOverlays({ hud, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, onDept, on
     const lead = AGENTS.find(a => a.dept === k && a.lead);
     const b = document.createElement('div');
     b.className = 'badge';
+    const members = AGENTS.filter(a => a.dept === k);
     b.innerHTML = `
-      <div class="b-name"><span class="dot" style="background:${dept.chip}"></span>${esc(dept.short)}<span class="live"></span><span class="b-state">IDLE</span></div>
-      <div class="b-count"><span class="b-num">0</span><span class="b-lab">OF ${n} WORKING</span></div>
-      <div class="b-lead"><span class="b-star" style="border-color:${dept.ink}">★</span><span class="b-line">${esc(lead ? lead.name : dept.name)} — free</span></div>
+      <div class="b-name"><span class="dot" style="background:${dept.chip}"></span>${esc(dept.short)}<span class="live"></span><span class="b-state"><i></i><span>IDLE</span></span></div>
+      <div class="b-seats">${members.map(a => `<span class="seat${a.lead ? ' lead' : ''}" data-seat="${esc(a.id)}" title="${esc(a.name)}"></span>`).join('')}<span class="b-n"><b class="b-num">0</b>of ${n}</span></div>
+      <p class="b-now quiet"><span class="b-line">Everyone is at their desk.</span></p><div class="b-bar" style="display:none"><i></i></div>
+      <div class="b-more"><div class="b-more-in"><div class="b-counts"></div><div class="b-rows"></div><div class="b-free"></div><div class="b-foot"><button type="button" data-act="open">Open team</button><button type="button" data-act="task" class="p">Give a task</button></div></div></div>
       <div class="b-metrics"></div>
-      <div class="b-appr" style="display:none">⚠ <span class="ap-n">1</span> WAITING APPROVAL</div>`;
+      <div class="b-appr" style="display:none"><span class="k">Waits for you</span><span><b class="ap-n">1</b> <span class="ap-w">decision</span></span><button type="button">Review</button></div>`;
     b.addEventListener('click', (e) => {
-      if (e.target.closest('.b-appr')) { onApproval(k); e.stopPropagation(); }
-      else onDept(k);
+      if (e.target.closest('.b-appr')) { onApproval(k); e.stopPropagation(); return; }
+      const act = e.target.closest('[data-act]'); if (act) { e.stopPropagation(); if (act.dataset.act === 'task') window.dispatchEvent(new CustomEvent('office:compose', { detail: k })); else onDept(k); return; }
+      const row = e.target.closest('[data-agent]'); if (row) { e.stopPropagation(); onAgent(row.dataset.agent); return; }
+      const seat = e.target.closest('[data-seat]'); if (seat) { e.stopPropagation(); onAgent(seat.dataset.seat); return; }
+      if (matchMedia('(hover: none)').matches && !b.classList.contains('open')) { b.classList.add('open'); e.stopPropagation(); return; } // a tap opens the card; a second tap enters the team
+      onDept(k);
     });
+    b.addEventListener('mouseleave', () => b.classList.remove('open'));
     hud.appendChild(b);
     badges[k] = b;
     const L = LAYOUT[k];
@@ -40,7 +47,7 @@ export function makeOverlays({ hud, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, onDept, on
     rig.deptRT[k] = { ...(rig.deptRT[k] || {}), badge: b, apprRow: b.querySelector('.b-appr'), apprN: b.querySelector('.ap-n'),
       badgeAnchor: new THREE.Vector3(...(std ? [L.pos[0], 9, L.pos[1] - L.d / 2 - 2] : ANCHOR[k])),
       sideBadge: !std && (k === 'fin' || k === 'ops'), sideLeft: !std && k === 'ops', vals: [],
-      stateEl: b.querySelector('.b-state'), numEl: b.querySelector('.b-num'), lineEl: b.querySelector('.b-line'), leadName: lead ? lead.name : dept.name, sig: '' };
+      stateEl: b.querySelector('.b-state span'), numEl: b.querySelector('.b-num'), lineEl: b.querySelector('.b-line'), barEl: b.querySelector('.b-bar'), moreEl: b.querySelector('.b-more'), rowsEl: b.querySelector('.b-rows'), freeEl: b.querySelector('.b-free'), counts: b.querySelector('.b-counts'), seats: Object.fromEntries([...b.querySelectorAll('[data-seat]')].map(el => [el.dataset.seat, el])), leadName: lead ? lead.name : dept.name, sig: '' };
   }
   /* ---------- the Brain: an icon in the top bar (design: "B BRAIN 3") ---------- */
   const brainTag = document.createElement('button');
@@ -118,27 +125,40 @@ export function makeOverlays({ hud, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, onDept, on
     const placed = [];
     for (const k of DEPT_KEYS) {
       const d = rig.deptRT[k]; if (!d || !d.badge) continue;
-      // the card's live numbers: N of M working, the state word, the lead line
+      // the card says three things: the state word, how many seats are lit, and one sentence about what matters now
       const rs = Object.values(rig.R).filter(r => r.a.dept === k);
-      const working = rs.filter(r => ['working', 'planning', 'verifying', 'reviewing', 'helping'].includes(r.livePhase)).length;
-      const stuck = rs.some(r => r.state === 'stuck' || r.livePhase === 'blocked');
-      const lead = rs.find(r => r.a.lead);
-      const state = stuck ? 'BLOCKED' : working ? 'WORKING' : 'IDLE';
-      let line = `${d.leadName} — free`;
-      if (lead) {
-        if (lead.assistTarget && rig.R[lead.assistTarget]) line = `${d.leadName} → helping ${rig.R[lead.assistTarget].a.name}`;
-        else if (lead.livePhase === 'planning') line = `${d.leadName} is planning`;
-        else if (lead.livePhase === 'reviewing' || lead.livePhase === 'verifying') line = `${d.leadName} verifying ${lead.liveTitle || 'the team’s work'}`;
-        else if (lead.livePhase === 'working') line = `${d.leadName} — ${lead.liveTitle || 'working'}`;
-        else if (stuck) line = `${d.leadName} — waiting on you`;
-      }
+      const ACTIVE = ['working', 'planning', 'verifying', 'reviewing', 'helping'];
+      const isOn = r => ACTIVE.includes(r.livePhase), isStuck = r => r.state === 'stuck' || r.livePhase === 'blocked';
+      const working = rs.filter(isOn).length, stuckOnes = rs.filter(isStuck), stuck = stuckOnes.length > 0;
+      const lead = rs.find(r => r.a.lead), first = rs.find(r => isOn(r) && r.liveTitle) || rs.find(isOn);
+      const state = stuck ? 'NEEDS YOU' : working ? 'WORKING' : 'IDLE';
+      const title = r => (r.liveTitle || '').slice(0, 60);
+      let line = 'Everyone is at their desk.';
+      if (lead && isStuck(lead)) line = `${d.leadName} is waiting on you.`;
+      else if (stuck) line = `${stuckOnes[0].a.name} is waiting on you.`;
+      else if (lead && lead.assistTarget && rig.R[lead.assistTarget]) line = `${d.leadName} is helping ${rig.R[lead.assistTarget].a.name}.`;
+      else if (lead && lead.livePhase === 'planning') line = `${d.leadName} is planning.`;
+      else if (lead && (lead.livePhase === 'reviewing' || lead.livePhase === 'verifying')) line = `${d.leadName} is verifying ${title(lead) || 'the team’s work'}.`;
+      else if (lead && lead.livePhase === 'working') line = `${d.leadName} is on ${title(lead) || 'a task'}.`;
+      else if (first) line = title(first) ? `${first.a.name} is on ${title(first)}.` : `${working} ${working === 1 ? 'person is' : 'people are'} working.`;
       if (rig.pm && rig.pm.target === k && rig.pm.state !== 'working') line += ' · PM ' + (rig.pm.state === 'walking' ? 'arriving' : 'here');
-      const sig = state + working + line;
-      if (d.sig !== sig) { d.sig = sig; d.stateEl.textContent = state; d.stateEl.style.color = state === 'BLOCKED' ? '#B4830B' : state === 'WORKING' ? '#287657' : '#5A5A5A'; d.numEl.textContent = working; d.lineEl.textContent = line; d.badge.classList.toggle('team-working', working > 0); }
+      const busy = rs.filter(r => isOn(r) || isStuck(r));
+      const rows = busy.map(r => `<button type="button" data-agent="${esc(r.a.id)}"><span class="seat ${isStuck(r) ? 'stuck' : 'on'}"></span><span class="who">${esc(r.a.name)}</span><span class="what">${esc(isStuck(r) ? (r.ask ? r.ask.slice(0, 60) : 'waits for you') : title(r) || STATE_WORD[r.livePhase]?.toLowerCase() || '')}</span></button>`).join('');
+      const sig = state + working + line + rows + rs.map(r => isStuck(r) ? 's' : isOn(r) ? 'o' : '.').join('');
+      if (d.sig !== sig) {
+        d.sig = sig; d.stateEl.textContent = state; d.stateEl.parentElement.className = 'b-state ' + (stuck ? 'blocked' : working ? 'working' : 'idle');
+        d.numEl.textContent = working; d.lineEl.textContent = line; d.lineEl.parentElement.classList.toggle('quiet', !working && !stuck);
+        for (const r of rs) { const el = d.seats[r.a.id]; if (el) { el.classList.toggle('on', isOn(r)); el.classList.toggle('stuck', isStuck(r)); el.title = r.a.name + (isStuck(r) ? ' · waits for you' : isOn(r) ? ' · ' + (title(r) || STATE_WORD[r.livePhase]?.toLowerCase() || 'working') : ' · free'); } }
+        d.rowsEl.innerHTML = rows; const free = rs.length - busy.length; d.freeEl.textContent = free === rs.length ? `${free} free · ${d.leadName} leads` : free ? `${free} free` : 'nobody free';
+        d.badge.classList.toggle('team-working', working > 0);
+      }
+      // the thin line under the sentence follows the lead's own progress bar
+      const leadBar = lead && lead.pill && lead.pill.querySelector('.p-bar'), pct = leadBar && leadBar.style.display !== 'none' && !stuck && isOn(lead) ? leadBar.firstElementChild.style.width : '';
+      if (d.barPct !== pct) { d.barPct = pct; d.barEl.style.display = pct ? '' : 'none'; d.barEl.firstElementChild.style.width = pct || '0%'; }
       if (focused === k) { d.badge.style.display = 'none'; continue; } // docked in the rail
       d.badge.style.display = '';
       let [sx, sy] = toScreen(d.badgeAnchor);
-      const bh = d.badge.offsetHeight * badgeScale, bw = d.badge.offsetWidth * badgeScale;
+      const bh = (d.badge.offsetHeight - d.moreEl.offsetHeight) * badgeScale, bw = d.badge.offsetWidth * badgeScale;
       // top-left placement in screen space, then clamped to the canvas and the panel's edge
       let left, top;
       if (d.sideBadge) { top = clamp(sy - bh / 2, 64, rig.size.h - bh - 8); left = d.sideLeft ? clamp(sx - bw, 8, rightEdge - bw) : clamp(sx, 8, rightEdge - bw); }
