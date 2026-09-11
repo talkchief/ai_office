@@ -944,3 +944,13 @@ test('a run stopped by a signal that was not ours ("Abort") starts again by itse
     assert.ok(!f.engine.notifications.list({ limit: 200 }).some(n => n.kind === 'blocked' && n.jobId === id), 'no inbox item for a restart');
   } finally { await f.close(); }
 });
+
+test('with "Ask before outside actions" off, a Vault action runs at once instead of pausing for the CEO', async () => {
+  const sent = [];
+  const specialist = ({ last }) => last.type === 'human' ? { calls: [call('send_email', { to: 'ceo@example.com', body: 'hello' })] } : { text: 'Email handled: ' + last.text };
+  const f = fixture({ hub: sendHub(sent), specialist, settings: { approvals: false } });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done', 'awaiting_ceo', 'blocked']);
+    assert.equal(done.state, 'done', done.error || ''); assert.deepEqual(sent, [{ to: 'ceo@example.com', body: 'hello' }], 'the email went without a pause');
+  } finally { await f.close(); }
+});

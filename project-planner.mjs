@@ -35,8 +35,8 @@ export function loadPlanningSkills({ dirs = [], names = PLANNING_SKILLS } = {}) 
 }
 
 export const PLANNER_PROMPT = `You are the Program Manager of a company office. The CEO gives you a brief for a project, sometimes with documents. You plan the whole project yourself and answer with one JSON object and nothing else:
-{"name":"<short project name>","description":"<one or two sentences: what it is for and what done looks like>","charter":"<scope and what is out of scope; objectives and how success is measured; constraints; standards to follow>","teams":["<team id>", ...],"startAt":"YYYY-MM-DD","dueAt":"YYYY-MM-DD","milestones":[{"title":"<milestone>","dueAt":"YYYY-MM-DD","tasks":[{"team":"<team id>","text":"<the assignment for that team: the deliverable, what it must contain, what to read, the criteria>"}]}]}
-Rules: teams are chosen from the list given, by purpose and people; a task names one team (or "auto" when the Program Manager should choose at the time). Two to six milestones in order, each with a date inside the project's window; the first milestone's tasks must be startable now with what the Brain and the documents hold. One to four tasks per milestone, each a complete brief for one team with the deliverable named (a file, a page, a decision) and the acceptance criteria. Use the CEO's deadline when there is one, otherwise propose a realistic target. Dates are ISO. Keep the CEO's own words for what must and must not happen. Never invent numbers; say where they come from. The charter is plain prose, not a list of headings.`;
+{"name":"<short project name>","description":"<one or two sentences: what it is for and what done looks like>","charter":"<scope and what is out of scope; objectives and how success is measured; constraints; standards to follow>","teams":["<team id>", ...],"startAt":"YYYY-MM-DD","dueAt":"YYYY-MM-DD","milestones":[{"title":"<milestone>","dueAt":"YYYY-MM-DD","after":[<0-based positions of the milestones this one waits for; [] when it can start at once>],"tasks":[{"team":"<team id>","text":"<the assignment for that team: the deliverable, what it must contain, what to read, the criteria>"}]}]}
+Rules: teams are chosen from the list given, by purpose and people; a task names one team (or "auto" when the Program Manager should choose at the time). Two to six milestones in order, each with a date inside the project's window; the first milestone's tasks must be startable now with what the Brain and the documents hold. Milestones that do not depend on each other run in parallel: give each milestone "after", the positions of the milestones it truly waits for ([] for one that can start at once); left out, it waits for the one before it. One to four tasks per milestone, each a complete brief for one team with the deliverable named (a file, a page, a decision) and the acceptance criteria. Use the CEO's deadline when there is one, otherwise propose a realistic target. Dates are ISO. Keep the CEO's own words for what must and must not happen. Never invent numbers; say where they come from. The charter is plain prose, not a list of headings.`;
 
 // The words a brief is about: five letters or more, common and bureaucratic words left out, most frequent first, in order of appearance.
 const STOP = new Set(['about', 'active', 'after', 'again', 'aimed', 'announce', 'announces', 'approve', 'approves', 'before', 'being', 'between', 'build', 'check', 'checks', 'client', 'clients', 'confirm', 'confirms', 'could', 'december', 'every', 'first', 'from', 'goes', 'have', 'into', 'january', 'february', 'march', 'april', 'august', 'september', 'october', 'november', 'made', 'make', 'month', 'months', 'must', 'needs', 'never', 'nothing', 'office', 'other', 'owns', 'please', 'project', 'projects', 'qualifies', 'qualify', 'request', 'requests', 'shared', 'should', 'since', 'status', 'teams', 'their', 'there', 'these', 'they', 'this', 'those', 'three', 'through', 'wants', 'weeks', 'what', 'when', 'where', 'which', 'while', 'without', 'would', 'years']);
@@ -100,7 +100,8 @@ export function parsePlan(raw, { office, brief = '', today = Date.now() } = {}) 
     const due = dateOf(m?.dueAt, null);
     const tasks = (Array.isArray(m?.tasks) ? m.tasks : []).slice(0, LIMITS.tasksPerMilestone).map(t => ({ team: teamIds.has(String(t?.team)) ? String(t.team) : 'auto', text: text(t?.text, 6000) })).filter(t => t.text.length >= 10);
     total += tasks.length;
-    return { title, dueAt: due, tasks };
+    const after = Array.isArray(m?.after) ? [...new Set(m.after.map(Number).filter(n => Number.isInteger(n) && n >= 0 && n < i))] : undefined;
+    return { title, dueAt: due, tasks, ...(after ? { after } : {}) };
   });
   // Dates: inside the window, in order; missing ones spread evenly between start and target.
   const span = dueAt - startAt, n = milestones.length;
@@ -133,21 +134,33 @@ export async function planProject({ brief, documents = [], skills = [], catalogu
 
 // The plan becomes a project and its tasks: the first milestone's tasks start now, later ones wait in the backlog.
 export function applyPlan({ plan, projects, engine, ownerId = null, audience = {} }) {
-  const project = projects.create({ name: plan.name, description: plan.description, charter: plan.charter, teams: plan.teams, startAt: plan.startAt, dueAt: plan.dueAt, milestones: plan.milestones.map(m => ({ title: m.title, dueAt: m.dueAt })), plannedBy: 'pm', ...audience }, { ownerId });
-  const tasks = [];
+  const project = projects.create({ name: plan.name, description: plan.description, charter: plan.charter, teams: plan.teams, startAt: plan.startAt, dueAt: plan.dueAt, milestones: plan.milestones.map(m => ({ title: m.title, dueAt: m.dueAt, ...(m.after ? { after: m.after } : {}) })), plannedBy: 'pm', ...audience }, { ownerId });
+  const tasks = [], ready = new Set(projects.readyMilestones(project).map(m => m.id));
   project.milestones.forEach((m, i) => {
     for (const t of plan.milestones[i]?.tasks || []) {
-      const job = engine.create({ dept: t.team === 'auto' ? 'auto' : t.team, depts: t.team === 'auto' ? 'auto' : undefined, text: `${t.text}\n\nProject milestone: ${m.title}${m.dueAt ? ' (due ' + day(m.dueAt) + ')' : ''}.`, title: oneLine(t.text, 100), projectId: project.id, milestoneId: m.id, backlog: i > 0, ownerId, origin: { channel: 'project', projectId: project.id, milestoneId: m.id } });
+      const job = engine.create({ dept: t.team === 'auto' ? 'auto' : t.team, depts: t.team === 'auto' ? 'auto' : undefined, text: `${t.text}\n\nProject milestone: ${m.title}${m.dueAt ? ' (due ' + day(m.dueAt) + ')' : ''}.`, title: oneLine(t.text, 100), projectId: project.id, milestoneId: m.id, backlog: !ready.has(m.id), ownerId, origin: { channel: 'project', projectId: project.id, milestoneId: m.id } });
       tasks.push(job);
     }
   });
   return { project, tasks };
 }
 
-// After a milestone is achieved, the next milestone's backlog tasks are queued. Returns the tasks started.
+// Every milestone that can be worked now (nothing it waits for is open) is under way: its backlog tasks are queued, and one with
+// no tasks at all is handed to the Program Manager as one task to plan and deliver (once: that task carries the milestone).
+// Milestones that do not wait for each other run in parallel. Returns the tasks started.
 export function startNextMilestone({ project, projects, engine }) {
-  const next = projects.nextMilestone(project); if (!next) return [];
+  if (!project || project.status !== 'active') return [];
   const started = [];
-  for (const job of engine.list().filter(j => j.projectId === project.id && j.state === 'backlog' && j.milestoneId === next.id)) { try { engine.editQueue(job.id, { state: 'queued' }); started.push(job.id); } catch {} }
+  for (const next of projects.readyMilestones(project)) {
+    const mine = engine.list().filter(j => j.projectId === project.id && j.milestoneId === next.id && j.state !== 'cancelled');
+    for (const job of mine.filter(j => j.state === 'backlog')) { try { engine.editQueue(job.id, { state: 'queued' }); started.push(job.id); } catch {} }
+    if (mine.length) continue;
+    const due = next.dueAt ? ` (due ${day(next.dueAt)})` : '';
+    try {
+      const job = engine.create({ dept: 'auto', depts: 'auto', title: oneLine(`Milestone: ${next.title}`, 100), projectId: project.id, milestoneId: next.id, ownerId: project.ownerId || null, origin: { channel: 'project', projectId: project.id, milestoneId: next.id, planned: true },
+        text: `Plan and deliver the milestone “${next.title}” of the project “${project.name}”${due}: read the project page and what the earlier tasks delivered, decide the work this milestone needs, delegate it to the teams, and close the task when the milestone is true.\n\nProject milestone: ${next.title}${due}.` });
+      started.push(job.id);
+    } catch {}
+  }
   return started;
 }

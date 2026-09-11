@@ -88,3 +88,41 @@ test('the planner picks the Agency methods that fit the brief: at least two of i
   assert.match(plannerAsk({ brief, office, catalogue: methods, today: TODAY }), /Methods from the Agency catalogue that fit this brief \(use what applies\):\n\n### Portal Architect — Designs client portals/);
   assert.deepEqual(loadCatalogueMethods({ agency: null, brief }), []);
 });
+
+test('a next milestone with no tasks is handed to the Program Manager to plan and deliver, once; a paused project gets nothing', async () => {
+  const dir = temp(), office = new OfficeStore({ dataDir: dir, initialAgents: loadRoster().agents }), projects = new ProjectStore({ dataDir: dir, office });
+  const engine = new OfficeEngine({ dataDir: dir, office, models: { resolve: () => ({ model: 'x', effort: '' }), instance: async () => null }, knowledgeDir: path.join(dir, 'knowledge'), settings: () => ({}), projectFor: id => { const p = projects.get(id); return p ? { ...p, brief: projects.brief(p), next: projects.nextMilestone(p) } : null; } });
+  engine.pump = () => {};
+  try {
+    const project = projects.create({ name: 'Q4 campaign', description: 'Fill the pipeline.', milestones: [{ title: 'ICP agreed', dueAt: '2026-09-30' }, { title: 'Landing page live', dueAt: '2026-10-31' }] }, { ownerId: 'u1' });
+    const [icp, landing] = project.milestones.map(m => m.id);
+    const [first] = startNextMilestone({ project, projects, engine });
+    const job = engine.get(first);
+    assert.equal(job.milestoneId, icp); assert.ok(job.autoRoute, 'the Program Manager owns it'); assert.ok(job.origin.planned, 'marked as planned by the office'); assert.equal(job.ownerId, 'u1'); assert.equal(job.title, 'Milestone: ICP agreed');
+    assert.match(job.text, /Plan and deliver the milestone “ICP agreed” of the project “Q4 campaign” \(due 2026-09-30\): read the project page/);
+    assert.deepEqual(startNextMilestone({ project: projects.get(project.id), projects, engine }), [], 'once');
+    projects.recordCompletion({ id: first, projectId: project.id, state: 'done', doneAt: TODAY, milestoneId: icp }, { tasks: [] });
+    const [second] = startNextMilestone({ project: projects.get(project.id), projects, engine }); assert.equal(engine.get(second).milestoneId, landing, 'the next one follows');
+    projects.setStatus(project.id, 'paused');
+    assert.deepEqual(startNextMilestone({ project: projects.get(project.id), projects, engine }), [], 'a paused project gets nothing');
+  } finally { await engine.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+});
+
+test('the planner says which milestones wait for which; two ready milestones start together and each gets its own planning task when empty', async () => {
+  const dir = temp(), office = new OfficeStore({ dataDir: dir, initialAgents: loadRoster().agents }), projects = new ProjectStore({ dataDir: dir, office });
+  const engine = new OfficeEngine({ dataDir: dir, office, models: { resolve: () => ({ model: 'x', effort: '' }), instance: async () => null }, knowledgeDir: path.join(dir, 'knowledge'), settings: () => ({}), projectFor: id => { const p = projects.get(id); return p ? { ...p, brief: projects.brief(p), next: projects.nextMilestone(p) } : null; } });
+  engine.pump = () => {};
+  try {
+    const raw = { ...PLAN, milestones: [{ ...PLAN.milestones[0], after: [] }, { ...PLAN.milestones[1], after: [] }, { ...PLAN.milestones[2], after: [0, 1, 7, -1, 'x'] }] };
+    const { plan } = parsePlan(JSON.stringify(raw), { office: office.get(), today: TODAY });
+    assert.deepEqual(plan.milestones.map(m => m.after), [[], [], [0, 1]], 'positions before the milestone only');
+    assert.match(PLANNER_PROMPT, /"after":\[/);
+    const { project, tasks } = applyPlan({ plan, projects, engine, ownerId: 'u1' });
+    const [m1, m2, m3] = project.milestones.map(m => m.id);
+    assert.deepEqual(project.milestones.map(m => m.after), [[], [], [m1, m2]]);
+    assert.deepEqual(tasks.map(t => [t.state, t.milestoneId]), [['queued', m1], ['queued', m1], ['queued', m2], ['backlog', m3]], 'the two ready milestones start together');
+    const empty = projects.create({ name: 'Two at once', description: 'Two milestones with nothing planned yet, to be planned side by side.', milestones: [{ title: 'A', after: [] }, { title: 'B', after: [] }] });
+    const started = startNextMilestone({ project: empty, projects, engine });
+    assert.deepEqual(started.map(id => engine.get(id).milestoneId), empty.milestones.map(m => m.id), 'the Program Manager gets one planning task per ready milestone');
+  } finally { await engine.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+});

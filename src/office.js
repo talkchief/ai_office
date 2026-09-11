@@ -3,6 +3,7 @@ import { officeReady } from './auth.js';
 import { HOSTED, USER, PLATFORM_ONLY, isOfficeAdmin, isPlatformAdmin, MANAGED_MODELS, canOpenArea } from './session.js';
 import { initSettings } from './settings.js';
 import { unseenResult } from './activity.js';
+import { readyMilestones } from '../milestones.mjs';
 import { initInbox } from './inbox.js';
 import { mark, dot, officeSummary } from './status.js';
 import { connectLive } from './sse.js';
@@ -77,7 +78,7 @@ export function initOfficeWork(ctx) {
   const inbox = initInbox({ api, openTask: id => showTask(id), openNote: id => settings.openNote(id), retryTask: id => api(`/tasks/${id}/retry`, 'POST', {}) });
   let rosterChanged = false, projectsOpen = [], providerHealth = null;
   // Open projects for the task form; refreshed with the board.
-  const fillProjects = () => { const sel = $('spaceProject'); if (!sel) return; const current = sel.value; sel.innerHTML = '<option value="">None</option>' + projectsOpen.map(p => `<option value="${esc(p.id)}">${esc(p.name)}${p.status === 'paused' ? ' (paused)' : ''}</option>`).join(''); if (projectsOpen.some(p => p.id === current)) sel.value = current; };
+  const fillProjects = () => { const sel = $('spaceProject'); if (!sel) return; const current = sel.value; sel.innerHTML = '<option value="">None</option>' + projectsOpen.filter(p => p.status !== 'done').map(p => `<option value="${esc(p.id)}">${esc(p.name)}${p.status === 'paused' ? ' (paused)' : ''}</option>`).join(''); if (projectsOpen.some(p => p.id === current)) sel.value = current; };
   const reloadForRoster = () => { if (!rosterChanged || settings.isOpen() || dialog.open || taskDirty) return; rosterChanged = false; $('spaceHint').textContent = 'The roster changed. Refreshing the office…'; setTimeout(() => location.reload(), 600); };
   const settings = initSettings({ api, openTask: id => { settings.close(); showTask(id); }, brain: ctx.brain, syncBrain, onShow: () => { if (dialog.open) close(); inbox?.close(); }, onHide: () => setTimeout(reloadForRoster, 50) });
   // The Manage menu is a directory: every area with a one-line status, and what needs the owner at the top.
@@ -195,27 +196,42 @@ export function initOfficeWork(ctx) {
     return projectsOpen.map(p => {
       const tasks = jobs.filter(j => j.projectId === p.id), counted = tasks.filter(j => j.state !== 'cancelled');
       if (dept && dept !== 'brain' && tasks.length && !tasks.some(j => involves(j, dept))) return null;
-      const milestones = p.milestones || [], reached = milestones.filter(m => m.done).length, next = milestones.find(m => !m.done) || null;
+      // Milestones that do not wait for each other are worked in parallel: the ready ones are those with nothing open before them.
+      const milestones = p.milestones || [], reached = milestones.filter(m => m.done).length, ready = readyMilestones(milestones), readyIds = new Set(ready.map(m => m.id)), next = ready[0] || null;
       const count = states => tasks.filter(j => states.includes(j.state)).length, done = count(['done']);
-      // Progress follows the milestones: each an equal share, an open one counted by its tasks done (a task without a milestone belongs to the current one); without milestones, the tasks.
-      const share = m => { if (m.done) return 1; const own = counted.filter(j => (j.milestoneId || next?.id) === m.id); return own.length ? own.filter(j => j.state === 'done').length / own.length : 0; };
+      // Progress follows the milestones: each an equal share, an open one counted by its tasks done (a task without a milestone counts for the milestone current when it finished); without milestones, the tasks.
+      const since = Math.max(0, ...milestones.filter(m => m.done).map(m => m.doneAt || 0));
+      const share = m => { if (m.done) return 1; const own = counted.filter(j => j.milestoneId === m.id || (!j.milestoneId && next?.id === m.id && (j.doneAt || Infinity) > since)); return own.length ? own.filter(j => j.state === 'done').length / own.length : 0; };
       const complete = milestones.length ? milestones.every(m => m.done) : counted.length > 0 && done === counted.length;
-      const state = count(PROJECT_STATES.blocked) ? 'blocked' : count(PROJECT_STATES.waiting) ? 'waiting' : count(PROJECT_STATES.active) ? 'active' : p.status === 'paused' ? 'paused' : complete ? 'done' : 'idle';
-      const percent = milestones.length ? Math.round(milestones.reduce((sum, m) => sum + share(m), 0) / milestones.length * 100) : counted.length ? Math.round(done / counted.length * 100) : 0;
-      return { ...p, milestones, tasks, state, percent, done, reached, next, working: count(PROJECT_STATES.active), blocked: count(PROJECT_STATES.blocked), waiting: count(PROJECT_STATES.waiting), backlog: count(['backlog']), unseen: tasks.some(unseenResult), updatedAt: Math.max(0, ...tasks.map(j => j.doneAt || j.updatedAt || j.createdAt || 0)) };
+      // Nothing running: either the next milestone has tasks waiting (idle) or none at all (unplanned: the Program Manager can plan it, or the project is finished).
+      const planned = ready.length ? ready.every(m => counted.some(j => j.milestoneId === m.id || (!j.milestoneId && next?.id === m.id && (j.doneAt || Infinity) > since))) : counted.length > 0;
+      const state = p.status === 'done' ? 'done' : count(PROJECT_STATES.blocked) ? 'blocked' : count(PROJECT_STATES.waiting) ? 'waiting' : count(PROJECT_STATES.active) ? 'active' : p.status === 'paused' ? 'paused' : complete ? 'done' : planned ? 'idle' : 'unplanned';
+      const percent = p.status === 'done' ? 100 : milestones.length ? Math.round(milestones.reduce((sum, m) => sum + share(m), 0) / milestones.length * 100) : counted.length ? Math.round(done / counted.length * 100) : 0;
+      // Each milestone with its tasks and its own state, for the nested rows.
+      const rows = milestones.map(m => {
+        const own = counted.filter(j => j.milestoneId === m.id || (!j.milestoneId && next?.id === m.id && (j.doneAt || Infinity) > since));
+        const has = states => own.some(j => states.includes(j.state));
+        const rowState = m.done || (own.length && own.every(j => j.state === 'done')) ? 'done' : has(PROJECT_STATES.blocked) ? 'blocked' : has(PROJECT_STATES.waiting) ? 'waiting' : has(PROJECT_STATES.active) ? 'active' : own.length ? 'idle' : readyIds.has(m.id) ? 'unplanned' : 'later';
+        return { ...m, own, rowState };
+      });
+      return { ...p, milestones, rows, tasks, state, percent, done, reached, next, working: count(PROJECT_STATES.active), blocked: count(PROJECT_STATES.blocked), waiting: count(PROJECT_STATES.waiting), backlog: count(['backlog']), unseen: tasks.some(unseenResult), updatedAt: Math.max(0, ...tasks.map(j => j.doneAt || j.updatedAt || j.createdAt || 0)) };
     }).filter(Boolean);
   }
   const projectMatches = (id, p) => id === 'all' || (id === 'active' ? p.state === 'active' : id === 'waiting' ? p.state === 'waiting' : id === 'blocked' ? p.state === 'blocked' : id === 'done' ? p.state === 'done' : false);
   function projectCard(p) {
-    const label = { blocked: 'Blocked', waiting: 'Your call', active: 'In progress', done: 'Complete', paused: 'Paused', idle: 'Nothing running' }[p.state];
+    const label = { blocked: 'Blocked', waiting: 'Your call', active: 'In progress', done: 'Complete', paused: 'Paused', idle: 'Nothing running', unplanned: 'Next milestone to plan' }[p.state];
     const first = states => p.tasks.find(j => states.includes(j.state));
     const line = [p.done ? `${p.done} done` : '', p.working ? `${p.working} in progress` : '', p.waiting ? `${p.waiting} for you` : '', p.blocked ? `${p.blocked} blocked` : '', p.backlog ? `${p.backlog} to come` : ''].filter(Boolean).join(' · ') || 'No tasks yet';
-    const milestone = p.milestones.length ? `Milestone ${Math.min(p.reached + 1, p.milestones.length)} of ${p.milestones.length}${p.next ? ' · ' + esc(p.next.title) : ' · all achieved'}` : 'No milestones yet';
-    const problem = p.state === 'blocked' && first(PROJECT_STATES.blocked)?.error ? ` · ${esc(String(first(PROJECT_STATES.blocked).error).slice(0, 90))}` : '';
-    const actions = p.state === 'blocked' ? `<span class="space-card-actions"><button type="button" data-inline="retry-project" data-project-id="${esc(p.id)}">RETRY</button><button type="button" class="space-text-action" data-inline="read" data-job-id="${esc(first(PROJECT_STATES.blocked).id)}">Open ↗</button></span>`
-      : p.state === 'waiting' ? `<span class="space-card-actions"><button type="button" class="space-text-action" data-inline="read" data-job-id="${esc(first(PROJECT_STATES.waiting).id)}">Read ↗</button></span>` : '';
+    const GLYPH = { done: '✓', blocked: '!', waiting: '?', active: '●', idle: '○', unplanned: '◌', later: '·' };
+    const word = r => r.rowState === 'done' ? 'achieved' : r.rowState === 'blocked' ? 'blocked' : r.rowState === 'waiting' ? 'waiting for you' : r.rowState === 'active' ? `${r.own.filter(j => PROJECT_STATES.active.includes(j.state)).length} in progress` : r.rowState === 'idle' ? `${r.own.length} queued` : r.rowState === 'unplanned' ? 'to plan' : 'to come';
+    const rows = p.rows.length ? `<ul class="space-ms-list">${p.rows.map(r => `<li class="${r.rowState}" title="${esc(r.title)}${r.dueAt ? ' · due ' + esc(new Date(r.dueAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })) : ''}"><i>${GLYPH[r.rowState]}</i><span>${esc(r.title)}</span><em>${word(r)}</em></li>`).join('')}</ul>` : '';
+    const stuck = p.state === 'blocked' ? first(PROJECT_STATES.blocked) : p.state === 'waiting' ? first(PROJECT_STATES.waiting) : null;
+    // What needs the CEO, by name, and the same buttons a task card has for it.
+    const problem = stuck ? ` · <b>${p.state === 'blocked' ? 'Blocked' : 'Waiting for you'}: ${esc(stuck.title.slice(0, 70))}</b>${p.state === 'blocked' && stuck.error ? ' · ' + esc(String(stuck.error).slice(0, 90)) : ''}` : '';
+    const actions = p.state === 'blocked' ? `<span class="space-card-actions"><button type="button" data-inline="retry-project" data-project-id="${esc(p.id)}">RETRY</button><button type="button" class="secondary" data-inline="changes" data-job-id="${esc(stuck.id)}">FIX & RETRY</button><button type="button" class="space-text-action" data-inline="read" data-job-id="${esc(stuck.id)}">Open ↗</button></span>`
+      : p.state === 'waiting' ? `<span class="space-card-actions">${stuck.review?.approved || stuck.pendingActions?.length ? `<button type="button" data-inline="approve" data-job-id="${esc(stuck.id)}">APPROVE</button>` : ''}<button type="button" class="secondary" data-inline="changes" data-job-id="${esc(stuck.id)}">REQUEST CHANGES</button><button type="button" class="space-text-action" data-inline="read" data-job-id="${esc(stuck.id)}">Read ↗</button></span>` : '';
     const when = p.updatedAt ? new Date(p.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
-    return `<div class="space-job space-project ${p.state}" data-project-card="${esc(p.id)}" role="button" tabindex="0" title="Open the project"><span class="space-card-top"><span class="space-state">${p.unseen ? '<i class="space-unread" title="New results, not opened yet"></i>' : ''}Project · ${label}</span><time>${esc(when)}</time></span><strong>${esc(p.name)}</strong><span class="space-progress" role="progressbar" aria-valuenow="${p.percent}" aria-valuemin="0" aria-valuemax="100" title="${p.done} of ${p.tasks.filter(j => j.state !== 'cancelled').length} tasks done · ${p.reached} of ${p.milestones.length} milestones achieved"><span class="space-bar"><i style="width:${p.percent}%"></i></span><b class="space-pct">${p.percent}%</b><span class="space-ms" title="${p.next ? esc(p.next.title) : ''}">${milestone}</span></span><span class="space-card-foot"><span>${esc(line)}${problem}</span>${actions}</span></div>`;
+    return `<div class="space-job space-project ${p.state}" data-project-card="${esc(p.id)}" role="button" tabindex="0" title="Open the project"><span class="space-card-top"><span class="space-state">${p.state === 'waiting' ? '<i class="space-unread warn" title="Waiting for you"></i>' : p.state === 'blocked' ? '<i class="space-unread red" title="Blocked"></i>' : p.unseen ? '<i class="space-unread" title="New results, not opened yet"></i>' : ''}Project · ${label}</span><time>${esc(when)}</time></span><strong>${esc(p.name)}</strong><span class="space-progress" role="progressbar" aria-valuenow="${p.percent}" aria-valuemin="0" aria-valuemax="100" title="${p.done} of ${p.tasks.filter(j => j.state !== 'cancelled').length} tasks done · ${p.reached} of ${p.milestones.length} milestones achieved"><span class="space-bar"><i style="width:${p.percent}%"></i></span><b class="space-pct">${p.percent}%</b><span class="space-ms">${p.milestones.length ? `${p.reached} of ${p.milestones.length} milestones` : 'no milestones yet'}</span></span>${rows}<span class="space-card-foot"><span>${esc(line)}${problem}</span>${actions}</span></div>`;
   }
   function render() {
     activityByAgent.clear();

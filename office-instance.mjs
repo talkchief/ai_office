@@ -70,7 +70,10 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
       // Filed through the store so the Brain graph and the search index both see the result.
       await knowledge.writeNote(`Agents Office/task-${job.id}.md`, `# ${job.title}\n\nTask: ${job.id} · Teams: ${job.depts.map(d => o.teams.find(t => t.id === d)?.name || d).join(', ')} · Version ${version?.n || 1} · Filed: ${new Date().toISOString()}\n\nCEO request: ${job.text}\n\n${job.result}\n\n---\nApproved by ${lead}. ${job.review?.summary || ''}\n`);
       // A project task marks its milestones achieved and the project page is rewritten.
-      if (job.projectId) { try { const marked = projects.recordCompletion({ ...job, state: 'done', doneAt: job.doneAt || Date.now() }, { tasks: engine.list().filter(j => j.projectId === job.projectId) }); if (marked.length) { engine.event(job.id, 'milestones_achieved', null, `Milestone${marked.length === 1 ? '' : 's'} achieved: ${marked.map(m => m.title).join(', ')}.`); audit.record({ area: 'projects', summary: `${job.projectName || job.projectId}: milestone${marked.length === 1 ? '' : 's'} achieved by “${job.title}”: ${marked.map(m => m.title).join(', ')}` }); const started = startNextMilestone({ project: projects.get(job.projectId), projects, engine }); if (started.length) engine.event(job.id, 'milestone_started', null, `The next milestone's ${started.length} task${started.length === 1 ? '' : 's'} queued.`); } syncProject(job.projectId); } catch (error) { console.warn('project milestones:', error.message); } }
+      if (job.projectId) { try { const marked = projects.recordCompletion({ ...job, state: 'done', doneAt: job.doneAt || Date.now() }, { tasks: engine.list().filter(j => j.projectId === job.projectId) }); if (marked.length) { engine.event(job.id, 'milestones_achieved', null, `Milestone${marked.length === 1 ? '' : 's'} achieved: ${marked.map(m => m.title).join(', ')}.`); audit.record({ area: 'projects', summary: `${job.projectName || job.projectId}: milestone${marked.length === 1 ? '' : 's'} achieved by “${job.title}”: ${marked.map(m => m.title).join(', ')}` }); const started = startNextMilestone({ project: projects.get(job.projectId), projects, engine }); if (started.length) engine.event(job.id, 'milestone_started', null, `The next milestone is under way: ${started.length} task${started.length === 1 ? '' : 's'}${started.some(id => engine.get(id)?.origin?.planned) ? ', the Program Manager plans it' : ''}.`); }
+        const finished = projects.settle(job.projectId, { tasks: engine.list().map(j => j.id === job.id ? { ...j, state: 'done' } : j) });
+        if (finished) { engine.event(job.id, 'project_done', null, `Project “${finished.name}” is complete: every milestone achieved.`); audit.record({ area: 'projects', summary: `Project “${finished.name}” is complete: every milestone achieved` }); engine.notifications.notify({ kind: 'done', title: `Project complete: ${finished.name}`, body: 'Every milestone is achieved and no task is open.', jobId: job.id, dept: job.dept, dedupe: `project-done:${finished.id}`, action: { type: 'open' }, userId: job.ownerId || null }); bus.publish('office.updated', { area: 'projects' }); }
+        syncProject(job.projectId); } catch (error) { console.warn('project milestones:', error.message); } }
     } });
 
   const audit = new AuditLog({ db: engine.db, bus });
@@ -225,6 +228,17 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
   // Every change to teams, people, skills, connectors or models rewrites the company pages agents read from /memories/.
   bus.on(event => { if (event.type === 'office.updated') engine.memory?.refresh().catch(e => console.warn('memory:', e.message)); });
   // The page every agent reads about a project, rewritten when the project or its tasks change (debounced per project).
+  // After the engine has recovered: milestones reached by tasks that finished before the office recorded milestones (older projects)
+  // are marked, and every active project has its next milestone under way.
+  function settleProjects() {
+    // Milestones reached by tasks that finished before the office recorded milestones (older projects) are marked now.
+    try {
+      const reached = projects.reconcile({ tasks: engine.list() });
+      if (reached.length) { audit.record({ area: 'projects', summary: `Milestones achieved by finished tasks: ${reached.map(r => `${r.project} — ${r.milestone.title}`).join('; ')}` }); for (const id of new Set(reached.map(r => r.projectId))) { const finished = projects.settle(id, { tasks: engine.list() }); if (finished) audit.record({ area: 'projects', summary: `Project “${finished.name}” is complete: every milestone achieved` }); syncProject(id); } }
+      // Every active project has its next milestone under way: its backlog tasks queued, or the Program Manager asked to plan it.
+      for (const p of projects.list().filter(p => p.status === 'active')) { const started = startNextMilestone({ project: p, projects, engine }); if (started.length) { audit.record({ area: 'projects', summary: `${p.name}: the next milestone's ${started.length} task${started.length === 1 ? '' : 's'} under way` }); syncProject(p.id); } }
+    } catch (error) { console.warn('project milestones:', error.message); }
+  }
   const projectSyncTimers = new Map();
   function syncProject(id) {
     clearTimeout(projectSyncTimers.get(id));
@@ -250,6 +264,7 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
     await rebuildGraph();
     const indexed = index.sync(); log(`  Brain search: ${indexed.backend}, ${indexed.notes} notes (${indexed.indexed} refreshed, ${indexed.removed} removed)`);
     engine.recover();
+    settleProjects();
     connecting = hub.load().then(() => engine.memory?.refresh()).then(() => log(`  connectors: ${Object.values(hub.status).filter(s => s === 'connected').length} of ${Object.keys(hub.status).length} connected`)).catch(e => console.warn('connectors:', e.message));
     discover().catch(() => {});
     return { migrated, indexed };

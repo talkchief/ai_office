@@ -3,6 +3,7 @@
 // (Projects/<id>/project.md) so every agent working a task of that project reads the same description, timeline and history.
 import fs from 'node:fs';
 import path from 'node:path';
+import { dependsOn, readyMilestones, waitsFor, tasksOf } from './milestones.mjs';
 
 const text = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -40,8 +41,15 @@ export class ProjectStore {
       const title = text(m?.title, 160); if (!title) fail(`Milestone ${i + 1} needs a title.`);
       const before = previous?.milestones?.find(x => x.id === m.id);
       const done = !!m?.done;
-      return { id: /^[a-z0-9-]{1,40}$/.test(m?.id || '') ? m.id : `m-${Date.now().toString(36)}-${i}`, title, dueAt: dateOf(m?.dueAt, `Milestone “${title}”`), done, doneAt: done ? before?.doneAt || (before?.done ? before.doneAt : Date.now()) : null };
+      return { id: /^[a-z0-9-]{1,40}$/.test(m?.id || '') ? m.id : `m-${Date.now().toString(36)}-${i}`, title, dueAt: dateOf(m?.dueAt, `Milestone “${title}”`), done, doneAt: done ? before?.doneAt || (before?.done ? before.doneAt : Date.now()) : null, after: m?.after };
     });
+    // What a milestone waits for: ids, or positions in this list (0-based); itself, unknown ones and anything that would close a
+    // circle are dropped. No list at all means the one before it.
+    for (const m of milestones) {
+      if (!Array.isArray(m.after)) { delete m.after; continue; }
+      m.after = [...new Set(m.after.map(a => typeof a === 'number' ? milestones[a]?.id : /^\d+$/.test(String(a)) ? milestones[Number(a)]?.id : text(a, 40)).filter(id => id && id !== m.id && milestones.some(x => x.id === id)))].slice(0, 12);
+    }
+    for (const m of milestones) if (Array.isArray(m.after)) m.after = m.after.filter(id => !waitsFor(milestones, id, m.id));
     // Who sees it (hosted offices): the owner, everyone when public, or the people and groups it is shared with. Tasks of the project inherit this.
     const visibility = input.visibility === undefined ? previous?.visibility || 'private' : input.visibility;
     if (!['private', 'public'].includes(visibility)) fail('Visibility must be private or public.');
@@ -60,12 +68,20 @@ export class ProjectStore {
     Object.assign(project, this.validate({ ...project, ...input }, project), { updatedAt: Date.now() });
     this.changed(project); return structuredClone(project);
   }
-  setStatus(id, status) { return this.update(id, { status }); }
+  setStatus(id, status) { const out = this.update(id, { status }); const item = this.items.find(p => p.id === id); if (item) { if (status === 'done') item.doneAt ||= Date.now(); else if (item.doneAt) item.doneAt = null; this.changed(item); } return this.get(id) || out; }
+  // A project is complete when it has milestones, every one is achieved, and none of its tasks is open: then its status is done.
+  settle(id, { tasks = [] } = {}) {
+    const project = this.items.find(p => p.id === id); if (!project || project.status !== 'active' || !(project.milestones || []).length) return null;
+    if (!project.milestones.every(m => m.done) || tasks.some(t => t.projectId === id && !['done', 'cancelled'].includes(t.state))) return null;
+    return this.setStatus(id, 'done');
+  }
   remove(id) { const project = this.items.find(p => p.id === id); if (!project) fail('There is no such project.', 404); this.items = this.items.filter(p => p.id !== id); this.changed(project); return true; }
   // The Brain folder that holds the project's files.
   folder(project) { return `Projects/${project.id}`; }
   pageId(project) { return `${this.folder(project)}/project.md`; }
-  nextMilestone(project, now = Date.now()) { return [...(project.milestones || [])].filter(m => !m.done).sort((a, b) => (a.dueAt || Infinity) - (b.dueAt || Infinity))[0] || null; }
+  // The milestones that can be worked now (nothing they wait for is open), earliest due first; and the first of them.
+  readyMilestones(project) { return readyMilestones(project.milestones || []); }
+  nextMilestone(project) { return this.readyMilestones(project)[0] || [...(project.milestones || [])].filter(m => !m.done).sort((a, b) => (a.dueAt || Infinity) - (b.dueAt || Infinity))[0] || null; }
   // The page every agent reads: charter, timeline, files, and what the project's tasks delivered so far.
   page(project, { tasks = [], files = [], teams = [] } = {}) {
     const teamName = id => teams.find(t => t.id === id)?.name || id;
@@ -75,7 +91,7 @@ export class ProjectStore {
       project.charter ? '## Charter\n' + project.charter + '\n' : '',
       '## Owners', project.teams.length ? project.teams.map(teamName).join(', ') : 'The Program Manager brings in the teams it needs.', '',
       '## Timeline', `Start: ${day(project.startAt) || 'not set'} · Target: ${day(project.dueAt) || 'not set'}${next ? ` · Next milestone: ${next.title}${next.dueAt ? ' by ' + day(next.dueAt) : ''}` : ''}`,
-      ...(project.milestones.length ? ['', ...project.milestones.map(m => `- [${m.done ? 'x' : ' '}] ${m.title}${m.dueAt ? ' — due ' + day(m.dueAt) : ''}${m.done && m.doneAt ? ' — done ' + day(m.doneAt) : ''}`)] : ['', 'No milestones yet.']), '',
+      ...(project.milestones.length ? ['', ...project.milestones.map(m => { const waits = dependsOn(project.milestones, m).map(id => project.milestones.find(x => x.id === id)?.title).filter(Boolean); return `- [${m.done ? 'x' : ' '}] ${m.title}${m.dueAt ? ' — due ' + day(m.dueAt) : ''}${m.done && m.doneAt ? ' — done ' + day(m.doneAt) : ''}${waits.length ? ' — after ' + waits.join(', ') : ' — can start at once'}`; }), '', 'Milestones that do not wait for each other are worked in parallel.'] : ['', 'No milestones yet.']), '',
       '## Files', files.length ? files.map(f => `- /knowledge/${f.id}${f.title ? ' — ' + f.title : ''}`).join('\n') : 'No files yet.', '',
       '## Tasks', tasks.length ? tasks.map(t => `- ${t.state === 'done' ? '✓' : '·'} ${t.title} (${t.state}${t.doneAt ? ', done ' + day(t.doneAt) : ''})${t.resultPreview ? '\n  ' + String(t.resultPreview).replace(/\s+/g, ' ').slice(0, 240) : ''}`).join('\n') : 'No tasks yet.', ''];
     return lines.filter(l => l !== undefined && l !== null).join('\n').replace(/\n{3,}/g, '\n\n');
@@ -85,21 +101,49 @@ export class ProjectStore {
     const next = this.nextMilestone(project);
     return [`PROJECT: ${project.name} (${project.status})`, project.description, project.charter ? `Charter: ${project.charter.slice(0, 1500)}${project.charter.length > 1500 ? '…' : ''}` : '',
       `Timeline: start ${day(project.startAt) || 'not set'}, target ${day(project.dueAt) || 'not set'}${next ? `, next milestone “${next.title}”${next.dueAt ? ' by ' + day(next.dueAt) : ''}` : ''}.`,
-      project.milestones?.length ? `Milestones (name the ids this task achieves in complete_task): ${project.milestones.map(m => `${m.id} “${m.title}”${m.dueAt ? ' due ' + day(m.dueAt) : ''}${m.done ? ' (done)' : ''}`).join('; ')}.` : '',
+      project.milestones?.length ? `Milestones (name the ids this task achieves in complete_task): ${project.milestones.map(m => { const waits = dependsOn(project.milestones, m); return `${m.id} “${m.title}”${m.dueAt ? ' due ' + day(m.dueAt) : ''}${m.done ? ' (done)' : waits.length ? ' (after ' + waits.join(', ') + ')' : ' (can start at once)'}`; }).join('; ')}. Milestones that do not wait for each other are worked in parallel${this.readyMilestones(project).length > 1 ? `; ready now: ${this.readyMilestones(project).map(m => m.id).join(', ')}` : ''}.` : '',
       `The project page, its files and what earlier tasks delivered are under /knowledge/${this.folder(project)}/ (read /knowledge/${this.pageId(project)} before planning).`].filter(Boolean).join('\n');
   }
-  // A finished task marks its milestones achieved: the one it was created for (the next one at the time) and any the Program
-  // Manager named in complete_task. Returns the milestones marked now, so the caller can say so.
-  // A milestone is achieved when every task of it is done: the task created for it finishing, or the Program Manager naming it,
-  // counts only once no other task of that milestone is still open (`tasks`: the project's tasks as the engine lists them).
+  // The tasks that count for a milestone: those created for it, and, for the first open milestone, the project's tasks that carry
+  // no milestone at all (older tasks, or tasks added while the project had none) finished after the last milestone achieved.
+  // Cancelled tasks never count.
+  milestoneTasks(project, milestone, tasks = [], { first = this.nextMilestone(project) } = {}) {
+    return tasksOf(project.milestones || [], milestone, tasks.filter(t => t.projectId === project.id), { first });
+  }
+  // A finished task marks its milestones achieved: the one it counts for and any the Program Manager named in complete_task, each
+  // only once every task of that milestone is done (`tasks`: the project's tasks as the engine lists them). Returns the milestones
+  // marked now, so the caller can say so.
   recordCompletion(job, { tasks = [] } = {}) {
     const project = this.items.find(p => p.id === job?.projectId); if (!project || job.state !== 'done') return [];
-    const busy = new Set(tasks.filter(t => t.id !== job.id && t.projectId === project.id && t.milestoneId && !['done', 'cancelled'].includes(t.state)).map(t => t.milestoneId));
-    const wanted = new Set([...(Array.isArray(job.milestonesDone) ? job.milestonesDone : []), job.milestoneId].filter(id => id && !busy.has(id)));
+    const first = this.nextMilestone(project), all = [...tasks.filter(t => t.id !== job.id), job];
+    const own = job.milestoneId || (first && this.milestoneTasks(project, first, [job], { first }).length ? first.id : null);
+    const wanted = new Set([...(Array.isArray(job.milestonesDone) ? job.milestonesDone : []), own].filter(Boolean));
     const marked = [];
-    for (const m of project.milestones || []) if (wanted.has(m.id) && !m.done) { m.done = true; m.doneAt = job.doneAt || Date.now(); m.taskId = job.id; marked.push(m); }
+    for (const m of project.milestones || []) {
+      if (!wanted.has(m.id) || m.done || this.milestoneTasks(project, m, all, { first }).some(t => t.state !== 'done')) continue;
+      m.done = true; m.doneAt = job.doneAt || Date.now(); m.taskId = job.id; marked.push(m);
+    }
     if (marked.length) { project.updatedAt = Date.now(); this.changed(project); }
     return marked.map(m => structuredClone(m));
+  }
+  // Milestones whose every task is done are achieved (at least one task; a milestone without tasks is never reached by itself):
+  // run at start, for projects whose tasks finished before the office recorded milestones. Returns what was marked.
+  reconcile({ tasks = [] } = {}) {
+    const marked = [];
+    for (const project of this.items) {
+      if (project.status === 'archived') continue;
+      const first = this.nextMilestone(project); let changed = false;
+      for (const m of [...(project.milestones || [])].sort((a, b) => (a.dueAt || Infinity) - (b.dueAt || Infinity))) {
+        if (m.done) continue;
+        const own = this.milestoneTasks(project, m, tasks, { first });
+        if (!own.length || own.some(t => t.state !== 'done')) continue;
+        const last = own.reduce((a, t) => ((t.doneAt || 0) > (a.doneAt || 0) ? t : a), own[0]);
+        m.done = true; m.doneAt = last.doneAt || Date.now(); m.taskId = last.id; changed = true;
+        marked.push({ projectId: project.id, project: project.name, milestone: structuredClone(m) });
+      }
+      if (changed) { project.updatedAt = Date.now(); this.changed(project); }
+    }
+    return marked;
   }
   // What the Program Manager keeps in long-term memory: every project at a glance.
   summary({ tasks = () => [] } = {}) {

@@ -8,9 +8,9 @@ const who = r => `${r.a.name}${r.a.role ? ', ' + r.a.role : ''}`;
 const leadTitle = r => `Team lead (★): ${r.a.name}${r.a.role ? ', ' + r.a.role : ''}`;
 const PM_TITLE = 'The Program Manager (◆): plans the task and brings in the team leads';
 const ST = {
-  blocked: ['blocked', '#B4830B'], stuck: ['needs you', '#B4830B'], planning: ['planning', '#B4830B'], verifying: ['verifying', '#684C91'],
+  blocked: ['blocked', '#b14236'], stuck: ['needs you', '#b14236'], planning: ['planning', '#B4830B'], verifying: ['verifying', '#684C91'],
   together: ['together', '#A08A1E'], working: ['working', '#2A6DB5'], submitted: ['submitted', '#A8408A'], coordinating: ['coordinating', '#B4830B'],
-  done: ['done', '#248267'], idle: ['free', '#5A5A5A'],
+  done: ['done', '#248267'], idle: ['free', '#8A8A82'],
 };
 const PRIO = ['stuck', 'blocked', 'coordinating', 'planning', 'verifying', 'together', 'working', 'submitted'];
 const PM_COL = '#B9A775';

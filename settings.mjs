@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const SETTINGS_DEFAULTS = { maxConcurrentJobs: 4, runTimeoutMinutes: 20, escalateAfterHours: 1, outboundTools: [], readOnlyTools: [], digestTime: '08:00', knowledgeSeedNotes: 6, publicOrigin: '', officeName: '', fastLane: true };
+export const SETTINGS_DEFAULTS = { maxConcurrentJobs: 4, runTimeoutMinutes: 20, escalateAfterHours: 1, outboundTools: [], readOnlyTools: [], digestTime: '08:00', knowledgeSeedNotes: 6, publicOrigin: '', officeName: '', fastLane: true, approvals: true };
 const fail = message => { throw Object.assign(new Error(message), { status: 400 }); };
 const number = (value, fallback, min, max, label) => {
   if (value === undefined || value === null || value === '') return fallback;
@@ -25,7 +25,8 @@ export class SettingsStore {
       escalateAfterHours: number(input.escalateAfterHours, d.escalateAfterHours, 0.25, 72, 'Escalate after (hours)'), outboundTools: names(input.outboundTools, 'Always ask before'), readOnlyTools: names(input.readOnlyTools, 'Never ask before'),
       digestTime, knowledgeSeedNotes: Math.round(number(input.knowledgeSeedNotes, d.knowledgeSeedNotes, 0, 20, 'Brain notes given to planners')), publicOrigin, officeName,
       // The fast lane: quick work done by the lead alone. Off, and every task goes through the Program Manager.
-      fastLane: input.fastLane === undefined ? d.fastLane : !(input.fastLane === false || input.fastLane === 0 || /^(false|no|0|off)$/i.test(String(input.fastLane))) };
+      fastLane: input.fastLane === undefined ? d.fastLane : !(input.fastLane === false || input.fastLane === 0 || /^(false|no|0|off)$/i.test(String(input.fastLane))),
+      approvals: input.approvals === undefined ? d.approvals : !(input.approvals === false || input.approvals === 0 || /^(false|no|0|off)$/i.test(String(input.approvals))) };
   }
   get() { return structuredClone(this.value); }
   update(input) {
