@@ -60,7 +60,7 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
   toolStore.onChange = () => { hub.load().then(() => bus.publish('office.updated', { area: 'tools' })).catch(e => console.warn('connectors:', e.message)); };
 
   const vault = new VaultStore({ dataDir: DATA });
-  const engine = new OfficeEngine({ dataDir: DATA, office, models, toolHub: hub, vault, toolLabels: () => Object.fromEntries(toolStore.list().map(t => [t.id, t.name])), memoryFactory: db => new OfficeMemory({ db, office, tools: () => toolStore.list(), projects: () => projects.summary({ tasks: () => engine.list() }), name }), projectFor: id => { const p = projects.get(id); return p ? { ...p, brief: projects.brief(p) } : null; }, brain: { save: input => knowledge.save(input), read: id => knowledge.read(id) }, knowledgeDir: BRAIN, knowledgeIndex: index, bus, name, settings: () => settings.get(),
+  const engine = new OfficeEngine({ dataDir: DATA, office, models, toolHub: hub, vault, toolLabels: () => Object.fromEntries(toolStore.list().map(t => [t.id, t.name])), memoryFactory: db => new OfficeMemory({ db, office, tools: () => toolStore.list(), projects: () => projects.summary({ tasks: () => engine.list() }), name }), projectFor: id => { const p = projects.get(id); return p ? { ...p, brief: projects.brief(p), next: projects.nextMilestone(p) } : null; }, brain: { save: input => knowledge.save(input), read: id => knowledge.read(id) }, knowledgeDir: BRAIN, knowledgeIndex: index, bus, name, settings: () => settings.get(),
     onChange: job => bus.publish('task.updated', listShape(job, office.get())),
     onComplete: async job => {
       if (job.kind === 'evaluation') return;
@@ -68,6 +68,8 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
       const version = job.resultVersions?.at(-1);
       // Filed through the store so the Brain graph and the search index both see the result.
       await knowledge.writeNote(`Agents Office/task-${job.id}.md`, `# ${job.title}\n\nTask: ${job.id} · Teams: ${job.depts.map(d => o.teams.find(t => t.id === d)?.name || d).join(', ')} · Version ${version?.n || 1} · Filed: ${new Date().toISOString()}\n\nCEO request: ${job.text}\n\n${job.result}\n\n---\nApproved by ${lead}. ${job.review?.summary || ''}\n`);
+      // A project task marks its milestones achieved and the project page is rewritten.
+      if (job.projectId) { try { const marked = projects.recordCompletion({ ...job, state: 'done', doneAt: job.doneAt || Date.now() }); if (marked.length) { engine.event(job.id, 'milestones_achieved', null, `Milestone${marked.length === 1 ? '' : 's'} achieved: ${marked.map(m => m.title).join(', ')}.`); audit.record({ area: 'projects', summary: `${job.projectName || job.projectId}: milestone${marked.length === 1 ? '' : 's'} achieved by “${job.title}”: ${marked.map(m => m.title).join(', ')}` }); } syncProject(job.projectId); } catch (error) { console.warn('project milestones:', error.message); } }
     } });
 
   const audit = new AuditLog({ db: engine.db, bus });

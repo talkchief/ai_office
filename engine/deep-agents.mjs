@@ -175,7 +175,7 @@ export class OfficeEngine {
     if (kind === 'evaluation' && !testcase) throw httpError('Choose a saved team test.');
     const skillIds = new Set(teams.flatMap(t => [...(t.skills || []), ...office.agents.filter(a => a.department === t.id).flatMap(a => a.skills || [])]));
     const now = Date.now();
-    const job = { schemaVersion: 2, id: randomUUID(), kind, dept: team.id, depts: all, autoRoute, title: clean(title || text).slice(0, 100), text: clean(text), assignee: assignee || null, dueAt: due, projectId: project ? project.id : null, projectName: project ? project.name : null,
+    const job = { schemaVersion: 2, id: randomUUID(), kind, dept: team.id, depts: all, autoRoute, title: clean(title || text).slice(0, 100), text: clean(text), assignee: assignee || null, dueAt: due, projectId: project ? project.id : null, projectName: project ? project.name : null, milestoneId: project?.next?.id || null, milestoneTitle: project?.next?.title || null,
       priority: [0, 1, 2].includes(priority) ? priority : 1, routine, suiteId: suiteId || null, testId: testcase?.id || null, testName: testcase?.name || null, agent: autoRoute ? 'pm' : team.lead,
       model: clean(model) || null, effort: clean(effort) || null, lane: ['quick', 'standard'].includes(lane) ? lane : null, lanePinned: ['quick', 'standard'].includes(lane), state: backlog ? 'backlog' : 'queued', stateSince: now, createdAt: now, updatedAt: now,
       officeRevision: office.revision, skills: office.skills.filter(s => skillIds.has(s.id)),
@@ -868,12 +868,13 @@ export class OfficeEngine {
   }
   // Filing a result: the approved deliverable becomes the task's result, the Brain is written, the CEO is told. Used by
   // complete_task and by the quick lane.
-  async finish(id, { summary, result, agent = 'pm', direct = false, cited = [], lane = null }) {
+  async finish(id, { summary, result, agent = 'pm', direct = false, cited = [], lane = null, milestones = [] }) {
     const job = this.get(id);
     this.setState(id, 'saving');
     const version = { n: (job.resultVersions?.length || 0) + 1, at: Date.now(), summary: clean(summary).slice(0, 2000), correction: job.correction || null, result };
     this.update(id, j => {
       j.result = result; j.resultSummary = version.summary; j.resultVersions = [...(j.resultVersions || []), version]; j.correction = null;
+      if (Array.isArray(milestones) && milestones.length) j.milestonesDone = [...new Set(milestones.map(m => clean(m).slice(0, 40)).filter(Boolean))].slice(0, 40);
       if (direct) { j.review = { approved: true, direct: true, lead: 'pm', by: 'pm', at: Date.now(), criteria: [], summary: `Answered by the Program Manager from the Brain, no team engaged: ${cited.join(', ')}.`, sources: cited }; j.sources = [...new Set([...(j.sources || []), ...cited])].slice(0, 60); }
     });
     if (direct) this.event(id, 'answered_from_brain', 'pm', `Answered from the Brain: ${cited.join(', ')}.`);
@@ -1004,7 +1005,7 @@ export class OfficeEngine {
         changes: z.array(z.object({ specialist: z.string(), feedback: z.string() })).optional() }) });
   }
   completeTool(id) {
-    return tool(async ({ summary, answer = '' }) => {
+    return tool(async ({ summary, answer = '', milestones = [] }) => {
       const job = this.get(id); if (job.state === 'cancelled') return 'The task was cancelled.';
       const open = this.openHandoffs(job);
       if (open.length) { const office = this.office.get(), name = d => office.teams.find(t => t.id === d)?.name || d; this.event(id, 'completion_refused', 'pm', `Hand-off not delegated: ${open.map(h => name(h.team)).join(', ')}.`); return `Refused: a lead asked for a hand-off that you have not delegated yet: ${open.map(h => `${name(h.from)} needs ${name(h.team)} to ${h.request.slice(0, 200)} (delegate with the task tool to ${leadName(h.team)})`).join('; ')}. Delegate it, wait for that lead's approved review, then complete.`; }
@@ -1016,10 +1017,10 @@ export class OfficeEngine {
       if (!direct && stale.length) { this.event(id, 'completion_refused', 'pm', `No approved review from ${stale.map(leadName).join(', ')}.`); return `Refused: ${stale.map(leadName).join(', ')} has no approved review of the latest work. Ask the lead to review, then call complete_task again.`; }
       const office = this.office.get(), used = job.autoRoute ? involved(job) : job.depts, parts = used.map(d => job.deliverables?.[d]).filter(Boolean);
       const result = direct ? clean(answer) : parts.length === 1 ? parts[0] : used.map(d => `## ${office.teams.find(t => t.id === d)?.name || d}\n\n${job.deliverables?.[d] || ''}`).join('\n\n');
-      const out = await this.finish(id, { summary, result, agent: 'pm', direct, cited });
+      const out = await this.finish(id, { summary, result, agent: 'pm', direct, cited, milestones });
       if (!out.ok) return `Saving the result failed (${out.error}). Call complete_task again.`;
       return `Task completed and filed as version ${out.version}. End your turn with a one-line confirmation.`;
-    }, { name: 'complete_task', description: 'Complete the task once every involved lead has recorded an approved review of the latest work; or, for a plain question the Brain answers with no team engaged, file the answer directly. Files the result for the CEO.', schema: z.object({ summary: z.string().describe('One paragraph: what was delivered'), answer: z.string().optional().describe('Only for a question answered from the Brain with no team engaged: the full answer, naming the /knowledge/ notes it rests on') }) });
+    }, { name: 'complete_task', description: 'Complete the task once every involved lead has recorded an approved review of the latest work; or, for a plain question the Brain answers with no team engaged, file the answer directly. Files the result for the CEO.', schema: z.object({ summary: z.string().describe('One paragraph: what was delivered'), answer: z.string().optional().describe('Only for a question answered from the Brain with no team engaged: the full answer, naming the /knowledge/ notes it rests on'), milestones: z.array(z.string()).optional().describe('For a project task: the ids of the project milestones this task achieved, from the PROJECT block (m-…)') }) });
   }
   askTool(id) {
     return tool(async ({ question }) => {

@@ -54,3 +54,16 @@ test('projects are created with a stable id, updated in place, and their page an
   assert.equal(store.remove('website-relaunch-2'), true);
   assert.deepEqual(new ProjectStore({ dataDir: dir, office }).list().map(x => x.id), ['website-relaunch'], 'a removed project is gone from disk');
 });
+
+test('a finished task marks its milestones: the one it was created for and any the Program Manager named; nothing twice', () => {
+  const { store } = setup();
+  const p = store.create({ name: 'Portal launch', description: 'Ship the self-service client portal to all active clients.', milestones: [{ title: 'Scope signed off', dueAt: '2026-09-30' }, { title: 'Beta with three clients', dueAt: '2026-10-31' }, { title: 'All clients live', dueAt: '2026-11-30' }] });
+  const [scope, beta, live] = p.milestones.map(m => m.id);
+  assert.match(store.brief(p), /Milestones \(name the ids this task achieves in complete_task\): m-[a-z0-9-]+ “Scope signed off” due 2026-09-30; /);
+  assert.deepEqual(store.recordCompletion({ projectId: p.id, state: 'working', milestoneId: scope }), [], 'only a finished task counts');
+  const marked = store.recordCompletion({ id: 't1', projectId: p.id, state: 'done', doneAt: 1000, milestoneId: scope, milestonesDone: [beta, 'm-unknown'] });
+  assert.deepEqual(marked.map(m => [m.title, m.done, m.doneAt, m.taskId]), [['Scope signed off', true, 1000, 't1'], ['Beta with three clients', true, 1000, 't1']]);
+  assert.equal(store.nextMilestone(store.get(p.id)).id, live);
+  assert.deepEqual(store.recordCompletion({ id: 't2', projectId: p.id, state: 'done', milestoneId: scope }), [], 'a milestone is achieved once');
+  assert.equal(store.summary({ tasks: () => [{ projectId: p.id, state: 'done' }, { projectId: p.id, state: 'working' }] })[0].done, 1);
+});

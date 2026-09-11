@@ -85,7 +85,18 @@ export class ProjectStore {
     const next = this.nextMilestone(project);
     return [`PROJECT: ${project.name} (${project.status})`, project.description, project.charter ? `Charter: ${project.charter.slice(0, 1500)}${project.charter.length > 1500 ? '…' : ''}` : '',
       `Timeline: start ${day(project.startAt) || 'not set'}, target ${day(project.dueAt) || 'not set'}${next ? `, next milestone “${next.title}”${next.dueAt ? ' by ' + day(next.dueAt) : ''}` : ''}.`,
+      project.milestones?.length ? `Milestones (name the ids this task achieves in complete_task): ${project.milestones.map(m => `${m.id} “${m.title}”${m.dueAt ? ' due ' + day(m.dueAt) : ''}${m.done ? ' (done)' : ''}`).join('; ')}.` : '',
       `The project page, its files and what earlier tasks delivered are under /knowledge/${this.folder(project)}/ (read /knowledge/${this.pageId(project)} before planning).`].filter(Boolean).join('\n');
+  }
+  // A finished task marks its milestones achieved: the one it was created for (the next one at the time) and any the Program
+  // Manager named in complete_task. Returns the milestones marked now, so the caller can say so.
+  recordCompletion(job) {
+    const project = this.items.find(p => p.id === job?.projectId); if (!project || job.state !== 'done') return [];
+    const wanted = new Set([...(Array.isArray(job.milestonesDone) ? job.milestonesDone : []), job.milestoneId].filter(Boolean));
+    const marked = [];
+    for (const m of project.milestones || []) if (wanted.has(m.id) && !m.done) { m.done = true; m.doneAt = job.doneAt || Date.now(); m.taskId = job.id; marked.push(m); }
+    if (marked.length) { project.updatedAt = Date.now(); this.changed(project); }
+    return marked.map(m => structuredClone(m));
   }
   // What the Program Manager keeps in long-term memory: every project at a glance.
   summary({ tasks = () => [] } = {}) {

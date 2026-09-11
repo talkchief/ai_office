@@ -109,6 +109,17 @@ test('an identical read repeated in one run is refused until something is writte
   } finally { await f.close(); }
 });
 
+test('a project task carries the next milestone and the Program Manager may name the milestones it achieved', async () => {
+  const project = { id: 'portal', name: 'Portal launch', status: 'active', brief: 'PROJECT: Portal launch (active)\nShip the portal.\nMilestones (name the ids this task achieves in complete_task): m-1 “Scope” due 2026-09-30; m-2 “Beta” due 2026-10-31.', next: { id: 'm-1', title: 'Scope', dueAt: 1 } };
+  const pm = context => context.last.type === 'tool' && !/^(Task completed|Refused|Review recorded)/.test(context.last.text) ? { calls: [call('complete_task', { summary: 'Delivered the scope.', milestones: ['m-1', 'm-2'] })] } : defaultPm(context);
+  const f = fixture({ pm, engineOptions: { projectFor: id => id === 'portal' ? project : null } });
+  try {
+    const id = start(f, { projectId: 'portal' }); assert.equal(f.engine.get(id).milestoneId, 'm-1'); assert.equal(f.engine.get(id).milestoneTitle, 'Scope');
+    const done = await until(f.engine, id, ['done']);
+    assert.deepEqual(done.milestonesDone, ['m-1', 'm-2']); assert.equal(done.review.approved, true);
+  } finally { await f.close(); }
+});
+
 test('completing without an approved review is refused, re-prompted once, then escalated to the CEO', async () => {
   const f = fixture({ pm: ({ last }) => last.type === 'human' ? { calls: [call('complete_task', { summary: 'Done already.' })] } : { text: 'I think it is done.' } });
   try {
