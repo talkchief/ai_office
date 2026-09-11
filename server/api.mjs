@@ -153,6 +153,7 @@ export function registerApi(router, ctx) {
   router.on('POST', '/api/routines/:id/pause', ({ params }) => routines.pause(params.id, true));
   router.on('POST', '/api/routines/:id/resume', ({ params }) => routines.pause(params.id, false));
   router.on('POST', '/api/chat', async ({ req }) => ctx.chat(await body(req)));
+  router.on('POST', '/api/assist', async ({ req }) => ctx.assist(await body(req)));
   // Compatibility for the scene: connector docks (was the Claude Code list) and the top-bar usage gauge (was the Claude plan).
   router.on('GET', '/api/mcp', () => {
     const teams = office.get().teams, key = name => String(name).toLowerCase().replace(/^claude[ ._]ai[ ._]/, '').replace(/[^a-z0-9]/g, '');

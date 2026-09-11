@@ -214,15 +214,21 @@ body.dark{--mg-rail:#121316;--mg-card:#1E1F23;--mg-line2:rgba(236,234,226,.32);-
 #settingsPage.mg .mg-team-head .mg-lead{font:12px var(--ui);color:var(--grey);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 #settingsPage.mg .mg-team-head .mg-lead b{color:var(--ink);font-weight:500}
 #settingsPage.mg .mg-team-head .mg-actions{margin-left:auto;display:flex;gap:8px}
-#settingsPage.mg .mg-person>summary{display:grid;grid-template-columns:44px 1fr auto;gap:4px 14px;align-items:center;padding:14px 18px;list-style:none;cursor:pointer}
+#settingsPage.mg details.mg-person>summary{display:grid;grid-template-columns:44px minmax(0,1fr) auto auto;grid-template-areas:"av who facts edit" "av does does does";gap:6px 14px;align-items:center;padding:14px 18px;list-style:none;cursor:pointer}
 #settingsPage.mg .mg-person>summary::-webkit-details-marker{display:none}
-#settingsPage.mg .mg-avatar{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--mg-rail);border:1px solid var(--hairline);font:600 10px var(--mg-mono);letter-spacing:.06em;color:var(--grey);grid-row:1/3}
+#settingsPage.mg .mg-avatar{grid-area:av;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--mg-rail);border:1px solid var(--hairline);font:600 10px var(--mg-mono);letter-spacing:.06em;color:var(--grey);align-self:start}
 #settingsPage.mg .mg-avatar.lead{border-color:var(--mg-gold);color:var(--mg-gold);box-shadow:0 0 0 2px color-mix(in srgb,var(--mg-gold) 25%,transparent)}
-#settingsPage.mg .mg-person .mg-who b{display:block;font:500 13px var(--ui);color:var(--ink)}
-#settingsPage.mg .mg-person .mg-who span{font:11px var(--mg-mono);color:var(--grey);letter-spacing:.03em}
-#settingsPage.mg .mg-person .mg-does{grid-column:2;color:var(--grey);font:12px/1.5 var(--ui);max-width:70ch}
-#settingsPage.mg .mg-person .mg-facts{grid-column:3;grid-row:1/3;display:flex;flex-direction:column;align-items:flex-end;gap:6px;font:11px var(--mg-mono);color:var(--grey);white-space:nowrap}
-#settingsPage.mg .mg-person[open]>summary{border-bottom:1px solid var(--hairline)}
+#settingsPage.mg .mg-person .mg-who{grid-area:who;min-width:0}
+#settingsPage.mg .mg-person .mg-who b{display:block;font:600 13.5px var(--ui);color:var(--ink)}
+#settingsPage.mg .mg-person .mg-who span{font:11.5px var(--ui);color:var(--grey)}
+#settingsPage.mg .mg-person .mg-does{grid-area:does;color:var(--grey);font:12.5px/1.5 var(--ui);max-width:78ch}
+#settingsPage.mg .mg-person .mg-does.mg-missing{color:var(--mg-warn)}
+#settingsPage.mg .mg-person .mg-facts{grid-area:facts;display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+#settingsPage.mg .mg-person .mg-open{grid-area:edit;margin-left:0;font:500 11.5px var(--ui);color:var(--ink);border:1px solid var(--mg-line2);border-radius:6px;padding:4px 10px}
+#settingsPage.mg .mg-assist{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:99px;border:1px solid var(--mg-gold);background:color-mix(in srgb,var(--mg-gold) 16%,transparent);color:#6E5A1C;font:600 11px var(--ui);cursor:pointer;white-space:nowrap}
+#settingsPage.mg .mg-assist:hover{background:color-mix(in srgb,var(--mg-gold) 30%,transparent)}
+body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
+#settingsPage.mg details.mg-person[open]>summary{border-bottom:1px solid var(--hairline)}
 #settingsPage.mg .mg-person .mg-fold-body h4{margin:18px 0 8px;font:500 10.5px var(--mg-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--grey)}
 #settingsPage.mg .mg-rules td:first-child{width:60%}
 
@@ -306,7 +312,7 @@ body.dark{--mg-rail:#121316;--mg-card:#1E1F23;--mg-line2:rgba(236,234,226,.32);-
   #settingsPage.mg .mg-area-head{grid-template-columns:1fr}#settingsPage.mg .mg-area-meta{align-items:flex-start}
   #settingsPage.mg .mg-area-head h1{font-size:30px}
   #settingsPage.mg .mg-control{grid-template-columns:1fr}#settingsPage.mg .mg-control .mg-ctl{grid-column:1;grid-row:auto;justify-content:flex-start}
-  #settingsPage.mg .mg-person>summary{grid-template-columns:44px 1fr}#settingsPage.mg .mg-person .mg-facts{grid-column:2;grid-row:auto;align-items:flex-start}
+  #settingsPage.mg details.mg-person>summary{grid-template-columns:44px minmax(0,1fr) auto;grid-template-areas:"av who edit" "av does does" "av facts facts"}#settingsPage.mg .mg-person .mg-facts{justify-content:flex-start}
   #settingsPage.mg .mg-timetable{display:none}
   #settingsPage.mg .mg-savebar{position:static;margin-top:16px}
   .toast-host{right:8px;left:8px;width:auto}
