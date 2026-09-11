@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task view options</title>
+<style>
+:root{--cream:#FDFFF8;--ink:#151414;--grey:#5F5E59;--hairline:rgba(21,20,20,.12);--card:#FFFFFF;--rail:#F4F4ED;--mute:#9C9B93;--line2:rgba(22,21,20,.28);--label:#4A4947;
+  --ok:#1E7A55;--ok-bg:#E9F5EE;--fail:#B2382C;--fail-bg:#FBECEA;--warn:#8F6407;--warn-bg:#FBF3DC;--busy:#2E5EA8;--busy-bg:#E8EFFA;--gold:#B9A775;
+  --serif:"Instrument Serif",Georgia,serif;--ui:Inter,-apple-system,"Segoe UI",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --shadow:0 14px 36px rgba(22,21,20,.12),0 1px 2px rgba(22,21,20,.06)}
+body.dark{--cream:#15161A;--ink:#ECEAE3;--grey:#A3A098;--hairline:rgba(236,234,227,.14);--card:#1E1F24;--rail:#121316;--mute:#6E6D67;--line2:rgba(236,234,226,.32);--label:#B7B4AC;
+  --ok:#5CC292;--ok-bg:rgba(92,194,146,.14);--fail:#F0857A;--fail-bg:rgba(240,133,122,.14);--warn:#E4B75B;--warn-bg:rgba(228,183,91,.14);--busy:#84ADEC;--busy-bg:rgba(132,173,236,.14);--gold:#CDBB86;--shadow:0 18px 44px rgba(0,0,0,.55)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(120% 90% at 50% 30%,var(--cream) 55%,color-mix(in srgb,var(--cream) 92%,#000) 100%);color:var(--ink);font:13px/1.5 var(--ui);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+[hidden]{display:none!important}
+
+/* ---- the switcher ---- */
+.bar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:10px;padding:10px 18px;background:color-mix(in srgb,var(--cream) 90%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--hairline);font:12px var(--ui);color:var(--grey);flex-wrap:wrap}
+.bar .seg{display:inline-flex;border:1px solid var(--line2);border-radius:99px;overflow:hidden}
+.bar .seg button{border:0;background:transparent;padding:6px 12px;font:500 12px var(--ui);color:var(--grey)}
+.bar .seg button[aria-pressed=true]{background:var(--ink);color:var(--cream)}
+.bar .sp{flex:1}
+.bar .note{max-width:52ch}
+.stage{padding:26px 18px 120px;display:grid;place-items:start center}
+.sheet{width:min(1040px,100%);background:var(--card);border:1px solid var(--hairline);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+
+/* ---- atoms (the Manage vocabulary) ---- */
+.eyebrow{font:500 10.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--label)}
+.mono{font-family:var(--mono)}
+.st{display:inline-flex;align-items:center;gap:6px;padding:3px 9px 3px 7px;border-radius:99px;border:1px solid var(--hairline);font:500 11px/1.2 var(--mono);letter-spacing:.03em;white-space:nowrap;vertical-align:middle}
+.st i{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.st-ok{color:var(--ok);background:var(--ok-bg);border-color:transparent}.st-fail{color:var(--fail);background:var(--fail-bg);border-color:transparent}.st-warn{color:var(--warn);background:var(--warn-bg);border-color:transparent}.st-busy{color:var(--busy);background:var(--busy-bg);border-color:transparent}.st-off{color:var(--grey)}.st-off i{background:var(--mute)}
+.st-busy i{animation:pulse 1.1s ease-in-out infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.chip{display:inline-block;padding:2px 8px;border:1px solid var(--hairline);border-radius:99px;font:500 10.5px var(--mono);letter-spacing:.04em;color:var(--label);white-space:nowrap}
+.chip-ink{color:var(--ink);border-color:var(--line2)}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.btn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:8px;border:1px solid var(--line2);background:transparent;font:500 12.5px var(--ui);white-space:nowrap}
+.btn:hover{background:color-mix(in srgb,var(--ink) 5%,transparent)}
+.btn-p{background:var(--ink);color:var(--cream);border-color:var(--ink)}.btn-p:hover{background:color-mix(in srgb,var(--ink) 86%,var(--cream))}
+.btn-sm{height:28px;padding:0 10px;font-size:11.5px;border-radius:6px}
+.btn-text{border-color:transparent;color:var(--grey);padding:0 8px}.btn-text:hover{color:var(--ink)}
+.btn-danger{color:var(--fail);border-color:color-mix(in srgb,var(--fail) 40%,transparent)}
+.card{background:var(--card);border:1px solid var(--hairline);border-radius:12px;padding:18px 20px;margin:0 0 14px}
+.card h3{margin:0 0 4px;font:400 20px var(--serif)}
+.card>p.lead{margin:0 0 14px;color:var(--grey);font-size:12.5px}
+.card-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}.card-head h3{margin:0}.card-head .sp{flex:1}
+.ledger{width:100%;border-collapse:collapse}
+.ledger th{font:500 10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--label);text-align:left;padding:9px 12px;border-bottom:1px solid var(--hairline);background:var(--rail)}
+.ledger td{padding:10px 12px;border-bottom:1px solid var(--hairline);vertical-align:middle;font-size:12.5px}
+.ledger tr:last-child td{border-bottom:0}.ledger td.k{font-family:var(--mono);font-size:11.5px;white-space:nowrap}.ledger td.r{text-align:right;white-space:nowrap}
+.ledger .sub{display:block;font:11px var(--mono);color:var(--label);margin-top:2px}
+.ledger-wrap{border:1px solid var(--hairline);border-radius:10px;overflow:auto;background:var(--card)}
+.fold{border:1px solid var(--hairline);border-radius:10px;background:var(--card);margin:0 0 10px}
+.fold>summary{cursor:pointer;padding:11px 16px;font:500 13px var(--ui);list-style:none;display:flex;align-items:center;gap:10px}
+.fold>summary::-webkit-details-marker{display:none}.fold>summary small{font:11px var(--mono);color:var(--label)}.fold>summary .sp{flex:1}
+.fold[open]>summary{border-bottom:1px solid var(--hairline)}.fold>.in{padding:14px 16px}
+textarea{width:100%;border:1px solid var(--line2);border-radius:8px;padding:9px 11px;background:var(--card);color:var(--ink);font:13px/1.5 var(--ui);min-height:64px;resize:vertical}
+textarea:focus{outline:0;border-color:var(--busy);box-shadow:0 0 0 3px var(--busy-bg)}
+.switch{appearance:none;width:30px;height:18px;border-radius:99px;background:var(--mute);position:relative;margin:0;cursor:pointer;vertical-align:middle}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .15s}.switch:checked{background:var(--ok)}.switch:checked::after{transform:translateX(12px)}
+.avatar{width:26px;height:26px;border-radius:50%;display:inline-grid;place-items:center;background:var(--rail);border:1px solid var(--hairline);font:600 8.5px var(--mono);letter-spacing:.04em;color:var(--label);flex:none}
+.avatar.lead{border-color:var(--gold);color:var(--gold)}
+
+/* ---- file tiles: the extension on its colour, as in the office ---- */
+.file-icon{display:inline-grid;place-items:center;min-width:34px;height:24px;padding:0 5px;border-radius:5px 10px 5px 5px;background:var(--file-color,#7F8C8D);color:#fff;font:700 9.5px var(--mono);letter-spacing:.06em;margin-right:8px;vertical-align:middle;flex:none}
+.stop{}
+/* ---- the document ---- */
+.doc{font:14px/1.75 var(--ui);color:var(--ink);max-width:70ch}
+.doc h1{font:400 26px/1.2 var(--serif);margin:0 0 16px}.doc h2{font:400 21px/1.3 var(--serif);margin:26px 0 10px}.doc h3{font:600 14px var(--ui);margin:20px 0 8px}
+.doc p{margin:0 0 1em}.doc ul{padding-left:22px;margin:8px 0 16px}.doc li{margin:5px 0}
+.doc table{border-collapse:collapse;font-size:12.5px;margin:8px 0 18px;width:100%}.doc th,.doc td{border-bottom:1px solid var(--hairline);padding:7px 10px;text-align:left}.doc th{font:500 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--label)}.doc td.n{font-family:var(--mono);text-align:right}
+.doc blockquote{border-left:2px solid var(--gold);margin:14px 0;padding:2px 0 2px 14px;color:var(--grey)}
+.outline{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px}.outline a{font:11.5px var(--ui);color:var(--label);text-decoration:none;border:1px solid var(--hairline);border-radius:99px;padding:3px 10px}.outline a:hover{color:var(--ink);border-color:var(--line2)}
+.prov{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--hairline);margin-top:18px;padding-top:10px;font:11px var(--mono);color:var(--label)}
+
+/* ---- header, facts, decision ---- */
+.head{padding:22px 28px 0}
+.head .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.head h1{margin:8px 0 6px;font:400 30px/1.15 var(--serif)}
+.head .x{margin-left:auto;border:0;background:transparent;color:var(--grey);font-size:18px;line-height:1;padding:4px 6px}
+.facts{display:flex;flex-wrap:wrap;gap:6px 18px;font:11.5px var(--mono);color:var(--label);padding:4px 0 16px}
+.facts b{font-weight:500;color:var(--ink)}
+.decision{border:1px solid;border-radius:12px;padding:14px 18px;margin:0 0 16px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;align-items:start}
+.decision.fail{border-color:color-mix(in srgb,var(--fail) 40%,transparent);background:var(--fail-bg)}
+.decision.warn{border-color:color-mix(in srgb,var(--warn) 45%,transparent);background:var(--warn-bg)}
+.decision.ok{border-color:color-mix(in srgb,var(--ok) 35%,transparent);background:var(--ok-bg)}
+.decision .g{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font:700 11px var(--mono);color:#fff;margin-top:1px}
+.decision.fail .g{background:var(--fail)}.decision.warn .g{background:var(--warn)}.decision.ok .g{background:var(--ok)}
+.decision b.t{font:600 13.5px var(--ui);display:block}
+.decision p{margin:2px 0 0;font:12.5px/1.5 var(--ui);color:var(--ink)}
+.decision .raw{grid-column:2;margin:8px 0 0}
+.decision .raw>summary{font:500 11px var(--mono);color:var(--label);cursor:pointer;list-style:none}
+.decision .raw pre{margin:6px 0 0;padding:10px 12px;border-radius:8px;background:color-mix(in srgb,var(--ink) 6%,transparent);font:11px/1.55 var(--mono);white-space:pre-wrap;color:var(--label)}
+.decision .act{grid-column:2;display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.decision .act .sp{flex:1}
+.decision .fld{grid-column:2;margin-top:10px}
+.decision .fld label{display:block;font:500 12px var(--ui);margin-bottom:6px}
+.remember{display:inline-flex;align-items:center;gap:8px;font:12px var(--ui);color:var(--grey)}
+
+/* ---- steps ---- */
+.steps{display:flex;flex-direction:column;gap:8px}
+.step{border:1px solid var(--hairline);border-radius:10px;background:var(--card)}
+.step>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:28px 26px 1fr auto;gap:10px;align-items:center;padding:10px 14px}
+.step>summary::-webkit-details-marker{display:none}
+.step .n{font:500 11px var(--mono);color:var(--mute)}
+.step .t{font:500 13px var(--ui)}.step .t small{display:block;font:11px var(--mono);color:var(--label);margin-top:1px}
+.step[open]>summary{border-bottom:1px solid var(--hairline)}
+.step .in{padding:12px 14px 14px 78px;font-size:12.5px}
+.step .in .meta{font:11px var(--mono);color:var(--label);margin-bottom:8px}
+.step .in ul{margin:6px 0 10px;padding-left:18px}.step .in li{margin:3px 0}
+.excerpt{border-left:2px solid var(--hairline);padding:2px 0 2px 12px;color:var(--grey);font-size:12.5px;margin-top:8px}
+.plan{display:flex;align-items:center;gap:12px;margin:0 0 12px;font-size:12.5px;color:var(--grey)}
+.plan .bar2{flex:1;height:4px;border-radius:2px;background:var(--hairline);overflow:hidden}.plan .bar2 i{display:block;height:100%;background:var(--ok)}
+.timeline{list-style:none;margin:0;padding:0}
+.timeline li{display:grid;grid-template-columns:118px 1fr;gap:12px;padding:6px 0;border-bottom:1px solid var(--hairline);font-size:12px}
+.timeline li:last-child{border:0}.timeline time{font:11px var(--mono);color:var(--label)}.timeline b{font-weight:600;margin-right:6px}
+
+/* ---- review ---- */
+.check{display:grid;grid-template-columns:20px 1fr;gap:4px 10px;padding:9px 0;border-bottom:1px solid var(--hairline)}
+.check:last-child{border:0}
+.check .m{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font:700 10px var(--mono);color:#fff}
+.check.pass .m{background:var(--ok)}.check.fail .m{background:var(--fail)}
+.check b{font:600 12.5px var(--ui)}.check p{grid-column:2;margin:0;font:12px/1.5 var(--ui);color:var(--grey)}
+.note{border-left:2px solid var(--gold);padding:2px 0 2px 12px;font:italic 13px/1.5 var(--serif);color:var(--ink)}
+
+/* ---- facts rail ---- */
+.rail{display:flex;flex-direction:column;gap:16px;font:12px/1.5 var(--ui)}
+.rail .lab{font:500 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--label);margin-bottom:6px}
+.rail .row{display:flex;align-items:flex-start;gap:8px;margin:4px 0}.rail .row small{display:block;font:10.5px var(--mono);color:var(--label)}
+.rail .stats{font:11px/1.7 var(--mono);color:var(--label);border-top:1px solid var(--hairline);padding-top:10px}
+
+/* ================= option A: the case file ================= */
+.A{display:grid;grid-template-columns:172px minmax(0,1fr) 224px;gap:0}
+.A .outline-col{border-right:1px solid var(--hairline);padding:22px 12px;position:sticky;top:52px;align-self:start;height:fit-content}
+.A .outline-col a{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--grey);font:12.5px var(--ui);padding:7px 10px;border-radius:8px}
+.A .outline-col a:hover{background:color-mix(in srgb,var(--ink) 5%,transparent);color:var(--ink)}
+.A .outline-col a.on{background:var(--rail);color:var(--ink);font-weight:500}
+.A .outline-col a .c{margin-left:auto;font:11px var(--mono);color:var(--mute)}
+.A .outline-col .eyebrow{display:block;padding:0 10px 8px}
+.A .main{padding:22px 26px 40px;min-width:0}
+.A .main h2{font:400 22px var(--serif);margin:26px 0 12px;padding-top:18px;border-top:1px solid var(--hairline)}
+.A .main h2:first-of-type{border:0;padding-top:0;margin-top:0}
+.A .facts-col{border-left:1px solid var(--hairline);padding:22px 18px;position:sticky;top:52px;align-self:start}
+
+/* ================= option B: the desk (tabs) ================= */
+.B .tabs{display:flex;gap:2px;border-bottom:1px solid var(--hairline);padding:0 28px;position:sticky;top:52px;background:var(--card);z-index:2}
+.B .tabs button{background:transparent;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:11px 12px;font:500 13px var(--ui);color:var(--grey)}
+.B .tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--ink)}
+.B .tabs button .c{font:11px var(--mono);color:var(--mute);margin-left:6px}
+.B .tabs button .st{margin-left:8px}
+.B .pane{padding:20px 28px 40px}
+.B .two{display:grid;grid-template-columns:minmax(0,1fr) 224px;gap:26px;align-items:start}
+
+/* ================= option C: the review (split) ================= */
+.C .split{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(320px,.9fr);gap:0}
+.C .left{padding:20px 28px 40px;border-right:1px solid var(--hairline);min-width:0}
+.C .right{padding:20px 22px 40px;background:color-mix(in srgb,var(--rail) 60%,transparent)}
+.C .sec{border:1px solid var(--hairline);border-radius:12px;background:var(--card);margin:0 0 12px}
+.C .sec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 16px;font:400 17px var(--serif)}
+.C .sec>summary::-webkit-details-marker{display:none}.C .sec>summary .sp{flex:1}.C .sec>summary .c{font:11px var(--mono);color:var(--label)}
+.C .sec[open]>summary{border-bottom:1px solid var(--hairline)}.C .sec .in{padding:12px 16px 14px}
+.stop{border:1px dashed var(--line2);border-radius:12px;padding:18px 20px;color:var(--grey);font-size:12.5px}
+.stop b{display:block;font:400 20px var(--serif);color:var(--ink);margin-bottom:6px}
+@media (max-width:860px){.A{grid-template-columns:1fr}.A .outline-col,.A .facts-col{position:static;border:0;border-bottom:1px solid var(--hairline)}.B .two{grid-template-columns:1fr}.C .split{grid-template-columns:1fr}.C .left{border-right:0}}
+</style>
+</head>
+<body>
+<div class="bar">
+  <span class="seg" id="opt"><button type="button" data-opt="A" aria-pressed="true">A · The case file</button><button type="button" data-opt="B" aria-pressed="false">B · The desk</button><button type="button" data-opt="C" aria-pressed="false">C · The review</button></span>
+  <span class="seg" id="state"><button type="button" data-state="blocked" aria-pressed="true">Needs attention</button><button type="button" data-state="done" aria-pressed="false">Approved</button></span>
+  <span class="note" id="optNote"></span>
+  <span class="sp"></span>
+  <button type="button" class="btn btn-sm" onclick="document.body.classList.toggle('dark')">◐ Dark</button>
+</div>
+<div class="stage"><div class="sheet" id="sheet"></div></div>
+
+<script>
+/* ---------- two real tasks ---------- */
+const TASKS = {
+  blocked: {
+    title: 'what was the last task you worked on?', team: 'Program Manager', lead: 'Program Manager', state: 'blocked',
+    created: '11 Sep · 12:16', duration: '4 s', model: 'google/gemini-3.8-flash', effort: 'high', calls: 2, tokens: '11.1k',
+    error: '400 [{"error":{"code":400,"message":"Function call is missing a thought_signature in functionCall parts. This is required for tools to work correctly, and missing thought_signature may lead to degraded model performance. Additional data, function call `default_api:ls` , position 2. Please refer to https://ai.google.dev/gemini-api/docs/thought-signatures for more details.","status":"INVALID_ARGUMENT"}}]',
+    plain: 'The model provider refused a tool call before any work was done. Gemini 3.8 Flash requires thought signatures on function calls, which the office did not send. Retrying usually works; if it repeats, give the Program Manager another model under Models & keys.',
+    brief: 'what was the last task you worked on?',
+    plan: '', steps: [], reviews: [], files: [], result: '',
+    events: [['12:16:08', 'Office', 'Task received. Routed to the Program Manager.'], ['12:16:09', 'Program Manager', 'Started planning.'], ['12:16:10', 'Program Manager', 'Called the model (google/gemini-3.8-flash · high).'], ['12:16:12', 'Program Manager', 'The provider answered 400: INVALID_ARGUMENT.'], ['12:16:12', 'Office', 'Retried once, refused again. Task blocked.']],
+  },
+  done: {
+    title: 'Prepare the Growth plan price change for November: the October table is superseded, every Growth tier moves', team: 'Finance', lead: 'CHIEF FINANCIAL OFFICER', state: 'done',
+    created: '11 Sep · 10:51', duration: '23 min', model: 'google/gemini-3.8-flash', effort: 'high', calls: 41, tokens: '212k', approvedAt: '11 Sep · 11:14',
+    brief: 'Prepare the Growth plan price change for November: the October table is superseded, every Growth tier moves 5% up, annual keeps its 15% discount. Update the price table in the Brain, check the contract clauses that mention pricing, draft the proposal template, the onboarding note, the newsletter paragraph and the client email. Nothing goes out; everything comes back to me first.',
+    plan: 'Finance sets the November table and the effective date, Operations checks the clauses that mention pricing, then Sales, Delivery, Marketing and Emails each rewrite their piece from the same table.',
+    steps: [
+      ['FINANCIAL ANALYST', 'FA', 'Finance', 'Set the November Growth table: every tier plus 5%, annual keeps the 15% discount', 'done', 'google/gemini-3.8-flash · high', ['Every tier recomputed from the October table', 'Annual shown next to monthly', 'Effective date stated'], 'November Growth pricing. Monthly: Starter 29 → 30.45, Team 79 → 82.95, Business 189 → 198.45. Annual keeps the 15% discount on the new monthly figures…'],
+      ['LEGAL REVIEW', 'LR', 'Operations', 'Check every contract clause that mentions Growth pricing or notice periods', 'done', 'z-ai/glm-5.3 · high', ['Each clause quoted with its note path', 'Notice period stated per contract form'], 'Three clauses mention price changes. The 2025 MSA (Brain: Company/msa-2025.md §7.2) requires 30 days’ written notice…'],
+      ['PROPOSALS', 'PR', 'Sales', 'Rewrite the proposal template with the November table', 'done', 'google/gemini-3.8-flash · medium', ['Uses the Finance table verbatim', 'Send-ready, one page'], 'Growth plan proposal, November 2026. For teams that want…'],
+      ['ONBOARDER', 'ON', 'Delivery', 'Update the onboarding note where it quotes prices', 'done', 'google/gemini-3.8-flash · medium', ['No stale October figure remains'], 'Onboarding note, pricing section, revised…'],
+      ['NEWSLETTER', 'NL', 'Marketing', 'Write the newsletter paragraph announcing the change', 'done', 'google/gemini-3.8-flash · medium', ['One paragraph, plain, states the date', 'Links to the price page'], 'From 1 November, Growth plan prices rise by 5%…'],
+      ['CLIENT EMAILS', 'CE', 'Emails', 'Draft the client email with the 30-day notice', 'done', 'google/gemini-3.8-flash · medium', ['30-day notice date correct', 'Company voice, one ask'], 'Subject: A change to your Growth plan from 1 November…'],
+    ],
+    reviews: [{ who: 'CHIEF FINANCIAL OFFICER', at: '11 Sep · 11:12', passed: true, summary: 'The table is right, every piece uses it, and the notice period is respected. The newsletter paragraph was too long on the first pass and was shortened.',
+      checks: [['pass', 'Every figure traces to a Brain note', 'All six pieces cite Finance/growth-pricing-november.md.'], ['pass', 'Nothing goes out without the owner', 'Every deliverable is marked draft; no send tool was called.'], ['pass', 'One clear next step', 'Each piece ends with what the owner decides.'], ['pass', 'Contract notice respected', 'Client email dated 1 October for a 1 November change.']] }],
+    files: [['growth-plan-price-change-november.pdf', '196 KB', '11:13', 'pdf'], ['growth-pricing-november.csv', '2 KB', '11:02', 'csv'], ['proposal-template-november.md', '6 KB', '11:06', 'md'], ['client-email-notice.md', '3 KB', '11:10', 'md']],
+    result: `<h1>Growth plan price change, November 2026</h1><p>Every Growth tier moves up 5% on 1 November 2026. Annual billing keeps its 15% discount on the new monthly figures. The October table is superseded.</p>
+<h2>The November table</h2><table><tr><th>Tier</th><th>Monthly, October</th><th>Monthly, November</th><th>Annual, per month</th></tr><tr><td>Starter</td><td class="n">29.00</td><td class="n">30.45</td><td class="n">25.88</td></tr><tr><td>Team</td><td class="n">79.00</td><td class="n">82.95</td><td class="n">70.51</td></tr><tr><td>Business</td><td class="n">189.00</td><td class="n">198.45</td><td class="n">168.68</td></tr></table>
+<h2>What the contracts require</h2><p>Three clauses mention price changes. The 2025 master agreement requires 30 days’ written notice, so the client email is dated 1 October. The two older forms need no notice but the same email goes to everyone for consistency.</p>
+<h2>The pieces, ready for you</h2><ul><li>Proposal template, one page, using the table above.</li><li>Onboarding note, pricing section revised, no October figure remains.</li><li>Newsletter paragraph, 60 words, stating the date and linking to the price page.</li><li>Client email with the 30-day notice, in the company voice, one ask.</li></ul>
+<blockquote>Nothing has been sent. Approving this files the table and the four drafts in the Brain; sending is a separate decision.</blockquote>`,
+    events: [['10:51:02', 'Office', 'Task received. Routed to the Program Manager.'], ['10:51:04', 'Program Manager', 'Planned six parts across Finance, Operations, Sales, Delivery, Marketing and Emails.'], ['10:52:10', 'FINANCIAL ANALYST', 'Set the November table.'], ['10:58:41', 'LEGAL REVIEW', 'Checked three clauses.'], ['11:06:12', 'NEWSLETTER', 'Draft sent back: too long. Shortened.'], ['11:12:30', 'CHIEF FINANCIAL OFFICER', 'Reviewed the assembled deliverable: passed.'], ['11:14:02', 'You', 'Approved. Filed in the Brain.']],
+  },
+};
+
+/* ---------- shared fragments ---------- */
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const mark = (k, l) => `<span class="st st-${k}"><i></i>${l}</span>`;
+const statusOf = t => t.state === 'done' ? mark('ok', 'Approved') : t.state === 'blocked' ? mark('fail', 'Failed · needs you') : t.state === 'waiting' ? mark('warn', 'Waits for you') : mark('busy', 'Working');
+const head = t => `<div class="head"><div class="top"><span class="eyebrow">Task · ${esc(t.team)} · ${esc(t.lead)}</span>${statusOf(t)}<button class="x" type="button" aria-label="Close">✕</button></div><h1>${esc(t.title)}</h1>
+  <div class="facts"><span>created <b>${t.created}</b></span><span>took <b>${t.duration}</b></span>${t.approvedAt ? `<span>approved <b>${t.approvedAt}</b> · filed in the Brain</span>` : ''}</div></div>`;
+const decision = t => t.state === 'blocked'
+  ? `<div class="decision fail"><span class="g">✕</span><div><b class="t">The provider refused the call, so nothing was done.</b><p>${esc(t.plain)}</p></div>
+     <details class="raw"><summary>What the provider said</summary><pre>${esc(t.error)}</pre></details>
+     <div class="fld"><label>Tell the team what to change, or leave it blank to retry as it was</label><textarea placeholder="Describe a correction…"></textarea></div>
+     <div class="act"><button class="btn btn-p" type="button">Retry task</button><button class="btn" type="button">Change the model</button><span class="sp"></span><button class="btn btn-text btn-danger" type="button">Cancel task</button></div></div>`
+  : `<div class="decision ok"><span class="g">✓</span><div><b class="t">Approved and filed in the Brain on ${t.approvedAt}.</b><p>The lead verified the deliverable against 4 of 4 checks. Every team can read it now.</p></div>
+     <details class="raw" style="margin-top:6px"><summary>Ask for changes</summary><div class="fld" style="margin-top:8px"><textarea placeholder="What should change? The lead reworks it, reviews it again, and you get a new version."></textarea><div class="act" style="margin-top:8px"><label class="remember"><input type="checkbox" class="switch"> Remember this for the Finance team from now on</label><span class="sp"></span><button class="btn btn-p" type="button">Send correction</button></div></div></details></div>`;
+const outline = t => t.result ? `<nav class="outline"><a href="#">The November table</a><a href="#">What the contracts require</a><a href="#">The pieces, ready for you</a></nav>` : '';
+const resultDoc = t => t.result
+  ? `<div class="card-head"><span class="eyebrow">${t.state === 'done' ? 'Final deliverable' : 'Draft deliverable · not approved'}</span><span class="sp"></span><button class="btn btn-sm" type="button">Copy</button><button class="btn btn-sm" type="button">Download .md</button><button class="btn btn-sm" type="button">Open PDF</button></div>${outline(t)}<article class="doc">${t.result}</article><div class="prov"><span>Lead verification complete</span><span>${esc(t.lead)} · ${t.approvedAt}</span></div>`
+  : `<div class="stop"><b>No result yet.</b>The task stopped before any assignment was made. Retry above, or read the brief and the timeline below to see where it stopped.</div>`;
+const brief = t => `<details class="fold"><summary>Original brief<span class="sp"></span><small>as you wrote it</small></summary><div class="in"><div class="doc" style="font-size:13px">${esc(t.brief)}</div></div></details>`;
+const plan = t => t.steps.length ? `<p style="margin:0 0 8px;font-size:12.5px">${esc(t.plan)}</p><div class="plan"><span>${t.steps.filter(s => s[4] === 'done').length} of ${t.steps.length} assignments submitted</span><span class="bar2"><i style="width:${Math.round(100 * t.steps.filter(s => s[4] === 'done').length / t.steps.length)}%"></i></span>${mark('ok', 'Lead review passed')}</div>` : `<p style="margin:0;color:var(--grey);font-size:12.5px">No plan was made. The Program Manager was refused by the provider on its first call.</p>`;
+const steps = t => t.steps.length ? `<div class="steps">${t.steps.map((s, i) => `<details class="step"${i === 0 ? ' open' : ''}><summary><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="avatar">${s[1]}</span><span class="t">${esc(s[3])}<small>${esc(s[0])} · ${esc(s[2])}</small></span>${mark(s[4] === 'done' ? 'ok' : 'busy', s[4] === 'done' ? 'Submitted' : 'Working')}</summary><div class="in"><div class="meta">tools: read_brain, write_file</div><b style="font-size:12px">Acceptance</b><ul>${s[6].map(a => `<li>${esc(a)}</li>`).join('')}</ul><b style="font-size:12px">Submission</b><div class="excerpt">${esc(s[7])}</div></div></details>`).join('')}</div>` : '';
+const timeline = t => `<details class="fold"><summary>Activity timeline<span class="sp"></span><small>${t.events.length} events</small></summary><div class="in"><ol class="timeline">${t.events.map(e => `<li><time>${e[0]}</time><div><b>${esc(e[1])}</b>${esc(e[2])}</div></li>`).join('')}</ol></div></details>`;
+const review = t => t.reviews.length ? t.reviews.map((r, i) => `<div class="card"><div class="card-head"><h3>Review ${i + 1}</h3>${mark(r.passed ? 'ok' : 'warn', r.passed ? 'Passed' : 'Changes required')}<span class="sp"></span><span class="mono" style="font-size:11px;color:var(--label)">${esc(r.who)} · ${r.at}</span></div><div class="note">${esc(r.summary)}</div><div style="margin-top:12px">${r.checks.map(c => `<div class="check ${c[0]}"><span class="m">${c[0] === 'pass' ? '✓' : '✕'}</span><b>${esc(c[1])}</b><p>${esc(c[2])}</p></div>`).join('')}</div></div>`).join('') + `<details class="fold"><summary>Run details<span class="sp"></span><small>model, calls, tokens</small></summary><div class="in"><div class="ledger-wrap"><table class="ledger"><tbody><tr><td>Model</td><td class="k r">${esc(t.model)} · ${t.effort}</td></tr><tr><td>Model calls</td><td class="k r">${t.calls} of 120</td></tr><tr><td>Reported tokens</td><td class="k r">${t.tokens} of 2.0M</td></tr><tr><td>Team configuration</td><td class="k r">v25</td></tr><tr><td>Skills used</td><td class="k r">Financial Analyst v1</td></tr></tbody></table></div></div></details>`
+  : `<div class="stop"><b>Review has not started.</b>The lead reviews the actual submissions once the team has finished its work. This task never reached that point.</div>`;
+const ICON = { pdf: ['PDF', '#C0392B'], csv: ['CSV', '#1E8449'], md: ['MD', '#2C6E9E'], docx: ['DOCX', '#2E5CB8'], pptx: ['PPTX', '#D35400'] };
+const fileIcon = k => `<span class="file-icon" style="--file-color:${(ICON[k] || ['FILE', '#7F8C8D'])[1]}" role="img" aria-label="${(ICON[k] || ['FILE'])[0]} file">${(ICON[k] || ['FILE'])[0]}</span>`;
+const artifacts = t => t.files.length ? `<div class="ledger-wrap"><table class="ledger"><thead><tr><th>File</th><th>Kind</th><th>Size</th><th>When</th><th class="r"></th></tr></thead><tbody>${t.files.map(f => `<tr><td>${fileIcon(f[3])}<b style="font-weight:500">${esc(f[0])}</b>${f[3] === 'pdf' ? '<span class="sub">exported document</span>' : ''}</td><td class="k">${f[3]}</td><td class="k">${f[1]}</td><td class="k">${f[2]}</td><td class="r"><button class="btn btn-sm" type="button">Download</button></td></tr>`).join('')}</tbody></table></div>`
+  : `<div class="stop"><b>No files.</b>Files the team writes while working appear here: drafts, exports, data. This task produced none.</div>`;
+const facts = t => `<div class="rail"><div><div class="lab">Who</div><div class="row"><span class="avatar lead">★</span><div>${esc(t.lead)}<small>planned${t.reviews.length ? ' · reviewed' : ''}</small></div></div>${t.steps.map(s => `<div class="row"><span class="avatar">${s[1]}</span><div>${esc(s[0])}<small>${esc(s[2])}</small></div></div>`).join('')}</div>
+  ${t.reviews.length ? `<div><div class="lab">Checks · 4 of 4</div>${t.reviews[0].checks.map(c => `<div class="row"><span style="color:var(--ok);font-family:var(--mono)">✓</span><div>${esc(c[1])}</div></div>`).join('')}</div><div><div class="lab">Lead’s note</div><div class="note">${esc(t.reviews[0].summary.split('.')[0])}.</div></div>` : ''}
+  <div class="stats">took ${t.duration}${t.state === 'done' ? '<br>Filed in the Brain as a note the whole office can read.' : ''}</div></div>`;
+const counts = t => ({ steps: t.steps.length, review: t.reviews.length ? (t.reviews[0].passed ? 'passed' : 'changes') : '', files: t.files.length });
+
+/* ---------- option A: the case file ---------- */
+function A(t) {
+  const c = counts(t);
+  return `${head(t)}<div class="A"><nav class="outline-col"><span class="eyebrow">In this task</span><a href="#a-decision" class="on">${t.state === 'blocked' ? 'Needs you' : 'Decision'}</a><a href="#a-result">Result</a><a href="#a-work">How it was done<span class="c">${c.steps || ''}</span></a><a href="#a-review">Review<span class="c">${c.review}</span></a><a href="#a-files">Artifacts<span class="c">${c.files || ''}</span></a></nav>
+    <div class="main"><div id="a-decision">${decision(t)}</div>
+      <h2 id="a-result">Result</h2>${resultDoc(t)}
+      <h2 id="a-work">How it was done</h2>${brief(t)}<div class="card"><h3>The team’s plan</h3>${plan(t)}${steps(t)}</div>${timeline(t)}
+      <h2 id="a-review">Review</h2>${review(t)}
+      <h2 id="a-files">Artifacts</h2>${artifacts(t)}</div>
+    <aside class="facts-col">${facts(t)}</aside></div>`;
+}
+/* ---------- option B: the desk ---------- */
+let bTab = 'result';
+function B(t) {
+  const c = counts(t);
+  const tab = t.state === 'blocked' && bTab === 'result' ? 'work' : bTab;
+  const tabs = [['result', 'Result', ''], ['work', 'How it was done', c.steps ? `<span class="c">${c.steps} steps</span>` : ''], ['review', 'Review', c.review ? mark('ok', 'passed') : ''], ['artifacts', 'Artifacts', c.files ? `<span class="c">${c.files}</span>` : '']];
+  const pane = tab === 'result' ? `<div class="two"><div>${resultDoc(t)}</div><aside>${facts(t)}</aside></div>`
+    : tab === 'work' ? `${brief(t)}<div class="card"><h3>The team’s plan</h3>${plan(t)}${steps(t)}</div>${timeline(t)}`
+    : tab === 'review' ? review(t) : artifacts(t);
+  return `${head(t)}<div class="B"><div style="padding:0 28px">${decision(t)}</div><nav class="tabs" role="tablist">${tabs.map(([id, l, extra]) => `<button type="button" role="tab" data-tab="${id}" aria-selected="${tab === id}">${l}${extra}</button>`).join('')}</nav><div class="pane">${pane}</div></div>`;
+}
+/* ---------- option C: the review ---------- */
+function C(t) {
+  const c = counts(t);
+  return `${head(t)}<div class="C"><div class="split"><div class="left">${resultDoc(t)}${t.result ? '' : `<div style="margin-top:14px">${brief(t)}</div>`}</div>
+    <div class="right">${decision(t)}
+      <details class="sec" open><summary>How it was done<span class="sp"></span><span class="c">${c.steps ? c.steps + ' steps' : 'no plan'}</span></summary><div class="in">${plan(t)}${steps(t)}<div style="margin-top:10px">${timeline(t)}</div></div></details>
+      <details class="sec" ${t.reviews.length ? 'open' : ''}><summary>Review<span class="sp"></span>${c.review ? mark('ok', 'Passed') : '<span class="c">not started</span>'}</summary><div class="in">${review(t)}</div></details>
+      <details class="sec"><summary>Artifacts<span class="sp"></span><span class="c">${c.files ? c.files + ' files' : 'none'}</span></summary><div class="in">${artifacts(t)}</div></details>
+      <details class="sec"><summary>Who, checks and cost<span class="sp"></span></summary><div class="in">${facts(t)}</div></details>
+    </div></div></div>`;
+}
+
+const NOTES = {
+  A: 'One scrolling case file with an outline on the left and the facts pinned on the right. No tabs: the decision comes first, then the result, then how it was done.',
+  B: 'Your tabs, rebuilt. The decision lives under the title, so it is never hidden behind a tab; the facts sit beside the result.',
+  C: 'The deliverable on the left, always. Everything about how it came to be stacks on the right, with the decision on top, like a code review.',
+};
+const q = new URLSearchParams(location.search); let opt = ['A','B','C'].includes(q.get('opt')) ? q.get('opt') : 'A', state = q.get('state') === 'done' ? 'done' : 'blocked'; if (q.get('tab')) bTab = q.get('tab'); if (q.get('dark')) document.body.classList.add('dark');
+const render = () => { const t = TASKS[state]; document.getElementById('sheet').innerHTML = { A, B, C }[opt](t); document.getElementById('optNote').textContent = NOTES[opt]; };
+document.getElementById('opt').addEventListener('click', e => { const b = e.target.closest('[data-opt]'); if (!b) return; opt = b.dataset.opt; [...e.currentTarget.children].forEach(x => x.setAttribute('aria-pressed', x === b)); render(); });
+document.getElementById('state').addEventListener('click', e => { const b = e.target.closest('[data-state]'); if (!b) return; state = b.dataset.state; [...e.currentTarget.children].forEach(x => x.setAttribute('aria-pressed', x === b)); render(); });
+document.getElementById('sheet').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { bTab = b.dataset.tab; render(); } const a = e.target.closest('.outline-col a'); if (a) { e.preventDefault(); document.querySelectorAll('.outline-col a').forEach(x => x.classList.toggle('on', x === a)); document.querySelector(a.getAttribute('href'))?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
+document.querySelectorAll('#opt [data-opt]').forEach(x => x.setAttribute('aria-pressed', x.dataset.opt === opt)); document.querySelectorAll('#state [data-state]').forEach(x => x.setAttribute('aria-pressed', x.dataset.state === state));
+render();
+</script>
+</body>
+</html>
