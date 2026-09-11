@@ -40,10 +40,11 @@ function fixture({ dir = temp(), pm, lead, specialist, triage, settings = {}, hu
   const team = office.team('marketing'), workers = office.agents().filter(a => a.department === 'marketing' && a.id !== team.lead).map(a => a.id);
   const scripts = { pm: pm || defaultPm, lead: lead ? lead(workers) : defaultLead(workers[0]), specialist: specialist || (() => ({ text: 'Verified result and evidence.' })), triage: triage || (() => ({ text: '{"lane":"standard","why":"the test default"}' })) };
   const meter = { active: 0, peak: 0, start() { this.active++; this.peak = Math.max(this.peak, this.active); }, end() { this.active--; } };
-  const models = { resolve: ({ role }) => ({ model: role === 'specialist' ? 'specialist' : role === 'pm' ? 'pm' : role === 'triage' ? 'triage' : 'lead', effort: '' }), instance: async ({ model }) => new ScriptedModel(model, scripts[model], { meter }) };
+  const instances = [];
+  const models = { resolve: ({ role, agent, team }) => ({ model: role === 'specialist' ? 'specialist' : role === 'pm' ? 'pm' : role === 'triage' ? 'triage' : 'lead', effort: agent?.effort || team?.efforts?.[role] || '', effortFrom: agent?.effort ? 'agent' : team?.efforts?.[role] ? 'team' : '' }), instance: async ({ model, effort }) => { instances.push({ model, effort: effort || '' }); return new ScriptedModel(model, scripts[model], { meter }); } };
   const completed = [];
   const engine = new OfficeEngine({ dataDir: dir, office, models, toolHub: hub, knowledgeDir: path.join(dir, 'knowledge'), knowledgeIndex, brain, settings: () => settings, onComplete: async job => { completed.push(job.id); }, ...engineOptions });
-  return { dir, office, engine, workers, worker: workers[0], meter, completed, close: async () => { await engine.close(); if (!keep) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } };
+  return { dir, office, engine, workers, worker: workers[0], meter, completed, instances, close: async () => { await engine.close(); if (!keep) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } };
 }
 async function until(engine, id, states, ms = 20000) {
   const end = Date.now() + ms;
@@ -819,4 +820,39 @@ test('triage: a pinned lane is honoured, an unparseable answer means the standar
     const id = start(h); const done = await until(h.engine, id, ['done']);
     assert.equal(asked, false, 'no triage call when the fast lane is off'); assert.equal(done.lane, 'standard'); assert.equal(done.runs.length, 2);
   } finally { await h.close(); }
+});
+
+test('the thinking level: a lead chooses the effort per assignment, the line comes off the brief, the run records it and the specialist runs at it; a CEO pin wins', async () => {
+  let briefSeen = '';
+  const lead = workers => ({ last, system, messages }) => {
+    if (last.type === 'human') return { calls: [call('task', { subagent_type: workers[0], description: 'Effort: low\nList the launch dates from the plan note.' })] };
+    if (last.type === 'tool' && /^Review recorded/.test(last.text)) return { text: /APPROVED/.test(last.text) ? 'Review approved.' : 'Not approved: ' + last.text };
+    if (last.type === 'tool') return { calls: [call('record_review', { approved: true, summary: 'Checked.', criteria: criteria(system).map(id => ({ id, passed: true, evidence: 'Present.' })), deliverable: 'Final: ' + toolTexts(messages).join('\n') })] };
+    return { text: 'ok' };
+  };
+  const specialist = ({ last }) => { if (last.type === 'human') briefSeen = last.text; return { text: 'Verified result and evidence.' }; };
+  const f = fixture({ lead, specialist });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done']);
+    const run = done.runs.find(r => r.role === 'specialist');
+    assert.equal(run.effort, 'low'); assert.match(briefSeen, /^List the launch dates/); assert.ok(!/Effort:/.test(briefSeen), 'the effort line is not part of the brief');
+    assert.ok(f.instances.some(i => i.model === 'specialist' && i.effort === 'low'), 'the specialist ran on a low-effort instance');
+    assert.equal(f.engine.askedEfforts.size, 0, 'nothing left behind');
+  } finally { await f.close(); }
+  const g = fixture({ lead, specialist, configure: c => { const w = c.agents.filter(a => a.department === 'marketing' && a.id !== c.teams.find(t => t.id === 'marketing').lead)[0]; w.effort = 'high'; } });
+  try {
+    const id = start(g); const done = await until(g.engine, id, ['done']);
+    assert.equal(done.runs.find(r => r.role === 'specialist').effort, 'low', 'the ask is recorded');
+    assert.ok(!g.instances.some(i => i.model === 'specialist' && i.effort === 'low'), 'but the CEO pinned high on the person, so no low-effort instance was made');
+    assert.ok(g.instances.some(i => i.model === 'specialist' && i.effort === 'high'));
+  } finally { await g.close(); }
+});
+
+test('the lane effort is the base for the Program Manager and the leads unless the CEO pinned one', async () => {
+  const f = fixture({ triage: () => ({ text: '{"lane":"standard","effort":"high","why":"numbers to verify"}' }) });
+  try {
+    const id = start(f); await until(f.engine, id, ['done']);
+    assert.equal(f.engine.get(id).laneEffort, 'high'); assert.ok(f.instances.some(i => i.model === 'pm' && i.effort === 'high')); assert.ok(f.instances.some(i => i.model === 'lead' && i.effort === 'high'));
+    assert.ok(!f.instances.some(i => i.model === 'specialist' && i.effort === 'high'), 'specialists take the delegator\'s choice, not the lane base');
+  } finally { await f.close(); }
 });

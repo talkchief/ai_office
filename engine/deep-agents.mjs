@@ -97,6 +97,12 @@ const withTimeout = (promise, ms, signal) => new Promise((resolve, reject) => {
   promise.then(v => { clearTimeout(timer); signal?.removeEventListener?.('abort', stop); resolve(v); }, e => { clearTimeout(timer); signal?.removeEventListener?.('abort', stop); reject(e); });
 });
 
+// The thinking level for a run: an effort the CEO pinned on the task, the routine, the person or the team always wins; then
+// what the delegator or the lane asked for; then the role's default.
+export const PINNED_EFFORTS = new Set(['task', 'routine', 'agent', 'team']);
+export const effortFor = (spec, wanted) => PINNED_EFFORTS.has(spec?.effortFrom) ? spec.effort : (normEffortWord(wanted) || spec?.effort || '');
+const normEffortWord = value => ['low', 'medium', 'high'].includes(String(value || '').toLowerCase()) ? String(value).toLowerCase() : '';
+const EFFORT_LINE = /^\s*effort\s*:\s*(low|medium|high)\b[^\n]*\n?/i;
 export class OfficeEngine {
   constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent, pmSkillsDir = null, toolLabels = () => ({}), memoryFactory = null, projectFor = () => null, brain = null, vault = null, connectors = {}, providerRetryDelays = [30000, 90000, 180000, 300000] }) {
     fs.mkdirSync(dataDir, { recursive: true });
@@ -111,6 +117,8 @@ export class OfficeEngine {
     this.running = new Map(); this.waiting = []; this.faults = []; this.brain = brain; this.vault = vault; this.followUps = new Map(); this.gates = new Map(); this.closed = false; this.providerTrouble = [];
     // Pauses before the automatic retries after a provider failure, and the waits the model calls themselves sat through.
     this.providerRetryDelays = providerRetryDelays; this.providerWaits = [];
+    // Efforts delegators asked for ("Effort: low" on a task call), keyed by task and delegate, until the run record takes them.
+    this.askedEfforts = new Map();
     if (models) models.onWait = info => this.noteProviderWait(info);
     // The database and SSH connectors behind the Vault's entries; tests inject fakes, the office uses the real ones.
     this.connectors = { pool: connectors.pool || new DatabasePool(), ssh: connectors.ssh || new SshRunner() };
@@ -453,7 +461,9 @@ export class OfficeEngine {
       if (!spec.model) throw httpError('No model is configured for this role. Choose one in Settings → Models.', 409);
       models[agent?.id || 'pm'] = spec.model;
       const providerId = this.models.model?.(spec.model)?.provider;
-      return { model: await this.models.instance({ model: spec.model, effort: spec.effort }), provider: providerId ? this.models.provider?.(providerId)?.type : undefined };
+      // The Program Manager and the leads start at the lane's effort (triage's judgement) unless the CEO pinned one.
+      const effort = role === 'specialist' ? spec.effort : effortFor(spec, job.laneEffort);
+      return { model: await this.models.instance({ model: spec.model, effort }), provider: providerId ? this.models.provider?.(providerId)?.type : undefined, spec: { ...spec, effort } };
     };
     // The Program Manager's skills: the shipped programme/project-management methods, and the owner's own under the Brain.
     const pmSkills = { agency: this.pmSkillsDir || path.join(ROOT, 'agency', 'pm-skills'), office: path.join(this.knowledgeDir, 'Agents Office', 'pm-skills') };
@@ -464,20 +474,20 @@ export class OfficeEngine {
       const lead = office.agents.find(a => a.id === team.lead), specialists = office.agents.filter(a => a.department === team.id && a.id !== team.lead);
       const subagents = [];
       for (const agent of specialists) {
-        const { model, provider } = await make('specialist', agent, team);
+        const { model, provider, spec } = await make('specialist', agent, team);
         const set = this.toolHub ? this.toolHub.toolsFor({ agent, team, provider, evaluation }) : { tools: [], interruptOn: {} };
         subagents.push({ name: agent.id, description: `${agent.name}, ${agent.role}. ${agent.does || ''}`.slice(0, 600), systemPrompt: specialistPrompt({ office, team, agent, leadAgent: lead, toolLabels }),
-          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id), ...this.vaultTools(job.id, team, agent.id), ...this.connectorTools(job.id, team, agent.id)], interruptOn: { ...set.interruptOn, ...VAULT_APPROVALS }, middleware: [this.stepGuard(job.id, agent.id, 'specialist'), this.pace(job.id, team, agent.id, signal), this.loopGuard(job.id, agent.id), this.specialistReadGuard(job.id, agent.id)] });
+          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id), ...this.vaultTools(job.id, team, agent.id), ...this.connectorTools(job.id, team, agent.id)], interruptOn: { ...set.interruptOn, ...VAULT_APPROVALS }, middleware: [this.stepGuard(job.id, agent.id, 'specialist'), this.effortSwitch(job.id, agent.id, spec), this.pace(job.id, team, agent.id, signal), this.loopGuard(job.id, agent.id), this.specialistReadGuard(job.id, agent.id)] });
       }
-      const { model, provider } = await make('lead', lead, team);
+      const { model, provider, spec } = await make('lead', lead, team);
       const spotChecks = this.toolHub ? this.toolHub.toolsFor({ agent: lead, team, provider, evaluation, readOnly: true }).tools : [];
       const graph = this.agentFactory({ name: leadName(team.id), model, systemPrompt: leadPrompt({ office, team, lead, specialists, reworkRounds: reworkRounds(team), toolLabels }),
-        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), this.brainTool(job.id, lead.id), ...this.vaultTools(job.id, team, lead.id), ...this.connectorTools(job.id, team, lead.id), ...spotChecks], interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...VAULT_APPROVALS }, subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [this.stepGuard(job.id, lead.id, 'lead'), todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
+        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), this.brainTool(job.id, lead.id), ...this.vaultTools(job.id, team, lead.id), ...this.connectorTools(job.id, team, lead.id), ...spotChecks], interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...VAULT_APPROVALS }, subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [this.stepGuard(job.id, lead.id, 'lead'), this.effortSwitch(job.id, lead.id, spec), this.effortTag(job.id, lead.id), todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
       leads.push({ name: leadName(team.id), description: `${team.name} team, led by ${lead.name}.${team.purpose ? ' ' + team.purpose : ''}`.slice(0, 600), runnable: graph });
     }
     const { model } = await make('pm', null, null);
     const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams, toolLabels }),
-      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm'), this.brainTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.subagentGuard(job.id, 'pm', leads.map(l => l.name), 'lead'), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm'), this.pmReadGuard(job.id)],
+      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm'), this.brainTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.effortTag(job.id, 'pm'), this.subagentGuard(job.id, 'pm', leads.map(l => l.name), 'lead'), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm'), this.pmReadGuard(job.id)],
       checkpointer: this.saver, interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...(job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {}) } });
     return { pm, models };
   }
@@ -755,6 +765,30 @@ export class OfficeEngine {
       return new ToolMessage({ tool_call_id: call.id, name: 'task', content: 'Refused: plan first. Call write_todos with one item per work package (team, deliverable, what you need back), then delegate with task.' });
     } });
   }
+  /* ---------- the thinking level per assignment ---------- */
+  // A delegator writes "Effort: low" (or medium, high) as the first line of a task description. The office takes it off the
+  // brief, keeps it for the run record (the tracker asks with takeEffort), and the delegate runs at that effort.
+  effortTag(jobId, who) {
+    return createMiddleware({ name: `effort_tag_${who.replace(/[^a-zA-Z0-9_]/g, '_')}`, wrapToolCall: async (request, handler) => {
+      const call = request.toolCall;
+      if (call?.name === 'task' && call.args && typeof call.args.description === 'string') {
+        const m = EFFORT_LINE.exec(call.args.description);
+        if (m) { call.args.description = call.args.description.replace(EFFORT_LINE, '').trimStart(); this.askedEfforts.set(`${jobId}:${call.args.subagent_type || ''}`, m[1].toLowerCase()); }
+      }
+      return handler(request);
+    } });
+  }
+  takeEffort(jobId, subagent) { const key = `${jobId}:${subagent || ''}`, effort = this.askedEfforts.get(key) || null; this.askedEfforts.delete(key); return effort; }
+  // The delegate's model runs at the effort its run record carries (what the delegator asked for), unless the CEO pinned one.
+  effortSwitch(jobId, agentId, spec) {
+    const cache = new Map();
+    return createMiddleware({ name: `effort_${agentId.replace(/[^a-zA-Z0-9_]/g, '_')}`, wrapModelCall: async (request, handler) => {
+      const run = this.get(jobId)?.runs.find(r => r.agent === agentId && r.state === 'working'), wanted = normEffortWord(run?.effort);
+      if (!wanted || PINNED_EFFORTS.has(spec?.effortFrom) || wanted === (spec?.effort || '')) return handler(request);
+      let model = cache.get(wanted); if (!model) { model = await this.models.instance({ model: spec.model, effort: wanted }); cache.set(wanted, model); }
+      return handler({ ...request, model });
+    } });
+  }
   /* ---------- the fast lane ---------- */
   // Sizing a task on arrival: rules first (a project, several teams, a routine, an approval to close go to the Program Manager),
   // then one plain model call, low effort, no tools, six seconds at most. Any doubt or failure means the standard lane.
@@ -779,8 +813,8 @@ export class OfficeEngine {
       const parsed = parseJsonReply(textOf(reply?.content)) || {};
       const why = oneLine(parsed.why, 200) || 'sized by the office';
       const team = teams.find(t => t.id === String(parsed.team || '')) || (teams.length === 1 ? teams[0] : null);
-      if (parsed.lane !== 'quick' || !team) return standard(why);
-      const effort = ['low', 'medium', 'high'].includes(parsed.effort) ? parsed.effort : 'low';
+      const effort = ['low', 'medium', 'high'].includes(parsed.effort) ? parsed.effort : (parsed.lane === 'quick' ? 'low' : '');
+      if (parsed.lane !== 'quick' || !team) { if (effort) this.update(id, j => { j.laneEffort = effort; }, { touch: false }); return standard(why); }
       this.update(id, j => { j.lane = 'quick'; j.laneTeam = team.id; j.laneEffort = effort; j.laneWhy = why; if (!j.autoRoute || true) j.agent = team.lead; }, { touch: false });
       this.event(id, 'lane_chosen', team.lead, `Quick lane, ${team.name}, effort ${effort}: ${why}`, { lane: 'quick', team: team.id, effort });
       return 'quick';

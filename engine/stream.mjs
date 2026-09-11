@@ -69,7 +69,7 @@ export class RunTracker {
     // Resuming after an approval re-enters the same delegation; keep one run for it.
     const paused = job.runs.find(r => r.state === 'paused' && r.agent === agent && r.title === title);
     if (paused) { engine.update(this.id, j => { j.runs.find(r => r.id === paused.id).state = 'working'; }); return; }
-    const run = { id: `${Date.now().toString(36)}-${++this.seq}`, agent, role: isLead ? 'lead' : 'specialist', dept, by: this.agentOf(event), title, brief: String(description || '').slice(0, 2000), state: 'working', startedAt: Date.now(), tools: [], model: this.models[agent] || null };
+    const run = { id: `${Date.now().toString(36)}-${++this.seq}`, agent, role: isLead ? 'lead' : 'specialist', dept, by: this.agentOf(event), title, brief: String(description || '').slice(0, 2000), effort: engine.takeEffort?.(this.id, subagent) || null, state: 'working', startedAt: Date.now(), tools: [], model: this.models[agent] || null };
     engine.update(this.id, j => { j.runs.push(run); });
     engine.event(this.id, 'run_started', agent, title, { run: run.id, role: run.role });
     if (job.state === 'planning' || (run.role === 'specialist' && ['awaiting_lead_review', 'reviewing'].includes(job.state))) engine.setState(this.id, 'working');

@@ -22,7 +22,7 @@ for (const brief of picked) {
   const started = job.startedAt || job.createdAt, ended = ['done', 'cancelled', 'blocked', 'escalated'].includes(job.state) ? job.stateSince : Date.now();
   const spent = runs.reduce((a, r) => a + (r.tokens || 0), 0);
   console.log(`\n${job.title}\n  ${job.id} · ${job.state} · ${t(started)} → ${t(ended)} (${mins(ended - started)}) · ${(job.tokens || 0).toLocaleString('en-GB')} tokens in ${job.calls || 0} calls${job.projectId ? ' · project ' + job.projectId : ''}${job.error ? '\n  stopped: ' + job.error : ''}`);
-  console.log('  who spent what: ' + [`pm ${k((job.tokens || 0) - spent)}`, ...runs.filter(r => r.tokens).map(r => `${r.agent} ${k(r.tokens)} in ${r.calls || 0} calls`)].join(' · '));
+  console.log('  who spent what: ' + [`pm ${k((job.tokens || 0) - spent)}`, ...runs.filter(r => r.tokens).map(r => `${r.agent} ${k(r.tokens)} in ${r.calls || 0} calls${r.effort ? ' at ' + r.effort : ''}`)].join(' · '));
   if (job.todos?.length) console.log('  plan: ' + job.todos.map(x => `[${x.status === 'completed' ? 'x' : x.status === 'in_progress' ? '~' : ' '}] ${x.content.slice(0, 80)}`).join('\n        '));
   console.log('  runs:');
   for (const r of runs) console.log(`    ${t(r.startedAt)} → ${t(r.finishedAt || r.endedAt)} ${String(mins((r.finishedAt || r.endedAt || Date.now()) - r.startedAt)).padStart(9)}  ${(r.agent || '').padEnd(24)} ${(r.role || '').padEnd(10)} ${(r.dept || '-').padEnd(9)} ${(r.state || '').padEnd(8)} by ${r.by || '-'}  ${(r.title || '').replace(/\s+/g, ' ').slice(0, 70)}`);

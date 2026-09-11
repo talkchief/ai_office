@@ -26,5 +26,5 @@ export function detailShape(job, office) {
   const team = job.autoRoute ? { id: 'pm', name: 'Program Manager', lead: 'pm', criteria: [], guardrails: [] } : office.teams.find(t => t.id === job.dept) || { id: job.dept, name: job.teamName || job.dept, lead: job.agent, criteria: [], guardrails: [] };
   return { ...job, team, agents: [...office.agents, { id: 'pm', name: 'Program Manager', role: 'Program Manager', department: 'pm' }], requireHumanApproval: !!job.completionApproval, humanApproved: (job.decisions || []).some(d => d.action === 'complete_task' && d.type !== 'reject'),
     subtasks: specialistRuns(job).map(r => ({ id: r.id, title: runTitle(r.title), agent: r.agent, eligible: [r.agent], state: stepState(r.state), instructions: r.title, acceptance: [], dependencies: [],
-      output: r.output || '', feedback: '', error: r.error || '', notes: [], tools: r.tools || [], requiredTools: [], modelUsed: r.model || '', effortUsed: '', complexity: '', routingReason: '' })) };
+      output: r.output || '', feedback: '', error: r.error || '', notes: [], tools: r.tools || [], requiredTools: [], modelUsed: r.model || '', effortUsed: r.effort || '', complexity: '', routingReason: '' })) };
 }
