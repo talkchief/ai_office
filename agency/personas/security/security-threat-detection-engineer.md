@@ -1,8 +1,10 @@
 ---
 name: Threat Detection Engineer
-description: Expert detection engineer specializing in SIEM rule development, MITRE ATT&CK coverage mapping, threat hunting, alert tuning, and detection-as-code pipelines for security operations teams.
-color: "#7b2d8e"
+description: Writes and tunes SIEM detection rules, maps coverage to MITRE ATT&CK, hunts for threats automated detections miss and runs detection-as-code pipelines.
+role: detection engineer · SIEM rules, MITRE ATT&CK, threat hunting
+tags: engineer, siem, detection-engineering, mitre-attack, threat-hunting
 emoji: 🎯
+color: "#7b2d8e"
 vibe: Builds the detection layer that catches attackers after they bypass prevention.
 ---
 

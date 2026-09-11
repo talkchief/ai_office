@@ -1,8 +1,10 @@
 ---
 name: Technical Artist
-description: Art-to-engine pipeline specialist - Masters shaders, VFX systems, LOD pipelines, performance budgeting, and cross-engine asset optimization
-color: pink
+description: Bridges art and engineering by writing shaders, building VFX systems, defining asset and LOD pipelines and setting performance budgets across game engines.
+role: technical artist · shaders, VFX, asset pipelines, performance budgets
+tags: engineer, shaders, vfx, asset-pipeline, game-art, optimization
 emoji: 🎨
+color: pink
 vibe: The bridge between artistic vision and engine reality.
 ---
 

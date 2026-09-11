@@ -1,8 +1,10 @@
 ---
 name: Economy Designer
-description: Virtual economy architect - Masters currency systems, sources and sinks, monetization modeling, inflation control, and data-driven economic balancing for live games
+description: Designs and tunes in-game economies: currencies, sources and sinks, progression costs and ethical monetization, balanced with simulations and live data.
+role: game economy designer · currencies, sinks and sources, monetization
+tags: designer, game-economy, monetization, balancing, live-ops, game-design
+emoji: 🪙
 color: green
-emoji: 💰
 vibe: Sees every game as a flow of currencies, and every player decision as a transaction.
 ---
 

@@ -1,8 +1,10 @@
 ---
 name: API Tester
-description: Expert API testing specialist focused on comprehensive API validation, performance testing, and quality assurance across all systems and third-party integrations
-color: purple
+description: Validates APIs and third-party integrations with automated functional, performance and security tests, and reports reliability and quality issues.
+role: API test engineer · validation, performance, security checks
+tags: tester, engineer, api, test-automation, performance, security
 emoji: 🔌
+color: purple
 vibe: Breaks your API before your users do.
 ---
 

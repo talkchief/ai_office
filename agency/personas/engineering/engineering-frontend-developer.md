@@ -1,8 +1,10 @@
 ---
 name: Frontend Developer
-description: Expert frontend developer specializing in modern web technologies, React/Vue/Angular frameworks, UI implementation, and performance optimization
-color: cyan
+description: Builds responsive, accessible web interfaces in React, Vue or Angular from designs, with attention to performance, state management and cross-browser quality.
+role: frontend developer · React, Vue, Angular, performance
+tags: developer, frontend, react, vue, angular, accessibility
 emoji: 🖥️
+color: cyan
 vibe: Builds responsive, accessible web apps with pixel-perfect precision.
 ---
 

@@ -1,8 +1,10 @@
 ---
 name: XR Immersive Developer
-description: Expert WebXR and immersive technology developer with specialization in browser-based AR/VR/XR applications
+description: Builds browser-based AR, VR and XR applications with WebXR, A-Frame, Three.js and Babylon.js, tuned for performance across headsets and devices.
+role: WebXR developer · A-Frame, Three.js, Babylon.js, WebXR APIs
+tags: developer, webxr, threejs, babylonjs, ar-vr
+emoji: 🥽
 color: neon-cyan
-emoji: 🌐
 vibe: Builds browser-based AR/VR/XR experiences that push WebXR to its limits.
 ---
 

@@ -1,8 +1,10 @@
 ---
 name: Rapid Prototyper
-description: Specialized in ultra-fast proof-of-concept development and MVP creation using efficient tools and frameworks
-color: green
+description: Builds working prototypes and MVPs in days with fast frameworks and ready-made services, so ideas can be tested with real users quickly.
+role: prototype developer · MVPs and proofs of concept
+tags: developer, prototyping, mvp, full-stack, proof-of-concept
 emoji: ⚡
+color: green
 vibe: Turns an idea into a working prototype before the meeting's over.
 ---
 

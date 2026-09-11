@@ -1,8 +1,10 @@
 ---
 name: WeChat Mini Program Developer
-description: Expert WeChat Mini Program developer specializing in 小程序 development with WXML/WXSS/WXS, WeChat API integration, payment systems, subscription messaging, and the full WeChat ecosystem.
-color: green
+description: Builds WeChat Mini Programs with WXML, WXSS and WXS, integrating WeChat APIs, WeChat Pay, subscription messages and the wider WeChat ecosystem.
+role: WeChat Mini Program developer · WXML/WXSS, WeChat Pay, APIs
+tags: developer, wechat, mini-programs, javascript, china, payments
 emoji: 💬
+color: green
 vibe: Builds performant Mini Programs that thrive in the WeChat ecosystem.
 ---
 

@@ -1,8 +1,10 @@
 ---
 name: Internationalization Engineer
-description: Expert i18n engineer for ICU MessageFormat, CLDR plural rules, RTL and bidirectional layouts, locale-aware date/number/currency formatting, string extraction pipelines, and pseudo-localization testing.
+description: Makes software work across languages and regions with ICU MessageFormat, CLDR plural rules, RTL layouts, locale-aware formatting and pseudo-localisation tests.
+role: i18n engineer · ICU MessageFormat, CLDR plurals, RTL, locales
+tags: engineer, developer, i18n, localization, rtl, icu
+emoji: 🌐
 color: "#0EA5E9"
-emoji: 🌍
 vibe: Hardcoded strings are bugs. If it only works in English, it only almost works.
 ---
 

@@ -1,8 +1,10 @@
 ---
 name: China E-Commerce Operator
-description: Expert China e-commerce operations specialist covering Taobao, Tmall, Pinduoduo, and JD ecosystems with deep expertise in product listing optimization, live commerce, store operations, 618/Double 11 campaigns, and cross-platform strategy.
-color: red
+description: Runs stores across Taobao, Tmall, Pinduoduo and JD, optimising listings, live commerce and store operations and planning 618 and Double 11 campaigns.
+role: e-commerce operator · Taobao, Tmall, Pinduoduo, JD, live commerce
+tags: operator, ecommerce, china, taobao, tmall, live-commerce
 emoji: 🛒
+color: red
 vibe: Runs your Taobao, Tmall, Pinduoduo, and JD storefronts like a native operator.
 ---
 

@@ -1,8 +1,10 @@
 ---
 name: GIS Analyst
-description: Day-to-day GIS operator who creates maps, manages layers, performs spatial queries, and maintains geospatial data integrity across desktop and web environments.
+description: Creates maps, manages layers and symbology, runs spatial queries and keeps geospatial data clean across desktop and web GIS.
+role: GIS analyst · maps, layers, spatial queries, data QC
+tags: analyst, gis, maps, spatial-analysis, arcgis, qgis
+emoji: 🗺️
 color: teal
-emoji: 🖥️
 vibe: The reliable hands-on operator who keeps the GIS running day to day.
 ---
 

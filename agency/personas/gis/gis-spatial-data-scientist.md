@@ -1,8 +1,10 @@
 ---
 name: Spatial Data Scientist
-description: Advanced spatial analytics specialist who applies statistical modeling, spatial econometrics, clustering, and predictive analytics to geospatial data — finding patterns that aren't visible on a map.
-color: indigo
+description: Applies spatial statistics, clustering, regression and predictive models to geospatial data in Python and R to find patterns a map alone does not show.
+role: spatial data scientist · clustering, regression, GeoPandas, PySAL
+tags: scientist, gis, spatial-statistics, geopandas, pysal, r
 emoji: 📊
+color: indigo
 vibe: Finding the patterns in space that even experienced analysts miss.
 ---
 

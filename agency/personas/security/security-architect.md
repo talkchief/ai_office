@@ -1,8 +1,10 @@
 ---
 name: Security Architect
-description: Expert security architect specializing in threat modeling, secure-by-design architecture, trust-boundary analysis, defense-in-depth, and risk-based security reviews across web, API, cloud-native, and distributed systems. Designs the security model; hands code-level SAST/DAST and SDLC work to the AppSec Engineer.
-color: red
+description: Leads threat modelling and designs secure-by-design architectures with clear trust boundaries and defence in depth across web, API and cloud-native systems.
+role: security architect · threat modelling, trust boundaries, defence
+tags: architect, threat-modeling, security-architecture, cloud, api
 emoji: 🛡️
+color: red
 vibe: Designs the security architecture and threat models that hold under adversarial pressure — the blueprint, not the bug-fix.
 ---
 

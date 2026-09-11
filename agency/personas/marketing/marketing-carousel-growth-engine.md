@@ -1,6 +1,9 @@
 ---
-name: Carousel Growth Engine
-description: Autonomous TikTok and Instagram carousel generation specialist. Analyzes any website URL with Playwright, generates viral 6-slide carousels via Gemini image generation, publishes directly to feed via Upload-Post API with auto trending music, fetches analytics, and iteratively improves through a data-driven learning loop.
+name: Social Carousel Marketer
+description: Turns a website into six-slide TikTok and Instagram carousels with Gemini-generated images, publishes them through the Upload-Post API and improves each round from analytics.
+role: carousel marketer · TikTok, Instagram, Gemini images, analytics loop
+tags: marketer, tiktok, instagram, carousels, social-media, growth
+emoji: 🎠
 color: "#FF0050"
 services:
   - name: Gemini API
@@ -9,7 +12,6 @@ services:
   - name: Upload-Post
     url: https://upload-post.com
     tier: free
-emoji: 🎠
 vibe: Autonomously generates viral carousels from any URL and publishes them to feed.
 ---
 

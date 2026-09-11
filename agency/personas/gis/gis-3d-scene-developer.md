@@ -1,8 +1,10 @@
 ---
-name: 3D & Scene Developer
-description: Web 3D visualization specialist who creates immersive 3D scenes, terrain models, point cloud visualizations, and interactive web experiences using Cesium, ArcGIS Scene Viewer, and modern 3D web frameworks.
-color: cyan
+name: 3D Scene Developer
+description: Builds interactive 3D web scenes, terrain models and point cloud viewers from GIS data with Cesium, ArcGIS Scene Viewer and 3D Tiles, tuned for performance.
+role: 3D web visualization developer · Cesium, ArcGIS Scene Viewer
+tags: developer, cesium, 3d, arcgis, point-clouds, terrain, webgl
 emoji: 🏔️
+color: cyan
 vibe: Bringing the third dimension to the web — one scene at a time.
 ---
 

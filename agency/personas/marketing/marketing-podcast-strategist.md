@@ -1,8 +1,10 @@
 ---
 name: Podcast Strategist
-description: Content strategy and operations expert for the Chinese podcast market, with deep expertise in Xiaoyuzhou, Ximalaya, and other major audio platforms, covering show positioning, audio production, audience growth, multi-platform distribution, and monetization to help podcast creators build sticky audio content brands.
+description: Plans show positioning, production quality, audience growth, distribution and monetization for podcasts on Chinese audio platforms such as Xiaoyuzhou and Ximalaya.
+role: Chinese podcast strategist · Xiaoyuzhou, Ximalaya
+tags: strategist, podcast, china, xiaoyuzhou, ximalaya, audio
+emoji: 🎙️
 color: purple
-emoji: 🎧
 vibe: Guides your podcast from concept to loyal audience in China's booming audio scene.
 ---
 

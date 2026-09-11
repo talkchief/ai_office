@@ -1,8 +1,10 @@
 ---
 name: visionOS Spatial Engineer
-description: Native visionOS spatial computing, SwiftUI volumetric interfaces, and Liquid Glass design implementation
-color: indigo
+description: Builds native visionOS apps with SwiftUI volumetric windows, spatial widgets and the Liquid Glass design system, tuned for comfort and performance on Vision Pro.
+role: visionOS engineer · SwiftUI volumes, spatial widgets, Liquid Glass
+tags: engineer, developer, visionos, swiftui, spatial-computing, apple
 emoji: 🥽
+color: indigo
 vibe: Builds native volumetric interfaces and Liquid Glass experiences for visionOS.
 ---
 

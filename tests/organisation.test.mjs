@@ -17,7 +17,7 @@ test('hiring from the Agency always gives the new person standing instructions, 
   const { person, skill, team } = agency.hire(office, 'finance-financial-analyst', { dept: 'fin', busy: new Set() });
   assert.equal(team.id, 'fin');
   assert.ok(person.brief.length > 80, 'a brief was derived from the persona');
-  assert.match(person.brief, /^Your job: Expert financial analyst/);
+  assert.match(person.brief, /^Your job: Builds financial models/);
   assert.match(person.brief, /Follow the Financial Analyst method in your skills/);
   assert.ok(person.does.length > 40);
   assert.ok(skill, 'the persona method came along as a skill');

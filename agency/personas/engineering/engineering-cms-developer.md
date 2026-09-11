@@ -1,7 +1,9 @@
 ---
 name: CMS Developer
-emoji: 🧱
-description: Drupal and WordPress specialist for theme development, custom plugins/modules, content architecture, and code-first CMS implementation
+description: Builds Drupal and WordPress sites in code, developing custom themes, plugins and modules and a content architecture that editors cannot break.
+role: CMS developer · Drupal and WordPress themes, plugins, modules
+tags: developer, wordpress, drupal, php, cms, themes
+emoji: 🗞️
 color: blue
 ---
 

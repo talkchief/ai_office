@@ -1632,9 +1632,9 @@ body.dark #settingsPage .secondary { background: transparent; color: var(--ink);
 .agency-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-bottom: 8px; } .agency-search input, .agency-search select { min-width: 0; margin: 0; }
 .agency-count { margin: 0 0 8px; font: 600 10px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--grey); }
 .agency-list { display: grid; gap: 8px; max-height: min(56vh, 560px); overflow: auto; padding: 2px 2px 6px; }
-.agency-item { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: start; gap: 10px 12px; border: 1px solid var(--hairline); border-radius: 12px; padding: 12px 14px; background: var(--cream); }
+.agency-item { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: start; gap: 10px 12px; border: 1px solid var(--hairline); border-radius: 12px; padding: 12px 14px; background: var(--cream); }
 .agency-item:hover { border-color: color-mix(in srgb, var(--ink) 35%, transparent); }
-.agency-emoji { font-size: 18px; line-height: 1.2; text-align: center; }
+#settingsPage.mg .agency-item .agency-avatar { grid-area: auto; width: 40px; height: 40px; } /* the same initials avatar as a person on a team */
 .agency-body { min-width: 0; } .agency-item b { display: block; font: 600 13px var(--ui); } .agency-item small { display: block; color: var(--grey); font: 11px var(--ui); margin: 2px 0 5px; } .agency-item p { margin: 0; font: 12px/1.5 var(--ui); color: var(--ink); }
 .agency-actions { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 96px; } .agency-actions button { margin: 0; } .agency-actions .space-text-action { font-size: 11px; padding: 4px 0; text-align: center; }
 .agency-empty { margin: 0; padding: 18px; text-align: center; color: var(--grey); font: 12px var(--ui); }
@@ -1662,7 +1662,7 @@ body.dark #settingsPage .secondary { background: transparent; color: var(--ink);
 .space-artifact-body { min-width: 0; } .space-artifact-body b { display: block; font: 600 13px var(--ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .space-artifact-body small { display: block; color: var(--grey); font: 11px var(--ui); margin-top: 2px; }
 .space-artifact-download { font: 600 11px var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); text-decoration: none; border: 1px solid var(--hairline); border-radius: 99px; padding: 6px 12px; white-space: nowrap; } .space-artifact-download:hover { border-color: var(--ink); }
 #settingsPage form.picker-open .space-settings-save, #spaceDialog form.picker-open .space-settings-save { position: static; }
-@media (max-width: 720px) { .agency-search { grid-template-columns: 1fr; } .agency-item { grid-template-columns: 24px minmax(0, 1fr); } .agency-actions { grid-column: 1 / -1; flex-direction: row; } }
+@media (max-width: 720px) { .agency-search { grid-template-columns: 1fr; } .agency-item { grid-template-columns: 40px minmax(0, 1fr); } .agency-actions { grid-column: 1 / -1; flex-direction: row; } }
 .task-plan { margin: 8px 0 14px; font: 12.5px var(--ui); } .task-plan ul { margin: 6px 0 0; padding-left: 18px; } .task-plan li { margin: 3px 0; } .task-plan li.completed { text-decoration: line-through; color: var(--grey); } .task-plan li.in_progress::marker { color: #62BCEA; }
 /* ---------- tablets and phones: the task panel becomes a bottom sheet, the rail fills the width ---------- */
 #tpanelHandle { display: none; }

@@ -1,8 +1,10 @@
 ---
-name: Solution Engineer
-description: Hands-on GIS prototype builder who takes strategy from Technical Consultant and turns it into working demos, proof-of-concepts, and technical validations across the full Esri and open-source stack.
-color: blue
+name: GIS Solution Engineer
+description: Builds working GIS demos and proofs of concept in ArcGIS Pro, ArcGIS Online, Python and JavaScript to validate feasibility and estimate effort.
+role: pre-sales GIS engineer · demos, proofs of concept, ArcGIS, Python
+tags: engineer, gis, arcgis, prototyping, pre-sales, python
 emoji: 🔧
+color: blue
 vibe: The builder who makes strategy real — one working demo at a time.
 ---
 

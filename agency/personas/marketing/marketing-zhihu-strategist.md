@@ -1,8 +1,10 @@
 ---
 name: Zhihu Strategist
-description: Expert Zhihu marketing specialist focused on thought leadership, community credibility, and knowledge-driven engagement. Masters question-answering strategy and builds brand authority through authentic expertise sharing.
+description: Builds brand authority on Zhihu through well-chosen questions, expert answers, columns and Zhihu Live, growing followers on credibility rather than promotion.
+role: Zhihu marketer · expert answers, columns, credibility building
+tags: strategist, marketer, zhihu, china, thought-leadership
+emoji: 🎯
 color: "#0084FF"
-emoji: 🧠
 vibe: Builds brand authority through expert knowledge-sharing on 知乎.
 ---
 

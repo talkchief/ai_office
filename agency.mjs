@@ -4,8 +4,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT } from './config.mjs';
+import { searchAgency } from './src/agency-search.js';
 
 const DIR = path.join(ROOT, 'agency');
+// The catalogue's divisions, in the order the picker lists them. A persona's folder under agency/personas/ is its division.
+export const DIVISIONS = {
+  engineering: 'Software Engineering', ai: 'AI & Agents', data: 'Data & Analytics', devops: 'DevOps & Cloud', security: 'Security',
+  testing: 'Quality & Testing', automation: 'Automation & Integrations', design: 'Design', writing: 'Writing & Documents',
+  product: 'Product', 'project-management': 'Project Management', marketing: 'Marketing', 'paid-media': 'Paid Media', sales: 'Sales',
+  support: 'Customer Support', finance: 'Finance', business: 'Business & Operations', research: 'Research & Science',
+  academic: 'Academic', healthcare: 'Healthcare', gis: 'GIS & Mapping', 'game-development': 'Game Development',
+  'spatial-computing': 'Spatial Computing', specialized: 'Specialized',
+};
 const text = (value, max) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 export const slugOf = name => String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || 'persona';
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -20,14 +30,15 @@ export function parsePersona(markdown, { division = '', file = '' } = {}) {
   const section = (...names) => names.map(n => sections[Object.keys(sections).find(k => k.includes(n)) || '']).find(Boolean) || '';
   const bullet = (block, label) => (new RegExp(`\\*\\*${label}\\*\\*:?\\s*(.+)`, 'i').exec(block) || [])[1] || '';
   const identity = section('identity');
-  const role = text(bullet(identity, 'Role') || meta.description.split(/[.—–-]\s/)[0], 120);
+  const role = text(meta.role || bullet(identity, 'Role') || meta.description.split(/[.—–-]\s/)[0], 120);
+  const tags = [...new Set(String(meta.tags || '').split(',').map(t => text(t, 32).toLowerCase()).filter(Boolean))].slice(0, 10);
   const rules = section('critical rules', 'rules'), mission = section('core mission', 'mission', 'core responsibilities');
   const lines = block => block.split('\n').map(l => l.trim()).filter(l => /^[-*]\s/.test(l)).map(l => l.replace(/^[-*]\s+/, '').replace(/\*\*/g, ''));
   const extracted = [...lines(rules), ...lines(mission)].filter(l => l.length > 8 && !/^(Role|Personality|Memory|Experience):/i.test(l)).slice(0, 25).map(l => '- ' + l).join('\n').slice(0, 2000);
   const id = slugOf(file.replace(/\.md$/, '') || meta.name);
   // A persona without rules or mission bullets still needs standing instructions: the office refuses a person without a brief.
   const brief = extracted || [`Your job: ${text(meta.description, 400)}`, meta.vibe ? `Work like this: ${text(meta.vibe, 300)}` : '', `Follow the ${meta.name} method in your skills, step by step, and hand finished work to your lead in the format asked for, with assumptions and blockers named.`].filter(Boolean).join('\n').slice(0, 2000);
-  return { id, division, name: meta.name, description: text(meta.description, 500), emoji: meta.emoji || '', vibe: text(meta.vibe, 300), role, does: text(meta.description, 1200), brief, body };
+  return { id, division, name: meta.name, description: text(meta.description, 500), emoji: meta.emoji || '', vibe: text(meta.vibe, 300), role, tags, does: text(meta.description, 1200), brief, body };
 }
 
 export class Agency {
@@ -38,11 +49,8 @@ export class Agency {
     return this.index;
   }
   divisions() { return this.load().divisions; }
-  list({ q = '', division = '' } = {}) {
-    const needle = String(q).toLowerCase().trim();
-    return this.load().personas.filter(p => (!division || p.division === division) && (!needle || `${p.name} ${p.description} ${p.role} ${p.label}`.toLowerCase().includes(needle)))
-      .map(({ bytes, ...p }) => p);
-  }
+  // Best match first: see src/agency-search.js (the hire picker ranks with the same function).
+  list({ q = '', division = '' } = {}) { return searchAgency(this.load().personas, { q, division }).map(({ bytes, ...p }) => p); }
   get(id) {
     const entry = this.load().personas.find(p => p.id === id); if (!entry) fail('No such persona.', 404);
     const file = path.join(this.dir, 'personas', entry.division, entry.id + '.md');
