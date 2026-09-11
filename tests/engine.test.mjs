@@ -870,3 +870,24 @@ test('a person may be in four model calls at once across tasks by default; the C
     assert.equal(f.engine.settings().maxConcurrentJobs, 4);
   } finally { await f.close(); }
 });
+
+test('the Program Manager can assemble approved files into one document itself, and still cannot write content of its own', async () => {
+  let assembled = false;
+  const pm = context => {
+    const { last } = context;
+    if (last.type === 'tool' && /^Review recorded/.test(last.text) === false && /APPROVED|approved/i.test(last.text) && !assembled) { assembled = true; return { calls: [call('assemble_files', { output: '/work/pack.md', title: 'Launch pack', parts: [{ path: '/work/report.md', heading: 'Report' }] })] }; }
+    if (last.type === 'tool' && /^Combined|wrote|assembled|pack\.md/i.test(last.text)) return { calls: [call('write_file', { file_path: '/work/own.md', content: 'The PM wrote this.' })] };
+    if (last.type === 'tool' && /denied|not allowed|Permission|refused/i.test(last.text)) return { calls: [call('complete_task', { summary: 'Assembled the pack.' })] };
+    return defaultPm(context);
+  };
+  const specialist = ({ last }) => last.type === 'human' ? { calls: [call('write_file', { file_path: '/work/report.md', content: '# Report\n\nVerified result and evidence.' })] } : { text: 'Handed over /work/report.md with the verified result.' };
+  const lead = workers => ({ last, system }) => last.type === 'human' ? { calls: [call('task', { subagent_type: workers[0], description: 'Write the report' })] } : last.type === 'tool' && /^Review recorded/.test(last.text) ? { text: 'Review approved: the report is ready.' } : last.type === 'tool' ? { calls: [call('record_review', { approved: true, summary: 'Checked.', criteria: criteria(system).map(id => ({ id, passed: true, evidence: 'Present.' })), deliverablePath: '/work/report.md' })] } : { text: 'ok' };
+  const f = fixture({ pm, lead, specialist });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done'], 30000);
+    assert.ok(assembled, 'the Program Manager called assemble_files');
+    assert.ok(fs.existsSync(path.join(f.engine.workspaceDir(id), 'pack.md')), 'the pack was written by the office');
+    assert.ok(!fs.existsSync(path.join(f.engine.workspaceDir(id), 'own.md')), 'a file of the Program Manager\'s own was refused');
+    assert.equal(done.state, 'done');
+  } finally { await f.close(); }
+});

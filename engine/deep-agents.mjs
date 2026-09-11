@@ -490,7 +490,7 @@ export class OfficeEngine {
     }
     const { model } = await make('pm', null, null);
     const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams, toolLabels }),
-      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm'), this.brainTool(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.effortTag(job.id, 'pm'), this.subagentGuard(job.id, 'pm', leads.map(l => l.name), 'lead'), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm'), this.pmReadGuard(job.id)],
+      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm'), this.brainTool(job.id, 'pm'), ...this.exportTools(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.effortTag(job.id, 'pm'), this.subagentGuard(job.id, 'pm', leads.map(l => l.name), 'lead'), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm'), this.pmReadGuard(job.id)],
       checkpointer: this.saver, interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...(job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {}) } });
     return { pm, models };
   }

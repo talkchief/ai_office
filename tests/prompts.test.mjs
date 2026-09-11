@@ -36,7 +36,7 @@ test('the Program Manager sees the whole company: every team, its people, its pu
   assert.match(prompt, /turn the charter's constraints into acceptance criteria in each lead's brief/, 'the charter binds every lead');
   assert.match(prompt, /vault_list shows which services your team may use[\s\S]*You never see, type or ask for a key/, 'the Vault is explained: use it, never see it');
   assert.match(prompt, /db_list shows the database connections your team may use[\s\S]*db_write runs one INSERT, UPDATE or DELETE on a connection the CEO marked writable and pauses for the CEO first[\s\S]*ssh_run runs one command on one of them, always pausing for the CEO first/, 'the database and SSH connectors are explained: reads are free, writes and commands wait for the CEO');
-  assert.match(prompt, /that assembly and export is a work package like any other[\s\S]*\/work\/ is read-only for you/, 'assembling a document is delegated, never done by the PM');
+  assert.match(prompt, /make it yourself: assemble_files combines the approved files/, "assembling and exporting approved files is the PM's own work"); assert.match(prompt, /you never write content of your own and you cannot edit files/, "but the PM never authors content");
   assert.match(prompt, /SALES[\s\S]*Tools: none besides the Brain/, 'a team without connectors is told so');
   assert.ok(prompt.includes('a tool only another team has'), 'hand-offs cover missing tools, not just expertise');
   assert.ok(prompt.includes('leads only see their own team, you see all of it'));
@@ -88,6 +88,14 @@ test('a lead and the Program Manager are told which person has a tool the team l
   const pm = programManagerPrompt({ office, name: 'Northgate', teams: office.teams, toolLabels: labels });
   assert.match(pm, /FINANCE[\s\S]*Tools: Google Calendar; INVOICING also has Web search & fetch/);
   assert.ok(specialistPrompt({ office, team: fin, agent: invo, leadAgent: alead, toolLabels: labels }).includes('Tools you can call: Google Calendar, Web search & fetch.'));
+});
+
+test('the Program Manager and the leads are told they convert approved files to PDF and decks themselves', () => {
+  const office = { skills: [], agents: [{ id: 'mlead', name: 'Maya', role: 'Marketing Lead', does: 'Leads.', rules: [], skills: [], tools: [] }], teams: [{ id: 'marketing', name: 'Marketing', lead: 'mlead', purpose: 'Demand.', criteria: ['Cites sources'], guardrails: [], checks: [], tools: [], skills: [], rules: [] }] };
+  const pm = programManagerPrompt({ office, teams: office.teams });
+  assert.match(pm, /make it yourself: assemble_files combines the approved files/); assert.match(pm, /you never write content of your own/);
+  const lead = leadPrompt({ office, team: office.teams[0], lead: office.agents[0], specialists: [], reworkRounds: 3 });
+  assert.match(lead, /Converting is not writing: when the CEO wants a PDF or a deck of an approved deliverable, export it yourself/);
 });
 
 test('the quick-lane prompt tells the lead to work alone, export, review and hand the task to the team when it is bigger', () => {
