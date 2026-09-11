@@ -1,5 +1,6 @@
 import { DEPTS, DEPT_KEYS } from './data.js';
 import { officeReady } from './auth.js';
+import { HOSTED, USER, isOfficeAdmin, isPlatformAdmin, MANAGED_MODELS, canOpenArea } from './session.js';
 import { initSettings } from './settings.js';
 import { unseenResult } from './activity.js';
 import { initInbox } from './inbox.js';
@@ -35,7 +36,7 @@ export function initOfficeWork(ctx) {
   panel.innerHTML = `<button type="button" id="tpanelHandle" aria-label="Expand or collapse the work panel"></button><form class="space-command">
     <div class="space-team-picker"><button id="spaceDept" type="button" aria-expanded="false" aria-controls="spaceTeamMenu"><i style="background:${teamChip(selectedTeam).chip}"></i><span>${esc(teamChip(selectedTeam).name)}</span><span class="space-chevron">⌄</span></button><div id="spaceTeamMenu" hidden><button type="button" data-pick-team="auto"><i style="background:#465B70"></i>Let the Program Manager choose</button>${DEPT_KEYS.map(k => `<button type="button" data-pick-team="${k}"><i style="background:${DEPTS[k].chip}"></i>${esc(DEPTS[k].name)}</button>`).join('')}</div></div>
     <textarea id="spaceBrief" rows="2" aria-label="Task brief" placeholder="What needs to get done? Enter sends, Shift+Enter for a new line" required></textarea>
-    <details class="space-options" id="spaceOptions"><summary><span class="opt-pill">Options <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span><span class="opt-hint">assign · due date · more teams · documents</span></summary><div class="space-options-grid"><label>For<span><select id="spaceAssignee"></select><small id="spaceAssignHint"></small></span></label><label>Due<input type="datetime-local" id="spaceDue"></label><label>Priority<select id="spacePriority"><option value="1">Normal</option><option value="2">High</option><option value="0">Low</option></select></label><label>Documents<input type="file" id="spaceFiles" multiple accept=".pdf,.docx,.txt,.md,.csv"></label><label>Project<select id="spaceProject"><option value="">None</option></select></label><div class="space-involve" id="spaceInvolve"></div></div></details>
+    <details class="space-options" id="spaceOptions"><summary><span class="opt-pill">Options <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span><span class="opt-hint">assign · due date · more teams · documents</span></summary><div class="space-options-grid"><label>For<span><select id="spaceAssignee"></select><small id="spaceAssignHint"></small></span></label><label>Due<input type="datetime-local" id="spaceDue"></label><label>Priority<select id="spacePriority"><option value="1">Normal</option><option value="2">High</option><option value="0">Low</option></select></label><label>Documents<input type="file" id="spaceFiles" multiple accept=".pdf,.docx,.txt,.md,.csv"></label><label>Project<select id="spaceProject"><option value="">None</option></select></label>${HOSTED ? '<label>Visibility<select id="spaceVisibility"><option value="private">Private</option><option value="public">Everyone in the office</option></select></label><label id="spaceShareWrap">Share with<select id="spaceShare" multiple size="4"></select><small>People and groups who may see this task. You and the office admins always can.</small></label>' : ''}<div class="space-involve" id="spaceInvolve"></div></div></details>
     <div class="space-command-actions"><span>Lead-reviewed work</span><button type="submit" class="space-save-draft" data-backlog="true" title="Save without starting agents">Save idea</button><button type="submit">Add task <span aria-hidden="true">↗</span></button></div><p id="spaceHint" role="status"></p></form>
     <div class="space-now-head"><span class="space-h2">Right now</span></div>
     <div id="spaceNow" class="space-now"></div>
@@ -83,17 +84,20 @@ export function initOfficeWork(ctx) {
   const manage = document.createElement('div'); manage.className = 'space-manage';
   manage.innerHTML = `<button id="spaceManage" type="button" aria-label="Manage office" aria-expanded="false" aria-controls="spaceManageMenu"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.5" fill="var(--cream)"/><circle cx="15" cy="17" r="2.5" fill="var(--cream)"/></svg><span>Manage</span><span class="mg-dot mg-dot-off" id="spaceManageDot" hidden></span></button><div id="spaceManageMenu" hidden role="dialog" aria-label="Manage the office"></div>`;
   $('claudeConnect').before(manage);
-  const DIRECTORY = [['People', [['projects', 'Projects'], ['teams', 'Teams & people'], ['routines', 'Routines']]], ['Knowledge', [['brain', 'Brain'], ['skills', 'Skills'], ['artifacts', 'Office Artifacts'], ['reports', 'Reports & KPIs']]], ['Services', [['models', 'Models & keys'], ['tools', 'Tools & connectors'], ['vault', 'Vault']]], ['Administration', [['profile', 'Profile'], ['office', 'Office settings'], ['audit', 'Audit log']]]];
+  // The directory follows the viewer: a member of a hosted office sees no Tools, Vault, Office settings or Audit; the models are the platform's in hosted mode; platform admins get the Platform panel.
+  const DIRECTORY = [['People', [['projects', 'Projects'], ['teams', 'Teams & people'], ['routines', 'Routines']]], ['Knowledge', [['brain', 'Brain'], ['skills', 'Skills'], ['artifacts', 'Office Artifacts'], ['reports', 'Reports & KPIs']]], ['Services', [['models', 'Models & keys'], ['tools', 'Tools & connectors'], ['vault', 'Vault']]], ['Administration', [['profile', 'Profile'], ['users', 'Users & groups'], ['office', 'Office settings'], ['audit', 'Audit log'], ['admin', 'Platform']]]]
+    .map(([group, items]) => [group, items.filter(([id]) => canOpenArea(id))]).filter(([, items]) => items.length);
   const goArea = id => { if (id === 'inbox') return inbox.open(); if (id === 'projects') return projectUI.open(); settings.open(id); };
   const renderDirectory = s => {
     const a = id => s?.areas?.[id] || {};
     const item = ([id, label]) => `<button type="button" class="mg-dir-item" data-go="${id}">${esc(label)}${a(id).line ? `<small>${esc(a(id).line)}</small>` : ''}${a(id).dot ? dot(a(id).dot) : ''}</button>`;
     const connect = $('claudeConnect');
-    $('spaceManageMenu').innerHTML = `<div class="mg-dir-head"><h2>Manage</h2><span class="mg-eyebrow">${esc(s?.name || 'Your office')}${s ? ' · ' + esc(s.areas.teams.line) : ''}</span><span class="mg-needs">${s ? (s.attention.length ? `${dot(s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn')}<b>${s.attention.length}</b>&nbsp;need${s.attention.length === 1 ? 's' : ''} you` : `${dot('ok')}Nothing needs you`) : 'Checking…'}</span></div>
+    $('spaceManageMenu').innerHTML = `<div class="mg-dir-head"><h2>Manage</h2><span class="mg-eyebrow">${esc(s?.name || 'Your office')}${s ? ' · ' + esc(s.areas.teams.line) : ''}</span>${HOSTED && USER ? `<span class="mg-eyebrow mg-who">${esc(USER.name)} · ${esc(USER.email)} · ${esc(USER.role)}</span>` : ''}<span class="mg-needs">${s ? (s.attention.length ? `${dot(s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn')}<b>${s.attention.length}</b>&nbsp;need${s.attention.length === 1 ? 's' : ''} you` : `${dot('ok')}Nothing needs you`) : 'Checking…'}</span></div>
       <div class="mg-dir-attn">${(s?.attention || []).slice(0, 4).map(x => `<div class="mg-attn">${mark(x.kind, x.label)}<span>${esc(x.text)}</span><button type="button" data-go="${x.go}">${esc(x.action)}</button></div>`).join('')}</div>
-      <div class="mg-dir-body">${DIRECTORY.map(([group, items], i) => `<div class="mg-dir-col"><span class="mg-eyebrow">${group}</span>${items.map(item).join('')}${i === 3 ? '<div id="claudeConnectSlot"></div>' : ''}</div>`).join('')}</div>
-      <div class="mg-dir-foot">${s ? esc(s.foot) : 'Reading the office…'}${s ? mark(s.healthy ? 'ok' : (s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn'), s.healthy ? 'Office healthy' : (s.attention.some(x => x.kind === 'fail') ? 'Something failed' : 'Needs attention')) : ''}</div>`;
+      <div class="mg-dir-body">${DIRECTORY.map(([group, items], i) => `<div class="mg-dir-col"><span class="mg-eyebrow">${group}</span>${items.map(item).join('')}${i === DIRECTORY.length - 1 ? '<div id="claudeConnectSlot"></div>' : ''}</div>`).join('')}</div>
+      <div class="mg-dir-foot">${s ? esc(s.foot) : 'Reading the office…'}${HOSTED ? '<button type="button" class="mg-signout" id="spaceSignOut">Sign out</button>' : ''}${s ? mark(s.healthy ? 'ok' : (s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn'), s.healthy ? 'Office healthy' : (s.attention.some(x => x.kind === 'fail') ? 'Something failed' : 'Needs attention')) : ''}</div>`;
     $('claudeConnectSlot').replaceWith(connect); // the unlock / models shortcut keeps the label auth.js gives it
+    const signOut = $('spaceSignOut'); if (signOut) signOut.onclick = async () => { try { await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); } catch {} location.reload(); };
     const d = $('spaceManageDot'); if (s) { d.hidden = !s.attention.length; d.className = 'mg-dot mg-dot-' + (s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn'); d.title = s.attention.length + ' need you'; }
   };
   renderDirectory(null);
@@ -125,6 +129,18 @@ export function initOfficeWork(ctx) {
     $('spaceInvolve').innerHTML = auto ? '<small>The Program Manager brings in the teams it needs.</small>' : '<span>Also involve</span>' + DEPT_KEYS.filter(k => k !== selectedTeam).map(k => `<label><input type="checkbox" value="${k}">${esc(DEPTS[k].name)}</label>`).join('');
   }
   fillOptions();
+  // Hosted offices: who sees a new task. The lists of people and groups come from the office; the owner and the admins always see it.
+  let audienceLists = { users: [], groups: [] };
+  const audienceName = id => audienceLists.users.find(x => x.id === id)?.name || audienceLists.groups.find(x => x.id === id)?.name || id;
+  async function fillAudience() {
+    if (!HOSTED) return;
+    try { const [u, g] = await Promise.all([api('/users'), api('/groups')]); audienceLists = { users: u.users.filter(x => x.id !== USER?.id), groups: g.groups }; } catch { return; }
+    const sel = $('spaceShare'); if (!sel) return; const keep = new Set([...sel.selectedOptions].map(o => o.value));
+    sel.innerHTML = (audienceLists.groups.length ? `<optgroup label="Groups">${audienceLists.groups.map(x => `<option value="g:${esc(x.id)}" ${keep.has('g:' + x.id) ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</optgroup>` : '') + `<optgroup label="People">${audienceLists.users.map(x => `<option value="u:${esc(x.id)}" ${keep.has('u:' + x.id) ? 'selected' : ''}>${esc(x.name)} · ${esc(x.role)}</option>`).join('') || '<option disabled>Nobody else yet — invite people under Manage → Users & groups</option>'}</optgroup>`;
+  }
+  const audienceOf = (visibility, picked) => ({ visibility, sharedWith: { users: picked.filter(v => v.startsWith('u:')).map(v => v.slice(2)), groups: picked.filter(v => v.startsWith('g:')).map(v => v.slice(2)) } });
+  const audienceInput = () => HOSTED ? audienceOf($('spaceVisibility')?.value || 'private', [...($('spaceShare')?.selectedOptions || [])].map(o => o.value)) : {};
+  if (HOSTED) { $('spaceVisibility').onchange = () => { $('spaceShareWrap').hidden = $('spaceVisibility').value === 'public'; }; fillAudience(); }
   panel.querySelector('form').onsubmit = async event => {
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
@@ -137,8 +153,8 @@ export function initOfficeWork(ctx) {
       }
       const assignee = $('spaceAssignee').value || undefined, forTeam = assignee ? Object.values(R).find(r => r.a.id === assignee)?.a.dept : null;
       const auto = selectedTeam === 'auto' && !forTeam, team = forTeam || selectedTeam, involve = [...$('spaceInvolve').querySelectorAll('input:checked')].map(el => el.value), due = $('spaceDue').value;
-      const job = await api('/tasks', 'POST', { dept: auto ? 'auto' : team, ...(auto ? { depts: 'auto' } : involve.length ? { depts: [team, ...involve] } : {}), text: $('spaceBrief').value + (refs.length ? `\n\nReference documents in the Brain: ${refs.join(', ')}` : ''), assignee, dueAt: due ? new Date(due).getTime() : undefined, priority: Number($('spacePriority').value), backlog: !!event.submitter.dataset.backlog, projectId: $('spaceProject').value || undefined });
-      $('spaceDue').value = ''; $('spaceFiles').value = ''; $('spacePriority').value = '1'; $('spaceOptions').open = false; selectedTeam = 'auto'; $('spaceDept').innerHTML = `<i style="background:${teamChip('auto').chip}"></i><span>${esc(teamChip('auto').name)}</span><span class="space-chevron">⌄</span>`; fillOptions();
+      const job = await api('/tasks', 'POST', { dept: auto ? 'auto' : team, ...(auto ? { depts: 'auto' } : involve.length ? { depts: [team, ...involve] } : {}), text: $('spaceBrief').value + (refs.length ? `\n\nReference documents in the Brain: ${refs.join(', ')}` : ''), assignee, dueAt: due ? new Date(due).getTime() : undefined, priority: Number($('spacePriority').value), backlog: !!event.submitter.dataset.backlog, projectId: $('spaceProject').value || undefined, ...audienceInput() });
+      $('spaceDue').value = ''; $('spaceFiles').value = ''; $('spacePriority').value = '1'; $('spaceOptions').open = false; if (HOSTED) { $('spaceVisibility').value = 'private'; $('spaceShareWrap').hidden = false; for (const o of $('spaceShare').options) o.selected = false; } selectedTeam = 'auto'; $('spaceDept').innerHTML = `<i style="background:${teamChip('auto').chip}"></i><span>${esc(teamChip('auto').name)}</span><span class="space-chevron">⌄</span>`; fillOptions();
       $('spaceBrief').value = ''; $('spaceHint').textContent = job.state === 'backlog' ? 'Idea saved. Start it when you are ready.' : 'Task received. The lead will create the plan; open the task from the list on the right to follow it.';
       await refresh();
     } catch (error) { $('spaceHint').textContent = error.message; if (/model key/i.test(error.message)) settings.open('models'); }
@@ -271,9 +287,28 @@ export function initOfficeWork(ctx) {
     content.querySelectorAll('[data-detail-key]').forEach(el=>taskExpanded.set(el.dataset.detailKey,el.open));
     taskScroll[taskTab]=content.scrollTop;
   }
+  // Hosted offices: who sees this task, and where it came from; the owner or an office admin can change the audience.
+  function audienceBar(job) {
+    const mine = job.ownerId && job.ownerId === USER?.id, can = isOfficeAdmin() || mine, shared = [...(job.sharedWith?.groups || []), ...(job.sharedWith?.users || [])];
+    const who = job.visibility === 'public' ? 'Everyone in the office can see this task' : `Private${shared.length ? ' · shared with ' + shared.map(id => esc(audienceName(id))).join(', ') : ''}`;
+    const from = job.origin?.channel === 'email' ? ` · from email${job.origin.from ? ' · ' + esc(job.origin.from) : ''}` : job.origin?.channel === 'routine' ? ' · from a routine' : job.origin?.channel === 'chat' ? ' · from a chat' : '';
+    const owner = mine ? 'yours' : job.ownerId ? 'owned by ' + esc(audienceName(job.ownerId)) : '';
+    const options = `<optgroup label="Groups">${audienceLists.groups.map(g => `<option value="g:${esc(g.id)}" ${(job.sharedWith?.groups || []).includes(g.id) ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</optgroup><optgroup label="People">${audienceLists.users.filter(u => u.id !== job.ownerId).map(u => `<option value="u:${esc(u.id)}" ${(job.sharedWith?.users || []).includes(u.id) ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</optgroup>`;
+    return `<div class="space-audience" data-audience><span>${who}${owner ? ' · ' + owner : ''}${from}</span>${can ? '<button type="button" class="secondary" data-audience-edit>Change</button>' : ''}
+      ${can ? `<form class="space-audience-form" data-audience-form hidden><label>Visibility<select name="visibility"><option value="private" ${job.visibility !== 'public' ? 'selected' : ''}>Private</option><option value="public" ${job.visibility === 'public' ? 'selected' : ''}>Everyone in the office</option></select></label><label>Share with<select name="share" multiple size="4">${options}</select></label><button type="submit">Save</button><small>Private covers the record, its thread, progress and files. An approved result is still filed in the shared Brain, which every agent reads.</small></form>` : ''}</div>`;
+  }
+  function bindAudience(job) {
+    const edit = content.querySelector('[data-audience-edit]'), form = content.querySelector('[data-audience-form]'); if (!edit || !form) return;
+    edit.onclick = () => { form.hidden = !form.hidden; taskDirty = !form.hidden; };
+    form.onsubmit = async event => {
+      event.preventDefault(); const picked = [...form.elements.share.selectedOptions].map(o => o.value);
+      try { await api(`/tasks/${job.id}/share`, 'POST', audienceOf(form.elements.visibility.value, picked)); taskDirty = false; taskSignature = ''; await refresh(); await showTask(job.id, false); feedback('Saved who sees this task.'); }
+      catch (error) { feedback(error.message, true); }
+    };
+  }
   function renderTaskView() {
     const job=taskCurrent;if(!job)return;
-    content.innerHTML=renderTaskWorkspace(job,taskTab,taskActions(job));
+    content.innerHTML=(HOSTED?audienceBar(job):'')+renderTaskWorkspace(job,taskTab,taskActions(job));bindAudience(job);
     content.querySelectorAll('[data-detail-key]').forEach(el=>{if(taskExpanded.has(el.dataset.detailKey))el.open=taskExpanded.get(el.dataset.detailKey);});
     for(const [id,value] of Object.entries(taskInputDraft)){const field=$(id);if(field)field.value=value;}
     content.scrollTop=taskScroll[taskTab] || 0;
@@ -578,11 +613,13 @@ export function initOfficeWork(ctx) {
     if (type.startsWith('notification.')) inbox.onEvent(type, data);
     else if (type === 'task.updated') { const j = uiJob(data), i = jobs.findIndex(x => x.id === j.id); if (i >= 0) jobs[i] = j; else jobs.unshift(j); render(); if (agentOpen) renderAgent(agentOpen); refreshOpenTask(j.id); }
     else if (['task.state', 'task.live', 'task.event'].includes(type)) refreshOpenTask(data.id);
+    // A task's audience changed: everyone drops it; those who may still see it get it back in the task.updated that follows.
+    else if (type === 'task.removed') { const i = jobs.findIndex(x => x.id === data.id); if (i >= 0) { jobs.splice(i, 1); render(); } if (modalKind === 'task' && modalTask === data.id) setTimeout(() => { if (!jobs.some(x => x.id === data.id) && modalKind === 'task' && modalTask === data.id) { close(); } }, 600); }
     else if (type === 'brain.updated') syncBrain().catch(() => {});
     else if (type === 'resync' || type === 'office.updated') { if (type === 'office.updated' && data?.area === 'office') { rosterChanged = true; reloadForRoster(); } refresh(); }
   };
   const poll = () => setTimeout(async () => { await refresh(); poll(); }, liveStatus === 'live' ? 15000 : 2000);
-  officeReady.then(async()=>{connectLive({ onEvent, onStatus: status => { const was = liveStatus; liveStatus = status; if (status === 'live' && was !== 'live') refresh(); } });poll();try{const health=await api('/health');onLive?.(health);await syncBrain();await refresh();const usage=await api('/usage');onUsage?.(usage);}catch(error){$('spaceHint').textContent=error.message;}});
+  officeReady.then(async()=>{connectLive({ onEvent, onStatus: status => { const was = liveStatus; liveStatus = status; if (status === 'live' && was !== 'live') refresh(); } });poll();try{const health=await api('/health');onLive?.(health);await syncBrain();await refresh();const wanted=new URLSearchParams(location.hash.slice(1)).get('task');if(wanted)showTask(wanted).catch(()=>{});const usage=await api('/usage');onUsage?.(usage);}catch(error){$('spaceHint').textContent=error.message;}});
   const noop=()=>{};
   return { chatContext, chatInput, chatPickerKey, chatSent, loadHistory, openInbox: () => inbox.open(), needsYouCount: () => inbox.counts.needsYou, settings, get tasks(){return jobs.flatMap(j=>[...j.subtasks.filter(s=>s.agent).map(s=>({...s,agent:s.agent,state:s.state==='working'?'doing':s.state})),...(['planning','reviewing'].includes(j.state)?[{agent:j.agent,state:'doing'}]:[]),...(j.state==='working'?(j.runs||[]).filter(r=>r.role==='lead'&&r.state==='working'&&r.agent&&!(j.runs||[]).some(x=>x.role==='specialist'&&x.state==='working'&&x.dept===r.dept)).map(r=>({agent:r.agent,state:'doing'})):[])]);},
     projectActivity:()=>projectUI.activity(),openProjects:()=>projectUI.open(),agentActivity:id=>activityByAgent.get(id),job:id=>jobs.find(j=>j.id===id),jobs:()=>jobs,tick:noop,panelWidth:()=>panel.offsetWidth,onFocusChange:key=>{ /* the composer keeps the Program Manager until the owner picks a team */ },rowHTML,

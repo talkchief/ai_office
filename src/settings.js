@@ -10,6 +10,7 @@ import { toast } from './toast.js';
 import { mark, dot, clock, ago, toolState, officeSummary, dropSummary } from './status.js';
 import { MANAGE_CSS } from './manage.css.js';
 import { searchAgency } from './agency-search.js';
+import { HOSTED, USER, LIMITS, MANAGED_MODELS, isOfficeAdmin, canOpenArea } from './session.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const when = value => value ? new Date(value).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
@@ -30,9 +31,12 @@ const SECTIONS = [
   ['reports', 'Reports & KPIs', 'Knowledge', 'What the office did, by team and by person, with every figure linked to the tasks behind it.', ''],
   ['brain', 'Brain', 'Knowledge', 'The company’s shared knowledge. Every agent searches it before and during work and cites what it used.', 'brain'],
   ['audit', 'Audit log', 'Administration', 'Every change made through the office, by you or by an agent, with what it was before. Nothing here can be edited.', ''],
+  ['users', 'Users & groups', 'Administration', 'The people who sign in to this office, their roles, and the groups you share tasks and projects with. Groups are people, not AI teams.', 'users'],
+  ['admin', 'Platform', 'Administration', 'What every office on this platform inherits: the model providers and keys, the limits, who may register, and the offices themselves.', ''],
 ];
 const RESUME = 'ao.settings.resume';
-const RAIL = [['People', ['teams', 'projects', 'routines']], ['Knowledge', ['brain', 'skills', 'artifacts', 'reports']], ['Services', ['models', 'tools', 'vault']], ['Administration', ['profile', 'office', 'audit']]];
+// The rail follows the viewer: a member sees no Tools, Vault, Office settings or Audit; hosted offices have no Models page (the platform's admin panel has it).
+const RAIL = [['People', ['teams', 'projects', 'routines']], ['Knowledge', ['brain', 'skills', 'artifacts', 'reports']], ['Services', ['models', 'tools', 'vault']], ['Administration', ['profile', 'users', 'office', 'audit', 'admin']]].map(([g, ids]) => [g, ids.filter(canOpenArea)]).filter(([, ids]) => ids.length);
 const readFile = file => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(',')[1]); r.onerror = reject; r.readAsDataURL(file); });
 const SEARCH_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
 
@@ -92,12 +96,12 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   });
   page.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Escape' && !event.target.closest('input,textarea,select')) close(); });
   $('settingsBack').onclick = event => { event.preventDefault(); close(); };
-  const RENDER = { profile: showProfile, office: showOffice, teams: showTeams, models: showModels, tools: showTools, vault: showVault, skills: showSkills, projects: showProjects, artifacts: showArtifacts, routines: showRoutines, reports: showReports, brain: showBrain, audit: showAudit };
+  const RENDER = { profile: showProfile, office: showOffice, teams: showTeams, models: showModels, tools: showTools, vault: showVault, skills: showSkills, projects: showProjects, artifacts: showArtifacts, routines: showRoutines, reports: showReports, brain: showBrain, audit: showAudit, users: showUsers, admin: showAdmin };
 
   function route() {
     const match = location.hash.match(/^#\/settings(?:\/([\w-]+))?/);
     if (!match) { if (!page.hidden) hide(); return; }
-    const next = RENDER[match[1]] ? match[1] : 'office';
+    const next = RENDER[match[1]] && canOpenArea(match[1]) ? match[1] : canOpenArea('office') ? 'office' : 'profile';
     if (dirty && section && next !== section && !confirm('You have unsaved changes. Leave this page without saving them?')) { history.replaceState(null, '', '#/settings/' + section); return; }
     show(next);
   }
@@ -106,7 +110,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     if (page.hidden) { page.hidden = false; document.body.dataset.view = 'settings'; onShow?.(); }
     page.querySelectorAll('[data-section]').forEach(a => a.dataset.section === next ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
     const s = SECTIONS.find(x => x[0] === next); $('settingsGroup').textContent = s[2]; $('settingsTitle').textContent = s[1]; $('settingsIntro').textContent = s[3];
-    clearError(); setMeta(''); content.innerHTML = '<p class="mg-intro">Loading…</p>'; main.scrollTop = 0;
+    clearError(); setMeta(''); content.innerHTML = '<p class="mg-intro">Loading…</p>'; content.classList.remove('mg-readonly'); main.scrollTop = 0;
     refreshRail(); RENDER[next]();
   }
   function hide() { page.hidden = true; delete document.body.dataset.view; section = null; dirty = false; stopPoll(); onHide?.(); }
@@ -125,18 +129,37 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   const empty = (title, text) => `<div class="mg-card" style="text-align:center;padding:36px 22px"><h3>${title}</h3><p style="margin:0">${text}</p></div>`;
   const banner = (kind, html, actions = '') => `<div class="mg-banner mg-banner-${kind}"><span class="mg-glyph">${{ fail: '✕', warn: '!', ok: '✓', info: 'i' }[kind]}</span><div>${html}</div>${actions ? `<div class="mg-actions">${actions}</div>` : ''}</div>`;
 
-  /* ---------- Profile: the company's name and purpose ---------- */
+  /* ---------- Profile: the company's name and purpose (and, hosted, your own account) ---------- */
+  function bindAccount() {
+    const form = $('setAccount'); if (!form) return;
+    form.onsubmit = async event => {
+      event.preventDefault(); const name = form.elements.name.value.trim(), current = form.elements.current.value, next = form.elements.next.value;
+      try {
+        if (name && name !== USER.name) await api('/auth/prefs', 'PUT', { name });
+        if (next) { if (!current) throw new Error('Enter your current password to change it.'); await api('/auth/password', 'POST', { current, next }); }
+        feedback('Account saved.'); if (name !== USER.name) setTimeout(() => location.reload(), 600); form.elements.current.value = form.elements.next.value = '';
+      } catch (error) { feedback(error.message, true); }
+    };
+  }
   const PURPOSE_ID = 'Knowledge/office-purpose.md';
   async function showProfile() {
     try {
       const [s, health, note] = await Promise.all([api('/settings'), api('/health'), api('/knowledge/note?id=' + encodeURIComponent(PURPOSE_ID)).catch(() => null)]);
       const purpose = note ? note.content.replace(/^#\s+.*(?:\r?\n)?/, '').trim() : '';
-      content.innerHTML = `<form id="setProfile" data-dirty novalidate><div class="mg-card"><div class="mg-card-head"><h3>The company</h3><span class="mg-count">shown across the office and told to every agent</span></div>
+      const account = HOSTED && USER ? `<div class="mg-card"><div class="mg-card-head"><h3>Your account</h3><span class="mg-count">${esc(USER.email)} · ${esc(USER.role)}</span></div>
+        <form id="setAccount" novalidate><div class="mg-grid">${field('Your name', `<input name="name" value="${esc(USER.name)}" maxlength="80" required>`)}${field('Current password', '<input name="current" type="password" autocomplete="current-password">')}${field('New password', '<input name="next" type="password" autocomplete="new-password" minlength="10">', 'Leave both blank to keep your password. Changing it signs out your other devices.')}</div>
+        <div class="mg-toolbar" style="margin:0"><button type="submit" class="mg-btn mg-btn-primary">Save account</button></div></form></div>` : '';
+      if (HOSTED && !isOfficeAdmin()) {
+        content.innerHTML = account + `<div class="mg-card"><div class="mg-card-head"><h3>The company</h3><span class="mg-count">${esc(s.officeName || health.name || '')}</span></div><p class="mg-intro">${purpose ? esc(purpose).replace(/\n/g, '<br>') : 'The office owner has not written the office purpose yet.'}</p></div>`;
+        bindAccount(); setMeta(mark('ok', 'Member')); return;
+      }
+      content.innerHTML = account + `<form id="setProfile" data-dirty novalidate><div class="mg-card"><div class="mg-card-head"><h3>The company</h3><span class="mg-count">shown across the office and told to every agent</span></div>
         <div class="mg-grid">${field('Office name', `<input name="officeName" value="${esc(s.officeName || health.name || '')}" maxlength="80" placeholder="${esc(health.name || 'Your company')}" required>`, 'The company the teams work for. Agents introduce the office by this name.')}</div></div>
         <div class="mg-card"><div class="mg-card-head"><h3>Office purpose</h3><span class="mg-count">read by every planner before work</span></div>
         ${field('The business, who you serve, what the teams should achieve, and the constraints', `<textarea name="purpose" rows="12" placeholder="What the company does, for whom, what good work looks like, and what must never happen.">${esc(purpose)}</textarea>`, 'Kept in the Brain as Knowledge/office-purpose.md. Markdown is fine.')}
         ${saveBar({ hint: 'New work uses the new name and purpose at once.', label: 'Save profile' })}</div></form>`;
       setMeta(purpose ? mark('ok', 'Purpose written') : mark('warn', 'No purpose yet'), note?.updatedAt ? `purpose updated ${esc(when(note.updatedAt))}` : ''); refreshMeta('profile', purpose ? mark('ok', 'Purpose written') : mark('warn', 'No purpose yet'));
+      bindAccount();
       $('setProfile').onsubmit = async event => {
         event.preventDefault(); const form = event.target, name = form.elements.officeName.value.trim(), text = form.elements.purpose.value.trim();
         if (!name) { setBar(barOf(form), 'failed', 'Not saved: the office needs a name'); feedback('Give the office a name.', true); form.elements.officeName.focus(); return; }
@@ -176,12 +199,13 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   /* ---------- Teams & people ---------- */
   async function showTeams() {
     try {
-      [config, tools, providers] = await Promise.all([api('/office'), api('/tools'), api('/providers')]); draft = structuredClone(config);
+      [config, tools, providers] = await Promise.all([api('/office'), api('/tools').catch(() => []), MANAGED_MODELS ? Promise.resolve({ models: [] }) : api('/providers').catch(() => ({ models: [] }))]); draft = structuredClone(config);
       let resume = null; try { resume = JSON.parse(sessionStorage.getItem(RESUME) || 'null'); sessionStorage.removeItem(RESUME); } catch {}
       if (resume?.team && draft.teams.some(t => t.id === resume.team)) { team = resume.team; teamSection = resume.section || teamSection; }
       if (!draft.teams.some(t => t.id === team)) team = draft.teams[0].id;
-      setMeta(mark('ok', 'Saved')); refreshMeta('teams', mark('ok', 'Saved'));
-      renderTeam();
+      setMeta(isOfficeAdmin() ? mark('ok', 'Saved') : mark('off', 'Read-only')); refreshMeta('teams', mark('ok', 'Saved'));
+      renderTeam(); content.classList.toggle('mg-readonly', !isOfficeAdmin());
+      if (!isOfficeAdmin()) content.insertAdjacentHTML('afterbegin', banner('info', '<b>Read-only.</b> Only the office owner or an admin changes teams and people. You can see who does what and the instructions they work from.'));
       if (resume?.hire) $('spaceAddAgent')?.click();
     } catch (error) { feedback(error.message, true); }
   }
@@ -232,11 +256,11 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       </div></details>`; };
     content.innerHTML = `<div class="mg-team-strip" role="tablist">${draft.teams.map(x => { const n = draft.agents.filter(a => a.department === x.id); return `<button type="button" class="mg-team-tab" role="tab" data-team="${x.id}" aria-selected="${x.id === t.id}"><b>${esc(x.name)}</b><small>${n.length} people · ${esc(n.find(a => a.id === x.lead)?.name || 'no lead')}</small></button>`; }).join('')}<button type="button" class="mg-team-tab mg-add" id="spaceAddTeam">+ Add team</button></div>
       <div class="mg-team-head"><h2>${esc(t.name)}</h2><span class="mg-lead">Led by <b>${esc(lead?.name || 'nobody yet')}</b> · ${t.maxParallelRuns} at once · ${t.maxReworkRounds} rework rounds · ${t.completionApproval ? mark('warn', 'Asks your OK to close') : mark('off', 'Closes on the lead’s approval')}</span><div class="mg-actions"><button type="button" class="mg-btn mg-btn-sm mg-btn-danger" id="spaceRemoveTeam">${unsaved ? 'Discard' : 'Remove team'}</button></div></div>
-      <nav class="mg-subnav" role="tablist" aria-label="Team pages">${[['overview', 'Charter', ''], ['people', 'People', agents.length], ['rules', 'Standing rules', ruleCount], ['access', 'Tools & skills', teamTools + t.skills.length], ['quality', 'Review', t.checks.length || ''], ['execution', 'Models & pace', ''], ['tests', 'Tests', t.tests.length || '']].map(([id, text, n]) => `<button type="button" class="mg-tab" data-settings-section="${id}" aria-pressed="${teamSection === id}" ${unsaved && id !== 'overview' ? 'disabled title="Create the team first"' : ''}>${text}${n !== '' ? `<span class="mg-n">${n}</span>` : ''}</button>`).join('')}</nav>
+      <nav class="mg-subnav" role="tablist" aria-label="Team pages">${[['overview', 'Charter', ''], ['people', 'People', agents.length], ['rules', 'Standing rules', ruleCount], ['access', 'Tools & skills', teamTools + t.skills.length], ['quality', 'Review', t.checks.length || ''], ...(MANAGED_MODELS ? [] : [['execution', 'Models & pace', '']]), ['tests', 'Tests', t.tests.length || '']].map(([id, text, n]) => `<button type="button" class="mg-tab" data-settings-section="${id}" aria-pressed="${teamSection === id}" ${unsaved && id !== 'overview' ? 'disabled title="Create the team first"' : ''}>${text}${n !== '' ? `<span class="mg-n">${n}</span>` : ''}</button>`).join('')}</nav>
       <form id="spaceTeamForm" data-dirty novalidate>
       <section data-settings-page="overview">${unsaved ? banner('info', '<b>This team does not exist yet.</b> Name it, write its charter or draft it with AI, then press Create team. People, rules, tools and tests open once it exists.') : ''}<div class="mg-card"><div class="mg-card-head"><h3>Charter</h3><span class="mg-count">read before every assignment</span><button type="button" class="mg-assist" data-assist="team" style="margin-left:auto">✦ Draft with AI</button></div><div class="mg-grid">${field('Team name', `<input name="name" value="${esc(t.name)}" required>`)}${field('Accountable lead', `<select name="lead">${agents.map(a => `<option value="${a.id}" ${a.id === t.lead ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>`, 'Reviews every result against the criteria before it is filed in the Brain.')}</div>
       <div style="margin-top:14px">${field('Purpose', `<textarea name="purpose" rows="2" required placeholder="What does this team own, and what does success look like?">${esc(t.purpose)}</textarea>`, 'What this team owns and what a good result looks like. Read before every assignment.')}${field('Working instructions', `<textarea name="instructions" rows="6" required placeholder="Process, tone, source requirements and boundaries for this team.">${esc(t.instructions)}</textarea>`, 'Process, tone, sources and boundaries. Steps with a template belong in a skill instead.')}</div></div></section>
-      <section data-settings-page="people"><div id="spaceAgencyPicker" hidden></div>${agents.map(person).join('')}<div class="mg-toolbar" style="margin-top:14px"><button type="button" class="mg-btn mg-btn-primary" id="spaceAddAgent" ${agents.length >= 7 ? 'disabled' : ''}>+ Add agent</button><span class="mg-muted">${agents.length >= 7 ? 'This team is full: a lead and six specialists.' : `Room for ${7 - agents.length} more on this team.`}</span></div>
+      <section data-settings-page="people"><div id="spaceAgencyPicker" hidden></div>${agents.map(person).join('')}<div class="mg-toolbar" style="margin-top:14px"><button type="button" class="mg-btn mg-btn-primary" id="spaceAddAgent" ${agents.length >= LIMITS.maxMembersPerTeam ? 'disabled' : ''}>+ Add agent</button><span class="mg-muted">${agents.length >= LIMITS.maxMembersPerTeam ? `This team is full: a lead and ${LIMITS.maxMembersPerTeam - 1} specialists.` : `Room for ${LIMITS.maxMembersPerTeam - agents.length} more on this team.`}</span></div>
       <div class="mg-modal" id="spaceAddAgentModal" hidden role="dialog" aria-modal="true" aria-label="Add an agent"><div class="mg-modal-box">
         <div class="mg-modal-head"><h3>Add an agent to ${esc(t.name)}</h3><button type="button" class="mg-modal-x" data-add-close aria-label="Close">✕</button></div>
         <div class="mg-choices">
@@ -346,13 +370,13 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   // Nothing is built in: a provider gets a key, its model list is fetched from the provider, and the owner activates the ones the office may use.
   const ROLES = [['office', 'Office default'], ['pm', 'Program Manager'], ['lead', 'Team leads'], ['specialist', 'Specialists'], ['review', 'Reviews'], ['chat', 'Chat with people']];
   let modelLists = {}, testResults = {};
-  async function showModels() {
+  async function showModels(base = '/providers', target = content) {
     try {
-      const reg = await api('/providers'), active = structuredClone(reg.models), roles = { ...reg.roleDefaults };
+      const reg = await api(base), active = structuredClone(reg.models), roles = { ...reg.roleDefaults };
       const providerName = id => reg.providers.find(p => p.id === id)?.label || id;
       const keyState = p => !p.hasKey ? mark('warn', 'Not set') : testResults[p.id]?.ok === false ? mark('fail', 'Key rejected') : testResults[p.id]?.ok ? mark('ok', `Connected · ${(testResults[p.id].ms / 1000).toFixed(1)} s`) : p.enabled === false ? mark('off', 'Disabled') : mark('ok', 'Key stored');
       const without = reg.providers.filter(p => !p.hasKey && p.enabled !== false);
-      content.innerHTML = `${reg.ready ? '' : banner('warn', '<b>No model can run yet.</b> Save a provider key, then activate a model from that provider’s list and choose the office default.')}
+      target.innerHTML = `${reg.ready ? '' : banner('warn', '<b>No model can run yet.</b> Save a provider key, then activate a model from that provider’s list and choose the office default.')}
         ${without.length && reg.ready ? banner('warn', `<b>${without.map(p => esc(p.label)).join(', ')} ${without.length === 1 ? 'has' : 'have'} no key.</b> Tasks cannot fall back to ${without.length === 1 ? 'it' : 'them'} until a key is saved.`) : ''}
         <form id="spaceKeysForm" data-dirty><div class="mg-card"><div class="mg-card-head"><h3>Providers</h3><span class="mg-count">${reg.providers.length} configured · ${reg.providers.filter(p => p.hasKey).length} keyed</span></div>
         <div class="mg-ledger-wrap"><table class="mg-ledger"><thead><tr><th>Provider</th><th>Key</th><th>State</th><th>Models</th><th class="r">Enabled</th><th class="r"></th></tr></thead><tbody>${reg.providers.map(p => `<tr data-provider="${esc(p.id)}"><td><span class="mg-name">${esc(p.label)}</span><span class="mg-sub">${esc(p.type === 'openai-compatible' ? (p.baseURL || 'OpenAI-compatible endpoint') : p.type)}</span>${p.type === 'openai-compatible' ? `<input data-field="baseURL" value="${esc(p.baseURL || '')}" placeholder="https://host/v1" aria-label="Base URL" style="margin-top:6px;width:100%;border:1px solid var(--mg-line2);border-radius:6px;padding:6px 8px;background:var(--mg-card);color:var(--ink);font:12px var(--mg-mono)">` : ''}</td>
@@ -368,20 +392,20 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       setMeta(reg.ready ? mark('ok', 'Ready · teams can work') : mark('warn', 'Not ready')); refreshMeta('models', reg.ready ? mark('ok', 'Ready · teams can work') : mark('warn', 'Not ready'));
       const box = $('spaceModelsBox'), modelsBar = $('spaceModelsBar');
       const collectKeys = () => reg.providers.map(({ hasKey, keySource, usable, ...p }) => { const f = content.querySelector(`[data-provider="${p.id}"]`), fieldOf = name => f.querySelector(`[data-field="${name}"]`); return { ...p, apiKey: fieldOf('apiKey').value, enabled: fieldOf('enabled').checked, clearKey: !!fieldOf('clearKey')?.checked, ...(fieldOf('baseURL') ? { baseURL: fieldOf('baseURL').value } : {}) }; });
-      const save = async () => { await api('/providers', 'PUT', { providers: collectKeys(), models: active, roleDefaults: roles, roleEfforts: reg.roleEfforts, embeddings: reg.embeddings }); dirty = false; };
+      const save = async () => { await api(base, 'PUT', { providers: collectKeys(), models: active, roleDefaults: roles, roleEfforts: reg.roleEfforts, embeddings: reg.embeddings }); dirty = false; };
       // Test connection is only offered once there is a key: stored, or typed just now (it is saved first).
       content.querySelectorAll('[data-field="apiKey"]').forEach(input => input.addEventListener('input', () => { const p = reg.providers.find(x => x.id === input.closest('[data-provider]').dataset.provider), b = content.querySelector(`[data-test-provider="${p.id}"]`); b.disabled = !(p.hasKey || input.value.trim()); b.title = b.disabled ? 'Paste a key first' : ''; }));
       content.querySelectorAll('[data-test-provider]').forEach(button => button.onclick = async () => {
         const id = button.dataset.testProvider, cell = content.querySelector(`[data-key-state="${id}"]`); button.disabled = true; button.innerHTML = '<span class="mg-spin"></span>Testing'; cell.innerHTML = mark('busy', 'Testing…');
         try {
           if (content.querySelector(`[data-provider="${id}"] [data-field="apiKey"]`).value.trim()) { await save(); dropSummary(); }
-          const r = await api(`/providers/${id}/test`, 'POST', {}); testResults[id] = r;
+          const r = await api(`${base}/${id}/test`, 'POST', {}); testResults[id] = r;
           if (!r.ok) { cell.innerHTML = mark('fail', 'Key rejected') + `<span class="mg-sub">${esc(r.error || '')}</span>`; toast(`${providerName(id)}: key rejected`, { kind: 'error', detail: r.error || 'The provider refused the key. Replace it and test again.' }); }
-          else { cell.innerHTML = mark('ok', r.ms ? `Connected · ${(r.ms / 1000).toFixed(1)} s` : 'Connected'); toast(`${providerName(id)}: connected`, { kind: 'ok', detail: r.model ? `Answered in ${r.ms} ms using ${r.model}.` : `${r.models} models available.` }); if (content.querySelector(`[data-provider="${id}"] [data-field="apiKey"]`).value.trim()) await showModels(); }
+          else { cell.innerHTML = mark('ok', r.ms ? `Connected · ${(r.ms / 1000).toFixed(1)} s` : 'Connected'); toast(`${providerName(id)}: connected`, { kind: 'ok', detail: r.model ? `Answered in ${r.ms} ms using ${r.model}.` : `${r.models} models available.` }); if (content.querySelector(`[data-provider="${id}"] [data-field="apiKey"]`).value.trim()) await showModels(base, target); }
         } catch (error) { testResults[id] = { ok: false, error: error.message }; cell.innerHTML = mark('fail', 'Failed') + `<span class="mg-sub">${esc(error.message)}</span>`; feedback(`${providerName(id)}: ${error.message}`, true); }
         finally { if (button.isConnected) { button.disabled = false; button.textContent = 'Test'; } }
       });
-      $('spaceKeysForm').onsubmit = async event => { event.preventDefault(); try { await runSave(barOf(event.target), save, { ok: 'Keys saved', sub: 'Stored on the server. Test the connection to be sure.' }); await showModels(); } catch {} };
+      $('spaceKeysForm').onsubmit = async event => { event.preventDefault(); try { await runSave(barOf(event.target), save, { ok: 'Keys saved', sub: 'Stored on the server. Test the connection to be sure.' }); await showModels(base, target); } catch {} };
       const touched = () => { dirty = true; setBar(modelsBar, 'dirty', 'Changes not saved', 'Running tasks finish on the model they started with.'); };
       const renderRoles = () => {
         const options = (selected, blank) => `<option value="">${blank}</option>` + active.filter(m => m.enabled !== false).map(m => `<option value="${esc(m.id)}" ${m.id === selected ? 'selected' : ''}>${esc(m.label || m.id)} · ${esc(providerName(m.provider))}</option>`).join('');
@@ -405,8 +429,8 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         box.querySelectorAll('[data-deactivate]').forEach(b => b.onclick = () => { const id = b.dataset.deactivate; active.splice(active.findIndex(m => m.id === id), 1); for (const r of Object.keys(roles)) if (roles[r] === id) roles[r] = ''; touched(); renderModels(); renderRoles(); });
       };
       renderModels(); renderRoles();
-      for (const p of reg.providers.filter(p => p.usable && !modelLists[p.id])) api(`/providers/${p.id}/models`).then(list => { modelLists[p.id] = list; if (section === 'models') renderModels(); }).catch(error => { modelLists[p.id] = { error: error.message }; if (section === 'models') { renderModels(); feedback(`${p.label}: ${error.message}`, true); } });
-      $('spaceSaveModels').onclick = async () => { if (active.length && !roles.office) { setBar(modelsBar, 'failed', 'Not saved: choose the office default model'); return feedback('Choose the office default model.', true); } try { await runSave(modelsBar, save, { ok: 'Models and roles saved', sub: 'New work uses these models.' }); await showModels(); } catch {} };
+      for (const p of reg.providers.filter(p => p.usable && !modelLists[p.id])) api(`${base}/${p.id}/models`).then(list => { modelLists[p.id] = list; if (section === 'models') renderModels(); }).catch(error => { modelLists[p.id] = { error: error.message }; if (section === 'models') { renderModels(); feedback(`${p.label}: ${error.message}`, true); } });
+      $('spaceSaveModels').onclick = async () => { if (active.length && !roles.office) { setBar(modelsBar, 'failed', 'Not saved: choose the office default model'); return feedback('Choose the office default model.', true); } try { await runSave(modelsBar, save, { ok: 'Models and roles saved', sub: 'New work uses these models.' }); await showModels(base, target); } catch {} };
     } catch (error) { feedback(error.message, true); }
   }
 
@@ -788,12 +812,84 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
 
   /* ---------- Audit ---------- */
   let auditArea = '';
+  /* ---------- Users & groups (hosted): who signs in, their roles, and the groups tasks are shared with ---------- */
+  async function showUsers() {
+    try {
+      const [u, g] = await Promise.all([api('/users'), api('/groups')]);
+      if (section !== 'users') return;
+      const me = USER, isOwner = me?.role === 'owner';
+      const roleCell = x => x.role === 'owner' || !isOwner ? `<span class="mg-chip">${esc(x.role)}</span>` : `<select data-role="${esc(x.id)}" aria-label="Role of ${esc(x.name)}"><option value="member" ${x.role === 'member' ? 'selected' : ''}>member</option><option value="admin" ${x.role === 'admin' ? 'selected' : ''}>admin</option></select>`;
+      const removable = x => x.role !== 'owner' && x.id !== me?.id && (isOwner || x.role === 'member');
+      setMeta(mark('ok', `${u.users.length} people`), g.groups.length ? `${g.groups.length} group${g.groups.length === 1 ? '' : 's'}` : ''); refreshMeta('users', mark('ok', `${u.users.length} people`));
+      content.innerHTML = `<div class="mg-card"><div class="mg-card-head"><h3>People</h3><span class="mg-count">${u.users.length} in this office · owner, admins and members</span></div>
+        <div class="mg-ledger-wrap"><table class="mg-ledger"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Last sign-in</th><th class="r"></th></tr></thead><tbody>${u.users.map(x => `<tr><td><span class="mg-name">${esc(x.name)}${x.id === me?.id ? ' <span class="mg-muted">(you)</span>' : ''}</span></td><td>${esc(x.email)}</td><td>${roleCell(x)}</td><td class="k">${x.lastLoginAt ? esc(ago(x.lastLoginAt)) : '—'}</td><td class="r">${removable(x) ? `<button type="button" class="mg-btn mg-btn-sm mg-btn-danger" data-remove-user="${esc(x.id)}">Remove</button>` : ''}</td></tr>`).join('')}</tbody></table></div>
+        <form id="inviteForm" class="mg-toolbar" style="margin-top:14px"><input name="email" type="email" required placeholder="colleague@company.com" aria-label="Email to invite" style="flex:1;min-width:220px"><select name="role" aria-label="Role"><option value="member">member</option>${isOwner ? '<option value="admin">admin</option>' : ''}</select><button type="submit" class="mg-btn mg-btn-primary">Invite</button></form>
+        <div id="inviteResult"></div>
+        ${u.invites.length ? `<h4 style="margin:14px 0 6px">Open invitations</h4><div class="mg-ledger-wrap"><table class="mg-ledger"><tbody>${u.invites.map(i => `<tr><td>${esc(i.email)}</td><td><span class="mg-chip">${esc(i.role)}</span></td><td class="k">expires ${esc(when(i.expiresAt))}</td><td class="r"><button type="button" class="mg-btn mg-btn-sm" data-revoke="${esc(i.hash)}">Revoke</button></td></tr>`).join('')}</tbody></table></div>` : ''}</div>
+        <div class="mg-card"><div class="mg-card-head"><h3>Groups</h3><span class="mg-count">people you share tasks and projects with · not AI teams</span></div>
+        ${g.groups.map(grp => `<details class="mg-fold"><summary>${esc(grp.name)}<small>${grp.users.length} people</small><span class="mg-open">Edit</span></summary><div class="mg-fold-body"><form data-group-form="${esc(grp.id)}">${field('Name', `<input name="name" value="${esc(grp.name)}" required maxlength="60">`)}<div class="mg-grid">${u.users.map(x => check(`<input type="checkbox" name="users" value="${esc(x.id)}" ${grp.users.includes(x.id) ? 'checked' : ''}>`, esc(x.name), esc(x.email))).join('')}</div><div class="mg-toolbar" style="margin:10px 0 0"><button type="submit" class="mg-btn mg-btn-primary mg-btn-sm">Save group</button><button type="button" class="mg-btn mg-btn-sm mg-btn-danger" data-delete-group="${esc(grp.id)}">Delete group</button></div></form></div></details>`).join('') || '<p class="mg-intro">No groups yet. A group is a set of people; sharing a task with the group shares it with everyone in it.</p>'}
+        <form id="groupForm" class="mg-toolbar" style="margin-top:14px"><input name="name" required placeholder="Sales staff" aria-label="Group name" maxlength="60" style="flex:1;min-width:220px"><button type="submit" class="mg-btn mg-btn-primary">+ New group</button></form></div>`;
+      $('inviteForm').onsubmit = async event => {
+        event.preventDefault(); const f = event.target;
+        try { const r = await api('/auth/invite', 'POST', { email: f.elements.email.value.trim(), role: f.elements.role.value }); $('inviteResult').innerHTML = banner('ok', `<b>Invitation for ${esc(r.email)}.</b> Send them this link; it works once and expires ${esc(when(r.expiresAt))}.<br><code style="user-select:all;word-break:break-all">${esc(r.link)}</code>`, `<button type="button" class="mg-btn mg-btn-sm" id="copyInvite">Copy link</button>`); $('copyInvite').onclick = () => navigator.clipboard?.writeText(r.link).then(() => toast('Link copied', { kind: 'ok' })).catch(() => {}); f.reset(); }
+        catch (error) { feedback(error.message, true); }
+      };
+      content.querySelectorAll('[data-role]').forEach(sel => sel.onchange = async () => { try { await api('/users/' + sel.dataset.role, 'PUT', { role: sel.value }); toast('Role saved', { kind: 'ok' }); } catch (error) { feedback(error.message, true); await showUsers(); } });
+      content.querySelectorAll('[data-remove-user]').forEach(b => b.onclick = async () => { if (!confirm('Remove this person from the office? Their tasks stay; they can no longer sign in here.')) return; try { await api('/users/' + b.dataset.removeUser, 'DELETE'); await showUsers(); } catch (error) { feedback(error.message, true); } });
+      content.querySelectorAll('[data-revoke]').forEach(b => b.onclick = async () => { try { await api('/auth/invite/' + b.dataset.revoke, 'DELETE'); await showUsers(); } catch (error) { feedback(error.message, true); } });
+      $('groupForm').onsubmit = async event => { event.preventDefault(); try { await api('/groups', 'POST', { name: event.target.elements.name.value.trim() }); await showUsers(); } catch (error) { feedback(error.message, true); } };
+      content.querySelectorAll('[data-group-form]').forEach(f => f.onsubmit = async event => {
+        event.preventDefault(); const id = f.dataset.groupForm, users = [...f.querySelectorAll('input[name=users]:checked')].map(i => i.value);
+        try { await api('/groups/' + id, 'PUT', { name: f.elements.name.value.trim() }); await api(`/groups/${id}/members`, 'PUT', { users }); toast('Group saved', { kind: 'ok' }); await showUsers(); } catch (error) { feedback(error.message, true); }
+      });
+      content.querySelectorAll('[data-delete-group]').forEach(b => b.onclick = async () => { if (!confirm('Delete this group? Tasks shared with it are no longer shared through it.')) return; try { await api('/groups/' + b.dataset.deleteGroup, 'DELETE'); await showUsers(); } catch (error) { feedback(error.message, true); } });
+    } catch (error) { feedback(error.message, true); }
+  }
+
+  /* ---------- Platform (platform admins): models and keys for every office, limits, registration, the offices, the people ---------- */
+  let adminTab = 'models', adminQ = '';
+  async function showAdmin() {
+    try {
+      const cfg = await api('/admin/config');
+      if (section !== 'admin') return;
+      content.innerHTML = `<nav class="mg-subnav" role="tablist" aria-label="Platform pages">${[['models', 'Models & keys'], ['limits', 'Limits & registration'], ['tenants', 'Offices'], ['people', 'People']].map(([id, text]) => `<button type="button" class="mg-tab" data-admin-tab="${id}" aria-pressed="${adminTab === id}">${text}</button>`).join('')}</nav><div id="adminBody"></div>`;
+      content.querySelectorAll('[data-admin-tab]').forEach(b => b.onclick = () => { adminTab = b.dataset.adminTab; showAdmin(); });
+      const body = $('adminBody');
+      setMeta(mark('ok', `${cfg.limits.maxTeams} teams × ${cfg.limits.maxMembersPerTeam} agents`), `registration ${cfg.registration}`);
+      if (adminTab === 'models') { body.innerHTML = banner('info', '<b>Every office runs on these.</b> Companies never see providers, keys or models; they inherit what is activated here.'); const inner = document.createElement('div'); body.appendChild(inner); await showModels('/admin/providers', inner); return; }
+      if (adminTab === 'limits') {
+        body.innerHTML = `<form id="platformForm" data-dirty novalidate><div class="mg-card"><div class="mg-card-head"><h3>Limits</h3><span class="mg-count">apply to the next change in every office</span></div><div class="mg-grid">
+          ${field('Maximum AI teams per office', `<input name="maxTeams" type="number" min="1" max="50" value="${cfg.limits.maxTeams}" required>`, 'From 1 to 50. An office already above a lowered number keeps working; its next change to teams is refused until it fits.')}
+          ${field('Maximum agents per AI team', `<input name="maxMembersPerTeam" type="number" min="2" max="20" value="${cfg.limits.maxMembersPerTeam}" required>`, 'A lead and the specialists, from 2 to 20.')}</div></div>
+          <div class="mg-card"><div class="mg-card-head"><h3>Registration and administrators</h3></div><div class="mg-grid">
+          ${field('Who may create an office', `<select name="registration"><option value="open" ${cfg.registration === 'open' ? 'selected' : ''}>Anyone with the address (open)</option><option value="invite" ${cfg.registration === 'invite' ? 'selected' : ''}>Invitation only</option></select>`)}
+          ${field('Platform administrator emails — one per line', `<textarea name="adminEmails" rows="4">${esc(cfg.adminEmails.join('\n'))}</textarea>`, 'These accounts see this panel. People flagged in the People tab count too.')}</div>
+          ${saveBar({ hint: 'Limits apply to the next change in every office.', label: 'Save platform settings' })}</div></form>`;
+        $('platformForm').onsubmit = async event => { event.preventDefault(); const f = event.target; try { await runSave(barOf(f), () => api('/admin/config', 'PUT', { limits: { maxTeams: Number(f.elements.maxTeams.value), maxMembersPerTeam: Number(f.elements.maxMembersPerTeam.value) }, registration: f.elements.registration.value, adminEmails: lines(f.elements.adminEmails.value) }), { ok: 'Platform settings saved', sub: 'Every office inherits them at its next change.' }); await showAdmin(); } catch {} };
+        return;
+      }
+      if (adminTab === 'tenants') {
+        const t = await api('/admin/tenants' + (adminQ ? '?q=' + encodeURIComponent(adminQ) : ''));
+        body.innerHTML = `<div class="mg-toolbar">${search('tenantQ', 'Search offices', adminQ)}<span class="mg-spacer"></span><span class="mg-muted">${t.tenants.length} office${t.tenants.length === 1 ? '' : 's'}</span></div>
+          <div class="mg-ledger-wrap"><table class="mg-ledger"><thead><tr><th>Office</th><th>Owner</th><th>People</th><th>Teams</th><th>Tasks</th><th>Tokens</th><th>State</th><th class="r"></th></tr></thead><tbody>${t.tenants.map(x => `<tr><td><span class="mg-name">${esc(x.name)}</span><span class="mg-sub">${esc(x.slug)} · since ${esc(when(x.createdAt))}</span></td><td>${esc(x.owner?.email || '—')}</td><td class="k">${x.users}</td><td class="k">${x.teams ?? '—'}</td><td class="k">${x.tasks == null ? '—' : `${x.openTasks} open · ${x.tasks}`}</td><td class="k">${x.tokens == null ? '—' : Number(x.tokens).toLocaleString()}</td><td>${x.suspendedAt ? mark('fail', 'Suspended') : x.loaded ? mark('ok', x.running ? `Working · ${x.running}` : 'Loaded') : mark('off', 'Put away')}</td><td class="r"><button type="button" class="mg-btn mg-btn-sm ${x.suspendedAt ? '' : 'mg-btn-danger'}" data-tenant="${esc(x.id)}" data-act="${x.suspendedAt ? 'resume' : 'suspend'}">${x.suspendedAt ? 'Resume' : 'Suspend'}</button></td></tr>`).join('') || '<tr><td colspan="8" class="mg-muted">No offices yet.</td></tr>'}</tbody></table></div>`;
+        $('tenantQ').oninput = () => { adminQ = $('tenantQ').value; clearTimeout(statusPoll); statusPoll = setTimeout(showAdmin, 300); };
+        body.querySelectorAll('[data-tenant]').forEach(b => b.onclick = async () => { if (b.dataset.act === 'suspend' && !confirm('Suspend this office? Its people are signed out and nothing runs until it is resumed.')) return; try { await api(`/admin/tenants/${b.dataset.tenant}/${b.dataset.act}`, 'POST', {}); await showAdmin(); } catch (error) { feedback(error.message, true); } });
+        return;
+      }
+      const u = await api('/admin/users' + (adminQ ? '?q=' + encodeURIComponent(adminQ) : ''));
+      body.innerHTML = `<div class="mg-toolbar">${search('userQ', 'Search people', adminQ)}<span class="mg-spacer"></span><span class="mg-muted">${u.users.length} shown</span></div>
+        <div class="mg-ledger-wrap"><table class="mg-ledger"><thead><tr><th>Name</th><th>Email</th><th>Offices</th><th>Last sign-in</th><th class="r">Platform admin</th></tr></thead><tbody>${u.users.map(x => `<tr><td><span class="mg-name">${esc(x.name)}</span></td><td>${esc(x.email)}</td><td>${x.offices.map(o => `<span class="mg-chip">${esc(o.name)} · ${esc(o.role)}</span>`).join(' ') || '—'}</td><td class="k">${x.lastLoginAt ? esc(ago(x.lastLoginAt)) : '—'}</td><td class="r"><input type="checkbox" data-padmin="${esc(x.id)}" ${x.platformAdmin ? 'checked' : ''} ${x.id === USER?.id ? 'disabled' : ''} aria-label="Platform admin"></td></tr>`).join('')}</tbody></table></div>`;
+      $('userQ').oninput = () => { adminQ = $('userQ').value; clearTimeout(statusPoll); statusPoll = setTimeout(showAdmin, 300); };
+      body.querySelectorAll('[data-padmin]').forEach(c => c.onchange = async () => { try { await api('/admin/users/' + c.dataset.padmin, 'PUT', { platformAdmin: c.checked }); toast(c.checked ? 'Platform admin added' : 'Platform admin removed', { kind: 'ok' }); } catch (error) { feedback(error.message, true); c.checked = !c.checked; } });
+    } catch (error) { feedback(error.message, true); }
+  }
+
   async function showAudit() {
     try {
       const rows = await api('/audit?limit=200' + (auditArea ? '&area=' + auditArea : ''));
       if (section !== 'audit') return;
       const show = v => v === undefined ? '—' : esc(typeof v === 'string' ? v : JSON.stringify(v)).slice(0, 240);
-      const AREAS = [['', 'Everything'], ['office', 'Teams & people'], ['providers', 'Models & keys'], ['settings', 'Office settings'], ['tools', 'Connectors'], ['vault', 'Vault'], ['routines', 'Routines'], ['brain', 'Brain']];
+      const AREAS = [['', 'Everything'], ['office', 'Teams & people'], ...(MANAGED_MODELS ? [] : [['providers', 'Models & keys']]), ['settings', 'Office settings'], ['tools', 'Connectors'], ['vault', 'Vault'], ['routines', 'Routines'], ['projects', 'Projects'], ['brain', 'Brain'], ...(HOSTED ? [['tasks', 'Sharing'], ['users', 'Users'], ['groups', 'Groups'], ['mail', 'Email']] : [])];
       setMeta(mark('off', `${rows.length} entr${rows.length === 1 ? 'y' : 'ies'}`), rows[0] ? `last ${esc(when(rows[0].at))}` : '');
       content.innerHTML = `<div class="mg-toolbar"><div class="mg-filters">${AREAS.map(([id, text]) => `<button type="button" data-audit-area="${id}" aria-pressed="${id === auditArea}">${text}</button>`).join('')}</div><span class="mg-spacer"></span>${search('auditQ', 'Search entries')}</div>
         ${rows.length ? `<div class="mg-ledger-wrap"><table class="mg-ledger" id="auditTable"><thead><tr><th>#</th><th>When</th><th>Who</th><th>Area</th><th>What changed</th><th class="r"></th></tr></thead><tbody>${rows.map(r => `<tr class="mg-row" data-toggle="audit-${r.seq}" data-text="${esc((r.summary + ' ' + (r.actor || '') + ' ' + r.area).toLowerCase())}"><td class="k mg-muted">${r.seq}</td><td class="k">${esc(when(r.at))}</td><td>${esc(r.actor === 'ceo' ? 'you' : r.actor || 'office')}</td><td><span class="mg-chip">${esc(r.area)}</span></td><td>${esc(r.summary)}</td><td class="r mg-muted">${r.diff?.length ? `${r.diff.length} change${r.diff.length === 1 ? '' : 's'} ▾` : ''}</td></tr>${r.diff?.length ? `<tr id="audit-${r.seq}" hidden><td class="mg-diffcell" colspan="6"><pre class="mg-diff">${r.diff.slice(0, 40).map(d => `${esc(d.path || d.key || '')}\n${d.before !== undefined ? `<span class="del">- ${show(d.before)}</span>\n` : ''}${d.after !== undefined ? `<span class="add">+ ${show(d.after)}</span>` : ''}`).join('\n')}</pre></td></tr>` : ''}`).join('')}</tbody></table></div>` : empty('No changes recorded yet.', 'Every change through the office lands here, with what it was before.')}`;

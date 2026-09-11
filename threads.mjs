@@ -1,4 +1,5 @@
-// Durable conversations. A task's thread id is the task id; an agent's own thread is "agent:<id>".
+// Durable conversations. A task's thread id is the task id; an agent's own thread is "agent:<id>", or "agent:<id>:<userId>"
+// in a hosted office, where every member has their own conversation with each person.
 export const MESSAGE_KINDS = ['message', 'question', 'correction', 'note', 'answer', 'system'];
 
 export class Threads {
@@ -10,9 +11,9 @@ export class Threads {
       CREATE INDEX IF NOT EXISTS office_messages_thread ON office_messages(thread_id, seq);`);
   }
   static taskThread(jobId) { return jobId; }
-  static agentThread(agentId) { return 'agent:' + agentId; }
-  ensure(kind, ref) {
-    const id = kind === 'task' ? Threads.taskThread(ref) : Threads.agentThread(ref), now = Date.now();
+  static agentThread(agentId, userId = null) { return 'agent:' + agentId + (userId ? ':' + userId : ''); }
+  ensure(kind, ref, { userId = null } = {}) {
+    const id = kind === 'task' ? Threads.taskThread(ref) : Threads.agentThread(ref, userId), now = Date.now();
     this.db.prepare('INSERT OR IGNORE INTO office_threads(id, kind, ref, created_at, updated_at) VALUES (?,?,?,?,?)').run(id, kind, ref, now, now);
     return id;
   }

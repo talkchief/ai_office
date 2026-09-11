@@ -27,6 +27,7 @@ import { AuditLog } from './audit.mjs';
 import { Scheduler } from './scheduler.mjs';
 import { listShape } from './server/shape.mjs';
 import { Router, httpError } from './server/routes.mjs';
+import { isAdmin } from './server/visibility.mjs';
 import { registerApi } from './server/api.mjs';
 import { VaultStore } from './vault.mjs';
 
@@ -38,9 +39,10 @@ const PM = { id: 'pm', name: 'Program Manager', role: 'Program Manager', does: '
  * `models`: an existing ModelRegistry to share (hosted mode), else one is built on dataDir/providers.json.
  * `discovery`: whether this machine's Claude Code connectors are looked up (`claude mcp list`); off in tests and hosted mode.
  * `agency`: a shared Agency catalogue; `log`: where start-up lines go.
+ * `tenant` (hosted): { id, slug, name, ownerId, viewers(), audience(sharedWith) } — the company this office belongs to; null for a single office.
  */
-export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?.name || 'My Office', version = '?', models = null, agency = new Agency(), discovery = true, allowStdio = true, limits = undefined, log = console.log }) {
-  const DATA = dataDir, BRAIN = brainDir;
+export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?.name || 'My Office', version = '?', models = null, agency = new Agency(), discovery = true, allowStdio = true, limits = undefined, tenant = null, log = console.log }) {
+  const DATA = dataDir, BRAIN = brainDir, managedModels = !!models;
   const office = new OfficeStore({ dataDir: DATA, initialAgents: loadRoster(BRAIN).agents, limits });
   const settings = new SettingsStore({ dataDir: DATA });
   models ||= new ModelRegistry({ dataDir: DATA });
@@ -70,7 +72,7 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
 
   const audit = new AuditLog({ db: engine.db, bus });
   // The minute clock: overdue notices, reminders for anything waiting on the CEO, and the daily digest (built from records, no model cost).
-  const scheduler = new Scheduler({ engine, office, settings: () => settings.get(), onDigest: async report => {
+  const scheduler = new Scheduler({ engine, office, settings: () => settings.get(), viewers: tenant?.viewers || null, projectFor: id => projects.get(id), onDigest: async report => {
     const id = `Digests/${report.date}.md`;
     await knowledge.save({ id, content: report.markdown });
     engine.notifications.notify({ kind: 'digest', title: `Daily digest · ${report.date}`, body: report.headline, action: { type: 'note', id } });
@@ -85,7 +87,7 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
     rlist = r; const { list, changed } = routines.withState(r.routines, RSTATE); if (changed) routines.saveState(DATA, RSTATE); return list;
   }
   function fire(r, { due = Date.now(), late = false, by = 'routine' } = {}) {
-    const job = engine.create({ dept: r.dept, text: r.text, title: r.title, requireHumanApproval: r.needsOk, routine: { id: r.id, due, late, by, model: r.model, effort: r.effort } });
+    const job = engine.create({ dept: r.dept, text: r.text, title: r.title, requireHumanApproval: r.needsOk, routine: { id: r.id, due, late, by, model: r.model, effort: r.effort }, ownerId: r.ownerId || tenant?.ownerId || null, origin: { channel: 'routine', routineId: r.id } });
     routines.advance(RSTATE, r, Date.now(), job.id, late); routines.saveState(DATA, RSTATE); return job;
   }
   function tickRoutines() {
@@ -94,7 +96,9 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
     for (const { routine, due, late } of routines.due(list, RSTATE)) fire(routine, { due, late });
   }
   const edit = (id, patch) => { const r = rlist.routines.find(x => x.id === id); if (!r) throw httpError('No such routine.', 404); Object.assign(r, patch); routines.save(BRAIN, rlist.routines); return loadRoutines().find(x => x.id === id); };
-  async function makeRoutine({ dept, text, when, agent, needsOk, model, effort }) {
+  // A routine is changed by whoever made it or an office admin; a single office has one owner.
+  const routineEditor = (id, user) => { const r = rlist.routines.find(x => x.id === id); if (!r) throw httpError('No such routine.', 404); if (user && !isAdmin(user) && r.ownerId && r.ownerId !== user.id) throw httpError('This routine belongs to someone else. Ask them or an office admin.', 403); return r; };
+  async function makeRoutine({ dept, text, when, agent, needsOk, model, effort, ownerId = null }) {
     let taskText = String(text || '').trim(), w = when, parsed = null;
     if (!office.team(dept)) return { error: 'Choose a team.' };
     if (!w) {
@@ -108,25 +112,25 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
     loadRoutines();
     const lead = office.team(dept).lead, owner = agent && office.agents().some(a => a.id === agent && a.department === dept) ? agent : lead;
     let id = taskText.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'routine'; for (let n = 2; rlist.routines.some(r => r.id === id); n++) id = id.replace(/-\d+$/, '') + '-' + n;
-    const v = routines.validate({ id, dept, agent: owner, title: taskText.slice(0, 90), text: taskText, when: w, needsOk: typeof needsOk === 'boolean' ? needsOk : routines.guessNeedsOk(taskText), model: normModel(model) || undefined, effort: normEffort(effort) || undefined }, office.agents(), rlist.routines);
+    const v = routines.validate({ id, dept, agent: owner, title: taskText.slice(0, 90), text: taskText, when: w, needsOk: typeof needsOk === 'boolean' ? needsOk : routines.guessNeedsOk(taskText), model: normModel(model) || undefined, effort: normEffort(effort) || undefined, ownerId: ownerId || undefined }, office.agents(), rlist.routines);
     if (v.problems.length) return { error: v.problems.join('; ') };
     rlist.routines.push(v.routine); routines.save(BRAIN, rlist.routines);
     return { ok: true, routine: loadRoutines().find(x => x.id === v.routine.id), guessed: parsed?.guessed ? parsed.guessWord : null };
   }
   const routineApi = {
     out: () => ({ routines: loadRoutines(), depts: office.get().teams.map(t => t.id), path: rlist.path, problems: rlist.problems }),
-    make: async input => { const r = await makeRoutine(input); if (r.ok) audit.record({ area: 'routines', summary: `Added routine “${r.routine.title}”` }); return r; },
-    remove: id => { const gone = rlist.routines.find(x => x.id === id); rlist.routines = rlist.routines.filter(x => x.id !== id); routines.save(BRAIN, rlist.routines); if (gone) audit.record({ area: 'routines', summary: `Removed routine “${gone.title}”` }); return { ok: true, routines: loadRoutines() }; },
-    patch: (id, b) => { const patch = {}; if (typeof b.needsOk === 'boolean') patch.needsOk = b.needsOk; if (typeof b.paused === 'boolean') patch.paused = b.paused; if (typeof b.text === 'string' && b.text.trim()) patch.text = b.text.trim(); if (typeof b.title === 'string' && b.title.trim()) patch.title = b.title.trim().slice(0, 90); if (b.when && validWhen(b.when)) patch.when = b.when; if (b.model !== undefined) patch.model = normModel(b.model) || ''; if (b.effort !== undefined) patch.effort = normEffort(b.effort) || ''; const before = structuredClone(rlist.routines.find(x => x.id === id)); edit(id, patch); audit.record({ area: 'routines', summary: `Edited routine “${before?.title || id}”`, before, after: rlist.routines.find(x => x.id === id) }); return { ok: true, routines: loadRoutines() }; },
-    run: id => { const r = loadRoutines().find(x => x.id === id); if (!r) throw httpError('No such routine.', 404); return { ok: true, task: fire(r, { by: 'you' }), routines: loadRoutines() }; },
-    pause: (id, paused) => { const r = edit(id, { paused }); audit.record({ area: 'routines', summary: `${paused ? 'Paused' : 'Resumed'} routine “${r?.title || id}”` }); return { ok: true, routines: loadRoutines() }; },
+    make: async (input, user = null) => { const r = await makeRoutine({ ...input, ownerId: user?.id || null }); if (r.ok) audit.record({ area: 'routines', summary: `Added routine “${r.routine.title}”` }); return r; },
+    remove: (id, user = null) => { loadRoutines(); const gone = rlist.routines.find(x => x.id === id); if (gone) routineEditor(id, user); rlist.routines = rlist.routines.filter(x => x.id !== id); routines.save(BRAIN, rlist.routines); if (gone) audit.record({ area: 'routines', summary: `Removed routine “${gone.title}”` }); return { ok: true, routines: loadRoutines() }; },
+    patch: (id, b, user = null) => { loadRoutines(); routineEditor(id, user); const patch = {}; if (typeof b.needsOk === 'boolean') patch.needsOk = b.needsOk; if (typeof b.paused === 'boolean') patch.paused = b.paused; if (typeof b.text === 'string' && b.text.trim()) patch.text = b.text.trim(); if (typeof b.title === 'string' && b.title.trim()) patch.title = b.title.trim().slice(0, 90); if (b.when && validWhen(b.when)) patch.when = b.when; if (b.model !== undefined) patch.model = normModel(b.model) || ''; if (b.effort !== undefined) patch.effort = normEffort(b.effort) || ''; const before = structuredClone(rlist.routines.find(x => x.id === id)); edit(id, patch); audit.record({ area: 'routines', summary: `Edited routine “${before?.title || id}”`, before, after: rlist.routines.find(x => x.id === id) }); return { ok: true, routines: loadRoutines() }; },
+    run: (id, user = null) => { const r = loadRoutines().find(x => x.id === id); if (!r) throw httpError('No such routine.', 404); routineEditor(id, user); return { ok: true, task: fire(r, { by: 'you' }), routines: loadRoutines() }; },
+    pause: (id, paused, user = null) => { loadRoutines(); routineEditor(id, user); const r = edit(id, { paused }); audit.record({ area: 'routines', summary: `${paused ? 'Paused' : 'Resumed'} routine “${r?.title || id}”` }); return { ok: true, routines: loadRoutines() }; },
   };
-  async function routinesChat(a, text) {
+  async function routinesChat(a, text, user = null) {
     const t = String(text).trim(), dept = a.department, teamName = office.team(dept)?.name || dept;
     if (/^\s*(routines?|schedule|timetable)\s*\??\s*$/i.test(t)) return { reply: routines.listText(loadRoutines(), dept, office.agents(), teamName) };
     const p = parseWhen(t); if (!p) return null;
     if (p.needsDay || p.needsTime || !p.text) return { reply: p.needsDay ? 'Which day? Say it again with the day.' : p.needsTime ? 'What time? Say it again with the time.' : 'I have the time but not the task.' };
-    const made = await makeRoutine({ dept, text: p.text, when: p.when, agent: a.lead ? undefined : a.id });
+    const made = await makeRoutine({ dept, text: p.text, when: p.when, agent: a.lead ? undefined : a.id, ownerId: user?.id || null });
     if (made.error) return { reply: made.error };
     return { reply: `Done: “${made.routine.title}” runs ${made.routine.desc}. Next run ${untilText(made.routine.nextAt)}.${made.routine.needsOk ? ' The result waits for your approval before it is filed.' : ''}`, routine: made.routine };
   }
@@ -145,8 +149,8 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
     return flat(answer.content).trim() || 'I do not have an answer to that yet.';
   }
   // A message about a task is kept in the task's thread and also in the person's chat, so the chat shows it when reopened.
-  function keepInChat(agentId, message, reply, jobId) {
-    const thread = engine.threads.ensure('agent', agentId);
+  function keepInChat(agentId, message, reply, jobId, user = null) {
+    const thread = engine.threads.ensure('agent', agentId, { userId: user?.id || null });
     engine.threads.append(thread, { role: 'ceo', agent: agentId, text: message, jobId });
     engine.threads.append(thread, { role: 'agent', agent: agentId, text: reply, jobId });
   }
@@ -162,20 +166,21 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
         engine.message(taskId, { text: message, kind: 'question', agent: a.id, refs });
         const reply = await answerAbout(a, team, job, message);
         engine.threads.append(taskId, { role: 'agent', agent: a.id, kind: 'answer', text: reply, jobId: taskId });
-        keepInChat(a.id, message, reply, taskId);
+        keepInChat(a.id, message, reply, taskId, user);
         return { reply, taskId };
       }
       if (!isLead && !isPm) throw httpError('Corrections go through the team lead. Open the lead’s chat to send this.', 409);
       const result = engine.message(taskId, { text: message, kind: kind === 'note' ? 'note' : 'correction', agent: a.id, refs, remember: ['agent', 'team'].includes(remember) ? remember : null });
       const reply = result.queued ? 'Noted. The team gets this at its next step.' : isPm ? 'On it. I have sent this back to the team and will close it again after the lead approves.' : `On it. I have sent this back to the ${team.name} team and will review the new version before it comes back to you.`;
-      keepInChat(a.id, message, reply, taskId);
+      keepInChat(a.id, message, reply, taskId, user);
       return { reply, taskId, delegated: true };
     }
-    if (!isPm) { const rc = await routinesChat({ ...a, lead: isLead }, message); if (rc) return { reply: rc.reply, routine: rc.routine || null, routines: true }; }
+    if (!isPm) { const rc = await routinesChat({ ...a, lead: isLead }, message, user); if (rc) return { reply: rc.reply, routine: rc.routine || null, routines: true }; }
     const question = /\?\s*$/.test(message) || /^(hi|hello|hey|thanks|thank you|what|who|why|how|when|where|which|can you|could you|do you|does|is|are|should)\b/i.test(message);
-    if (isPm && !question) { const job = engine.create({ depts: 'auto', text: message, dept: 'auto' }); return { reply: 'I have taken this on. I will bring in the right team leads and close it once they approve the work.', taskId: job.id, delegated: true }; }
-    if (isLead && !question) { const job = engine.create({ dept: a.department, text: message }); return { reply: `I have taken this on for the ${team.name} team. I will plan it, delegate it and review the result before it comes back to you.`, taskId: job.id, delegated: true }; }
-    const thread = engine.threads.ensure('agent', a.id);
+    const owned = { ownerId: user?.id || null, origin: { channel: 'chat', agent: a.id } };
+    if (isPm && !question) { const job = engine.create({ depts: 'auto', text: message, dept: 'auto', ...owned }); return { reply: 'I have taken this on. I will bring in the right team leads and close it once they approve the work.', taskId: job.id, delegated: true }; }
+    if (isLead && !question) { const job = engine.create({ dept: a.department, text: message, ...owned }); return { reply: `I have taken this on for the ${team.name} team. I will plan it, delegate it and review the result before it comes back to you.`, taskId: job.id, delegated: true }; }
+    const thread = engine.threads.ensure('agent', a.id, { userId: user?.id || null });
     engine.threads.append(thread, { role: 'ceo', agent: a.id, text: message });
     const model = await chatModel(a, team);
     const hits = index.search(message, { k: settings.get().knowledgeSeedNotes || 6 }), memory = { notes: hits.map(h => h.path), text: hits.map(h => `--- ${h.path}${h.heading ? ' › ' + h.heading : ''} ---\n${h.snippet}`).join('\n\n') };
@@ -221,7 +226,9 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
   }
   bus.on(event => { if (event.type === 'task.updated' && event.data?.projectId) syncProject(event.data.projectId); });
   for (const p of projects.list()) syncProject(p.id);
-  registerApi(router, { projects, syncProject, office, engine, models, settings, toolStore, hub, knowledge, index, bus, audit, vault, routines: routineApi, chat, assist, version, get name() { return officeName(); }, graph: () => graph, discover, agency });
+  registerApi(router, { projects, syncProject, office, engine, models, settings, toolStore, hub, knowledge, index, bus, audit, vault, routines: routineApi, chat, assist, version, get name() { return officeName(); }, graph: () => graph, discover, agency, tenant, managedModels });
+  // The raw routine records, for the one-time owner assignment when a self-hosted office moves into a tenant.
+  const routineRecords = { list: () => { loadRoutines(); return rlist.routines; }, save: list => { rlist.routines = list; routines.save(BRAIN, list); loadRoutines(); } };
 
   /* ---------- lifecycle ---------- */
   let routineTimer = null, connecting = Promise.resolve();
@@ -247,5 +254,5 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
     scheduler.stop(); bus.close(); index.close(); await connecting.catch(() => {}); await engine.close(); await hub.close();
   }
 
-  return { dataDir: DATA, brainDir: BRAIN, router, office, settings, models, knowledge, index, projects, toolStore, hub, vault, engine, audit, scheduler, bus, chat, assist, routines: routineApi, loadRoutines, tickRoutines, syncProject, graph: () => graph, get name() { return officeName(); }, boot, start, close };
+  return { dataDir: DATA, brainDir: BRAIN, tenant, managedModels, router, office, settings, models, knowledge, index, projects, toolStore, hub, vault, engine, audit, scheduler, bus, chat, assist, routines: routineApi, routineRecords, loadRoutines, tickRoutines, syncProject, graph: () => graph, get name() { return officeName(); }, boot, start, close };
 }

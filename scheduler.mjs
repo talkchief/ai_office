@@ -1,4 +1,6 @@
 // The office's minute clock: overdue notices, reminders for things waiting on the CEO, and the daily digest.
+// In a hosted office every member also gets a digest of the tasks they can see, as an inbox item of their own.
+import { visibleJobs, ADMIN_ROLES } from './server/visibility.mjs';
 const TERMINAL = new Set(['done', 'cancelled']);
 const WAITING = { blocked: ['blocked', 'blocked'], escalated: ['escalated', 'escalated'], awaiting_ceo: ['ceo_decision', 'decision'] };
 const day = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -21,8 +23,8 @@ export function digest({ jobs, office, since, now = Date.now() }) {
 }
 
 export class Scheduler {
-  constructor({ engine, office, settings, now = () => Date.now(), onDigest = async () => {} }) {
-    Object.assign(this, { engine, office, settings, now, onDigest }); this.timer = null;
+  constructor({ engine, office, settings, now = () => Date.now(), onDigest = async () => {}, viewers = null, projectFor = () => null }) {
+    Object.assign(this, { engine, office, settings, now, onDigest, viewers, projectFor }); this.timer = null;
     engine.db.exec('CREATE TABLE IF NOT EXISTS office_meta (key TEXT PRIMARY KEY, value TEXT)');
   }
   meta(key, value) {
@@ -36,14 +38,14 @@ export class Scheduler {
       if (job.dueAt && job.dueAt < t && !job.overdueNotifiedAt) {
         engine.update(job.id, j => { j.overdueNotifiedAt = t; }, { touch: false });
         engine.event(job.id, 'overdue', null, 'The task is past its due date.');
-        engine.notifications.notify({ kind: 'overdue', title: `Overdue: ${job.title}`, body: `Due ${new Date(job.dueAt).toLocaleString()}.`, jobId: job.id, dept: job.dept, dedupe: `overdue:${job.id}`, action: { type: 'open' } });
+        engine.notifications.notify({ kind: 'overdue', title: `Overdue: ${job.title}`, body: `Due ${new Date(job.dueAt).toLocaleString()}.`, jobId: job.id, dept: job.dept, dedupe: `overdue:${job.id}`, action: { type: 'open' }, userId: job.ownerId || null });
       }
       const waiting = WAITING[job.state];
       if (waiting && t - Math.max(job.lastReminderAt || 0, job.stateSince || job.updatedAt || t) >= windowMs) {
         const waited = t - (job.stateSince || job.updatedAt || t);
         engine.update(job.id, j => { j.lastReminderAt = t; }, { touch: false });
         engine.event(job.id, 'reminded', null, `Still waiting for the CEO after ${hours(waited)}.`);
-        engine.notifications.notify({ kind: waiting[0], title: `Still waiting on you: ${job.title}`, body: `Waiting ${hours(waited)}. ${job.error || ''}`.trim(), jobId: job.id, dept: job.dept, dedupe: `${waiting[1]}:${job.id}`, action: { type: job.state === 'awaiting_ceo' ? 'decide' : job.state === 'blocked' ? 'retry' : 'answer' } });
+        engine.notifications.notify({ kind: waiting[0], title: `Still waiting on you: ${job.title}`, body: `Waiting ${hours(waited)}. ${job.error || ''}`.trim(), jobId: job.id, dept: job.dept, dedupe: `${waiting[1]}:${job.id}`, action: { type: job.state === 'awaiting_ceo' ? 'decide' : job.state === 'blocked' ? 'retry' : 'answer' }, userId: job.ownerId || null });
       }
     }
     const [hh, mm] = String(s.digestTime || '08:00').split(':').map(Number), now = new Date(t);
@@ -51,6 +53,11 @@ export class Scheduler {
       this.meta('lastDigest', day(t));
       const report = digest({ jobs: engine.list(), office: this.office.get(), since: t - 86400000, now: t });
       await this.onDigest(report);
+      // Members who are not office admins: a digest of what they can see, kept to their own inbox (the shared note would show other people's titles).
+      for (const v of (this.viewers?.() || []).filter(v => !ADMIN_ROLES.has(v.role))) {
+        const mine = digest({ jobs: visibleJobs(v, engine.list(), { projectFor: this.projectFor }), office: this.office.get(), since: t - 86400000, now: t });
+        engine.notifications.notify({ kind: 'digest', title: `Your digest · ${mine.date}`, body: mine.markdown.slice(0, 4000), userId: v.id, dedupe: `digest:${v.id}:${mine.date}` });
+      }
     }
     this.prune(t);
   }

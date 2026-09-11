@@ -1,5 +1,6 @@
 // One status vocabulary for the Manage area, and the office roll-up the directory and the rail read.
 // A mark is a coloured dot and a word: Connected, Signed in, Failed, Not set, Waits for you, Saved… the same everywhere.
+import { MANAGED_MODELS } from './session.js';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export const mark = (kind, label, attrs = '') => `<span class="mg-st mg-st-${kind}" ${attrs}><i></i>${esc(label)}</span>`;
 export const dot = (kind, title = '') => `<span class="mg-dot mg-dot-${kind}" ${title ? `title="${esc(title)}"` : ''}></span>`;
@@ -38,7 +39,7 @@ export async function officeSummary(api, { force = false } = {}) {
     const needs = health.inbox?.needsYou ?? inbox?.counts?.needsYou ?? 0, unread = health.inbox?.unread ?? inbox?.counts?.unread ?? 0;
     const attention = [];
     for (const x of failed) attention.push({ kind: 'fail', label: x.s.label, text: `${x.t.name}: ${x.s.hint || 'the connection failed.'}`, go: 'tools', action: ['http', 'sse'].includes(x.t.type) ? 'Sign in' : 'Check' });
-    if (!health.ready) attention.push({ kind: 'warn', label: 'Not set', text: 'No model can run yet. Save a provider key and activate a model.', go: 'models', action: 'Add key' });
+    if (!health.ready) attention.push(MANAGED_MODELS ? { kind: 'warn', label: 'Not set', text: 'No model can run yet. The platform administrator adds one.', go: 'profile', action: 'Details' } : { kind: 'warn', label: 'Not set', text: 'No model can run yet. Save a provider key and activate a model.', go: 'models', action: 'Add key' });
     for (const p of rejected) attention.push({ kind: 'fail', label: 'Key rejected', text: `${p.label} refused the stored key.`, go: 'models', action: 'Replace key' });
     if (needs) attention.push({ kind: 'warn', label: 'Waits for you', text: `${needs} task${needs === 1 ? '' : 's'} need${needs === 1 ? 's' : ''} your decision.`, go: 'inbox', action: 'Open inbox' });
     for (const r of late) attention.push({ kind: 'warn', label: 'Ran late', text: `Routine “${r.title}” ran later than planned.`, go: 'routines', action: 'Review' });
@@ -56,7 +57,7 @@ export async function officeSummary(api, { force = false } = {}) {
         skills: { line: '', count: null },
         artifacts: { line: arts ? `${arts.total} document${arts.total === 1 ? '' : 's'}` : '', count: arts?.total },
         reports: { line: 'last 7 days', count: null },
-        models: { line: `${keyed.length} of ${providers.length} provider${providers.length === 1 ? '' : 's'} keyed · ${health.ready ? 'ready' : 'not ready'}`, dot: health.ready ? (rejected.length ? 'fail' : 'ok') : 'warn' },
+        models: MANAGED_MODELS ? { line: `provided by the platform · ${health.ready ? 'ready' : 'not ready'}`, dot: health.ready ? 'ok' : 'warn' } : { line: `${keyed.length} of ${providers.length} provider${providers.length === 1 ? '' : 's'} keyed · ${health.ready ? 'ready' : 'not ready'}`, dot: health.ready ? (rejected.length ? 'fail' : 'ok') : 'warn' },
         tools: { line: tools ? `${own.length} connector${own.length === 1 ? '' : 's'}${failed.length ? ' · ' + failed.length + ' failed' : signedOut.length ? ' · ' + signedOut.length + ' signed out' : ''}` : '', dot: failed.length ? 'fail' : signedOut.length ? 'warn' : own.length ? 'ok' : '' },
         vault: { line: vault ? `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}${noSecret.length ? ' · ' + noSecret.length + ' without a secret' : ''}` : '', dot: entries.length ? (noSecret.length ? 'warn' : 'ok') : '' },
         profile: { line: health.name || '' },

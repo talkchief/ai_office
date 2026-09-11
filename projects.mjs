@@ -7,6 +7,7 @@ import path from 'node:path';
 const text = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 export const PROJECT_STATUSES = ['active', 'paused', 'done', 'archived'];
+const ids = list => [...new Set((Array.isArray(list) ? list : []).map(v => text(v, 40)).filter(Boolean))].slice(0, 50);
 const slugOf = name => text(name, 80).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'project';
 const dateOf = (value, label) => { if (value === null || value === undefined || value === '') return null; const ms = Number(new Date(value)); if (!Number.isFinite(ms)) fail(`${label} needs a valid date.`); return ms; };
 const day = ms => ms ? new Date(ms).toISOString().slice(0, 10) : '';
@@ -41,12 +42,17 @@ export class ProjectStore {
       const done = !!m?.done;
       return { id: /^[a-z0-9-]{1,40}$/.test(m?.id || '') ? m.id : `m-${Date.now().toString(36)}-${i}`, title, dueAt: dateOf(m?.dueAt, `Milestone “${title}”`), done, doneAt: done ? before?.doneAt || (before?.done ? before.doneAt : Date.now()) : null };
     });
-    return { name, description, charter, teams, status, startAt, dueAt, milestones };
+    // Who sees it (hosted offices): the owner, everyone when public, or the people and groups it is shared with. Tasks of the project inherit this.
+    const visibility = input.visibility === undefined ? previous?.visibility || 'private' : input.visibility;
+    if (!['private', 'public'].includes(visibility)) fail('Visibility must be private or public.');
+    const sw = input.sharedWith === undefined ? previous?.sharedWith : input.sharedWith;
+    const sharedWith = { users: ids(sw?.users), groups: ids(sw?.groups) };
+    return { name, description, charter, teams, status, startAt, dueAt, milestones, visibility, sharedWith };
   }
-  create(input) {
+  create(input, { ownerId = null } = {}) {
     const fields = this.validate(input);
     let id = slugOf(fields.name); for (let n = 2; this.items.some(p => p.id === id); n++) id = slugOf(fields.name) + '-' + n;
-    const now = Date.now(), project = { id, ...fields, createdAt: now, updatedAt: now };
+    const now = Date.now(), project = { id, ...fields, ownerId: ownerId || text(input.ownerId, 40) || null, createdAt: now, updatedAt: now };
     this.items.push(project); this.changed(project); return structuredClone(project);
   }
   update(id, input) {

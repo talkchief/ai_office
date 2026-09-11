@@ -67,6 +67,28 @@ export function persistOffice(office) {
   office.persist(); return true;
 }
 
+// A self-hosted office moved into a hosted tenant: every task, project and routine without an owner belongs to the tenant's
+// owner, and the owner's chats with the people become the owner's own threads. Runs once per tenant.
+export function assignOwners({ engine, projects = null, routines = null, ownerId }) {
+  const m = meta(engine.db); if (!ownerId || m.get('ownersAssigned')) return { jobs: 0, projects: 0, routines: 0, threads: 0 };
+  let jobs = 0;
+  for (const row of engine.db.prepare('SELECT id, body FROM office_jobs').all()) {
+    const j = JSON.parse(row.body); if (j.ownerId) continue;
+    j.ownerId = ownerId; j.visibility ||= 'private'; j.sharedWith ||= { users: [], groups: [] };
+    engine.db.prepare('UPDATE office_jobs SET body = ? WHERE id = ?').run(JSON.stringify(j), j.id); jobs++;
+  }
+  let p = 0;
+  if (projects) { for (const project of projects.items) if (!project.ownerId) { project.ownerId = ownerId; project.visibility ||= 'private'; project.sharedWith ||= { users: [], groups: [] }; p++; } if (p) projects.persist(); }
+  let r = 0;
+  if (routines) { const list = routines.list(); for (const x of list) if (!x.ownerId) { x.ownerId = ownerId; r++; } if (r) routines.save(list); }
+  let t = 0;
+  for (const th of engine.db.prepare("SELECT id FROM office_threads WHERE kind = 'agent' AND id NOT LIKE 'agent:%:%'").all()) {
+    const next = `${th.id}:${ownerId}`;
+    engine.db.prepare('UPDATE office_threads SET id = ? WHERE id = ?').run(next, th.id); engine.db.prepare('UPDATE office_messages SET thread_id = ? WHERE thread_id = ?').run(next, th.id); t++;
+  }
+  m.set('ownersAssigned', Date.now()); return { jobs, projects: p, routines: r, threads: t };
+}
+
 export async function runMigrations({ engine, office, knowledge, brainPath }) {
   return { office: persistOffice(office), jobs: migrateJobs(engine), skills: importBrainSkills(office, brainPath, engine.db), conversations: await archiveConversations(knowledge, engine.db) };
 }

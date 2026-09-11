@@ -188,6 +188,95 @@ await step('tests: the full suite passes', async () => {
   srv.kill(); await new Promise(r => setTimeout(r, 300)); fs.rmSync(tmp, { recursive: true, force: true });
 }
 
+/* ---------- 5. hosted mode smoke: accounts, private tasks, sharing, roles, platform limits — on throwaway folders ---------- */
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ao-hosted-'));
+  const port = 4900 + Math.floor(Math.random() * 300), base = `http://127.0.0.1:${port}`;
+  const env = { ...process.env, PORT: String(port), HOST: '127.0.0.1', AO_MODE: 'hosted', AO_TENANTS_DIR: path.join(tmp, 'tenants'), AO_ACCOUNTS: path.join(tmp, 'accounts.sqlite'), AO_PLATFORM_DIR: path.join(tmp, 'platform'), AO_PLATFORM_ADMINS: 'admin@check.test', AO_PUBLIC_ORIGIN: base, AO_MAIL_DRY_RUN: '1', AO_MAIL_DOMAIN: 'check.test', AO_MAIL_PROVIDER: 'postmark', AO_MAIL_WEBHOOK_SECRET: 'check-secret' };
+  delete env.AO_DATA; delete env.AO_BRAIN;
+  const srv = spawn(NODE, ['serve.mjs'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  let log = ''; srv.stdout.on('data', d => { log += d; }); srv.stderr.on('data', d => { log += d; });
+  const jar = {};
+  const call = async (p, method = 'GET', body, who = 'owner') => {
+    const r = await fetch(base + p, { method, headers: { origin: base, ...(jar[who] ? { cookie: jar[who] } : {}), ...(body !== undefined ? { 'content-type': 'application/json' } : {}) }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+    const set = r.headers.get('set-cookie'); if (set) jar[who] = set.split(';')[0];
+    let json = null; try { json = await r.json(); } catch {} return { status: r.status, ok: r.ok, json };
+  };
+  const up = await (async () => { for (let i = 0; i < 80; i++) { try { const r = await fetch(base + '/api/health'); if (r.ok) return await r.json(); } catch {} await new Promise(r => setTimeout(r, 250)); } return null; })();
+  if (!up || up.mode !== 'hosted') bad('hosted: starts', log.trim().split('\n').slice(-3).join(' | ') || 'no health response');
+  else {
+    ok('hosted: starts', `mode ${up.mode} · models ${up.ready ? 'ready' : 'need a key'}`);
+    let team = null, privateTask = null, memberId = null, ownerId = null;
+    await step('hosted: a company registers and its owner sees a fresh office', async () => {
+      const r = await call('/api/auth/register', 'POST', { email: 'owner@check.test', password: 'owner-password-1', name: 'Owner', officeName: 'Check Co' }); if (r.status !== 201) throw new Error('register: ' + JSON.stringify(r.json));
+      const me = await call('/api/auth/me'); if (me.json?.user?.role !== 'owner' || me.json.tenant.slug !== 'check-co') throw new Error('me: ' + JSON.stringify(me.json)); ownerId = me.json.user.id;
+      const h = await call('/api/health'); if (h.json.teams?.length !== 6 || !h.json.platform?.managedModels || !h.json.limits?.maxTeams) throw new Error('health: ' + JSON.stringify(h.json).slice(0, 200)); team = h.json.teams[0].id;
+      const again = await call('/api/auth/register', 'POST', { email: 'owner@check.test', password: 'owner-password-1', name: 'Owner', officeName: 'Twice' }, 'dup'); if (again.status !== 409) throw new Error('duplicate email: ' + again.status);
+      return `${me.json.user.email} owns ${me.json.tenant.name} · ${h.json.teams.length} teams · limits ${h.json.limits.maxTeams}×${h.json.limits.maxMembersPerTeam}`;
+    });
+    await step('hosted: a new task is private to its owner', async () => {
+      const r = await call('/api/tasks', 'POST', { dept: team, text: 'Private plan for the spring launch.', backlog: true }); if (!r.ok || r.json.visibility !== 'private' || r.json.ownerId !== ownerId || r.json.origin?.channel !== 'web') throw new Error('task: ' + JSON.stringify(r.json).slice(0, 200));
+      privateTask = r.json; const list = await call('/api/tasks'); if (!list.json.some(t => t.id === privateTask.id)) throw new Error('not in the owner’s list');
+      return `${privateTask.visibility} · owner ${privateTask.ownerId}`;
+    });
+    await step('hosted: an invited member cannot see it — 403, absent from the list, silent on the event stream', async () => {
+      const inv = await call('/api/auth/invite', 'POST', { email: 'member@check.test' }); if (inv.status !== 201 || !/#invite=/.test(inv.json.link)) throw new Error('invite: ' + JSON.stringify(inv.json));
+      const token = inv.json.link.split('#invite=')[1];
+      const acc = await call('/api/auth/accept', 'POST', { token, name: 'Member', password: 'member-password-1' }, 'member'); if (!acc.ok || acc.json.user.role !== 'member') throw new Error('accept: ' + JSON.stringify(acc.json));
+      memberId = acc.json.user.id;
+      const direct = await call('/api/tasks/' + privateTask.id, 'GET', undefined, 'member'); if (direct.status !== 403 || !/someone else/.test(direct.json?.error || '')) throw new Error('direct: ' + direct.status + ' ' + JSON.stringify(direct.json));
+      const list = await call('/api/tasks', 'GET', undefined, 'member'); if (list.json.some(t => t.id === privateTask.id)) throw new Error('listed to the member');
+      const controller = new AbortController(); const stream = await fetch(base + '/api/events?lastEventId=1', { headers: { cookie: jar.member }, signal: controller.signal });
+      const reader = stream.body.getReader(); let seen = ''; const deadline = Date.now() + 900;
+      while (Date.now() < deadline) { const chunk = await Promise.race([reader.read(), new Promise(r => setTimeout(() => r({ done: true }), deadline - Date.now()))]); if (chunk.done) break; seen += new TextDecoder().decode(chunk.value); }
+      controller.abort(); if (seen.includes(privateTask.id)) throw new Error('the event stream replayed the private task to the member');
+      const inbox = await call('/api/inbox', 'GET', undefined, 'member'); if (!Array.isArray(inbox.json.items)) throw new Error('inbox shape');
+      return 'accepted the invitation · 403 · absent · stream silent';
+    });
+    await step('hosted: made public, the member sees it; shared with a group they are in, another one appears too', async () => {
+      const pub = await call(`/api/tasks/${privateTask.id}/share`, 'POST', { visibility: 'public' }); if (!pub.ok || pub.json.visibility !== 'public') throw new Error('share: ' + JSON.stringify(pub.json));
+      const direct = await call('/api/tasks/' + privateTask.id, 'GET', undefined, 'member'); if (direct.status !== 200) throw new Error('public task: ' + direct.status);
+      const denied = await call(`/api/tasks/${privateTask.id}/share`, 'POST', { visibility: 'private' }, 'member'); if (denied.status !== 403) throw new Error('a member changed someone else’s audience: ' + denied.status);
+      const group = await call('/api/groups', 'POST', { name: 'Sales staff', users: [memberId] }); if (group.status !== 201) throw new Error('group: ' + JSON.stringify(group.json));
+      const second = await call('/api/tasks', 'POST', { dept: team, text: 'Shared with the sales staff.', backlog: true, sharedWith: { groups: [group.json.id] } }); if (!second.ok) throw new Error('second: ' + JSON.stringify(second.json));
+      const seen = await call('/api/tasks/' + second.json.id, 'GET', undefined, 'member'); if (seen.status !== 200) throw new Error('group share: ' + seen.status);
+      const badShare = await call('/api/tasks', 'POST', { dept: team, text: 'x', backlog: true, sharedWith: { users: ['u_nobody'] } }); if (badShare.status !== 400) throw new Error('an unknown user id was accepted: ' + badShare.status);
+      return 'public seen · group share seen · stranger id refused';
+    });
+    await step('hosted: sharing a project shares its tasks', async () => {
+      const p = await call('/api/projects', 'POST', { name: 'Launch', description: 'The spring launch: everything that must ship by May.', sharedWith: { users: [memberId] } }); if (!p.ok) throw new Error('project: ' + JSON.stringify(p.json));
+      const t = await call('/api/tasks', 'POST', { dept: team, text: 'Launch task, private, in the shared project.', backlog: true, projectId: p.json.id }); if (!t.ok || t.json.visibility !== 'private') throw new Error('task: ' + JSON.stringify(t.json).slice(0, 160));
+      const seen = await call('/api/tasks/' + t.json.id, 'GET', undefined, 'member'); if (seen.status !== 200) throw new Error('project task: ' + seen.status);
+      const list = await call('/api/projects/' + p.json.id, 'GET', undefined, 'member'); if (!list.ok || !list.json.tasks.some(x => x.id === t.json.id)) throw new Error('project page: ' + list.status);
+      return `${p.json.name} shared · its task visible`;
+    });
+    await step('hosted: a member is kept out of office settings and the models live with the platform', async () => {
+      const s = await call('/api/settings', 'PUT', { maxConcurrentJobs: 1 }, 'member'); if (s.status !== 403) throw new Error('settings: ' + s.status);
+      const prov = await call('/api/providers', 'GET', undefined, 'owner'); if (prov.status !== 404) throw new Error('providers: ' + prov.status);
+      const tools = await call('/api/tools', 'GET', undefined, 'member'); if (tools.status !== 403) throw new Error('tools: ' + tools.status);
+      const admin = await call('/api/admin/config', 'GET', undefined, 'owner'); if (admin.status !== 403) throw new Error('an office owner reached the platform panel: ' + admin.status);
+      return 'settings 403 · providers 404 · tools 403 · admin panel 403';
+    });
+    await step('hosted: the platform admin lowers the team limit and the owner’s change is refused with that number', async () => {
+      const r = await call('/api/auth/register', 'POST', { email: 'admin@check.test', password: 'admin-password-1', name: 'Admin', officeName: 'Platform Co' }, 'admin'); if (r.status !== 201 || !r.json.user.platformAdmin) throw new Error('admin register: ' + JSON.stringify(r.json));
+      const cfgNow = await call('/api/admin/config', 'PUT', { limits: { maxTeams: 2 } }, 'admin'); if (!cfgNow.ok || cfgNow.json.limits.maxTeams !== 2) throw new Error('config: ' + JSON.stringify(cfgNow.json));
+      const bad = await call('/api/admin/config', 'PUT', { limits: { maxTeams: 99 } }, 'admin'); if (bad.status !== 400) throw new Error('an out-of-range limit was accepted');
+      const office = await call('/api/office'); const saved = await call('/api/office', 'PUT', office.json); if (saved.status !== 400 || !/1–2 teams/.test(saved.json?.error || '')) throw new Error('team limit: ' + saved.status + ' ' + JSON.stringify(saved.json));
+      const h = await call('/api/health'); if (h.json.limits.maxTeams !== 2) throw new Error('health limits: ' + JSON.stringify(h.json.limits));
+      const tenants = await call('/api/admin/tenants', 'GET', undefined, 'admin'); if (!tenants.json.tenants.some(t => t.slug === 'check-co' && t.users === 2)) throw new Error('tenants: ' + JSON.stringify(tenants.json).slice(0, 200));
+      const prov = await call('/api/admin/providers', 'GET', undefined, 'admin'); if (!prov.ok || !Array.isArray(prov.json.providers)) throw new Error('admin providers: ' + prov.status);
+      return `${saved.json.error} · ${tenants.json.tenants.length} offices listed`;
+    });
+    await step('hosted: the audit log names the person', async () => {
+      const rows = await call('/api/audit'); if (!rows.json.some(a => a.actor === 'owner@check.test')) throw new Error('actors: ' + JSON.stringify(rows.json.map(a => a.actor).slice(0, 5)));
+      const denied = await call('/api/audit', 'GET', undefined, 'member'); if (denied.status !== 403) throw new Error('a member read the audit log');
+      const out = await call('/api/auth/logout', 'POST', {}, 'member'); const after = await call('/api/tasks', 'GET', undefined, 'member'); if (!out.ok || after.status !== 401) throw new Error('logout: ' + after.status);
+      return `${rows.json.length} entries · member signed out`;
+    });
+  }
+  srv.kill(); await new Promise(r => setTimeout(r, 300)); fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5 });
+}
+
 /* ---------- summary ---------- */
 const fails = results.filter(r => !r[0]);
 console.log(`\n${fails.length ? '✗' : '✓'} ${results.length - fails.length}/${results.length} checks passed${fails.length ? ' — ' + fails.map(f => f[1]).join(', ') : ''}`);

@@ -15,29 +15,35 @@ export const DEFAULT_CRITERIA = [
   'Factual claims are supported by the supplied material or cited sources; uncertainty is stated.',
   'The result is usable, internally consistent, and follows the team instructions.',
 ];
+export const DEFAULT_LIMITS = { maxTeams: 10, maxMembersPerTeam: 7 };
 export class OfficeStore {
-  constructor({ dataDir, initialAgents }) {
+  // `limits`: how many teams and how many people per team this office may have (the platform's numbers in hosted mode).
+  constructor({ dataDir, initialAgents, limits = {} }) {
     fs.mkdirSync(dataDir, { recursive: true });
     this.file = path.join(dataDir, 'office.json');
+    this.limits = { ...DEFAULT_LIMITS, ...Object.fromEntries(Object.entries(limits || {}).filter(([k, v]) => k in DEFAULT_LIMITS && Number.isInteger(v) && v > 0)) };
     if (fs.existsSync(this.file)) {
       // An office from before charters were required gets the shipped ones once, only where a field is empty.
+      // A file that already exceeds a lowered limit still loads; the limit applies to the next change.
       const { office: filled, changed } = fillOrganisation(JSON.parse(fs.readFileSync(this.file, 'utf8')), initialAgents);
-      this.value = this.validate(filled); if (changed) this.persist();
+      this.value = this.validate(filled, { loading: true }); if (changed) this.persist();
     } else {
       this.value = { version: 1, schema: 2, revision: 1, agents: initialAgents.map(a => ({ ...a, skills: [], model: a.model || '' })),
         teams: DEPT_KEYS.map(id => ({ id, name: DEPTS[id].name, lead: initialAgents.find(a => a.department === id && a.lead)?.id,
           purpose: TEAM_CHARTERS[id]?.purpose || '', instructions: TEAM_CHARTERS[id]?.instructions || '', criteria: [...DEFAULT_CRITERIA], checks: [], tools: [], maxParallelRuns: 2, maxReworkRounds: 3,
            requireHumanApproval: false, tests: [] })) };
-      this.value = this.validate(fillOrganisation(this.value, initialAgents).office); this.persist();
+      // The shipped roster seeds every new office whatever the limits; the limits apply to the owner's changes.
+      this.value = this.validate(fillOrganisation(this.value, initialAgents).office, { loading: true }); this.persist();
     }
   }
   get() { return structuredClone(this.value); }
   agents() { return this.get().agents; }
   team(id) { return this.get().teams.find(t => t.id === id); }
-  validate(input) {
+  validate(input, { loading = false } = {}) {
     if (!input || !Array.isArray(input.agents) || !Array.isArray(input.teams)) fail('An office needs teams and agents.');
     const teamIds = new Set(input.teams.map(t => t.id));
-    if (input.teams.length < 1 || input.teams.length > 10) fail('An office supports 1–10 teams.');
+    const maxTeams = loading ? Math.max(this.limits.maxTeams, input.teams.length) : this.limits.maxTeams, maxMembers = loading ? 50 : this.limits.maxMembersPerTeam;
+    if (input.teams.length < 1 || input.teams.length > maxTeams) fail(`An office supports 1–${maxTeams} teams.`);
     if (teamIds.size !== input.teams.length || [...teamIds].some(id => !/^[a-z][a-z0-9_-]{0,47}$/.test(id || '') || id === 'brain')) fail('Teams need unique IDs.');
     const skillIds = new Set();
     const skills = (Array.isArray(input.skills) ? input.skills : []).map(skill => {
@@ -71,7 +77,7 @@ export class OfficeStore {
       if (!teamIds.has(t.id) || seen.has(t.id)) fail('Each functional area must appear exactly once.');
       seen.add(t.id);
       const members = agents.filter(a => a.department === t.id);
-      if (members.length < 2 || members.length > 7) fail(`${t.name || t.id} needs a lead and at least one worker, with a maximum of 7 agents (a lead and six specialists).`);
+      if (members.length < 2 || members.length > maxMembers) fail(`${t.name || t.id} needs a lead and at least one worker, with a maximum of ${maxMembers} agents (a lead and ${maxMembers - 1} specialists).`);
       const lead = members.find(a => a.id === t.lead);
       if (!lead) fail(`Assign a lead who belongs to ${t.name || t.id}.`);
       lead.lead = true;

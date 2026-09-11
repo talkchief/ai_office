@@ -45,6 +45,7 @@ export function validate(r, agents, existing = []) {
   if (!valid(out.when)) problems.push(`${out.id}: the schedule is not complete (${JSON.stringify(r.when || null)}) — see src/when.js`);
   out.needsOk = r.needsOk !== false;
   out.paused = r.paused === true;
+  if (r.ownerId) out.ownerId = String(r.ownerId).slice(0, 40); // the member who made it, in a hosted office
   if (Array.isArray(r.plan)) out.plan = r.plan.slice(0, 4).map(String);
   if (r.model !== undefined && r.model !== '' && r.model !== null) out.model = String(r.model).trim().slice(0, 120); // any model configured in Settings → Models
   if (r.effort !== undefined && r.effort !== '' && r.effort !== null) { const e = String(r.effort).toLowerCase().trim(); if (['low', 'medium', 'high', 'xhigh', 'max'].includes(e)) out.effort = e; else problems.push(`${out.id}: effort must be low, medium, high, xhigh or max (got "${r.effort}")`); }
@@ -68,7 +69,7 @@ export function load(brainPath, agents) {
 export function save(brainPath, routines) {
   const p = file(brainPath);
   fs.mkdirSync(path.dirname(p), { recursive: true });
-  const clean = routines.map(r => ({ id: r.id, dept: r.dept, agent: r.agent, title: r.title, text: r.text, when: r.when, needsOk: r.needsOk, paused: r.paused, ...(r.model ? { model: r.model } : {}), ...(r.effort ? { effort: r.effort } : {}), ...(r.plan ? { plan: r.plan } : {}) }));
+  const clean = routines.map(r => ({ id: r.id, dept: r.dept, agent: r.agent, title: r.title, text: r.text, when: r.when, needsOk: r.needsOk, paused: r.paused, ...(r.model ? { model: r.model } : {}), ...(r.effort ? { effort: r.effort } : {}), ...(r.plan ? { plan: r.plan } : {}), ...(r.ownerId ? { ownerId: r.ownerId } : {}) }));
   fs.writeFileSync(p, JSON.stringify({ routines: clean }, null, 2) + '\n');
   return p;
 }

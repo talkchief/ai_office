@@ -27,6 +27,8 @@
     "@langchain/langgraph-checkpoint-sqlite": "^1.0.4",
     "@langchain/mcp-adapters": "^1.1.4",
     "@langchain/openai": "^1.5.12",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "better-sqlite3": "^12.10.0",
     "@zvec/zvec": "^0.7.1",
     "d3-force": "^3.0.0",
     "deepagents": "^1.13.4",

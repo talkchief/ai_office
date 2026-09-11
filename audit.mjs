@@ -1,4 +1,6 @@
 // An append-only record of configuration changes: who, when, what changed. Secrets are redacted.
+// The actor is the signed-in person's email in a hosted office, 'ceo' in a single-owner one.
+import { currentUser } from './server/request-context.mjs';
 const SECRET = /(api_?key|token|secret|password|authorization|verifier|client_secret|refresh|credential)/i;
 export function redact(value, depth = 0) {
   if (depth > 8) return '…';
@@ -26,7 +28,7 @@ export class AuditLog {
     db.exec('CREATE TABLE IF NOT EXISTS office_audit (seq INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, actor TEXT NOT NULL, area TEXT NOT NULL, summary TEXT NOT NULL, diff TEXT); CREATE INDEX IF NOT EXISTS office_audit_at ON office_audit(at DESC);');
   }
   // Pass before/after snapshots; nothing is written when nothing changed.
-  record({ area, summary, before, after, actor = 'ceo' }) {
+  record({ area, summary, before, after, actor = currentUser()?.email || 'ceo' }) {
     const changes = before === undefined && after === undefined ? [] : diff(before, after);
     if ((before !== undefined || after !== undefined) && !changes.length) return null;
     const row = { at: Date.now(), actor, area, summary: String(summary).slice(0, 300), diff: changes };

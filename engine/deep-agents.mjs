@@ -137,8 +137,9 @@ export class OfficeEngine {
     return new Set(this.list().filter(j => !TERMINAL.has(j.state) && j.state !== 'backlog').flatMap(j => [...(j.runs || []).filter(r => ['working', 'paused'].includes(r.state)).map(r => r.agent), ...(j.autoRoute ? involved(j) : j.depts || [j.dept]).map(d => office.teams.find(t => t.id === d)?.lead)]).filter(Boolean));
   }
   /* ---------- creating and scheduling ---------- */
-  create({ dept, depts, text, title, model, effort, kind = 'task', testId, suiteId, routine = null, backlog = false, priority = 1, assignee = null, dueAt = null, autoStart = true, completionApproval, requireHumanApproval, projectId = null }) {
+  create({ dept, depts, text, title, model, effort, kind = 'task', testId, suiteId, routine = null, backlog = false, priority = 1, assignee = null, dueAt = null, autoStart = true, completionApproval, requireHumanApproval, projectId = null, ownerId = null, visibility = 'private', sharedWith = null, origin = null }) {
     const office = this.office.get();
+    const audience = this.audience({ visibility, sharedWith });
     const autoRoute = depts === 'auto' || dept === 'auto';
     const all = autoRoute ? office.teams.map(t => t.id) : [...new Set([dept, ...(Array.isArray(depts) ? depts : [])].filter(Boolean))];
     const teams = all.map(id => office.teams.find(t => t.id === id));
@@ -159,13 +160,28 @@ export class OfficeEngine {
       completionApproval: kind !== 'evaluation' && (teams.some(t => t.completionApproval) || !!completionApproval || !!requireHumanApproval),
       checks: [...teams.flatMap(t => (t.checks || []).map(c => ({ ...c, team: t.id }))), ...(testcase?.requiredText || []).map((value, i) => ({ id: `test-${i + 1}`, label: `Test requires: ${value}`, type: 'contains', value }))],
       runs: [], todos: [], reviews: [], reviewsByDept: {}, deliverables: {}, review: null, result: '', resultVersions: [], pendingActions: [], decisions: [], questions: [],
-      calls: 0, tokens: 0, tokensByModel: {}, liveCalls: {}, reworkRounds: {}, reprompts: 0, next: null, error: null, progressLine: '' };
+      calls: 0, tokens: 0, tokensByModel: {}, liveCalls: {}, reworkRounds: {}, reprompts: 0, next: null, error: null, progressLine: '',
+      // Hosted offices: whose task it is, who else sees it, and where it came from (web, chat, routine, email).
+      ownerId: ownerId ? String(ownerId).slice(0, 40) : null, ...audience, origin: origin && typeof origin === 'object' ? { channel: String(origin.channel || 'web').slice(0, 20), ...Object.fromEntries(Object.entries(origin).filter(([k, v]) => k !== 'channel' && v != null).map(([k, v]) => [k, String(v).slice(0, 300)])) } : null, attachments: [] };
     this.db.prepare('INSERT INTO office_jobs(id, body) VALUES (?, ?)').run(job.id, JSON.stringify(job));
     this.threads.ensure('task', job.id); this.threads.append(job.id, { role: 'ceo', text: job.text, jobId: job.id });
     this.event(job.id, 'received', job.agent, autoRoute ? 'The Program Manager received the task and will choose the teams.' : `${teams.map(t => t.name).join(' + ')} received the ${kind === 'evaluation' ? 'test' : 'task'}.`);
     try { this.onChange(job); } catch {}
     if (autoStart && !backlog) queueMicrotask(() => this.pump());
     return job;
+  }
+  // Visibility for a hosted office: private (the owner, office admins and whoever it is shared with) or public (everyone in the office).
+  audience({ visibility = 'private', sharedWith = null } = {}) {
+    if (!['private', 'public'].includes(visibility)) throw httpError('Visibility must be private or public.');
+    const ids = list => { if (list === undefined || list === null) return []; if (!Array.isArray(list) || list.length > 50 || list.some(v => typeof v !== 'string' || !v.trim() || v.length > 80)) throw httpError('Share lists must name up to 50 people or groups by id.'); return [...new Set(list.map(v => v.trim()))]; };
+    return { visibility, sharedWith: { users: ids(sharedWith?.users), groups: ids(sharedWith?.groups) } };
+  }
+  // Changing who sees a task: everyone hears the record left (so a viewer who lost access drops it), then the record itself goes to those who may see it.
+  share(id, input) {
+    if (!this.get(id)) throw httpError('No such task.', 404);
+    const audience = this.audience(input);
+    this.bus?.publish('task.removed', { id });
+    return this.update(id, j => { Object.assign(j, audience); });
   }
   createTestSuite(dept) {
     const team = this.office.team(dept); if (!team?.tests?.length) throw httpError('Save at least one team test first.');
@@ -332,7 +348,7 @@ export class OfficeEngine {
     const completion = actions.every(a => a.name === 'complete_task');
     this.event(id, 'decision_requested', job.pendingActions[0]?.agent, completion ? 'Completion waits for the CEO’s approval.' : `Waiting for the CEO before: ${actions.map(a => a.name).join(', ')}.`);
     this.notifications.notify({ kind: completion ? 'ceo_approval' : 'ceo_decision', title: completion ? `Approve completion: ${job.title}` : `Decision needed: ${job.title}`,
-      body: actions.map(a => `${a.name} ${JSON.stringify(a.args).slice(0, 600)}`).join('\n'), jobId: id, dept: job.dept, agent: job.pendingActions[0]?.agent, dedupe: `decision:${id}`, action: { type: 'decide' } });
+      body: actions.map(a => `${a.name} ${JSON.stringify(a.args).slice(0, 600)}`).join('\n'), jobId: id, dept: job.dept, agent: job.pendingActions[0]?.agent, dedupe: `decision:${id}`, action: { type: 'decide' }, userId: job.ownerId || null });
   }
   block(id, reason, { provider = false, quiet = false } = {}) {
     this.update(id, j => { for (const r of j.runs) if (['working', 'paused'].includes(r.state)) r.state = 'failed'; for (const c of Object.values(j.liveCalls || {})) if (c.state === 'running') c.state = 'failed'; });
@@ -341,8 +357,8 @@ export class OfficeEngine {
     if (quiet) return;
     // One inbox item per blocked task; a provider failure says where to fix it.
     this.notifications.notify(provider
-      ? { kind: 'provider_error', title: `Model provider problem: ${job.title}`, body: `${reason}\n\nCheck the key, credit and model under Settings → Models & keys, then retry.`, jobId: id, dept: job.dept, dedupe: `blocked:${id}`, action: { type: 'retry' } }
-      : { kind: 'blocked', title: `Blocked: ${job.title}`, body: reason, jobId: id, dept: job.dept, dedupe: `blocked:${id}`, action: { type: 'retry' } });
+      ? { kind: 'provider_error', title: `Model provider problem: ${job.title}`, body: `${reason}\n\nCheck the key, credit and model under Settings → Models & keys, then retry.`, jobId: id, dept: job.dept, dedupe: `blocked:${id}`, action: { type: 'retry' }, userId: job.ownerId || null }
+      : { kind: 'blocked', title: `Blocked: ${job.title}`, body: reason, jobId: id, dept: job.dept, dedupe: `blocked:${id}`, action: { type: 'retry' }, userId: job.ownerId || null });
   }
   // Retention: a finished task keeps its record, result, reviews and thread. Its scratch workspace and resumable
   // checkpoints go after `days`; a later correction starts a fresh thread from the brief and the latest result.
@@ -360,7 +376,7 @@ export class OfficeEngine {
   escalate(id, reason, kind = 'escalated') {
     const job = this.setState(id, 'escalated', { error: reason, escalation: kind });
     this.event(id, 'escalated', null, reason);
-    this.notifications.notify({ kind: 'escalated', title: `Needs you: ${job.title}`, body: reason, jobId: id, dept: job.dept, dedupe: `escalated:${id}`, action: { type: 'answer' } });
+    this.notifications.notify({ kind: 'escalated', title: `Needs you: ${job.title}`, body: reason, jobId: id, dept: job.dept, dedupe: `escalated:${id}`, action: { type: 'answer' }, userId: job.ownerId || null });
   }
   /* ---------- the org chart for one task ---------- */
   gate(key, size) { let g = this.gates.get(key); if (!g) { g = new Gate(size); this.gates.set(key, g); } g.size = size; return g; }
@@ -804,7 +820,7 @@ export class OfficeEngine {
       catch (error) { this.setState(id, 'working'); return `Saving the result failed (${clean(error.message).slice(0, 300)}). Call complete_task again.`; }
       this.setState(id, 'done', { doneAt: Date.now(), pendingActions: [], error: null });
       this.event(id, 'completed', 'pm', `Result version ${version.n} saved.`);
-      if (job.kind !== 'evaluation') this.notifications.notify({ kind: 'done', title: `Done: ${job.title}`, body: version.summary, jobId: id, dept: job.dept, action: { type: 'open' } });
+      if (job.kind !== 'evaluation') this.notifications.notify({ kind: 'done', title: `Done: ${job.title}`, body: version.summary, jobId: id, dept: job.dept, action: { type: 'open' }, userId: job.ownerId || null });
       return `Task completed and filed as version ${version.n}. End your turn with a one-line confirmation.`;
     }, { name: 'complete_task', description: 'Complete the task once every involved lead has recorded an approved review of the latest work; or, for a plain question the Brain answers with no team engaged, file the answer directly. Files the result for the CEO.', schema: z.object({ summary: z.string().describe('One paragraph: what was delivered'), answer: z.string().optional().describe('Only for a question answered from the Brain with no team engaged: the full answer, naming the /knowledge/ notes it rests on') }) });
   }
@@ -814,7 +830,7 @@ export class OfficeEngine {
       this.update(id, j => { j.questions.push({ at: Date.now(), text: q }); });
       this.threads.append(id, { role: 'agent', agent: 'pm', kind: 'question', text: q, jobId: id });
       this.escalate(id, q, 'question');
-      this.notifications.notify({ kind: 'question', title: `Question: ${job.title}`, body: q, jobId: id, dept: job.dept, dedupe: `question:${id}`, action: { type: 'answer' } });
+      this.notifications.notify({ kind: 'question', title: `Question: ${job.title}`, body: q, jobId: id, dept: job.dept, dedupe: `question:${id}`, action: { type: 'answer' }, userId: job.ownerId || null });
       return 'Your question was sent to the CEO. End your turn now; you will be resumed with the answer.';
     }, { name: 'ask_ceo', description: 'Ask the CEO for information only they have, when no reasonable assumption is possible. Ends your turn.', schema: z.object({ question: z.string() }) });
   }

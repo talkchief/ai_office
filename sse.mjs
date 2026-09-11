@@ -22,14 +22,15 @@ export class EventBus {
     entry.timer = setTimeout(() => { this.liveTimers.delete(key); if (entry.data !== data) this.publish(type, entry.data); }, this.liveThrottleMs);
     entry.timer.unref?.();
   }
-  write(client, event) { try { client.res.write(`id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`); } catch { this.drop(client); } }
+  // A client with a filter (a member of a hosted office) receives only the events it may see; a resync always passes.
+  write(client, event) { if (client.filter && event.type !== 'resync' && !client.filter(event)) return; try { client.res.write(`id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`); } catch { this.drop(client); } }
   drop(client) { clearInterval(client.heartbeat); this.clients.delete(client); try { client.res.end(); } catch {} }
-  handle(req, res, { session = 'default', lastEventId } = {}) {
+  handle(req, res, { session = 'default', lastEventId, filter = null } = {}) {
     res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', connection: 'keep-alive', 'x-accel-buffering': 'no' });
     res.write(`retry: 3000\n\n`);
     const mine = [...this.clients].filter(c => c.session === session);
     while (mine.length >= this.maxPerSession) this.drop(mine.shift());
-    const client = { res, session, heartbeat: setInterval(() => { try { res.write(': ping\n\n'); } catch { this.drop(client); } }, this.heartbeatMs) };
+    const client = { res, session, filter, heartbeat: setInterval(() => { try { res.write(': ping\n\n'); } catch { this.drop(client); } }, this.heartbeatMs) };
     client.heartbeat.unref?.();
     this.clients.add(client);
     const after = Number(lastEventId ?? req.headers['last-event-id']);

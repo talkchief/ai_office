@@ -73,7 +73,7 @@ export class Agency {
       person = config.agents.find(a => a.id === team.lead); if (!person) fail('This team has no lead.');
       Object.assign(person, { role: persona.role, does: persona.does, brief: persona.brief, name: text(name, 48) || person.name });
     } else {
-      const members = config.agents.filter(a => a.department === dept); if (members.length >= 7) fail(`${team.name} is full: a team is a lead and up to six specialists. Remove someone first.`);
+      const max = office.limits?.maxMembersPerTeam || 7, members = config.agents.filter(a => a.department === dept); if (members.length >= max) fail(`${team.name} is full: a team is a lead and up to ${max - 1} specialists. Remove someone first.`);
       let pid = ('agency-' + persona.id).slice(0, 44); for (let n = 2; config.agents.some(a => a.id === pid); n++) pid = ('agency-' + persona.id).slice(0, 41) + '-' + n;
       person = { id: pid, department: dept, name: text(name, 48) || text(persona.name, 48).toUpperCase(), role: persona.role, does: persona.does, brief: persona.brief, model: '', effort: '', tools: [], inheritTools: true, skills: [], rules: [] };
       config.agents.push(person);

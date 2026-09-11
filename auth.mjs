@@ -1,5 +1,5 @@
 // Delegate account authentication and credential storage to the official Claude CLI.
-import { randomUUID, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 const same = (a, b) => {
   const x = Buffer.from(String(a || '')), y = Buffer.from(String(b || ''));
@@ -23,6 +23,11 @@ export function createOfficeAccess(key = '') {
     },
   };
 }
+
+// Hosted mode: the account session. Lax so a link in a mail (or a later OAuth redirect) carries the cookie; sameOrigin still guards every mutation.
+export const sessionCookie = (id, { secure = false, maxAge = 604800 } = {}) => `ao_session=${id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
+export const clearCookie = ({ secure = false } = {}) => `ao_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? '; Secure' : ''}`;
+export const cookieValue = (req, name = 'ao_session') => String(req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith(name + '='))?.slice(name.length + 1) || '';
 
 export function sameOrigin(req) {
   const origin = req.headers.origin;
