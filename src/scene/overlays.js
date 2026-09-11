@@ -171,14 +171,27 @@ export function makeOverlays({ hud, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, onDept, on
     }
     // desk pills: at every zoom, smaller when far
     const pillScale = 0.62 + 0.38 * smooth(1.2, 2.4, z);
+    // A chip stays whole on the screen: it slides inward when its desk is near an edge (a phone shows only part of the office) and
+    // goes when the desk itself has left the screen. The chip is shifted by (-50%,-100%) and scaled about its centre, so its box is
+    // w·s wide and h·s tall, centred at (x, y - h/2). The panel covers the right side of a wide screen, the bottom of a narrow one.
+    const chipRight = rightEdge > rig.size.w / 2 ? rightEdge : rig.size.w - 6;
+    const whole = (el, x, y, s) => {
+      if (x < -24 || x > rig.size.w + 24 || y < -24 || y > rig.size.h + 24) return null;
+      const w = el.offsetWidth * s, h = el.offsetHeight * s;
+      const cx = w + 12 > chipRight ? chipRight / 2 : clamp(x, 6 + w / 2, chipRight - w / 2);
+      const cy = clamp(y - el.offsetHeight / 2, 64 + h / 2, rig.size.h - 6 - h / 2) + el.offsetHeight / 2;
+      return [cx, cy];
+    };
     const v = new THREE.Vector3();
     for (const r of Object.values(rig.R)) {
       const pill = r.pill; if (!pill) continue;
       const p = r.person.position;
-      const [sx, sy] = toScreen(v.set(p.x, p.y + 5.9 * (r.a.lead ? 1.12 : 1), p.z));
+      const [ax, ay] = toScreen(v.set(p.x, p.y + 5.9 * (r.a.lead ? 1.12 : 1), p.z));
       pill.style.display = 'block';
       const big = pill.classList.contains('is-supervising') || pill.classList.contains('is-stuck');
-      pill.style.transform = `translate(${sx}px,${sy}px) translate(-50%,-100%) scale(${big ? Math.max(0.95, pillScale) : pillScale})`;
+      const s = big ? Math.max(0.95, pillScale) : pillScale, at = whole(pill, ax, ay, s);
+      pill.style.visibility = at ? '' : 'hidden';
+      if (at) pill.style.transform = `translate(${at[0]}px,${at[1]}px) translate(-50%,-100%) scale(${s})`;
       const dimmed = focused && focused !== 'brain' && r.a.dept !== focused;
       pill.style.opacity = dimmed ? 1 - 0.85 * focusDim : 1;
       pill.classList.toggle('is-selected', store.getState().selected === r.a.id);
@@ -186,9 +199,11 @@ export function makeOverlays({ hud, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, onDept, on
     tickBubbles(now, focused, focusDim);
     if (rig.pm) {
       const p = rig.pm.person.position;
-      const [sx, sy] = toScreen(v.set(p.x, p.y + 6.6, p.z));
+      const [ax, ay] = toScreen(v.set(p.x, p.y + 6.6, p.z));
       pmPill.style.display = 'block';
-      pmPill.style.transform = `translate(${sx}px,${sy}px) translate(-50%,-100%) scale(${Math.max(0.8, pillScale)})`;
+      const s = Math.max(0.8, pillScale), at = whole(pmPill, ax, ay, s);
+      pmPill.style.visibility = at ? '' : 'hidden';
+      if (at) pmPill.style.transform = `translate(${at[0]}px,${at[1]}px) translate(-50%,-100%) scale(${s})`;
       pmPill.style.opacity = focused && focused !== 'brain' ? 0.45 : 1;
       const st = rig.pm.state === 'walking' ? 'EN ROUTE → ' + (DEPTS[rig.pm.target]?.short || '') : rig.pm.state === 'returning' ? 'HEADING BACK' : rig.pm.state === 'atDesk' ? 'WITH ' + (DEPTS[rig.pm.target]?.short || '') : rig.pm.busy ? 'COORDINATING' : 'FREE · AT DESK';
       const nx = rig.pm.next ? `next: <b style="color:${DEPTS[rig.pm.next.dept]?.ink || '#5A5A5A'}">${esc(DEPTS[rig.pm.next.dept]?.short || '')}</b> · ${esc(rig.pm.next.title || '')}` : '';

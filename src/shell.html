@@ -1662,6 +1662,22 @@ body.dark #settingsPage .secondary { background: transparent; color: var(--ink);
   #settingsPage h1, #settingsPage .space-h1 { font-size: 24px; }
   #settingsPage .space-settings-save { position: static; margin-top: 16px; } /* a sticky bar would cover the form on a phone */
 }
+/* The sheet on small screens: one page that scrolls as a whole; the handle cycles half → tall → peek (only the handle showing). */
+@media (max-width: 900px) {
+  #tpanel { display: block; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding-top: 0; }
+  #tpanel > * + * { margin-top: 9px; }
+  #tpanelHandle { position: sticky; top: 0; z-index: 3; margin: 0 -14px 6px; width: calc(100% + 28px); height: 26px; background: color-mix(in srgb, var(--cream) 96%, transparent); }
+  #tpanel.peek { height: 34px; overflow: hidden; padding-bottom: 0; }
+  .space-now, .tp-now { max-height: none; overflow: visible; flex: none; }
+  .space-jobs { overflow: visible; flex: none; max-height: none; }
+  body.sheet-peek #zoomCtl { bottom: 52px; } body.sheet-tall #zoomCtl { display: none; }
+  /* Name chips are never cut off on a tablet or a phone: no width cap here; the office slides a chip inside the screen (src/scene/overlays.js). */
+  .pill { max-width: none; overflow: visible; text-overflow: clip; white-space: nowrap; }
+  .program-manager-pill .pm-next { display: none; }
+}
+@media (max-width: 600px) {
+  .pill:not(.is-idle) .p-sub:not(:empty) { max-width: 150px; }
+}
 </style>
 </head>
 <body>

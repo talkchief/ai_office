@@ -44,7 +44,8 @@ export function initOfficeWork(ctx) {
   dialog.innerHTML = '<header><h2 id="spaceTitle"></h2><button type="button" id="spaceClose" aria-label="Close">×</button></header><p id="spaceMessage" role="status"></p><div id="spaceContent"></div>';
   document.body.appendChild(dialog);
   const $ = id => document.getElementById(id), content = $('spaceContent');
-  $('tpanelHandle').onclick = () => panel.classList.toggle('tall');
+  // The handle cycles the sheet: half (the default) → tall → peek (only the handle) → half. Body classes let the scene controls make room.
+  $('tpanelHandle').onclick = () => { const next = panel.classList.contains('tall') ? 'peek' : panel.classList.contains('peek') ? 'half' : 'tall'; panel.classList.remove('tall', 'peek'); if (next !== 'half') panel.classList.add(next); document.body.classList.toggle('sheet-peek', next === 'peek'); document.body.classList.toggle('sheet-tall', next === 'tall'); };
   for(const event of ['input','change'])content.addEventListener(event,e=>{if(modalKind==='task'&&e.target.matches('input,textarea,select')){taskDirty=true;if(e.target.id)taskInputDraft[e.target.id]=e.target.value;}});
   const feedback = (text, error = false) => { $('spaceMessage').textContent = text; $('spaceMessage').classList.toggle('error', error); };
   function open(kind, title) { modalKind = kind; dialog.dataset.view = kind; $('spaceTitle').textContent = title; feedback(''); if (!dialog.open) dialog.showModal(); requestAnimationFrame(()=>{dialog.scrollTop=0;content.scrollTop=0;}); }
