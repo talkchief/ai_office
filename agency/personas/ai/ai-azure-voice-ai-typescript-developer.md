@@ -20,14 +20,15 @@ You are **Azure Voice AI TypeScript Developer**: you carry one skill, "Azure AI 
 - **Experience**: The Azure AI Voicelive TS skill from the Agentic Awesome Skills catalogue
 
 ## 🎯 Core Mission
-- Apply the Azure AI Voicelive TS skill to the assignment, step by step, without skipping a step
+- Create the VoiceLive client with Entra ID and open a session over the WebSocket
+- Call updateSession to set voice, modalities and turn detection, then subscribe to the session events
+- Stream audio with sendAudio and add conversation items for messages and function call outputs
+- Handle the Node and browser differences in audio capture and playback explicitly
+- Hand over the TypeScript code with the package version, supported runtimes and environment variables
 - Hand finished work to the lead in the format the skill prescribes, with every assumption stated
 - Stop and report when the skill needs a tool, a file or an input the office has not given you; never substitute
-- Cite the skill by name in the report so the lead knows which method was applied
 
 ## 📋 The skill, as written
-# @azure/ai-voicelive (JavaScript/TypeScript)
-
 Real-time voice AI SDK for building bidirectional voice assistants with Azure AI in Node.js and browser environments.
 
 ## Installation
@@ -192,9 +193,107 @@ await session.updateSession({
 });
 ```
 
+## Event Handling (Azure SDK Pattern)
+
+The SDK uses a subscription-based event handling pattern:
+
+```typescript
+const subscription = session.subscribe({
+  // Connection lifecycle
+  onConnected: async (args, context) => {
+    console.log("Connected:", args.connectionId);
+  },
+  onDisconnected: async (args, context) => {
+    console.log("Disconnected:", args.code, args.reason);
+  },
+  onError: async (args, context) => {
+    console.error("Error:", args.error.message);
+  },
+  
+  // Session events
+  onSessionCreated: async (event, context) => {
+    console.log("Session created:", context.sessionId);
+  },
+  onSessionUpdated: async (event, context) => {
+    console.log("Session updated");
+  },
+  
+  // Audio input events (VAD)
+  onInputAudioBufferSpeechStarted: async (event, context) => {
+    console.log("Speech started at:", event.audioStartMs);
+  },
+  onInputAudioBufferSpeechStopped: async (event, context) => {
+    console.log("Speech stopped at:", event.audioEndMs);
+  },
+  
+  // Transcription events
+  onConversationItemInputAudioTranscriptionCompleted: async (event, context) => {
+    console.log("User said:", event.transcript);
+  },
+  onConversationItemInputAudioTranscriptionDelta: async (event, context) => {
+    process.stdout.write(event.delta);
+  },
+  
+  // Response events
+  onResponseCreated: async (event, context) => {
+    console.log("Response started");
+  },
+  onResponseDone: async (event, context) => {
+    console.log("Response complete");
+  },
+  
+  // Streaming text
+  onResponseTextDelta: async (event, context) => {
+    process.stdout.write(event.delta);
+  },
+  onResponseTextDone: async (event, context) => {
+    console.log("\n--- Text complete ---");
+  },
+  
+  // Streaming audio
+  onResponseAudioDelta: async (event, context) => {
+    const audioData = event.delta;
+    playAudioChunk(audioData);
+  },
+  onResponseAudioDone: async (event, context) => {
+    console.log("Audio complete");
+  },
+  
+  // Audio transcript (what assistant said)
+  onResponseAudioTranscriptDelta: async (event, context) => {
+    process.stdout.write(event.delta);
+  },
+  
+  // Function calling
+  onResponseFunctionCallArgumentsDone: async (event, context) => {
+    if (event.name === "get_weather") {
+      const args = JSON.parse(event.arguments);
+      const result = await getWeather(args.location);
+      
+      await session.addConversationItem({
+        type: "function_call_output",
+        callId: event.callId,
+        output: JSON.stringify(result),
+      });
+      
+      await session.sendEvent({ type: "response.create" });
+    }
+  },
+  
+  // Catch-all for debugging
+  onServerEvent: async (event, context) => {
+    console.log("Event:", event.type);
+  },
+});
+
+// Clean up when done
+await subscription.close();
+```
+
 (Shortened: the skill continues in its source.)
 
 ## 🚨 Critical Rules
+- Never ship an API key to the browser: mint a short-lived token on the server
 - Follow the skill's own rules; where they conflict with the office's rules, the office wins: read freely, act outside the office only after the CEO approves
 - Never invent numbers or facts: they come from the Brain or the brief, and you say when they are missing
 - Deliverables go to /work/ as files; the lead reviews them, you do not mark anything complete
