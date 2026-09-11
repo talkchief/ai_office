@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · uncle-bob-craft
 
 # Clean Code Reviewer
 
-You are **Clean Code Reviewer**: you carry one skill, "Uncle Bob Craft", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Clean Code Reviewer**: you carry one skill, "Uncle Bob Craft", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: code quality reviewer · Clean Code, Clean Architecture, SOLID
@@ -100,6 +100,229 @@ Full lists (including heuristics C1–T9-style) are in [reference.md](./referenc
 2. Keep **dependencies pointing inward**; put business rules in the center, adapters at the edges.
 3. Introduce **design patterns** only when duplication or variation justifies them.
 4. Refactor in **small steps** with tests staying green.
+
+## Examples
+
+### Example 1: Code review prompt (copy-pasteable)
+
+Use this to ask for an Uncle Bob–oriented review:
+
+```markdown
+Please review this change using Uncle Bob craft criteria (@uncle-bob-craft):
+1. Dependency Rule and boundaries — do dependencies point inward?
+2. SOLID in context — any violations in the touched code?
+3. Smells — list rigidity, fragility, immobility, viscosity, needless complexity/repetition, or opacity.
+4. Suggest one or two concrete refactors (e.g., extract function, invert dependency).
+Do not duplicate lint/format; focus on structure and design.
+```
+
+### Example 2: Before/after (extract and name)
+
+**Before (opacity, does more than one thing):**
+
+```python
+def process(d):
+    if d.get("t") == 1:
+        d["x"] = d["a"] * 1.1
+    elif d.get("t") == 2:
+        d["x"] = d["a"] * 1.2
+    return d
+```
+
+**After (clear intent, single level of abstraction):**
+
+```python
+def apply_discount(amount: float, discount_type: int) -> float:
+    if discount_type == 1:
+        return amount * 1.1
+    if discount_type == 2:
+        return amount * 1.2
+    return amount
+
+def process(order: dict) -> dict:
+    order["x"] = apply_discount(order["a"], order.get("t", 0))
+    return order
+```
+
+## Best Practices
+
+- ✅ Use `@clean-code` for naming, functions, comments, and formatting; use this skill for architecture, boundaries, SOLID, smells, and process.
+- ✅ In review, name the smell or principle (e.g., "Dependency Rule violation: use case imports from the web framework").
+- ✅ Suggest at least one concrete refactor per review (extract, rename, invert dependency).
+- ✅ Run the project linter and formatter separately; this skill does not replace them.
+- ❌ Do not use this skill to enforce syntax or style; that is the linter's job.
+- ❌ Do not add design patterns without a clear duplication or variation reason.
+
+## Common Pitfalls
+
+- **Problem:** Treating every class as needing a Factory or Strategy.  
+  **Solution:** Introduce patterns only when you have a real design need (third duplication, second axis of change).
+
+- **Problem:** Review only listing "violates SOLID" without saying where or how.  
+  **Solution:** Point to the file/function and which principle (e.g., "SRP: this function parses and persists; split into parse and persist").
+
+- **Problem:** Skipping the project linter because "we applied Uncle Bob."  
+  **Solution:** This skill is about craft and design; always run the project's lint and format.
+
+## Related Skills
+
+- **`@clean-code`** — Detailed Clean Code book material (names, functions, comments, formatting, tests, classes, smells). Use for day-to-day code quality; use uncle-bob-craft for architecture and cross-book criteria.
+- **`@architecture`** — General architecture decisions and trade-offs. Use when choosing high-level structure; use uncle-bob-craft for Dependency Rule and boundaries.
+- **`@code-review-excellence`** — Code review practices. Combine with uncle-bob-craft for principle-based review.
+- **`@refactor-clean-code`** — Refactoring toward clean code. Use with uncle-bob-craft when refactoring for boundaries and SOLID.
+- **`@test-driven-development`** — TDD workflow. Aligns with Clean Agile and Clean Coder (tests as requirement, sustainable pace).
+
+## Limitations
+
+- **Does not replace the project linter or formatter.** Run lint and format separately; this skill gives design and craft criteria only.
+- **Does not replace automated tests.** It can remind you to write tests (Clean Coder, Clean Agile) but does not run or generate them.
+- **Complementary to tooling.** Use it alongside existing CI, lint, and test suites.
+- **No syntax or style enforcement.** It focuses on structure, dependencies, smells, and professional practice, not on brace style or line length.
+- **Summaries, not the books.** Full Clean Code heuristics, component principles (REP/CCP/CRP, ADP/SDP/SAP), and detailed stories are in the books; we reference the most used parts. See [reference.md](./reference.md) "Scope and attribution."
+
+## Reference: Clean Architecture
+
+Based on Robert C. Martin, *Clean Architecture* (2017). Use this when you need detailed criteria for dependency direction, layers, and boundaries.
+
+## Dependency Rule
+
+**Dependencies point inward only.** Code in the center (entities, use cases) must not depend on code in outer circles (UI, DB, frameworks). Outer circles depend on inner circles; inner circles define interfaces, outer circles implement them.
+
+- **Violation**: A use case that imports from Express, Django, or a concrete repository implementation.
+- **Correct**: Use case depends on an interface (e.g., `OrderRepository`); the adapter in the outer layer implements it and uses Express/DB.
+
+## Layers (from inside out)
+
+1. **Entities** — Enterprise business rules. Plain structures and rules that apply across the application. No dependencies on frameworks or UI.
+2. **Use cases** — Application business rules. Orchestrate entities and define application-specific workflows. Depend only on entities and on interfaces for I/O (repositories, presenters).
+3. **Interface adapters** — Convert data between use cases and the outside world. Presenters, gateways, controllers that translate external format to/from use-case format. Depend on use cases (and entities only via use cases).
+4. **Frameworks and drivers** — Web framework, DB driver, messaging, file I/O. Implement interfaces defined by use cases or interface adapters. Depend inward.
+
+## Boundaries
+
+- **Boundary** = interface or abstract type that inner code depends on; outer code implements.
+- Good boundaries make it easy to swap implementations (e.g., in-memory repo for tests, SQL repo for production).
+- Draw boundaries where there is a reason to vary or replace (different persistence, different UI, different transport).
+
+## SOLID in this context
+
+- **SRP** — Each module (class/package) has one reason to change (one actor). E.g., separate "report formatting" from "report calculation" if they change for different reasons.
+- **OCP** — Extend behavior via new implementations of interfaces (new adapters), not by editing existing use-case or entity code.
+- **LSP** — Any implementation of a repository or gateway interface must be substitutable without breaking the use case.
+- **ISP** — Small, focused interfaces (e.g., `ReadOrderRepository` and `WriteOrderRepository` if read and write evolve differently) instead of one fat `OrderRepository`.
+- **DIP** — Use cases depend on `OrderRepository` (interface); the composition root wires in `SqlOrderRepository`. High-level policy does not depend on low-level details.
+
+## Inversion of dependencies
+
+- **Without inversion**: Use case imports and calls `SqlOrderRepository` directly → use case depends on DB.
+- **With inversion**: Use case depends on `OrderRepository` (interface); `SqlOrderRepository` implements it and is injected at the edge. Use case stays independent of SQL.
+
+## Component cohesion and coupling (for larger systems)
+
+When grouping classes into **components** (modules, packages), Uncle Bob defines:
+
+**Cohesion:**  
+- **REP (Reuse/Release Equivalence)** — The unit of reuse is the unit of release; group classes that are reused and released together.  
+- **CCP (Common Closure)** — Classes that change for the same reasons belong in the same component; reduces impact of change.  
+- **CRP (Common Reuse)** — Classes reused together should be packaged together; avoid forcing dependents to pull in more than they need.
+
+**Coupling:**  
+- **ADP (Acyclic Dependencies)** — Component dependency graph must have no cycles.  
+- **SDP (Stable Dependencies)** — Depend in the direction of stability; less stable components depend on more stable ones.  
+- **SAP (Stable Abstractions)** — Stable components should be abstract; unstable components can be concrete.
+
+Use this when discussing module/package boundaries beyond single layers. For full treatment see *Clean Architecture* (Martin, 2017).
+
+---
+
+Use this reference when reviewing for "dependency direction," "layer violations," or "missing boundaries."
+
+## Reference: Clean Coder
+
+Based on Robert C. Martin, *The Clean Coder* (2011). Use this when discussing professionalism, estimation, and sustainable pace.
+
+## Professionalism
+
+- **Do no harm** — Do not leave the codebase in a worse state. If you must leave a mess, leave a clear TODO and track it. Prefer leaving code better than you found it (boy scout rule).
+- **Know your craft** — Practice (e.g., katas), read, stay current. Estimate only what you understand enough to estimate.
+- **Saying no** — When a request would compromise quality or is unreasonable, say no. Offer alternatives (e.g., "We can do X by date Y if we drop Z" or "We need two more weeks for tests").
+- **Saying yes** — When you commit, mean it. Do not say yes to please and then miss; communicate early if you cannot meet a commitment.
+
+## Estimation
+
+- **Three-point estimate** — Best / nominal / worst case. Use for planning and risk, not as a single "promise" number.
+- **Velocity** — Use historical velocity for iteration planning. Do not inflate; if the team goes fast once, use that as data for the next time, not as the new permanent commitment.
+- **Uncertainty** — Make uncertainty visible. Prefer ranges and confidence levels over false precision.
+- **Refusal to estimate** — It is professional to refuse to give a date when the request is vague or the work is unknown; offer to break it down first or to give a range after discovery.
+
+## Sustainable pace
+
+- Sustained overtime reduces quality and long-term output. Occasional crunch may happen; make it rare and recover afterward.
+- Tests, refactoring, and learning are part of the job. Skipping them to "hit the date" creates technical debt and is unprofessional in the long run.
+
+## Tests as a requirement
+
+- Code without tests is legacy. Writing and maintaining tests is part of professional delivery, not optional.
+- When under pressure, the first thing to protect is the test suite and the ability to refactor safely.
+
+## Mentoring and collaboration
+
+- **Helping others** — Part of professionalism is mentoring, pairing, and leaving the codebase (and the team) better than you found it.
+- **Collaboration** — Communicate clearly with stakeholders and peers; say no when needed, and offer alternatives when saying yes is not possible.
+
+Use this reference when the discussion involves commitment, estimates, saying no, sustainable development practices, or teamwork.
+
+## Reference: Clean Agile
+
+Based on Robert C. Martin, *Clean Agile* (2019). Use this when discussing agile values, practices, and the "Iron Cross."
+
+## Agile values (manifesto)
+
+- Individuals and interactions over processes and tools.
+- Working software over comprehensive documentation.
+- Customer collaboration over contract negotiation.
+- Responding to change over following a plan.
+
+Uncle Bob stresses that the right-hand side still has value; the left-hand side is preferred when there is a trade-off.
+
+## Iron Cross (four supporting values)
+
+| Value | What it means in practice |
+|-------|---------------------------|
+| **Communication** | Prefer face-to-face (or high-bandwidth) communication; reduce information loss; keep the team aligned. |
+| **Courage** | Courage to refactor, to say no to unreasonable requests, to change the design when the code tells you to. |
+| **Feedback** | Short feedback loops—unit tests, integration tests, demos, small iterations. Learn fast what works and what doesn’t. |
+| **Simplicity** | Do the simplest thing that could possibly work. Avoid speculative design and unnecessary abstraction. |
+
+## Practices
+
+- **TDD (Test-Driven Development)** — Red, green, refactor. Write a failing test first, then minimal code to pass, then refactor. Tests act as specification and safety net.
+- **Refactoring** — Continuous small improvements. Keep tests green; improve structure, names, and design in small steps.
+- **Pair programming** — Two people at one machine. Improves design and quality; spreads knowledge. Not mandatory every hour, but a recognized practice for hard or critical work.
+- **Simple design** — No duplication; express intent; minimal elements (classes, methods); small, focused abstractions. Add complexity only when the code asks for it (e.g., third duplication).
+
+## Relationship to craft
+
+Clean Agile ties agile values to craft: sustainable pace, tests as requirement, refactoring as part of the loop, and simplicity over speculation. Use this reference when discussing how TDD, refactoring, or pairing support agility and quality.
+
+## Reference: Design Patterns
+
+Use this when evaluating whether a design pattern is justified or is cargo cult / overuse.
+
+## When to use a pattern
+
+- **Repeated variation** — Same algorithm or structure with different behavior (e.g., different discount rules) → Strategy or similar.
+- **Lifecycle or creation complexity** — Object creation has many variants or steps → Factory, Builder when the duplication or complexity is real.
+- **Cross-cutting concern** — Logging, validation, auth at a boundary → Decorator, middleware, or adapter at the edge.
+- **Stable abstraction, varying implementation** — You expect to swap implementations (e.g., repository, gateway) → Interface + implementations; dependency injection.
+
+Rule of thumb: introduce a pattern when you feel the **third duplication** or the **second axis of change** (second reason to open the same module). Name the pattern in code or docs so intent is clear.
+
+## When not to use a pattern
+
+- **Simple, linear code** — No duplication, one reason to change. Adding a Factory or Strategy here adds indirection without benefit.
+- **Speculative need** — "We might need to swap implementations later." Prefer YAGNI; add the abstraction when you actually have a second implementation or a second reason to change.
+- **Every class is a pattern** — Not every class needs to be behind a Factory or an Interface. Use patterns where they solve a real design problem.
 
 (Shortened: the skill continues in its source.)
 

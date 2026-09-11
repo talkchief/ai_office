@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · dotnet-reverse
 
 # .NET Reverse Engineer
 
-You are **.NET Reverse Engineer**: you carry one skill, ".NET Reverse", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **.NET Reverse Engineer**: you carry one skill, ".NET Reverse", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: reverse engineer · dnSpyEx, de4dot, IL patching
@@ -246,7 +246,445 @@ de4dot --detect target.exe
 ## 批量
 de4dot *.exe
 
-(Shortened: the skill continues in its source.)
+## 只解字符串，不动控制流（最小干预）
+de4dot --strtyp delegate --strtok METHOD_TOKEN target.exe
+```
+
+de4dot 的 `--strtyp` / `strtok` 模式：只解字符串解密器（指定解密方法 token），保留原控制流。适合"只想看明文字符串但不想碰 anti-tamper"的场景。
+
+---
+
+## ConfuserEx（最常见）
+
+### 特征识别
+
+- 入口模块 `<module>` 类带 `[MethodImpl(NoInlining)]` 的 anti-tamper 检查
+- 大量 `Dictionary<string, T>` 的字符串解密器调用
+- 控制流平坦化（switch dispatch + state 变量）
+- 资源里嵌 `.cmp` 压缩资源
+- dnSpyEx C# 视图：类名/方法名乱码（`\uXXXX` 或无意义字符），方法体里满屏 `int num = ...; switch(num)`
+
+### 脱壳流程
+
+```powershell
+## 1. 标准脱壳
+de4dot target.exe -o target-clean.exe
+
+##    先确认 anti-tamper：
+dnSpyEx 打开 → 找 Module .cctor 或 Main 里的完整性校验
+```
+
+### anti-tamper 绕过（新版 ConfuserEx 常见）
+
+ConfuserEx 的 `anti tamper` 会在运行时校验方法体哈希，被改就崩。de4dot 通常能处理旧版，新版需手动：
+
+```text
+方法 A — dnSpyEx 直接 patch 校验函数：
+  1. 找 anti-tamper 校验方法（通常在 <module> 的静态构造里调用）
+  2. IL 编辑：把校验方法体改成 ret（直接返回）
+  3. 保存 → 再喂给 de4dot
+
+方法 B — 运行时 dump：
+  1. 用 MegaDumper / ExtremeDumper 跑起来 dump 内存中的 assembly
+  2. dump 出来的已经解密，再用 de4dot 清理残留
+```
+
+### 控制流还原后
+
+de4dot 会把平坦化的 switch dispatch 还原成正常 if/while。如果没完全还原（看到残留 state 机），可再跑一次 de4dot 或手动跟 IL。
+
+---
+
+## SmartAssembly
+
+```powershell
+de4dot --type sa target.exe -o target-clean.exe
+```
+
+特征：
+- 字符串用 `SmartAssembly.Runtime.Strong` 系列编码
+- 资源压缩（`{assembly}.Resources`）
+- 方法调用隐藏（`ProcessCaller` / 间接 call）
+
+de4dot 对 SmartAssembly 兼容性最好，基本一键搞定。
+
+---
+
+## .NET Reactor（necrobit）
+
+`.NET Reactor` 的 **necrobit** 把真实方法体加密存到资源，运行时解密注入，原方法体是空壳。de4dot 对老版本有效，新版本（4.x+）常失败。
+
+```text
+当 de4dot 失败时：
+1. 让程序跑起来（dotnet target.exe 或直接双击）
+2. MegaDumper / ExtremeDumper dump 进程内存 → 导出解密后的 assembly
+3. 用 de4dot 清理 dump 产物的残留混淆
+4. 如果 metadata 损坏，用 dnlib 重建（见 common-workflow.md）
+```
+
+---
+
+## 字符串解密器手动提取
+
+混淆器把字符串加密，运行时调用解密方法还原。de4dot 多数能自动识别解密器，识别失败时手动：
+
+```text
+1. dnSpyEx 找到解密方法（通常签名固定：static string Decrypt(int) 或 Decrypt(string, int)）
+   - 特征：被大量调用、参数是数字常量、返回 string
+2. 记下方法 token（如 0x06000012）
+3. de4dot 指定解密器：
+   de4dot --strtyp delegate --strtok 0x06000012 target.exe -o target-clean.exe
+```
+
+如果连解密方法本身也被混淆（控制流平坦化），需要先脱控制流再定位解密器。
+
+## anti-debug 常见手法
+
+| 手法 | 位置 | 绕过 |
+|------|------|------|
+| `Debugger.IsAttached` 检查 | 任意方法 | IL 改 `ldc.i4.0; ret` 或 patch getter |
+| `Debugger.IsLogging` | — | 同上 |
+| 时间检测 (`DateTime.Now` 差值) | 方法入口 | patch 掉差值比较 |
+| `CheckRemoteDebuggerPresent` P/Invoke | — | nop 掉调用 |
+| 异常驱动控制流（try/catch 路径选择）| 主逻辑 | 不能简单 nop，要分析 catch 块真实路径 |
+
+> .NET anti-debug 比 native 简单 —— 多数是托管 API 调用，dnSpyEx IL 改一行即可。
+
+## de4dot 失败时的退路
+
+1. **de4dot --detect** 看识别结果，对照上表
+2. **运行时 dump**（MegaDumper / ExtremeDumper / Process Hacker 导出模块）
+3. **dnlib 脚本** 手动解（见 common-workflow.md 的 dnlib 段）
+4. **动态优先**：跑起来在解密点下断，直接看明文，不脱壳也能拿情报
+
+社区参考：Washi 博客《misconceptions-about-dotnet》（IL 分析的常见误区）、看雪 .NET 逆向版块、Guided Hacking《Top 5 .NET RE Tools》。
+
+## Reference: Common Workflow
+
+完整工作流细节、IL patch 可靠性、字符串解密器提取、状态机识别、dnlib 脚本化。
+
+## 完整工作流（端到端）
+
+```text
+1. Identify  → 确认是 .NET 托管程序（不是 native）
+2. Detect    → DIE / de4dot --detect 识别混淆器
+3. Deobf     → de4dot 脱混淆（保留原样本）
+4. Static    → dnSpyEx 浏览 C# 视图定位，IL 视图看关键逻辑
+5. Dynamic   → dnSpyEx 调试器在关键方法下断，看运行时明文
+6. Patch     → IL 编辑器修改，Save Module
+```
+
+每一步的产物要落盘：原样本 `target.exe` → 脱壳 `target-clean.exe` → patch 后 `target-patched.exe`。
+
+## IL patch vs C# patch 可靠性
+
+**核心结论：关键修改用 IL 编辑器，不要用 C# 编辑器。**
+
+| 维度 | C# 编辑器 (Edit Method C#) | IL 编辑器 (Edit IL) |
+|------|---------------------------|---------------------|
+| 编译失败风险 | 高（缺引用、语法、lambda 重写失败）| 几乎为零 |
+| 信息保真 | 编译器重新生成 IL，可能与原 IL 不同 | 原样替换，逐指令改 |
+| 适用 | 改个字符串、改个常量、简单逻辑 | 改判断、删校验、改控制流 |
+| async/await/状态机 | 经常编译失败或扭曲 | 直接改状态机字段，可靠 |
+
+dnSpyEx 的 C# 反编译器是基于只读反编译 + 尝试重编译，对编译器生成的代码（状态机、闭包、`yield`）重编译极易失败。IL 编辑器是逐指令编辑，所见即所得。
+
+### 典型 IL patch 模式
+
+```text
+改判断（if (check) → 永远 true）：
+  原: call bool Foo::Check()
+      brfalse.s SKIP
+  改: ldc.i4.1            ; push true
+      brfalse.s SKIP      ; 现在永远不跳，SKIP 不执行
+  或更直接：
+      ldc.i4.1
+      ret                 ; 方法直接返回 true
+
+改判断（if (check) → 永远 false）：
+  ldc.i4.0
+  ret
+
+删整段校验：
+  全部 nop，或改成 ret + 正确返回值
+
+改字符串常量：
+  C# 编辑器改字符串通常 OK（ldstr 直接换 token），但若字符串在资源/加密里则要改解密逻辑
+
+改数字常量：
+  ldarg / ldc 指令直接改操作数
+```
+
+## 状态机识别（async/await / yield）
+
+C# 的 `async/await` 和 `IEnumerator` yield 编译成**状态机**：编译器生成一个嵌套类，`MoveNext()` 里用 `state` 字段做 switch dispatch。dnSpyEx C# 视图会还原成 async，但反编译可能失真，IL 视图看 `MoveNext` 最准。
+
+```text
+async/await 的 MoveNext 结构：
+  switch(this.<>1__state) {
+    case 0: ... await 前的逻辑; this.<>1__state = 1; await MoveNext;
+    case 1: ... await 后的逻辑;
+  }
+
+要 patch async 逻辑：改 MoveNext 里的 state 转移或具体 case 里的判断。
+C# 编辑器改 async 几乎必失败 → 必须用 IL。
+```
+
+## 字符串解密器提取
+
+详见 `obfuscators.md`。这里补充 dnlib 脚本化批量解字符串：
+
+```csharp
+// dnlib 脚本：扫描所有字符串解密器调用，运行时还原后写回
+// 用法：dotnet script decrypt.csproj target.exe 0x06000012
+using System;
+using System.Reflection;
+using dnlib.DotNet;
+using dnlib.DotNet.Writer;
+using dnlib.DotNet.Emit;
+
+var module = ModuleDefMD.Load(args[0]);
+var decryptorToken = uint.Parse(args[1], System.Globalization.NumberStyles.HexNumber);
+
+// 找到解密方法，用反射调用它（需把 assembly 加载进 AppDomain）
+// 遍历所有方法，把 call Decryptor(token) 替换成 ldstr "解密结果"
+foreach (var type in module.GetTypes())
+    foreach (var method in type.Methods)
+    {
+        if (!method.HasBody) continue;
+        var instrs = method.Body.Instructions;
+        for (int i = 0; i < instrs.Count; i++)
+        {
+            // 识别 call 解密器模式，调用解密器拿明文，替换为 ldstr
+            // （此处省略反射调用解密器的样板，思路：加载原 assembly →
+            //   MethodInfo.Invoke 拿明文 → instrs[i] = OpCodes.Ldstr + operand=明文）
+        }
+    }
+
+var opts = new ModuleWriterOptions(module);
+module.Write("target-decrypted.exe", opts);
+```
+
+dnlib 是 .NET 元数据编程的事实标准，de4dot 内部就是用它。写自定义脱混淆脚本时首选。
+
+## 动态调试要点
+
+dnSpyEx 调试器对 .NET 程序比 native 友好得多：
+
+- **断点在方法入口**：右键方法 → Add Breakpoint
+- **看对象值**：断住后 Locals / Watch 窗口直接看对象字段、字符串内容
+- **内存写入**：可以直接改运行时变量值（Edit Value）
+- **异常断点**：Debug → Exceptions，勾选要断的异常类型 —— 混淆器常用异常驱动控制流，断异常能看到真实路径
+
+### 异常驱动控制流
+
+部分混淆器把正常逻辑塞进 `try`，用 `throw` + `catch` 做跳转。静态看 IL 像异常处理，实际是控制流：
+
+```text
+try { throw new CustomException(0x42); }
+catch (CustomException e) {
+    switch(e.Code) {
+        case 0x42: 真实逻辑A; break;
+        case 0x43: 真实逻辑B; break;
+    }
+}
+```
+
+下异常断点（断 `CustomException`），跟踪 `Code` 值流转，比硬啃 IL 快。
+
+## 模块初始化器（Module .cctor）
+
+`.NET` 模块的静态构造函数（`<module>` 的 `.cctor`）在 assembly 加载时最先执行，混淆器常把 anti-tamper / 解密初始化放这里。分析顺序：
+
+```text
+1. 先看 <module>.cctor（Module .cctor）—— 解密/反调试初始化
+2. 再看 Program.Main / Startup
+3. anti-tamper 在 .cctor 里 → 先 patch .cctor 再脱壳
+```
+
+## 提取配置 / C2 / Key 的通用模式
+
+红队工具和 loader 常把配置加密嵌在资源或字段里，运行时解密：
+
+```text
+定位流程：
+1. strings 看有无明文 URL/IP（混淆后通常没有）
+2. 找 byte[] 字段 + 解密方法（AES/XOR）
+3. 动态断在解密方法的返回点，dump 解密后的明文
+4. 常见：AES-256-CBC with Key==IV（Codegate 2013 模式，见 reverse-engineering/tools.md .NET 段）
+```
+
+参考 “Reference: Sharp Tools” below 里红队工具的具体配置结构。
+
+## 与 reverse-engineering 的边界
+
+- **IL2CPP / NativeAOT** → 编译成 native，没有 CLR 元数据 → 走 `reverse-engineering/`（IDA/r2），本 skill 仅做识别
+- **托管 .NET**（标准 C# exe/dll、Mono/Unity 托管层、Xamarin）→ 本 skill
+- **混合（native loader + .NET payload）** → loader 部分走 `reverse-engineering/`，dump 出 .NET payload 后切本 skill
+
+## 落盘产物清单
+
+每次 .NET 逆向任务建议产出：
+- `target-original.exe`（原样本，不动）
+- `target-clean.exe`（de4dot 脱壳后）
+- `notes.md`（识别的混淆器、解密器 token、关键方法地址、配置/C2/key）
+- `target-patched.exe`（patch 后，如需要）
+- `il-diff.txt`（patch 前后 IL 对照，如做 patch）
+
+## 红队 Sharp* 工具分析
+
+红队工具大量用 C# 写（Sharp* 系列），逆向它们是常见场景：理解检测逻辑、改特征、提取内嵌配置。
+
+### 常见 Sharp* 工具速查
+
+| 工具 | 功能 | 逆向关注点 |
+|------|------|-----------|
+| **Rubeus** | Kerberos 攻击（AS-REP roast / Kerberoast / S4U / pass-the-ticket）| Rubeus 工程结构固定，找 `Interop.*` P/Invoke 段看 native 调用 |
+| **SharpHound** | BloodHound 数据采集器 | LDAP 查询逻辑、采集的属性集合 |
+| **SharpShell / SharpWS** | 远程执行、横向 | WMI / WinRM 调用、命令混淆 |
+| **Seatbelt** | 信息收集 | 收集项清单、判断逻辑 |
+| **SharpRoast** | Kerberoasting | 票据请求/解析 |
+| **Inveigh / SharpSploit** | 中间人 / 通用利用框架 | 反射加载、API 调用链 |
+
+### 通用分析套路
+
+```text
+1. dnSpyEx 打开（通常没混淆，少数团队会加 ConfuserEx）
+2. 看 Program.Main 或入口命令分发（Rubeus 是 switch(command) 结构）
+3. 找目标命令的实现类/方法
+4. 看 P/Invoke 段（Interop.* 命名空间）—— native API 调用在这里
+5. 提取内嵌资源（有些工具嵌配置/模板）
+6. 如需改特征（EDR 规避）：改命令字符串、API 调用、字符串常量
+```
+
+### Rubeus 结构示例
+
+Rubeus 用命令分派，每个子命令一个类。找 Kerberoasting 逻辑：
+
+```text
+入口: Rubeus.CommandLineParser → 解析 args
+分派: switch(command) → "kerberoast" → 执行 Ask.TGS(...)
+P/Invoke: Rubeus.Interop.Lsa* / Native.cs → native Kerberos API
+关键: LsaCallAuthenticationPackage (KERB_RETRIEVE_TKT_REQUEST)
+```
+
+改特征（规避）：把命令字符串 `"kerberoast"` 改成自定义名、把 `Rubeus` banner 字符串改掉、改 P/Invoke 调用顺序。
+
+### 内嵌配置提取
+
+很多 loader/工具把 C2、密钥、证书加密嵌在资源或字段：
+
+```powershell
+## 或命令行
+powershell -c "[System.Reflection.Assembly]::LoadFile('target.exe').GetManifestResourceNames()"
+## 找到资源后 dnSpyEx 右键 → 提取 / Save
+```
+
+运行时解密的配置 → 动态断在解密方法返回点 dump 明文（见 `common-workflow.md`）。
+
+---
+
+## 工具安装矩阵
+
+### Windows（首选，dnSpyEx 是 GUI）
+
+```powershell
+## 方式 A：Chocolatey
+choco install dnspy ilspy de4dot detect-it-easy
+
+## dnlib:      dotnet add package dnlib  (NuGet)
+```
+
+### Linux / macOS（无 dnSpyEx GUI，用 CLI）
+
+```bash
+## ILSpy CLI 反编译
+dotnet tool install -g ilspycmd
+ilspycmd target.exe -p -o outdir/         # 反编译到目录
+
+## 从 release 下载 de4dot 产物的 .dll，用 dotnet 跑
+dotnet de4dot.dll target.exe -o target-clean.exe
+
+## dnlib（脚本化，需 dotnet SDK）
+dotnet new console -o dnclean && cd dnclean
+dotnet add package dnlib
+
+## Linux: 从 https://github.com/horsicq/Detect-It-Easy 装
+diec target.exe
+```
+
+### .NET runtime 前置
+
+```bash
+## Linux
+sudo apt install dotnet-runtime-8.0        # 或 6.0/7.0 看目标
+## macOS
+brew install --cask dotnet-sdk
+```
+
+> dnSpyEx（带 IL 编辑器 + 调试器）只有 Windows GUI 版。Linux/macOS 做 .NET 逆向只能用 `ilspycmd` 反编译 + `dnlib` 脚本 patch，没有等价的交互调试 GUI。需要 patch 时优先上 Windows。
+
+---
+
+## dnSpy MCP 集成
+
+社区已有多个 dnSpy MCP 项目，把 dnSpy 的反编译/IL 检查暴露成 MCP 工具，AI 可直接调用 —— 和 reverse-skill 的 MCP 哲学完全一致。
+
+### 主流 dnSpy MCP 项目
+
+| 项目 | 特点 | 适配 |
+|------|------|------|
+| **soufianetahiri/dnspy-mcp** | 核心 MCP Server，暴露 decompile、IL inspection 等工具 | Claude Code / Cursor |
+| **AgentSmithers/DnSpy-MCPserver-Extension** | 作为 dnSpyEx 扩展运行，深度集成 GUI | dnSpyEx 内加载 |
+| **malwarecakefactory/dnspy-mcp-extension** | 33 个工具，覆盖 triage → deobfuscation 全流程 | 全流程自动化 |
+
+### 注册到 Claude MCP 配置
+
+按对应项目 README 装 dnSpyEx 扩展后，在 `~/.claude/mcp.json` 注册（具体 command/args 以项目 README 为准）：
+
+```json
+{
+  "mcpServers": {
+    "dnspy": {
+      "command": "dotnet",
+      "args": ["path/to/dnspy-mcp.dll"]
+    }
+  }
+}
+```
+
+注册后本 skill 的 AI 联动路径：用户说"分析这个 .NET"→ 路由到 `dotnet-reverse/` → 优先调 `dnspy_decompile` / `dnspy_inspect_il` 工具面 → 不行再切 GUI。
+
+> dnSpy MCP 不是 reverse-skill 内置 bootstrap 能力，需用户手动按项目 README 安装扩展并注册。后续可考虑加进 `bootstrap-manifest.json`。
+
+---
+
+## 社区资源索引
+
+### 强烈推荐
+
+- **Washi 博客** — .NET 逆向大佬：https://blog.washi.dev/posts/misconceptions-about-dotnet/
+  - 核心观点：**不要过度依赖 dnSpy 的 C# 反编译器，要熟悉 IL 编辑器**（与本项目 IL 优先原则一致）
+- **dnSpyEx** — dnSpy 的活跃维护分支：https://github.com/dnSpyEx/dnSpy
+- **de4dot** — .NET 脱混淆：https://github.com/de4dot/de4dot
+- **dnlib** — 元数据编程：https://github.com/dnlib/dnlib
+
+### 实战教程
+
+- Medium《De-obfuscating and reversing a .NET/C# spyware》— dnSpy + de4dot 实战 info-stealer 脱混淆
+- YouTube《dnSpy Patch .NET EXEs & DLLs》— 手把手 patch + keygen
+- 看雪论坛 .NET 逆向版块 — 搜 ".net 逆向" / "dnSpy" / "ConfuserEx" 有大量实战帖、Nuitka 逆向、免杀讨论
+- Guided Hacking《Top 5 .NET Reverse Engineering Tools》— dnSpy 仍排第一
+- StackExchange / Reverse Engineering — `DynamicMethod` 调试等进阶问题
+
+### 本仓库已有 .NET 资源（联动）
+
+- `reverse-engineering/tools.md` `.NET Analysis` 段 — dnSpy/ILSpy 工具速查 + Codegate 2013 两阶段 XOR+AES-CBC 模式
+- `reverse-engineering/field-notes.md` `.NET` 段 — 工具速记
+- `reverse-engineering/awesome-re-resources.md` — de4dot 入选
+- `field-journal/seed-014_unity-il2cpp-reverse.md` — Unity IL2CPP（native 侧，与 .NET 托管层互补）
+
+.NET 逆向深度内容统一收敛到本模块，`reverse-engineering/` 里保留速查索引即可。
 
 ## 🚨 Critical Rules
 - Only analyse binaries the owner is authorised to reverse engineer

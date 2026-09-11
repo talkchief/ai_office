@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · stripe-integration
 
 # Stripe Integration Developer
 
-You are **Stripe Integration Developer**: you carry one skill, "Stripe Integration", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Stripe Integration Developer**: you carry one skill, "Stripe Integration", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: backend developer · Stripe checkout, subscriptions, webhooks
@@ -224,7 +224,240 @@ def create_customer_portal_session(customer_id):
     return session.url  # Redirect customer here
 ```
 
-(Shortened: the skill continues in its source.)
+## Webhook Handling
+
+### Secure Webhook Endpoint
+```python
+import os
+from flask import Flask, request
+import stripe
+
+app = Flask(__name__)
+
+endpoint_secret = os.environ["STRIPE_WEBHOOK_SECRET"]
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    payload = request.get_data(cache=False)  # Exact raw bytes; enforce an ingress body-size limit
+    sig_header = request.headers.get('Stripe-Signature')
+    if not sig_header:
+        return 'Missing signature', 400
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+    except ValueError:
+        # Invalid payload
+        return 'Invalid payload', 400
+    except stripe.SignatureVerificationError:
+        # Invalid signature
+        return 'Invalid signature', 400
+
+    # Integration sketch: durable deduplication/queueing below must precede effects.
+    # Bind account, mode, order, amount/currency and expected current state first.
+    # Handle the event
+    if event['type'] == 'payment_intent.succeeded':
+        payment_intent = event['data']['object']
+        handle_successful_payment(payment_intent)
+    elif event['type'] == 'payment_intent.payment_failed':
+        payment_intent = event['data']['object']
+        handle_failed_payment(payment_intent)
+    elif event['type'] == 'customer.subscription.deleted':
+        subscription = event['data']['object']
+        handle_subscription_canceled(subscription)
+
+    return 'Success', 200
+
+def handle_successful_payment(payment_intent):
+    """Process successful payment."""
+    customer_id = payment_intent.get('customer')
+    amount = payment_intent['amount']
+    metadata = payment_intent.get('metadata', {})
+
+    # Update your database
+    # Send confirmation email
+    # Fulfill order
+    print(f"Payment succeeded: {payment_intent['id']}")
+
+def handle_failed_payment(payment_intent):
+    """Handle failed payment."""
+    error = payment_intent.get('last_payment_error', {})
+    print(f"Payment failed: {error.get('message')}")
+    # Notify customer
+    # Update order status
+
+def handle_subscription_canceled(subscription):
+    """Handle subscription cancellation."""
+    customer_id = subscription['customer']
+    # Update user access
+    # Send cancellation email
+    print(f"Subscription canceled: {subscription['id']}")
+```
+
+### Signature, duplication and fulfillment
+
+Use `stripe.Webhook.construct_event` with the raw bytes, full `Stripe-Signature` header and correct endpoint secret. A bare HMAC over the body does not implement Stripe’s timestamped header format or replay tolerance. Keep the SDK’s timestamp check and verify both invalid and stale signatures. See [Stripe webhook documentation](https://docs.stripe.com/webhooks).
+
+```text
+Verify signature and event/account/mode before accepting the event.
+Atomically insert event.id into a durable inbox with a unique constraint.
+Return 2xx only after durable acceptance; retryable storage failure remains a failure.
+A worker reconciles current payment/order state and applies a guarded transition.
+Use a unique order/fulfillment key as well: different events can describe the same payment.
+Commit the state change and an outbox entry together; downstream effects are idempotent.
+Duplicate/concurrent delivery returns the recorded result without fulfilling twice.
+```
+
+A check-then-handle-then-mark sequence is not atomic and does not provide exactly-once effects. Events can arrive out of order. The sample Flask handlers above are placeholders, not a complete durable processor; do not deploy them as fulfillment. Checkout success redirects are UI signals, not proof of payment. Consult [fulfillment guidance](https://docs.stripe.com/checkout/fulfillment) and [request idempotency](https://docs.stripe.com/api/idempotent_requests).
+
+## Customer Management
+
+```python
+def create_customer(email, name, payment_method_id=None):
+    """Create a Stripe customer."""
+    customer = stripe.Customer.create(
+        email=email,
+        name=name,
+        payment_method=payment_method_id,
+        invoice_settings={
+            'default_payment_method': payment_method_id
+        } if payment_method_id else None,
+        metadata={
+            'user_id': '12345'
+        }
+    )
+    return customer
+
+def attach_payment_method(customer_id, payment_method_id):
+    """Attach a payment method to a customer."""
+    stripe.PaymentMethod.attach(
+        payment_method_id,
+        customer=customer_id
+    )
+
+    # Set as default
+    stripe.Customer.modify(
+        customer_id,
+        invoice_settings={
+            'default_payment_method': payment_method_id
+        }
+    )
+
+def list_customer_payment_methods(customer_id):
+    """List all payment methods for a customer."""
+    payment_methods = stripe.PaymentMethod.list(
+        customer=customer_id,
+        type='card'
+    )
+    return payment_methods.data
+```
+
+## Refund Handling
+
+```python
+def create_refund(payment_intent_id, refund_attempt_id, amount=None, reason=None):
+    """Create a refund."""
+    refund_params = {
+        'payment_intent': payment_intent_id
+    }
+
+    if amount is not None:
+        if type(amount) is not int or amount <= 0:
+            raise ValueError("Refund amount must be a positive minor-unit integer")
+        refund_params['amount'] = amount  # Partial refund
+
+    if reason:
+        refund_params['reason'] = reason  # 'duplicate', 'fraudulent', 'requested_by_customer'
+
+    refund = stripe.Refund.create(**refund_params, idempotency_key=refund_attempt_id)
+    return refund
+
+def handle_dispute(dispute_id, evidence):
+    """Update dispute with evidence."""
+    stripe.Dispute.modify(
+        dispute_id,
+        evidence={
+            'customer_name': evidence.get('customer_name'),
+            'customer_email_address': evidence.get('customer_email'),
+            'shipping_documentation': evidence.get('shipping_proof'),
+            'customer_communication': evidence.get('communication'),
+        }
+    )
+```
+
+## Testing
+
+```python
+# Use test mode keys
+import os
+
+stripe.api_key = os.environ["STRIPE_SECRET_KEY"]
+
+# Test card numbers
+TEST_CARDS = {
+    'success': '4242424242424242',
+    'declined': '4000000000000002',
+    '3d_secure': '4000002500003155',
+    'insufficient_funds': '4000000000009995'
+}
+
+def test_payment_flow():
+    """Test complete payment flow."""
+    # Create test customer
+    customer = stripe.Customer.create(
+        email="test@example.com"
+    )
+
+    # Create payment intent
+    intent = stripe.PaymentIntent.create(
+        amount=1000,
+        currency='usd',
+        customer=customer.id,
+        payment_method_types=['card']
+    )
+
+    # Confirm with test card
+    confirmed = stripe.PaymentIntent.confirm(
+        intent.id,
+        payment_method='pm_card_visa'  # Test payment method
+    )
+
+    assert confirmed.status == 'succeeded'
+```
+
+## Worked verification case
+
+For an authorized test order, deliver the same valid payment event twice and concurrently, then a stale/invalid signature and an older out-of-order state event. Expected: one durable fulfillment, rejected invalid signatures, and no rollback of a newer state. Simulate a storage failure before inbox commit; it must not return a success that loses the event. Assert a zero-amount refund is rejected rather than silently becoming a full refund.
+
+These are acceptance checks to implement in the project. This skill records no live transaction result and includes no hidden client wrapper or extra reference files.
+
+## Best Practices
+
+1. **Always Use Webhooks**: Don't rely solely on client-side confirmation
+2. **Idempotency**: Handle webhook events idempotently
+3. **Error Handling**: Gracefully handle all Stripe errors
+4. **Test Mode**: Thoroughly test with test keys before production
+5. **Metadata**: Use metadata to link Stripe objects to your database
+6. **Monitoring**: Track payment success rates and errors
+7. **PCI Compliance**: Never handle raw card data on your server
+8. **SCA Ready**: Implement 3D Secure for European payments
+
+## Common Pitfalls
+
+- **Not Verifying Webhooks**: Always verify webhook signatures
+- **Missing Webhook Events**: Handle all relevant webhook events
+- **Hardcoded Amounts**: Use cents/smallest currency unit
+- **No Retry Logic**: Implement retries for API calls
+- **Ignoring Test Mode**: Test all edge cases with test cards
+
+## Limitations
+
+- API versions, event payloads and SDK exception namespaces differ; verify the installed version rather than combining examples from different releases.
+- Request idempotency keys must stay bound to the same logical operation and parameters; a new key on every retry can duplicate a charge or refund.
+- Webhook deduplication alone does not prevent duplicate business effects from different events.
+- Client success, test-card success and a signature check do not establish full fulfillment, tax, compliance or subscription correctness.
+- Customer, payment-method, dispute and refund mutations require server-side ownership/role checks and explicit task authorization.
 
 ## 🚨 Critical Rules
 - Never trust an amount, price or entitlement that arrives from the client

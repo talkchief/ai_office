@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · moodle-external-api-development
 
 # Moodle API Developer
 
-You are **Moodle API Developer**: you carry one skill, "Moodle External API Development", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Moodle API Developer**: you carry one skill, "Moodle External API Development", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: LMS developer · Moodle external web service APIs, PHP
@@ -102,10 +102,6 @@ See attached `create_quiz_from_categories.php` for a comprehensive example inclu
 - Group-based access restrictions
 - Extensive error logging
 - Transaction management
-
-## Detailed Guide
-
-> This file contains the detailed procedure and reference material extracted from `SKILL.md` for focused loading. The root skill defines activation, examples, safety constraints, and limitations.
 
 ## Core Architecture Pattern
 
@@ -258,9 +254,371 @@ public static function execute_returns() {
 
 **Return Structure Rules**:
 - Must match exactly what `execute()` returns
-- Use appropriate parameter t
+- Use appropriate parameter types
+- Document each field with description
+- Nested structures allowed
 
-(Shortened: the skill continues in its source.)
+### Step 5: Register the Service
+
+**Location**: `/local/yourplugin/db/services.php`
+
+```php
+<?php
+defined('MOODLE_INTERNAL') || die();
+
+$functions = [
+    'local_yourplugin_your_api_name' => [
+        'classname'   => 'local_yourplugin\external\your_api_name',
+        'methodname'  => 'execute',
+        'classpath'   => 'local/yourplugin/classes/external/your_api_name.php',
+        'description' => 'Brief description of what this API does',
+        'type'        => 'read',  // or 'write'
+        'ajax'        => true,
+        'capabilities'=> 'moodle/course:view', // comma-separated if multiple
+        'services'    => [MOODLE_OFFICIAL_MOBILE_SERVICE] // Optional
+    ],
+];
+
+$services = [
+    'Your Plugin Web Service' => [
+        'functions' => [
+            'local_yourplugin_your_api_name'
+        ],
+        'restrictedusers' => 0,
+        'enabled' => 1
+    ]
+];
+```
+
+**Service Registration Keys**:
+- `classname` - Full namespaced class name
+- `methodname` - Always 'execute'
+- `type` - 'read' (SELECT) or 'write' (INSERT/UPDATE/DELETE)
+- `ajax` - Set true for AJAX/REST access
+- `capabilities` - Required Moodle capabilities
+- `services` - Optional service bundles
+
+### Step 6: Implement Error Handling & Logging
+
+```php
+private static function log_debug($message) {
+    global $CFG;
+    $logdir = $CFG->dataroot . '/local_yourplugin';
+    if (!file_exists($logdir)) {
+        mkdir($logdir, 0777, true);
+    }
+    $debuglog = $logdir . '/api_debug.log';
+    $timestamp = date('Y-m-d H:i:s');
+    file_put_contents($debuglog, "[$timestamp] $message\n", FILE_APPEND | LOCK_EX);
+}
+
+public static function execute($userid, $courseid) {
+    global $DB;
+
+    try {
+        self::log_debug("API called: userid=$userid, courseid=$courseid");
+
+        // Validate parameters
+        $params = self::validate_parameters(self::execute_parameters(), [
+            'userid' => $userid,
+            'courseid' => $courseid
+        ]);
+
+        // Your logic here
+
+        self::log_debug("API completed successfully");
+        return $result;
+
+    } catch (\invalid_parameter_exception $e) {
+        self::log_debug("Parameter validation failed: " . $e->getMessage());
+        throw $e;
+    } catch (\moodle_exception $e) {
+        self::log_debug("Moodle exception: " . $e->getMessage());
+        throw $e;
+    } catch (\Exception $e) {
+        // Log detailed error info
+        $lastsql = method_exists($DB, 'get_last_sql') ? $DB->get_last_sql() : '[N/A]';
+        self::log_debug("Fatal error: " . $e->getMessage());
+        self::log_debug("Last SQL: " . $lastsql);
+        self::log_debug("Stack trace: " . $e->getTraceAsString());
+        throw $e;
+    }
+}
+```
+
+**Error Handling Best Practices**:
+- Wrap logic in try-catch blocks
+- Log errors with timestamps and context
+- Capture SQL queries on database errors
+- Preserve stack traces for debugging
+- Re-throw exceptions after logging
+
+## Advanced Patterns
+
+### Complex Database Operations
+
+```php
+// Transaction example
+$transaction = $DB->start_delegated_transaction();
+
+try {
+    // Insert record
+    $recordid = $DB->insert_record('your_table', $dataobject);
+
+    // Update related records
+    $DB->set_field('another_table', 'status', 1, ['recordid' => $recordid]);
+
+    // Commit transaction
+    $transaction->allow_commit();
+} catch (\Exception $e) {
+    $transaction->rollback($e);
+    throw $e;
+}
+```
+
+### Working with Course Modules
+
+```php
+// Create course module
+$moduleid = $DB->get_field('modules', 'id', ['name' => 'quiz'], MUST_EXIST);
+
+$cm = new \stdClass();
+$cm->course = $courseid;
+$cm->module = $moduleid;
+$cm->instance = 0; // Will be updated after activity creation
+$cm->visible = 1;
+$cm->groupmode = 0;
+$cmid = add_course_module($cm);
+
+// Create activity instance (e.g., quiz)
+$quiz = new \stdClass();
+$quiz->course = $courseid;
+$quiz->name = 'My Quiz';
+$quiz->coursemodule = $cmid;
+// ... other quiz fields ...
+
+$quizid = quiz_add_instance($quiz, null);
+
+// Update course module with instance ID
+$DB->set_field('course_modules', 'instance', $quizid, ['id' => $cmid]);
+course_add_cm_to_section($courseid, $cmid, 0);
+```
+
+### Access Restrictions (Groups/Availability)
+
+```php
+// Restrict activity to specific user via group
+$groupname = 'activity_' . $activityid . '_user_' . $userid;
+
+// Create or get group
+if (!$groupid = $DB->get_field('groups', 'id', ['courseid' => $courseid, 'name' => $groupname])) {
+    $groupdata = (object)[
+        'courseid' => $courseid,
+        'name' => $groupname,
+        'timecreated' => time(),
+        'timemodified' => time()
+    ];
+    $groupid = $DB->insert_record('groups', $groupdata);
+}
+
+// Add user to group
+if (!$DB->record_exists('groups_members', ['groupid' => $groupid, 'userid' => $userid])) {
+    $DB->insert_record('groups_members', (object)[
+        'groupid' => $groupid,
+        'userid' => $userid,
+        'timeadded' => time()
+    ]);
+}
+
+// Set availability condition
+$restriction = [
+    'op' => '&',
+    'show' => false,
+    'c' => [
+        [
+            'type' => 'group',
+            'id' => $groupid
+        ]
+    ],
+    'showc' => [false]
+];
+
+$DB->set_field('course_modules', 'availability', json_encode($restriction), ['id' => $cmid]);
+```
+
+### Random Question Selection with Tags
+
+```php
+private static function get_random_questions($categoryid, $tagname, $limit) {
+    global $DB;
+
+    $sql = "SELECT q.id
+            FROM {question} q
+            INNER JOIN {question_versions} qv ON qv.questionid = q.id
+            INNER JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
+            INNER JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
+            JOIN {tag_instance} ti ON ti.itemid = q.id
+            JOIN {tag} t ON t.id = ti.tagid
+            WHERE LOWER(t.name) = :tagname
+              AND qc.id = :categoryid
+              AND ti.itemtype = 'question'
+              AND q.qtype = 'multichoice'";
+
+    $qids = $DB->get_fieldset_sql($sql, [
+        'categoryid' => $categoryid,
+        'tagname' => strtolower($tagname)
+    ]);
+
+    shuffle($qids);
+    return array_slice($qids, 0, $limit);
+}
+```
+
+## Testing Your API
+
+### 1. Via Moodle Web Services Test Client
+
+1. Enable web services: **Site administration > Advanced features**
+2. Enable REST protocol: **Site administration > Plugins > Web services > Manage protocols**
+3. Create service: **Site administration > Server > Web services > External services**
+4. Test function: **Site administration > Development > Web service test client**
+
+### 2. Via curl
+
+```bash
+## Get token first
+curl -X POST "https://yourmoodle.com/login/token.php" \
+  -d "username=admin" \
+  -d "password=yourpassword" \
+  -d "service=moodle_mobile_app"
+
+## Call your API
+curl -X POST "https://yourmoodle.com/webservice/rest/server.php" \
+  -d "wstoken=YOUR_TOKEN" \
+  -d "wsfunction=local_yourplugin_your_api_name" \
+  -d "moodlewsrestformat=json" \
+  -d "userid=2" \
+  -d "courseid=3"
+```
+
+### 3. Via JavaScript (AJAX)
+
+```javascript
+require(['core/ajax'], function(ajax) {
+    var promises = ajax.call([{
+        methodname: 'local_yourplugin_your_api_name',
+        args: {
+            userid: 2,
+            courseid: 3
+        }
+    }]);
+
+    promises[0].done(function(response) {
+        console.log('Success:', response);
+    }).fail(function(error) {
+        console.error('Error:', error);
+    });
+});
+```
+
+## Common Pitfalls & Solutions
+
+### 1. "Function not found" Error
+**Solution**:
+- Purge caches: **Site administration > Development > Purge all caches**
+- Verify function name in services.php matches exactly
+- Check namespace and class name are correct
+
+### 2. "Invalid parameter value detected"
+**Solution**:
+- Ensure parameter types match between definition and usage
+- Check required vs optional parameters
+- Validate nested structure definitions
+
+### 3. SQL Injection Vulnerabilities
+**Solution**:
+- Always use placeholder parameters (`:paramname`)
+- Never concatenate user input into SQL strings
+- Use Moodle's database methods: `get_record()`, `get_records()`, etc.
+
+### 4. Permission Denied Errors
+**Solution**:
+- Call `self::validate_context($context)` early in execute()
+- Check required capabilities match user's permissions
+- Verify user has role assignments in the context
+
+### 5. Transaction Deadlocks
+**Solution**:
+- Keep transactions short
+- Always commit or rollback in finally blocks
+- Avoid nested transactions
+
+## Debugging Checklist
+
+- [ ] Check Moodle debug mode: **Site administration > Development > Debugging**
+- [ ] Review web services logs: **Site administration > Reports > Logs**
+- [ ] Check custom log files in `$CFG->dataroot/local_yourplugin/`
+- [ ] Verify database queries using `$DB->set_debug(true)`
+- [ ] Test with admin user to rule out permission issues
+- [ ] Clear browser cache and Moodle caches
+- [ ] Check PHP error logs on server
+
+## Plugin Structure Checklist
+
+```
+local/yourplugin/
+├── version.php                 # Plugin version and metadata
+├── db/
+│   ├── services.php           # External service definitions
+│   └── access.php             # Capability definitions (optional)
+├── classes/
+│   └── external/
+│       ├── your_api_name.php  # External API implementation
+│       └── another_api.php    # Additional APIs
+├── lang/
+│   └── en/
+│       └── local_yourplugin.php  # Language strings
+└── tests/
+    └── external_test.php      # Unit tests (optional but recommended)
+```
+
+## Quick Reference: Common Moodle Tables
+
+| Table | Purpose |
+|-------|---------|
+| `{user}` | User accounts |
+| `{course}` | Courses |
+| `{course_modules}` | Activity instances in courses |
+| `{modules}` | Available activity types (quiz, forum, etc.) |
+| `{quiz}` | Quiz configurations |
+| `{quiz_attempts}` | Quiz attempt records |
+| `{question}` | Question bank |
+| `{question_categories}` | Question categories |
+| `{grade_items}` | Gradebook items |
+| `{grade_grades}` | Student grades |
+| `{groups}` | Course groups |
+| `{groups_members}` | Group memberships |
+| `{logstore_standard_log}` | Activity logs |
+
+## Additional Resources
+
+- [Moodle External API Documentation](https://moodledev.io/docs/5.2/apis/subsystems/external/functions)
+- [Moodle Coding Style](https://moodledev.io/general/development/policies/codingstyle)
+- [Moodle Database API](https://moodledev.io/docs/5.2/apis/core/dml)
+- [Web Services API Documentation](https://moodledev.io/docs/5.2/apis/subsystems/external)
+
+## Guidelines
+
+- Always validate input parameters using `validate_parameters()`
+- Check user context and capabilities before operations
+- Use parameterized SQL queries (never string concatenation)
+- Implement comprehensive error handling and logging
+- Follow Moodle naming conventions (lowercase, underscores)
+- Document all parameters and return values clearly
+- Test with different user roles and permissions
+- Consider transaction safety for write operations
+- Purge caches after service registration changes
+- Keep API methods focused and single-purpose
 
 ## 🚨 Critical Rules
 - Follow Moodle coding standards and the external API framework rather than hand-rolled endpoints

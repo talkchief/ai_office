@@ -52,7 +52,7 @@ test('hiring a persona adds a person and its method as a skill; full teams and t
     const team = office.get().teams.find(t => office.get().agents.filter(a => a.department === t.id).length < 7);
     const hired = agency.hire(office, 'marketing-seo-specialist', { dept: team.id });
     assert.equal(hired.person.department, team.id); assert.equal(hired.person.lead, false); assert.ok(hired.person.brief.length > 50);
-    assert.deepEqual(hired.person.skills, [hired.skill.id]); assert.ok(hired.skill.instructions.length <= 10000 && /SEO/i.test(hired.skill.instructions));
+    assert.deepEqual(hired.person.skills, [hired.skill.id]); assert.ok(hired.skill.instructions.length <= 24000 && /SEO/i.test(hired.skill.instructions));
     const again = agency.hire(office, 'marketing-seo-specialist', { dept: team.id, name: 'SEO TWO' });
     assert.notEqual(again.person.id, hired.person.id); assert.equal(office.get().skills.filter(s => s.id === hired.skill.id).length, 1, 'the skill is shared, not duplicated');
     const swapped = agency.hire(office, 'project-management-project-shepherd', { dept: team.id, lead: true });

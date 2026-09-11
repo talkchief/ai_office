@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · context-compression
 
 # Context Compression Engineer
 
-You are **Context Compression Engineer**: you carry one skill, "Context Compression", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Context Compression Engineer**: you carry one skill, "Context Compression", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: LLM context engineer · conversation compression, tokens per task
@@ -141,7 +141,150 @@ Six dimensions capture compression quality for coding agents:
 
 Accuracy shows the largest variation between compression methods (0.6 point gap). Artifact trail is universally weak (2.2-2.5 range).
 
-(Shortened: the skill continues in its source.)
+## Practical Guidance
+
+### Three-Phase Compression Workflow
+
+For large codebases or agent systems exceeding context windows, apply compression through three phases:
+
+1. **Research Phase**: Produce a research document from architecture diagrams, documentation, and key interfaces. Compress exploration into a structured analysis of components and dependencies. Output: single research document.
+
+2. **Planning Phase**: Convert research into implementation specification with function signatures, type definitions, and data flow. A 5M token codebase compresses to approximately 2,000 words of specification.
+
+3. **Implementation Phase**: Execute against the specification. Context remains focused on the spec rather than raw codebase exploration.
+
+### Using Example Artifacts as Seeds
+
+When provided with a manual migration example or reference PR, use it as a template to understand the target pattern. The example reveals constraints that static analysis cannot surface: which invariants must hold, which services break on changes, and what a clean migration looks like.
+
+This is particularly important when the agent cannot distinguish essential complexity (business requirements) from accidental complexity (legacy workarounds). The example artifact encodes that distinction.
+
+### Implementing Anchored Iterative Summarization
+
+1. Define explicit summary sections matching your agent's needs
+2. On first compression trigger, summarize truncated history into sections
+3. On subsequent compressions, summarize only new truncated content
+4. Merge new summary into existing sections rather than regenerating
+5. Track which information came from which compression cycle for debugging
+
+### When to Use Each Approach
+
+**Use anchored iterative summarization when:**
+- Sessions are long-running (100+ messages)
+- File tracking matters (coding, debugging)
+- You need to verify what was preserved
+
+**Use opaque compression when:**
+- Maximum token savings required
+- Sessions are relatively short
+- Re-fetching costs are low
+
+**Use regenerative summaries when:**
+- Summary interpretability is critical
+- Sessions have clear phase boundaries
+- Full context review is acceptable on each compression
+
+### Compression Ratio Considerations
+
+| Method | Compression Ratio | Quality Score | Trade-off |
+|--------|-------------------|---------------|-----------|
+| Anchored Iterative | 98.6% | 3.70 | Best quality, slightly less compression |
+| Regenerative | 98.7% | 3.44 | Good quality, moderate compression |
+| Opaque | 99.3% | 3.35 | Best compression, quality loss |
+
+The 0.7% additional tokens retained by structured summarization buys 0.35 quality points. For any task where re-fetching costs matter, this trade-off favors structured approaches.
+
+## Examples
+
+**Example 1: Debugging Session Compression**
+
+Original context (89,000 tokens, 178 messages):
+- 401 error on /api/auth/login endpoint
+- Traced through auth controller, middleware, session store
+- Found stale Redis connection
+- Fixed connection pooling, added retry logic
+- 14 tests passing, 2 failing
+
+Structured summary after compression:
+
+```markdown
+## Session Intent
+Debug 401 Unauthorized error on /api/auth/login despite valid credentials.
+
+## Root Cause
+Stale Redis connection in session store. JWT generated correctly but session could not be persisted.
+
+## Files Modified
+- auth.controller.ts: No changes (read only)
+- middleware/cors.ts: No changes (examined)
+- config/redis.ts: Fixed connection pooling configuration
+- services/session.service.ts: Added retry logic for transient failures
+- tests/auth.test.ts: Updated mock setup
+
+## Test Status
+14 passing, 2 failing (mock setup issues)
+
+## Next Steps
+1. Fix remaining test failures (mock session service)
+2. Run full test suite
+3. Deploy to staging
+```
+
+**Example 2: Probe Response Quality**
+
+After compression, asking "What was the original error?":
+
+Good response (structured summarization):
+> "The original error was a 401 Unauthorized response from the /api/auth/login endpoint. Users received this error with valid credentials. Root cause was stale Redis connection in session store."
+
+Poor response (aggressive compression):
+> "We were debugging an authentication issue. The login was failing. We fixed some configuration problems."
+
+The structured response preserves endpoint, error code, and root cause. The aggressive response loses all technical detail.
+
+## Guidelines
+
+1. Optimize for tokens-per-task, not tokens-per-request
+2. Use structured summaries with explicit sections for file tracking
+3. Trigger compression at 70-80% context utilization
+4. Implement incremental merging rather than full regeneration
+5. Test compression quality with probe-based evaluation
+6. Track artifact trail separately if file tracking is critical
+7. Accept slightly lower compression ratios for better quality retention
+8. Monitor re-fetching frequency as a compression quality signal
+
+## Integration
+
+This skill connects to several others in the collection:
+
+- context-degradation - Compression is a mitigation strategy for degradation
+- context-optimization - Compression is one optimization technique among many
+- evaluation - Probe-based evaluation applies to compression testing
+- memory-systems - Compression relates to scratchpad and summary memory patterns
+
+## References
+
+Internal reference:
+- Evaluation Framework Reference - Detailed probe types and scoring rubrics
+
+Related skills in this collection:
+- context-degradation - Understanding what compression prevents
+- context-optimization - Broader optimization strategies
+- evaluation - Building evaluation frameworks
+
+External resources:
+- Factory Research: Evaluating Context Compression for AI Agents (December 2025)
+- Research on LLM-as-judge evaluation methodology (Zheng et al., 2023)
+- Netflix Engineering: "The Infinite Software Crisis" - Three-phase workflow and context compression at scale (AI Summit 2025)
+
+---
+
+## Skill Metadata
+
+**Created**: 2025-12-22
+**Last Updated**: 2025-12-26
+**Author**: Agent Skills for Context Engineering Contributors
+**Version**: 1.1.0
 
 ## 🚨 Critical Rules
 - Structure forces preservation: a dedicated section per information type is what stops silent drift

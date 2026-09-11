@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · shopify-apps
 
 # Shopify App Developer
 
-You are **Shopify App Developer**: you carry one skill, "Shopify Apps", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Shopify App Developer**: you carry one skill, "Shopify Apps", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: Shopify app developer · Remix, App Bridge, GraphQL Admin API
@@ -41,10 +41,6 @@ Polaris components, billing, and app extensions.
 - User mentions or implies: polaris
 - User mentions or implies: app bridge
 - User mentions or implies: shopify webhook
-
-## Detailed Guide
-
-> This file contains the detailed procedure and reference material extracted from `SKILL.md` for focused loading. The root skill defines activation, examples, safety constraints, and limitations.
 
 ## Patterns
 
@@ -291,7 +287,564 @@ async function queueOrderProcessing(payload: any) {
 async function handleProductUpdate(shop: string, payload: any) {
   // Quick sync operation only
   await db.product.upsert({
-    where: { sh
+    where: { shopifyId: payload.id },
+    update: {
+      title: payload.title,
+      updatedAt: new Date(),
+    },
+    create: {
+      shopifyId: payload.id,
+      shop,
+      title: payload.title,
+    },
+  });
+}
+
+async function handleGDPRWebhook(topic: string, payload: any) {
+  // GDPR compliance - required for all apps
+  switch (topic) {
+    case "CUSTOMERS_DATA_REQUEST":
+      // Return customer data within 30 days
+      break;
+    case "CUSTOMERS_REDACT":
+      // Delete customer data
+      break;
+    case "SHOP_REDACT":
+      // Delete all shop data (48 hours after uninstall)
+      break;
+  }
+}
+
+### Notes
+
+- Respond within 5 seconds or webhook fails
+- Use job queues for heavy processing
+- GDPR webhooks are mandatory for App Store
+- HMAC verification handled by authenticate.webhook()
+
+### GraphQL Admin API
+
+Query and mutate shop data with GraphQL
+
+**When to use**: Interacting with Shopify Admin API
+
+### Template
+
+// GraphQL queries with authenticated admin client
+export async function loader({ request }: LoaderFunctionArgs) {
+  const { admin } = await authenticate.admin(request);
+
+  // Query products with pagination
+  const response = await admin.graphql(`
+    query GetProducts($first: Int!, $after: String) {
+      products(first: $first, after: $after) {
+        edges {
+          node {
+            id
+            title
+            status
+            totalInventory
+            priceRangeV2 {
+              minVariantPrice {
+                amount
+                currencyCode
+              }
+            }
+            images(first: 1) {
+              edges {
+                node {
+                  url
+                  altText
+                }
+              }
+            }
+          }
+          cursor
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  `, {
+    variables: {
+      first: 10,
+      after: null,
+    },
+  });
+
+  const { data } = await response.json();
+  return json({ products: data.products });
+}
+
+// Mutations
+export async function action({ request }: ActionFunctionArgs) {
+  const { admin } = await authenticate.admin(request);
+  const formData = await request.formData();
+  const productId = formData.get("productId");
+  const newTitle = formData.get("title");
+
+  const response = await admin.graphql(`
+    mutation UpdateProduct($input: ProductInput!) {
+      productUpdate(input: $input) {
+        product {
+          id
+          title
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `, {
+    variables: {
+      input: {
+        id: productId,
+        title: newTitle,
+      },
+    },
+  });
+
+  const { data } = await response.json();
+
+  if (data.productUpdate.userErrors.length > 0) {
+    return json({
+      errors: data.productUpdate.userErrors,
+    }, { status: 400 });
+  }
+
+  return json({ product: data.productUpdate.product });
+}
+
+// Bulk operations for large datasets
+async function bulkUpdateProducts(admin: AdminApiContext) {
+  // Create bulk operation
+  const response = await admin.graphql(`
+    mutation {
+      bulkOperationRunMutation(
+        mutation: "mutation call($input: ProductInput!) {
+          productUpdate(input: $input) { product { id } }
+        }",
+        stagedUploadPath: "path-to-staged-upload"
+      ) {
+        bulkOperation {
+          id
+          status
+        }
+        userErrors {
+          message
+        }
+      }
+    }
+  `);
+
+  // Poll for completion or use webhook
+  // BULK_OPERATIONS_FINISH webhook
+}
+
+### Notes
+
+- GraphQL required for new public apps (April 2025)
+- Rate limit: 1000 points per 60 seconds
+- Use bulk operations for >250 items
+- Direct API access available from App Bridge
+
+### Billing API Integration
+
+Implement subscription billing for your app
+
+**When to use**: Monetizing Shopify app
+
+### Template
+
+// app/routes/app.billing.tsx
+import { json, redirect } from "@remix-run/node";
+import { Page, Card, Button, BlockStack, Text } from "@shopify/polaris";
+import { authenticate } from "../shopify.server";
+
+const PLANS = {
+  basic: {
+    name: "Basic",
+    amount: 9.99,
+    currencyCode: "USD",
+    interval: "EVERY_30_DAYS",
+  },
+  pro: {
+    name: "Pro",
+    amount: 29.99,
+    currencyCode: "USD",
+    interval: "EVERY_30_DAYS",
+  },
+};
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const { admin, billing } = await authenticate.admin(request);
+
+  // Check current subscription
+  const response = await admin.graphql(`
+    query {
+      currentAppInstallation {
+        activeSubscriptions {
+          id
+          name
+          status
+          lineItems {
+            plan {
+              pricingDetails {
+                ... on AppRecurringPricing {
+                  price {
+                    amount
+                    currencyCode
+                  }
+                  interval
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `);
+
+  const { data } = await response.json();
+  return json({
+    subscription: data.currentAppInstallation.activeSubscriptions[0],
+  });
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  const { admin, session } = await authenticate.admin(request);
+  const formData = await request.formData();
+  const planKey = formData.get("plan") as keyof typeof PLANS;
+  const plan = PLANS[planKey];
+
+  // Create subscription charge
+  const response = await admin.graphql(`
+    mutation CreateSubscription($name: String!, $lineItems: [AppSubscriptionLineItemInput!]!, $returnUrl: URL!, $test: Boolean) {
+      appSubscriptionCreate(
+        name: $name
+        lineItems: $lineItems
+        returnUrl: $returnUrl
+        test: $test
+      ) {
+        appSubscription {
+          id
+          status
+        }
+        confirmationUrl
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `, {
+    variables: {
+      name: plan.name,
+      lineItems: [
+        {
+          plan: {
+            appRecurringPricingDetails: {
+              price: {
+                amount: plan.amount,
+                currencyCode: plan.currencyCode,
+              },
+              interval: plan.interval,
+            },
+          },
+        },
+      ],
+      returnUrl: `https://${session.shop}/admin/apps/${process.env.SHOPIFY_API_KEY}`,
+      test: process.env.NODE_ENV !== "production",
+    },
+  });
+
+  const { data } = await response.json();
+
+  if (data.appSubscriptionCreate.userErrors.length > 0) {
+    return json({
+      errors: data.appSubscriptionCreate.userErrors,
+    }, { status: 400 });
+  }
+
+  // Redirect merchant to approve charge
+  return redirect(data.appSubscriptionCreate.confirmationUrl);
+}
+
+export default function Billing() {
+  const { subscription } = useLoaderData<typeof loader>();
+  const submit = useSubmit();
+
+  return (
+    <Page title="Billing">
+      <Card>
+        {subscription ? (
+          <BlockStack gap="200">
+            <Text as="p" variant="bodyMd">
+              Current plan: {subscription.name}
+            </Text>
+            <Text as="p" variant="bodyMd">
+              Status: {subscription.status}
+            </Text>
+          </BlockStack>
+        ) : (
+          <BlockStack gap="400">
+            <Text as="h2" variant="headingMd">
+              Choose a Plan
+            </Text>
+            <Button onClick={() => submit({ plan: "basic" }, { method: "post" })}>
+              Basic - $9.99/month
+            </Button>
+            <Button onClick={() => submit({ plan: "pro" }, { method: "post" })}>
+              Pro - $29.99/month
+            </Button>
+          </BlockStack>
+        )}
+      </Card>
+    </Page>
+  );
+}
+
+### Notes
+
+- Use test: true for development stores
+- Merchant must approve subscription
+- One recurring + one usage charge per app max
+- 30-day billing cycle for recurring charges
+
+### App Extension Development
+
+Extend Shopify checkout, admin, or storefront
+
+**When to use**: Building app extensions
+
+## shopify.extension.toml (in extensions/my-extension/)
+api_version = "2024-10"
+
+[[extensions]]
+type = "ui_extension"
+name = "Product Customizer"
+handle = "product-customizer"
+
+[[extensions.targeting]]
+target = "admin.product-details.block.render"
+module = "./src/AdminBlock.tsx"
+
+[extensions.capabilities]
+api_access = true
+
+[extensions.settings]
+[[extensions.settings.fields]]
+key = "show_preview"
+type = "boolean"
+name = "Show Preview"
+
+// extensions/my-extension/src/AdminBlock.tsx
+import {
+  reactExtension,
+  useApi,
+  useSettings,
+  BlockStack,
+  Text,
+  Button,
+  InlineStack,
+} from "@shopify/ui-extensions-react/admin";
+
+export default reactExtension(
+  "admin.product-details.block.render",
+  () => <ProductCustomizer />
+);
+
+function ProductCustomizer() {
+  const { data, extension } = useApi<"admin.product-details.block.render">();
+  const settings = useSettings();
+
+  const productId = data?.selected?.[0]?.id;
+
+  const handleCustomize = async () => {
+    // API calls from extension
+    const result = await fetch("/api/customize", {
+      method: "POST",
+      body: JSON.stringify({ productId }),
+    });
+  };
+
+  return (
+    <BlockStack gap="base">
+      <Text fontWeight="bold">Product Customizer</Text>
+      <Text>
+        Customize product: {productId}
+      </Text>
+      {settings.show_preview && (
+        <Text size="small">Preview enabled</Text>
+      )}
+      <InlineStack gap="base">
+        <Button onPress={handleCustomize}>
+          Apply Customization
+        </Button>
+      </InlineStack>
+    </BlockStack>
+  );
+}
+
+// Checkout UI Extension
+// [[extensions.targeting]]
+// target = "purchase.checkout.block.render"
+
+// extensions/checkout-ext/src/Checkout.tsx
+import {
+  reactExtension,
+  Banner,
+  useCartLines,
+  useTotalAmount,
+} from "@shopify/ui-extensions-react/checkout";
+
+export default reactExtension(
+  "purchase.checkout.block.render",
+  () => <CheckoutBanner />
+);
+
+function CheckoutBanner() {
+  const cartLines = useCartLines();
+  const total = useTotalAmount();
+
+  if (total.amount > 100) {
+    return (
+      <Banner status="success">
+        You qualify for free shipping!
+      </Banner>
+    );
+  }
+
+  return null;
+}
+
+### Notes
+
+- Extensions run in sandboxed iframe
+- Use @shopify/ui-extensions-react for React
+- Limited APIs compared to full app
+- Deploy with 'shopify app deploy'
+
+## Sharp Edges
+
+### Webhook Must Respond Within 5 Seconds
+
+Severity: HIGH
+
+Situation: Receiving webhooks from Shopify
+
+Symptoms:
+Webhook deliveries marked as failed.
+"Your app didn't respond in time" in Shopify logs.
+Missing order/product updates.
+Webhooks retried repeatedly then cancelled.
+
+Why this breaks:
+Shopify expects a 2xx response within 5 seconds. If your app processes
+the webhook data before responding, you'll timeout.
+
+Shopify retries failed webhooks up to 19 times over 48 hours.
+After continued failures, webhooks may be cancelled entirely.
+
+Heavy processing (API calls, database operations) must happen
+after the response is sent.
+
+Recommended fix:
+
+## Respond immediately, process asynchronously
+
+```typescript
+// app/routes/webhooks.tsx
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { topic, shop, payload } = await authenticate.webhook(request);
+
+  // Queue for async processing
+  await jobQueue.add("process-webhook", {
+    topic,
+    shop,
+    payload,
+  });
+
+  // CRITICAL: Return 200 immediately
+  return new Response(null, { status: 200 });
+};
+
+// Worker process handles the actual work
+// workers/webhook-processor.ts
+import { Worker } from "bullmq";
+
+const worker = new Worker("process-webhook", async (job) => {
+  const { topic, shop, payload } = job.data;
+
+  switch (topic) {
+    case "ORDERS_CREATE":
+      await processOrder(shop, payload);
+      break;
+    // ... other handlers
+  }
+});
+```
+
+## For simple operations, be quick
+
+```typescript
+// Simple database update is OK if fast
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { topic, payload } = await authenticate.webhook(request);
+
+  // Quick database update (< 1 second)
+  await db.product.update({
+    where: { shopifyId: payload.id },
+    data: { title: payload.title },
+  });
+
+  return new Response(null, { status: 200 });
+};
+```
+
+## Monitor webhook performance
+
+```typescript
+// Log response times
+const start = Date.now();
+
+await handleWebhook(payload);
+
+const duration = Date.now() - start;
+console.log(`Webhook processed in ${duration}ms`);
+
+// Alert if approaching timeout
+if (duration > 3000) {
+  console.warn("Webhook processing taking too long!");
+}
+```
+
+### API Rate Limits Cause 429 Errors
+
+Severity: HIGH
+
+Situation: Making API calls to Shopify
+
+Symptoms:
+HTTP 429 Too Many Requests errors.
+"Throttled" responses.
+App becomes unresponsive.
+Operations fail silently or partially.
+
+Why this breaks:
+Shopify enforces strict rate limits:
+- REST: 2 requests per second per store
+- GraphQL: 1000 points per 60 seconds
+
+Exceeding limits causes immediate 429 errors.
+Continuous violations can result in temporary bans.
+
+Bulk operations count against limits.
+
+Recommended fix:
 
 (Shortened: the skill continues in its source.)
 

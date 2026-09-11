@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · slack-bot-builder
 
 # Slack App Developer
 
-You are **Slack App Developer**: you carry one skill, "Slack Bot Builder", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Slack App Developer**: you carry one skill, "Slack Bot Builder", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: Slack bot developer · Bolt, Block Kit, slash commands, OAuth
@@ -44,10 +44,6 @@ Focus on best practices for production-ready Slack apps.
 - User mentions or implies: slack workflow
 - User mentions or implies: slack interactive
 - User mentions or implies: slack oauth
-
-## Detailed Guide
-
-> This file contains the detailed procedure and reference material extracted from `SKILL.md` for focused loading. The root skill defines activation, examples, safety constraints, and limitations.
 
 ## Patterns
 
@@ -218,6 +214,403 @@ if __name__ == "__main__":
 #
 ## handler = SlackRequestHandler(app)
 #
+##     return handler.handle(request)
+
+### Anti_patterns
+
+- Not acknowledging requests within 3 seconds
+- Blocking operations in the ack handler
+- Hardcoding tokens in source code
+- Not using Socket Mode for development
+
+### Block Kit UI Pattern
+
+Block Kit is Slack's UI framework for building rich, interactive messages.
+Compose messages using blocks (sections, actions, inputs) and elements
+(buttons, menus, text inputs).
+
+Limits:
+- Up to 50 blocks per message
+- Up to 100 blocks in modals/Home tabs
+- Block text limited to 3000 characters
+
+Use Block Kit Builder to prototype: https://app.slack.com/block-kit-builder
+
+**When to use**: Building rich message layouts,Adding interactive components to messages,Creating forms in modals,Building Home tab experiences
+
+from slack_bolt import App
+import os
+
+app = App(token=os.environ["SLACK_BOT_TOKEN"])
+
+def build_notification_blocks(incident: dict) -> list:
+    """Build Block Kit blocks for incident notification."""
+    severity_emoji = {
+        "critical": ":red_circle:",
+        "high": ":large_orange_circle:",
+        "medium": ":large_yellow_circle:",
+        "low": ":white_circle:"
+    }
+
+    return [
+        # Header
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": f"{severity_emoji.get(incident['severity'], '')} Incident Alert"
+            }
+        },
+        # Details section
+        {
+            "type": "section",
+            "fields": [
+                {
+                    "type": "mrkdwn",
+                    "text": f"*Incident:*\n{incident['title']}"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": f"*Severity:*\n{incident['severity'].upper()}"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": f"*Service:*\n{incident['service']}"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": f"*Reported:*\n<!date^{incident['timestamp']}^{date_short} {time}|{incident['timestamp']}>"
+                }
+            ]
+        },
+        # Description
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*Description:*\n{incident['description'][:2000]}"
+            }
+        },
+        # Divider
+        {"type": "divider"},
+        # Action buttons
+        {
+            "type": "actions",
+            "block_id": f"incident_actions_{incident['id']}",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Acknowledge"},
+                    "style": "primary",
+                    "action_id": "acknowledge_incident",
+                    "value": incident['id']
+                },
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Resolve"},
+                    "style": "danger",
+                    "action_id": "resolve_incident",
+                    "value": incident['id'],
+                    "confirm": {
+                        "title": {"type": "plain_text", "text": "Resolve Incident?"},
+                        "text": {"type": "mrkdwn", "text": "Are you sure this incident is resolved?"},
+                        "confirm": {"type": "plain_text", "text": "Yes, Resolve"},
+                        "deny": {"type": "plain_text", "text": "Cancel"}
+                    }
+                },
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "View Details"},
+                    "action_id": "view_incident",
+                    "value": incident['id'],
+                    "url": f"https://incidents.example.com/{incident['id']}"
+                }
+            ]
+        },
+        # Context footer
+        {
+            "type": "context",
+            "elements": [
+                {
+                    "type": "mrkdwn",
+                    "text": f"Incident ID: {incident['id']} | <https://runbook.example.com/{incident['service']}|View Runbook>"
+                }
+            ]
+        }
+    ]
+
+def send_incident_notification(channel: str, incident: dict):
+    """Send incident notification with Block Kit."""
+    blocks = build_notification_blocks(incident)
+
+    app.client.chat_postMessage(
+        channel=channel,
+        text=f"Incident: {incident['title']}",  # Fallback for notifications
+        blocks=blocks
+    )
+
+## Handle button actions
+@app.action("acknowledge_incident")
+def handle_acknowledge(ack, body, client):
+    """Handle incident acknowledgment."""
+    ack()
+
+    incident_id = body["actions"][0]["value"]
+    user = body["user"]["id"]
+
+    # Update your system
+    acknowledge_incident(incident_id, user)
+
+    # Update message to show acknowledgment
+    original_blocks = body["message"]["blocks"]
+
+    # Add acknowledgment to context
+    original_blocks[-1]["elements"].append({
+        "type": "mrkdwn",
+        "text": f":white_check_mark: Acknowledged by <@{user}>"
+    })
+
+    # Remove acknowledge button (prevent double-click)
+    action_block = next(b for b in original_blocks if b.get("block_id", "").startswith("incident_actions"))
+    action_block["elements"] = [e for e in action_block["elements"] if e["action_id"] != "acknowledge_incident"]
+
+    client.chat_update(
+        channel=body["channel"]["id"],
+        ts=body["message"]["ts"],
+        blocks=original_blocks
+    )
+
+## Interactive select menus
+def build_user_selector_blocks():
+    """Build blocks with user selector."""
+    return [
+        {
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": "Assign this task:"},
+            "accessory": {
+                "type": "users_select",
+                "action_id": "assign_user",
+                "placeholder": {"type": "plain_text", "text": "Select assignee"}
+            }
+        }
+    ]
+
+## Overflow menu for more options
+def build_task_blocks(task: dict):
+    """Build task blocks with overflow menu."""
+    return [
+        {
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": f"*{task['title']}*"},
+            "accessory": {
+                "type": "overflow",
+                "action_id": "task_overflow",
+                "options": [
+                    {
+                        "text": {"type": "plain_text", "text": "Edit"},
+                        "value": f"edit_{task['id']}"
+                    },
+                    {
+                        "text": {"type": "plain_text", "text": "Delete"},
+                        "value": f"delete_{task['id']}"
+                    },
+                    {
+                        "text": {"type": "plain_text", "text": "Share"},
+                        "value": f"share_{task['id']}"
+                    }
+                ]
+            }
+        }
+    ]
+
+### Anti_patterns
+
+- Exceeding 50 blocks per message
+- Not providing fallback text for accessibility
+- Hardcoding action_ids (use dynamic IDs when needed)
+- Not handling button clicks idempotently
+
+### OAuth Installation Pattern
+
+Enable users to install your app in their workspaces via OAuth 2.0.
+Bolt handles most of the OAuth flow, but you need to configure it
+and store tokens securely.
+
+Key OAuth concepts:
+- Scopes define permissions (request minimum needed)
+- Tokens are workspace-specific
+- Installation data must be stored persistently
+- Users can add scopes later (additive)
+
+70% of users abandon installation when confronted with excessive
+permission requests - request only what you need!
+
+**When to use**: Distributing app to multiple workspaces,Building public Slack apps,Enterprise-grade integrations
+
+from slack_bolt import App
+from slack_bolt.oauth.oauth_settings import OAuthSettings
+from slack_sdk.oauth.installation_store import FileInstallationStore
+from slack_sdk.oauth.state_store import FileOAuthStateStore
+import os
+
+## For example: PostgreSQL, MongoDB, Redis
+
+class DatabaseInstallationStore:
+    """Store installation data in your database."""
+
+    async def save(self, installation):
+        """Save installation when user completes OAuth."""
+        await db.installations.upsert({
+            "team_id": installation.team_id,
+            "enterprise_id": installation.enterprise_id,
+            "bot_token": encrypt(installation.bot_token),
+            "bot_user_id": installation.bot_user_id,
+            "bot_scopes": installation.bot_scopes,
+            "user_id": installation.user_id,
+            "installed_at": installation.installed_at
+        })
+
+    async def find_installation(self, *, enterprise_id, team_id, user_id=None, is_enterprise_install=False):
+        """Find installation for a workspace."""
+        record = await db.installations.find_one({
+            "team_id": team_id,
+            "enterprise_id": enterprise_id
+        })
+
+        if record:
+            return Installation(
+                bot_token=decrypt(record["bot_token"]),
+                # ... other fields
+            )
+        return None
+
+## Initialize OAuth-enabled app
+app = App(
+    signing_secret=os.environ["SLACK_SIGNING_SECRET"],
+    oauth_settings=OAuthSettings(
+        client_id=os.environ["SLACK_CLIENT_ID"],
+        client_secret=os.environ["SLACK_CLIENT_SECRET"],
+        scopes=[
+            "channels:history",
+            "channels:read",
+            "chat:write",
+            "commands",
+            "users:read"
+        ],
+        user_scopes=[],  # User token scopes if needed
+        installation_store=DatabaseInstallationStore(),
+        state_store=FileOAuthStateStore(expiration_seconds=600)
+    )
+)
+
+## Flask integration
+from flask import Flask, request
+from slack_bolt.adapter.flask import SlackRequestHandler
+
+flask_app = Flask(__name__)
+handler = SlackRequestHandler(app)
+
+@flask_app.route("/slack/install", methods=["GET"])
+def install():
+    return handler.handle(request)
+
+@flask_app.route("/slack/oauth_redirect", methods=["GET"])
+def oauth_redirect():
+    return handler.handle(request)
+
+@flask_app.route("/slack/events", methods=["POST"])
+def slack_events():
+    return handler.handle(request)
+
+## Handle installation success/failure
+@app.oauth_success
+def handle_oauth_success(args):
+    """Called when OAuth completes successfully."""
+    installation = args["installation"]
+
+    # Send welcome message
+    app.client.chat_postMessage(
+        token=installation.bot_token,
+        channel=installation.user_id,
+        text="Thanks for installing! Type /help to get started."
+    )
+
+    return "Installation successful! You can close this window."
+
+@app.oauth_failure
+def handle_oauth_failure(args):
+    """Called when OAuth fails."""
+    error = args.get("error", "Unknown error")
+    return f"Installation failed: {error}"
+
+## Scope management - request additional scopes when needed
+def request_additional_scopes(team_id: str, new_scopes: list):
+    """
+    Generate URL for user to add scopes.
+    Note: Existing tokens retain old scopes.
+    User must re-authorize for new scopes.
+    """
+    base_url = "https://slack.com/oauth/v2/authorize"
+    params = {
+        "client_id": os.environ["SLACK_CLIENT_ID"],
+        "scope": ",".join(new_scopes),
+        "team": team_id
+    }
+    return f"{base_url}?{urlencode(params)}"
+
+### Anti_patterns
+
+- Requesting unnecessary scopes upfront
+- Storing tokens in plain text
+- Not validating OAuth state parameter (CSRF risk)
+- Assuming tokens have new scopes after config change
+
+### Socket Mode Pattern
+
+Socket Mode allows your app to receive events via WebSocket instead
+of public HTTP endpoints. Perfect for development and apps behind
+firewalls.
+
+Benefits:
+- No public URL needed
+- Works behind corporate firewalls
+- Simpler local development
+- Real-time bidirectional communication
+
+Limitation: Not recommended for high-volume production apps.
+
+**When to use**: Local development,Apps behind corporate firewalls,Internal tools with security constraints,Prototyping and testing
+
+from slack_bolt import App
+from slack_bolt.adapter.socket_mode import SocketModeHandler
+import os
+
+## Needs 'connections:write' scope
+
+app = App(token=os.environ["SLACK_BOT_TOKEN"])
+
+@app.message("hello")
+def handle_hello(message, say):
+    say(f"Hey <@{message['user']}>!")
+
+@app.command("/status")
+def handle_status(ack, say):
+    ack()
+    say("All systems operational!")
+
+@app.event("app_mention")
+def handle_mention(event, say):
+    say(f"You mentioned me, <@{event['user']}>!")
+
+if __name__ == "__main__":
+    # SocketModeHandler manages the WebSocket connection
+    handler = SocketModeHandler(
+        app,
+        os.environ["SLACK_APP_TOKEN"]  # xapp-... token
+    )
+
+    print("Starting Socket Mode...")
+    handler.start()
 
 (Shortened: the skill continues in its source.)
 

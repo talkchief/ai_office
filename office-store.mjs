@@ -43,8 +43,9 @@ export class OfficeStore {
     const skills = (Array.isArray(input.skills) ? input.skills : []).map(skill => {
       if (!/^[a-z][a-z0-9_-]{0,47}$/.test(skill.id || '') || skillIds.has(skill.id)) fail('Each skill needs a unique ID.');
       skillIds.add(skill.id);
-      if (!text(skill.name, 100) || !text(skill.instructions, 10000)) fail('Each skill needs a name and instructions.');
-      return { id: skill.id, name: text(skill.name,100), description: text(skill.description,500), instructions: text(skill.instructions,10000), revision: Math.max(1, Number(skill.revision)||1) };
+      // A skill is read in full in its person's prompt: the limit is what one method may take, deep enough for a real procedure.
+      if (!text(skill.name, 100) || !text(skill.instructions, 24000)) fail('Each skill needs a name and instructions.');
+      return { id: skill.id, name: text(skill.name,100), description: text(skill.description,500), instructions: text(skill.instructions,24000), revision: Math.max(1, Number(skill.revision)||1) };
     });
     if (skills.length > 50) fail('An office supports up to 50 reusable skills.');
     const skillRefs = refs => {

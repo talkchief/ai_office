@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · applicationinsights-web-ts
 
 # Application Insights RUM Engineer
 
-You are **Application Insights RUM Engineer**: you carry one skill, "Applicationinsights Web TS", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Application Insights RUM Engineer**: you carry one skill, "Applicationinsights Web TS", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: real user monitoring · Application Insights JavaScript SDK
@@ -160,6 +160,312 @@ appInsights.clearAuthenticatedUserContext(); // on logout
 
 // Force send before unload
 appInsights.flush();
+```
+
+## Telemetry Initializers (enrichment & filtering)
+
+Run for every envelope before send. Return `false` to drop.
+
+```typescript
+import type { ITelemetryItem } from "@microsoft/applicationinsights-web";
+
+appInsights.addTelemetryInitializer((item: ITelemetryItem) => {
+  item.tags ??= {};
+  item.tags["ai.cloud.role"] = "web-shop";
+  item.tags["ai.cloud.roleInstance"] = window.location.hostname;
+  item.data ??= {};
+  item.data["app.version"] = import.meta.env.VITE_APP_VERSION;
+  item.data["app.build"] = import.meta.env.VITE_BUILD_SHA;
+
+  // Drop noisy health-check page views
+  if (item.baseType === "PageviewData" && item.baseData?.uri?.endsWith("/healthz")) return false;
+
+  // Scrub query-string secrets
+  if (item.baseData?.uri) {
+    item.baseData.uri = item.baseData.uri.replace(/([?&](https://github.com/microsoft/skills/tree/main/.github/plugins/azure-sdk-typescript/skills/applicationinsights-web-ts/token|sig|key)=)[^&]+/gi, "$1REDACTED");
+  }
+});
+```
+
+## Click Analytics
+
+```typescript
+import { ClickAnalyticsPlugin } from "@microsoft/applicationinsights-clickanalytics-js";
+
+const clickPlugin = new ClickAnalyticsPlugin();
+const appInsights = new ApplicationInsights({
+  config: {
+    connectionString: import.meta.env.VITE_APPINSIGHTS_CONNECTION_STRING,
+    extensions: [clickPlugin],
+    extensionConfig: {
+      [clickPlugin.identifier]: {
+        autoCapture: true,
+        dataTags: { useDefaultContentNameOrId: true, customDataPrefix: "data-ai-" },
+        urlCollectHash: false,
+        behaviorValidator: (b: string) => /^[a-z0-9_]+$/.test(b) ? b : ""
+      }
+    }
+  }
+});
+appInsights.loadAppInsights();
+```
+
+Mark elements with `data-ai-*` attributes; clicks are emitted as Custom Events with parent-content metadata.
+
+## SPA Route Tracking
+
+- **Built-in:** set `enableAutoRouteTracking: true`. Hooks `history.pushState/replaceState` and `popstate`.
+- **React Router:** use `@microsoft/applicationinsights-react-js` `withAITracking` HOC (see [the “Framework Extensions” reference (not included)](https://github.com/microsoft/skills/tree/main/.github/plugins/azure-sdk-typescript/skills/applicationinsights-web-ts/references/framework-extensions.md)).
+- **Manual:** call `appInsights.trackPageView({ name, uri })` in your router's `useEffect` on route change. Disable `enableAutoRouteTracking` to avoid double counting.
+
+## Distributed Tracing (correlate to backend)
+
+Set `distributedTracingMode: 2` (`DistributedTracingModes.AI_AND_W3C`). The SDK adds `traceparent` (and legacy `Request-Id`) to outbound `fetch`/`XHR`. Backends instrumented with **OpenTelemetry** (e.g. `@azure/monitor-opentelemetry`) auto-link to the browser's operation_Id.
+
+For cross-origin calls, also set `enableCorsCorrelation: true` and add the calling origin to the **CORS exposed headers** on the API.
+
+## GenAI Agent Traces (OTel semantic conventions)
+
+When the browser invokes an AI agent (function-calling, tool-use, model calls direct from the client), emit App Insights **Dependency** telemetry whose attributes follow the OpenTelemetry **GenAI semantic conventions** so they are queryable alongside backend agent spans in App Insights / Log Analytics.
+
+**Set the opt-in env first** so backend instrumentations agree on the same schema version:
+
+```bash
+OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental
+```
+
+### Required attribute keys (use the OTel names verbatim)
+
+| Span / op | Required attributes |
+| --- | --- |
+| `invoke_agent {agent.name}` | `gen_ai.operation.name=invoke_agent`, `gen_ai.provider.name`, `gen_ai.agent.name`, `gen_ai.agent.id` (when known) |
+| `create_agent {agent.name}` | `gen_ai.operation.name=create_agent`, `gen_ai.provider.name`, `gen_ai.agent.name`, `gen_ai.request.model` |
+| `chat {model}` | `gen_ai.operation.name=chat`, `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` |
+| `execute_tool {tool.name}` | `gen_ai.operation.name=execute_tool`, `gen_ai.tool.name`, `gen_ai.tool.type` (`function` \| `extension` \| `datastore`), `gen_ai.tool.call.id` |
+
+`gen_ai.provider.name` well-known values: `openai`, `azure.ai.openai`, `azure.ai.inference`, `anthropic`, `aws.bedrock`, `gcp.gemini`, `gcp.vertex_ai`, `cohere`, `mistral_ai`, `groq`, `deepseek`, `perplexity`, `x_ai`, `ibm.watsonx.ai`.
+
+> **Sensitive content opt-in.** `gen_ai.system_instructions`, `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result` are **Opt-In** by default. Gate them behind a runtime flag and avoid them in production unless you have approved data handling.
+
+### Pattern: invoke_agent + nested tool/model spans
+
+```typescript
+import { ApplicationInsights, SeverityLevel } from "@microsoft/applicationinsights-web";
+
+type GenAiAttrs = Record<string, string | number | boolean | undefined>;
+
+function startGenAiSpan(name: string, attrs: GenAiAttrs) {
+  const id = crypto.randomUUID();
+  const start = performance.now();
+  const baseProps: GenAiAttrs = { "gen_ai.span.id": id, ...attrs };
+  return {
+    end(success: boolean, extra: GenAiAttrs = {}, error?: Error) {
+      const duration = Math.round(performance.now() - start);
+      const properties = { ...baseProps, ...extra };
+      appInsights.trackDependencyData({
+        id, name, duration, success,
+        responseCode: error ? 500 : 200,
+        type: "GenAI",
+        target: String(attrs["gen_ai.provider.name"] ?? "genai"),
+        properties: properties as Record<string, string>
+      });
+      if (error) {
+        appInsights.trackException({
+          exception: error,
+          severityLevel: SeverityLevel.Error,
+          properties: { ...properties, "error.type": error.name } as Record<string, string>
+        });
+      }
+    }
+  };
+}
+
+// Agent invocation
+const agentSpan = startGenAiSpan("invoke_agent ResearchAssistant", {
+  "gen_ai.operation.name": "invoke_agent",
+  "gen_ai.provider.name": "azure.ai.openai",
+  "gen_ai.agent.name": "ResearchAssistant",
+  "gen_ai.agent.id": "asst_5j66UpCpwteGg4YSxUnt7lPY",
+  "gen_ai.request.model": "gpt-4o-mini",
+  "server.address": "myresource.openai.azure.com"
+});
+
+try {
+  // Nested chat completion span
+  const chat = startGenAiSpan("chat gpt-4o-mini", {
+    "gen_ai.operation.name": "chat",
+    "gen_ai.provider.name": "azure.ai.openai",
+    "gen_ai.request.model": "gpt-4o-mini"
+  });
+  const res = await callAzureOpenAi(/* ... */);
+  chat.end(true, {
+    "gen_ai.response.model": res.model,
+    "gen_ai.response.id": res.id,
+    "gen_ai.response.finish_reasons": JSON.stringify(res.choices.map(c => c.finish_reason)),
+    "gen_ai.usage.input_tokens": res.usage.prompt_tokens,
+    "gen_ai.usage.output_tokens": res.usage.completion_tokens,
+    "gen_ai.output.type": "text"
+  });
+
+  // Nested tool execution span
+  const tool = startGenAiSpan("execute_tool getWeather", {
+    "gen_ai.operation.name": "execute_tool",
+    "gen_ai.tool.name": "getWeather",
+    "gen_ai.tool.type": "function",
+    "gen_ai.tool.call.id": "call_abc123"
+  });
+  const toolResult = await runGetWeather({ location: "SF" });
+  tool.end(true);
+
+  agentSpan.end(true, {
+    "gen_ai.usage.input_tokens": res.usage.prompt_tokens,
+    "gen_ai.usage.output_tokens": res.usage.completion_tokens
+  });
+} catch (err) {
+  agentSpan.end(false, { "error.type": (err as Error).name }, err as Error);
+}
+```
+
+The browser's `traceparent` is automatically attached to outbound `fetch` (when `distributedTracingMode: 2`), so downstream Azure OpenAI / agent backend spans hang under the same operation_Id in App Insights.
+
+For the full attribute reference, well-known values, and content-capture guidance, see [the “Agent Traces” reference (not included)](https://github.com/microsoft/skills/tree/main/.github/plugins/azure-sdk-typescript/skills/applicationinsights-web-ts/references/agent-traces.md).
+
+### KQL: query GenAI traces in App Insights
+
+```kusto
+dependencies
+| where type == "GenAI"
+| extend op   = tostring(customDimensions["gen_ai.operation.name"]),
+         agent = tostring(customDimensions["gen_ai.agent.name"]),
+         model = tostring(customDimensions["gen_ai.request.model"]),
+         tin   = toint(customDimensions["gen_ai.usage.input_tokens"]),
+         tout  = toint(customDimensions["gen_ai.usage.output_tokens"])
+| summarize calls=count(), p95_ms=percentile(duration, 95),
+            avg_in=avg(tin), avg_out=avg(tout) by op, agent, model, bin(timestamp, 5m)
+```
+
+## React (TypeScript)
+
+See [the “Framework Extensions” reference (not included)](https://github.com/microsoft/skills/tree/main/.github/plugins/azure-sdk-typescript/skills/applicationinsights-web-ts/references/framework-extensions.md) for full React, React Native, Angular, Next.js, and Vite recipes.
+
+```typescript
+import { ApplicationInsights } from "@microsoft/applicationinsights-web";
+import { ReactPlugin, withAITracking } from "@microsoft/applicationinsights-react-js";
+import { createBrowserHistory } from "history";
+
+const reactPlugin = new ReactPlugin();
+const browserHistory = createBrowserHistory();
+
+export const appInsights = new ApplicationInsights({
+  config: {
+    connectionString: import.meta.env.VITE_APPINSIGHTS_CONNECTION_STRING,
+    extensions: [reactPlugin],
+    extensionConfig: { [reactPlugin.identifier]: { history: browserHistory } }
+  }
+});
+appInsights.loadAppInsights();
+
+export const TrackedCheckout = withAITracking(reactPlugin, Checkout, "Checkout");
+```
+
+## React Native
+
+```typescript
+import { ApplicationInsights } from "@microsoft/applicationinsights-web";
+import { ReactNativePlugin } from "@microsoft/applicationinsights-react-native";
+
+const rnPlugin = new ReactNativePlugin();
+const appInsights = new ApplicationInsights({
+  config: {
+    connectionString: process.env.EXPO_PUBLIC_APPINSIGHTS_CONNECTION_STRING,
+    extensions: [rnPlugin],
+    disableFetchTracking: false
+  }
+});
+appInsights.loadAppInsights();
+```
+
+## Performance — Web Vitals
+
+Auto-collected: page-load timings via `PerformanceTiming` / `PerformanceNavigationTiming`. To add Core Web Vitals:
+
+```typescript
+import { onCLS, onLCP, onINP, type Metric } from "web-vitals";
+
+function send(m: Metric) {
+  appInsights.trackMetric(
+    { name: `web_vitals.${m.name.toLowerCase()}`, average: m.value },
+    { rating: m.rating, navigationType: m.navigationType, id: m.id }
+  );
+}
+onCLS(send); onLCP(send); onINP(send);
+```
+
+## Cookies & Privacy
+
+```typescript
+new ApplicationInsights({ config: {
+  connectionString,
+  isCookieUseDisabled: true,         // hard-disable all cookies
+  cookieCfg: { enabled: true, domain: ".example.com", path: "/", expiry: 365 }
+}});
+```
+
+To honor consent dynamically:
+
+```typescript
+appInsights.getCookieMgr().setEnabled(userGaveConsent);
+appInsights.config.disableTelemetry = !userGaveConsent;
+```
+
+## Sampling
+
+Server-side ingestion sampling (recommended) is configured on the App Insights resource. SDK-side sampling reduces network use:
+
+```typescript
+new ApplicationInsights({ config: { connectionString, samplingPercentage: 50 } });
+```
+
+Per-type sampling via telemetry initializer: drop with `return false` based on `item.baseType`.
+
+## Offline / Send-on-Unload
+
+The SDK uses `sendBeacon` (default `onunloadDisableBeacon: false`) to flush on `pagehide` / `unload`. For SPAs, also call `appInsights.flush()` before destructive transitions (logout, hard reload).
+
+## Common Pitfalls
+
+1. **Do not initialize twice.** Re-importing the module under different bundles produces duplicate page views. Use a single shared module export.
+2. **Initialize before first user input** to avoid losing early clicks/exceptions.
+3. **Connection string is public** — never reuse the same App Insights resource for backend secrets.
+4. **`enableAutoRouteTracking` + manual `trackPageView`** = duplicates. Pick one.
+5. **CORS distributed tracing** requires the API to allow `Request-Id`, `Request-Context`, `traceparent`, `tracestate` request headers and expose `Request-Context` response header.
+6. **GenAI sensitive content** (`gen_ai.input.messages` etc.) is Opt-In — never log without an explicit runtime flag and approved data handling.
+7. **Agent token usage is on `chat` spans, not `invoke_agent`** — copy aggregated usage to the parent agent span only if you know it.
+8. **React StrictMode** double-invokes effects in dev — guard `loadAppInsights()` with a module-level singleton.
+
+## Bundle Size
+
+The full web SDK is ~110 KB minified (~36 KB gzipped). For aggressive budgets, use the **Loader Script** path so the SDK loads asynchronously off the critical path, or tree-shake unused plugins.
+
+## Key Types
+
+```typescript
+import {
+  ApplicationInsights,
+  SeverityLevel,
+  DistributedTracingModes,
+  type IConfiguration,
+  type IConfig,
+  type ITelemetryItem,
+  type ITelemetryPlugin,
+  type ICustomProperties,
+  type IPageViewTelemetry,
+  type IEventTelemetry,
+  type IExceptionTelemetry,
+  type ITraceTelemetry,
+  type IMetricTelemetry,
+  type IDependencyTelemetry
+} from "@microsoft/applicationinsights-web";
 ```
 
 (Shortened: the skill continues in its source.)

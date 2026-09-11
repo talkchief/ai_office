@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · electron-development
 
 # Electron Desktop Developer
 
-You are **Electron Desktop Developer**: you carry one skill, "Electron Development", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Electron Desktop Developer**: you carry one skill, "Electron Development", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: desktop app developer · Electron, secure IPC, packaging
@@ -59,10 +59,6 @@ You are a senior Electron engineer specializing in secure, production-grade desk
 - Auto-update on Linux requires distributing via Snap, Flatpak, or custom mechanisms — `electron-updater` has limited Linux support
 - macOS notarization requires an Apple Developer account ($99/year) and is mandatory for distribution outside the Mac App Store
 - Debugging main process issues requires VS Code or Chrome DevTools via `--inspect` flag — there is no integrated debugger in Electron itself
-
-## Detailed Guide
-
-> This file contains the detailed procedure and reference material extracted from `SKILL.md` for focused loading. The root skill defines activation, examples, safety constraints, and limitations.
 
 ## Instructions
 
@@ -200,7 +196,386 @@ const ALLOWED_RECEIVE_CHANNELS = [
 ] as const;
 
 type SendChannel = typeof ALLOWED_SEND_CHANNELS[number];
-type ReceiveChannel = typeof ALLOWED_
+type ReceiveChannel = typeof ALLOWED_RECEIVE_CHANNELS[number];
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  // One-way: renderer → main
+  send: (channel: SendChannel, ...args: unknown[]) => {
+    if (ALLOWED_SEND_CHANNELS.includes(channel)) {
+      ipcRenderer.send(channel, ...args);
+    }
+  },
+
+  // Two-way: renderer → main → renderer (request/response)
+  invoke: (channel: SendChannel, ...args: unknown[]) => {
+    if (ALLOWED_SEND_CHANNELS.includes(channel)) {
+      return ipcRenderer.invoke(channel, ...args);
+    }
+    return Promise.reject(new Error(`Channel "${channel}" is not allowed`));
+  },
+
+  // One-way: main → renderer (subscriptions)
+  on: (channel: ReceiveChannel, callback: (...args: unknown[]) => void) => {
+    if (ALLOWED_RECEIVE_CHANNELS.includes(channel)) {
+      const listener = (_event: Electron.IpcRendererEvent, ...args: unknown[]) => callback(...args);
+      ipcRenderer.on(channel, listener);
+      return () => ipcRenderer.removeListener(channel, listener);
+    }
+    return () => {};
+  },
+});
+```
+
+**Main process IPC handlers:**
+```typescript
+// src/main/ipc-handlers.ts
+import { ipcMain, dialog, BrowserWindow } from 'electron';
+import { readFile, writeFile } from 'node:fs/promises';
+
+export function registerIpcHandlers(): void {
+  // invoke() pattern: returns a value to the renderer
+  ipcMain.handle('file:open', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'Text Files', extensions: ['txt', 'md'] }],
+    });
+
+    if (canceled || filePaths.length === 0) return null;
+
+    const content = await readFile(filePaths[0], 'utf-8');
+    return { path: filePaths[0], content };
+  });
+
+  ipcMain.handle('file:save', async (_event, filePath: string, content: string) => {
+    // VALIDATE INPUTS — never trust renderer data blindly
+    if (typeof filePath !== 'string' || typeof content !== 'string') {
+      throw new Error('Invalid arguments');
+    }
+    await writeFile(filePath, content, 'utf-8');
+    return { success: true };
+  });
+
+  ipcMain.handle('app:get-version', () => {
+    return process.versions.electron;
+  });
+}
+```
+
+**Renderer usage (type-safe):**
+```typescript
+// src/renderer/App.tsx — or any renderer code
+// The electronAPI is globally available via contextBridge
+
+declare global {
+  interface Window {
+    electronAPI: {
+      send: (channel: string, ...args: unknown[]) => void;
+      invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
+      on: (channel: string, callback: (...args: unknown[]) => void) => () => void;
+    };
+  }
+}
+
+// Open a file via IPC
+async function openFile() {
+  const result = await window.electronAPI.invoke('file:open');
+  if (result) {
+    console.log('File content:', result.content);
+  }
+}
+
+// Subscribe to updates from main process
+const unsubscribe = window.electronAPI.on('update:available', (version) => {
+  console.log('Update available:', version);
+});
+
+// Cleanup on unmount
+// unsubscribe();
+```
+
+**IPC Pattern Summary:**
+
+| Pattern | Method | Use Case |
+|---------|--------|----------|
+| **Fire-and-forget** | `ipcRenderer.send()` → `ipcMain.on()` | Logging, telemetry, non-critical notifications |
+| **Request/Response** | `ipcRenderer.invoke()` → `ipcMain.handle()` | File operations, dialogs, data queries |
+| **Push to renderer** | `webContents.send()` → `ipcRenderer.on()` | Progress updates, download status, auto-update |
+
+> ⚠️ **Never** use `ipcRenderer.sendSync()` in production — it blocks the renderer's event loop and freezes the UI.
+
+---
+
+### 4. Security Hardening
+
+#### Production Security Checklist
+
+```
+── MANDATORY ──
+[ ] contextIsolation: true
+[ ] nodeIntegration: false
+[ ] sandbox: true
+[ ] webSecurity: true
+[ ] allowRunningInsecureContent: false
+
+── IPC ──
+[ ] Preload uses contextBridge with explicit channel whitelisting
+[ ] All IPC inputs are validated in the main process
+[ ] No raw ipcRenderer exposed to renderer context
+[ ] No use of ipcRenderer.sendSync()
+
+── CONTENT ──
+[ ] Content Security Policy (CSP) headers set on all windows
+[ ] No use of eval(), new Function(), or innerHTML with untrusted data <!-- security-allowlist: defensive Electron checklist -->
+[ ] Remote content (if any) loaded in separate BrowserView with restricted permissions
+[ ] protocol.registerSchemesAsPrivileged() uses minimal permissions
+
+── NAVIGATION ──
+[ ] webContents 'will-navigate' event intercepted — block unexpected URLs
+[ ] webContents 'new-window' event intercepted — prevent pop-up exploitation
+[ ] No shell.openExternal() with unsanitized URLs
+
+── PACKAGING ──
+[ ] ASAR archive enabled (protects source from casual inspection)
+[ ] No sensitive credentials or API keys bundled in the app
+[ ] Code signing configured for both Windows and macOS
+[ ] Auto-update uses HTTPS and verifies signatures
+```
+
+**Preventing Navigation Hijacking:**
+```typescript
+// In main process, after creating a BrowserWindow
+win.webContents.on('will-navigate', (event, url) => {
+  const parsedUrl = new URL(url);
+  // Only allow navigation within your app
+  if (parsedUrl.origin !== 'http://localhost:5173') { // dev server
+    event.preventDefault();
+    console.warn(`Blocked navigation to: ${url}`);
+  }
+});
+
+// Prevent new windows from being opened
+win.webContents.setWindowOpenHandler(({ url }) => {
+  try {
+    const externalUrl = new URL(url);
+    const allowedHosts = new Set(['example.com', 'docs.example.com']);
+
+    // Never forward raw renderer-controlled URLs to the OS.
+    // Unvalidated links can enable phishing or abuse platform URL handlers.
+    if (externalUrl.protocol === 'https:' && allowedHosts.has(externalUrl.hostname)) {
+      require('electron').shell.openExternal(externalUrl.toString());
+    } else {
+      console.warn(`Blocked external URL: ${url}`);
+    }
+  } catch {
+    console.warn(`Rejected invalid external URL: ${url}`);
+  }
+
+  return { action: 'deny' }; // Block all new Electron windows
+});
+```
+
+**Custom Protocol Registration (secure):**
+```typescript
+import { protocol } from 'electron';
+import path from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { URL } from 'node:url';
+
+// Register a custom protocol for loading local assets securely
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+]);
+
+app.whenReady().then(() => {
+  protocol.handle('app', async (request) => {
+    const url = new URL(request.url);
+    const baseDir = path.resolve(__dirname, '../renderer');
+    // Strip the leading slash so path.resolve keeps baseDir as the root.
+    const relativePath = path.normalize(decodeURIComponent(url.pathname).replace(/^[/\\]+/, ''));
+    const filePath = path.resolve(baseDir, relativePath);
+
+    if (!filePath.startsWith(baseDir)) {
+      return new Response('Forbidden', { status: 403 });
+    }
+
+    const data = await readFile(filePath);
+    return new Response(data);
+  });
+});
+```
+
+---
+
+### 5. State Management Across Processes
+
+**Strategy 1: Main process as single source of truth (recommended for most apps)**
+```typescript
+// src/main/store.ts
+import { app } from 'electron';
+import { readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+
+interface AppState {
+  theme: 'light' | 'dark';
+  recentFiles: string[];
+  windowBounds: { x: number; y: number; width: number; height: number };
+}
+
+const DEFAULTS: AppState = {
+  theme: 'light',
+  recentFiles: [],
+  windowBounds: { x: 0, y: 0, width: 1200, height: 800 },
+};
+
+class Store {
+  private data: AppState;
+  private filePath: string;
+
+  constructor() {
+    this.filePath = path.join(app.getPath('userData'), 'settings.json');
+    this.data = this.load();
+  }
+
+  private load(): AppState {
+    try {
+      const raw = readFileSync(this.filePath, 'utf-8');
+      return { ...DEFAULTS, ...JSON.parse(raw) };
+    } catch {
+      return { ...DEFAULTS };
+    }
+  }
+
+  get<K extends keyof AppState>(key: K): AppState[K] {
+    return this.data[key];
+  }
+
+  set<K extends keyof AppState>(key: K, value: AppState[K]): void {
+    this.data[key] = value;
+    writeFileSync(this.filePath, JSON.stringify(this.data, null, 2));
+  }
+}
+
+export const store = new Store();
+```
+
+**Strategy 2: electron-store (lightweight persistent storage)**
+```typescript
+import Store from 'electron-store';
+
+const store = new Store({
+  schema: {
+    theme: { type: 'string', enum: ['light', 'dark'], default: 'light' },
+    windowBounds: {
+      type: 'object',
+      properties: {
+        width: { type: 'number', default: 1200 },
+        height: { type: 'number', default: 800 },
+      },
+    },
+  },
+});
+
+// Usage
+store.set('theme', 'dark');
+console.log(store.get('theme')); // 'dark'
+```
+
+**Multi-window state synchronization:**
+```typescript
+// Main process: broadcast state changes to all windows
+import { BrowserWindow } from 'electron';
+
+function broadcastToAllWindows(channel: string, data: unknown): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send(channel, data);
+    }
+  }
+}
+
+// When theme changes:
+ipcMain.handle('settings:set-theme', (_event, theme: 'light' | 'dark') => {
+  store.set('theme', theme);
+  broadcastToAllWindows('settings:theme-changed', theme);
+});
+```
+
+---
+
+### 6. Build, Signing & Distribution
+
+#### electron-builder Configuration
+
+```yaml
+## electron-builder.yml
+appId: com.mycompany.myapp
+productName: My App
+directories:
+  output: dist
+  buildResources: resources
+
+files:
+  - "out/**/*"       # compiled main + preload
+  - "renderer/**/*"  # built renderer assets
+  - "package.json"
+
+asar: true
+compression: maximum
+
+## ── macOS ──
+mac:
+  category: public.app-category.developer-tools
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+
+## ── Windows ──
+win:
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+  signingHashAlgorithms: [sha256]
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+
+## ── Linux ──
+linux:
+  target:
+    - target: AppImage
+    - target: deb
+  category: Development
+  maintainer: your-email@example.com
+
+## ── Auto Update ──
+publish:
+  provider: github
+  owner: your-org
+  repo: your-repo
+```
+
+#### Code Signing
+
+```bash
+## Set environment variables before building:
+export CSC_LINK="path/to/Developer_ID_Application.p12"
+read -rsp "macOS certificate password: " CSC_KEY_PASSWORD
+echo
+export CSC_KEY_PASSWORD
+
+## Set environment variables:
+export WIN_CSC_LINK="path/to/code-signing.pfx"
+read -rsp "Windows certificate password: " WIN_CSC_KEY_PASSWORD
+echo
+export WIN_CSC_KEY_PASSWORD
 
 (Shortened: the skill continues in its source.)
 

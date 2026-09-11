@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · bash-defensive-patterns
 
 # Bash Scripting Engineer
 
-You are **Bash Scripting Engineer**: you carry one skill, "Bash Defensive Patterns", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Bash Scripting Engineer**: you carry one skill, "Bash Defensive Patterns", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: shell scripting engineer · defensive Bash, CI/CD, automation
@@ -325,7 +325,262 @@ log_error "Error occurred"
 #!/bin/bash
 set -Eeuo pipefail
 
-(Shortened: the skill continues in its source.)
+## Track background processes
+PIDS=()
+
+cleanup() {
+    log_info "Shutting down..."
+
+    # Terminate all background processes
+    for pid in "${PIDS[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -TERM "$pid" 2>/dev/null || true
+        fi
+    done
+
+    # Wait for graceful shutdown
+    for pid in "${PIDS[@]}"; do
+        wait "$pid" 2>/dev/null || true
+    done
+}
+
+trap cleanup SIGTERM SIGINT
+
+## Start background tasks
+background_task &
+PIDS+=($!)
+
+another_task &
+PIDS+=($!)
+
+## Wait for all background processes
+wait
+```
+
+### Pattern 7: Safe File Operations
+
+```bash
+#!/bin/bash
+set -Eeuo pipefail
+
+## Use -i flag to move safely without overwriting
+safe_move() {
+    local -r source="$1"
+    local -r dest="$2"
+
+    if [[ ! -e "$source" ]]; then
+        echo "ERROR: Source does not exist: $source" >&2
+        return 1
+    fi
+
+    if [[ -e "$dest" ]]; then
+        echo "ERROR: Destination already exists: $dest" >&2
+        return 1
+    fi
+
+    mv "$source" "$dest"
+}
+
+## Safe directory cleanup
+safe_rmdir() {
+    local -r dir="$1"
+
+    if [[ ! -d "$dir" ]]; then
+        echo "ERROR: Not a directory: $dir" >&2
+        return 1
+    fi
+
+    # Use -I flag to prompt before rm (BSD/GNU compatible)
+    rm -rI -- "$dir"
+}
+
+## Atomic file writes
+atomic_write() {
+    local -r target="$1"
+    local -r tmpfile
+    tmpfile=$(mktemp) || return 1
+
+    # Write to temp file first
+    cat > "$tmpfile"
+
+    # Atomic rename
+    mv "$tmpfile" "$target"
+}
+```
+
+### Pattern 8: Idempotent Script Design
+
+```bash
+#!/bin/bash
+set -Eeuo pipefail
+
+## Check if resource already exists
+ensure_directory() {
+    local -r dir="$1"
+
+    if [[ -d "$dir" ]]; then
+        log_info "Directory already exists: $dir"
+        return 0
+    fi
+
+    mkdir -p "$dir" || {
+        log_error "Failed to create directory: $dir"
+        return 1
+    }
+
+    log_info "Created directory: $dir"
+}
+
+## Ensure configuration state
+ensure_config() {
+    local -r config_file="$1"
+    local -r default_value="$2"
+
+    if [[ ! -f "$config_file" ]]; then
+        echo "$default_value" > "$config_file"
+        log_info "Created config: $config_file"
+    fi
+}
+
+## Rerunning script multiple times should be safe
+ensure_directory "/var/cache/myapp"
+ensure_config "/etc/myapp/config" "DEBUG=false"
+```
+
+### Pattern 9: Safe Command Substitution
+
+```bash
+#!/bin/bash
+set -Eeuo pipefail
+
+## Use $() instead of backticks
+name=$(<"$file")  # Modern, safe variable assignment from file
+output=$(command -v python3)  # Get command location safely
+
+## Handle command substitution with error checking
+result=$(command -v node) || {
+    log_error "node command not found"
+    return 1
+}
+
+## For multiple lines
+mapfile -t lines < <(grep "pattern" "$file")
+
+## NUL-safe iteration
+while IFS= read -r -d '' file; do
+    echo "Processing: $file"
+done < <(find /path -type f -print0)
+```
+
+### Pattern 10: Dry-Run Support
+
+```bash
+#!/bin/bash
+set -Eeuo pipefail
+
+DRY_RUN="${DRY_RUN:-false}"
+
+run_cmd() {
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo "[DRY RUN] Would execute: $*"
+        return 0
+    fi
+
+    "$@"
+}
+
+## Usage
+run_cmd cp "$source" "$dest"
+run_cmd rm "$file"
+run_cmd chown "$owner" "$target"
+```
+
+## Advanced Defensive Techniques
+
+### Named Parameters Pattern
+
+```bash
+#!/bin/bash
+set -Eeuo pipefail
+
+process_data() {
+    local input_file=""
+    local output_dir=""
+    local format="json"
+
+    # Parse named parameters
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --input=*)
+                input_file="${1#*=}"
+                ;;
+            --output=*)
+                output_dir="${1#*=}"
+                ;;
+            --format=*)
+                format="${1#*=}"
+                ;;
+            *)
+                echo "ERROR: Unknown parameter: $1" >&2
+                return 1
+                ;;
+        esac
+        shift
+    done
+
+    # Validate required parameters
+    [[ -n "$input_file" ]] || { echo "ERROR: --input is required" >&2; return 1; }
+    [[ -n "$output_dir" ]] || { echo "ERROR: --output is required" >&2; return 1; }
+}
+```
+
+### Dependency Checking
+
+```bash
+#!/bin/bash
+set -Eeuo pipefail
+
+check_dependencies() {
+    local -a missing_deps=()
+    local -a required=("jq" "curl" "git")
+
+    for cmd in "${required[@]}"; do
+        if ! command -v "$cmd" &>/dev/null; then
+            missing_deps+=("$cmd")
+        fi
+    done
+
+    if [[ ${#missing_deps[@]} -gt 0 ]]; then
+        echo "ERROR: Missing required commands: ${missing_deps[*]}" >&2
+        return 1
+    fi
+}
+
+check_dependencies
+```
+
+## Best Practices Summary
+
+1. **Always use strict mode** - `set -Eeuo pipefail`
+2. **Quote all variables** - `"$variable"` prevents word splitting
+3. **Use [[ ]] conditionals** - More robust than [ ]
+4. **Implement error trapping** - Catch and handle errors gracefully
+5. **Validate all inputs** - Check file existence, permissions, formats
+6. **Use functions for reusability** - Prefix with meaningful names
+7. **Implement structured logging** - Include timestamps and levels
+8. **Support dry-run mode** - Allow users to preview changes
+9. **Handle temporary files safely** - Use mktemp, cleanup with trap
+10. **Design for idempotency** - Scripts should be safe to rerun
+11. **Document requirements** - List dependencies and minimum versions
+12. **Test error paths** - Ensure error handling works correctly
+13. **Use `command -v`** - Safer than `which` for checking executables
+14. **Prefer printf over echo** - More predictable across systems
+
+## Resources
+
+- **Bash Strict Mode**: http://redsymbol.net/articles/unofficial-bash-strict-mode/
+- **Google Shell Style Guide**: https://google.github.io/styleguide/shellguide.html
+- **Defensive BASH Programming**: https://www.lifepipe.net/
 
 ## 🚨 Critical Rules
 - Never run a destructive command without a confirmation prompt or a dry-run option

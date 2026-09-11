@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · llm-app-patterns
 
 # LLM Application Architect
 
-You are **LLM Application Architect**: you carry one skill, "LLM App Patterns", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **LLM Application Architect**: you carry one skill, "LLM App Patterns", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: LLM application architect · retrieval, tools, privacy boundaries
@@ -58,10 +58,6 @@ The limiter sketch is single-threaded and process-local. A distributed deploymen
 - Provider failover can change output quality, tool schemas, cost and data residency; only use pre-approved compatible fallbacks.
 - Caching must respect tenant access, data/prompt revisions and deletion policy; temperature zero does not make output deterministic.
 - Model/SDK examples are not a complete service, benchmark or production-readiness certificate.
-
-## Detailed Guide
-
-> This file contains the detailed procedure and reference material extracted from `SKILL.md` for focused loading. The root skill defines activation, examples, safety constraints, and limitations.
 
 ## 1. RAG Pipeline Architecture
 
@@ -214,6 +210,406 @@ def generate_with_rag(question: str):
 ```
 
 ---
+
+## 2. Agent Architectures
+
+### 2.1 ReAct Pattern (Reasoning + Acting)
+
+```
+Decision: Search for information about X
+Action: search("X")
+Observation: [search results]
+Decision: Perform the required calculation
+Action: calculate(...)
+Observation: [calculation result]
+Decision: Answer using the observed results
+Action: final_answer("The answer is...")
+```
+
+```python
+REACT_PROMPT = """
+You are an AI assistant that can use tools to answer questions.
+
+Available tools:
+{tools_description}
+
+Use this format:
+Decision: [brief action summary, not hidden reasoning]
+Action: [tool_name(arguments)]
+Observation: [tool result - this will be filled in]
+... (repeat Decision/Action/Observation as needed)
+Decision: The available evidence supports a final response
+Final Answer: [your final response]
+
+Question: {question}
+"""
+
+class ReActAgent:
+    def __init__(self, tools: list, llm):
+        self.tools = {t.name: t for t in tools}
+        self.llm = llm
+        self.max_iterations = 10
+
+    def run(self, question: str) -> str:
+        prompt = REACT_PROMPT.format(
+            tools_description=self._format_tools(),
+            question=question
+        )
+
+        for _ in range(self.max_iterations):
+            response = self.llm.generate(prompt)
+
+            if "Final Answer:" in response:
+                return self._extract_final_answer(response)
+
+            action = self._parse_action(response)
+            observation = self._execute_tool(action)
+            prompt += f"\nObservation: {observation}\n"
+
+        return "Max iterations reached"
+```
+
+### 2.2 Function Calling Pattern
+
+```python
+## Define tools as functions with schemas
+TOOLS = [
+    {
+        "name": "search_web",
+        "description": "Search the web for current information",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search query"
+                }
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "calculate",
+        "description": "Perform mathematical calculations",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "expression": {
+                    "type": "string",
+                    "description": "Math expression to evaluate"
+                }
+            },
+            "required": ["expression"]
+        }
+    }
+]
+
+class FunctionCallingAgent:
+    def run(self, question: str) -> str:
+        messages = [{"role": "user", "content": question}]
+
+        remaining_tool_calls = 32
+        for _ in range(10):
+            response = self.llm.chat(
+                messages=messages,
+                tools=TOOLS,
+                tool_choice="auto"
+            )
+
+            # Provider adapter must preserve the assistant message and tool-call IDs.
+            messages.append(response.to_message())
+            if response.tool_calls:
+                if len(response.tool_calls) > remaining_tool_calls:
+                    raise RuntimeError("Tool-call budget exhausted")
+                remaining_tool_calls -= len(response.tool_calls)
+                for tool_call in response.tool_calls:
+                    result = self._execute_tool(
+                        tool_call.name,
+                        tool_call.arguments
+                    )
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": str(result)
+                    })
+            else:
+                return response.content
+        raise RuntimeError("Agent iteration budget exhausted")
+```
+
+### 2.3 Plan-and-Execute Pattern
+
+```python
+class PlanAndExecuteAgent:
+    """
+    1. Create a plan (list of steps)
+    2. Execute each step
+    3. Replan if needed
+    """
+
+    def run(self, task: str) -> str:
+        # Planning phase
+        plan = self.planner.create_plan(task)
+        # Returns: ["Step 1: ...", "Step 2: ...", ...]
+
+        results = []
+        pending = list(plan)
+        for _ in range(20):
+            if not pending:
+                break
+            step = pending.pop(0)
+            result = self.executor.execute(step, context=results)
+            results.append(result)
+            if self._needs_replan(task, results):
+                # Replace the actual remaining queue; rebinding a for-loop iterable
+                # would leave that loop executing the old plan.
+                pending = list(self.planner.replan(task, completed=results, remaining=pending))
+        if pending:
+            raise RuntimeError("Plan execution budget exhausted")
+
+        # Synthesize final answer
+        return self.synthesizer.summarize(task, results)
+```
+
+### 2.4 Multi-Agent Collaboration
+
+```python
+class AgentTeam:
+    """
+    Specialized agents collaborating on complex tasks
+    """
+
+    def __init__(self):
+        self.agents = {
+            "researcher": ResearchAgent(),
+            "analyst": AnalystAgent(),
+            "writer": WriterAgent(),
+            "critic": CriticAgent()
+        }
+        self.coordinator = CoordinatorAgent()
+
+    def solve(self, task: str) -> str:
+        # Coordinator assigns subtasks
+        assignments = self.coordinator.decompose(task)
+
+        results = {}
+        for assignment in assignments:
+            agent = self.agents[assignment.agent]
+            result = agent.execute(
+                assignment.subtask,
+                context=results
+            )
+            results[assignment.id] = result
+
+        # Critic reviews
+        critique = self.agents["critic"].review(results)
+
+        if critique.needs_revision:
+            # Iterate with feedback
+            return self.solve_with_feedback(task, results, critique)
+
+        return self.coordinator.synthesize(results)
+```
+
+---
+
+## 3. Prompt IDE Patterns
+
+### 3.1 Prompt Templates with Variables
+
+```python
+class PromptTemplate:
+    def __init__(self, template: str, variables: list[str]):
+        self.template = template
+        self.variables = variables
+
+    def format(self, **kwargs) -> str:
+        # Validate all variables provided
+        missing = set(self.variables) - set(kwargs.keys())
+        if missing:
+            raise ValueError(f"Missing variables: {missing}")
+
+        return self.template.format(**kwargs)
+
+    def with_examples(self, examples: list[dict]) -> str:
+        """Add few-shot examples"""
+        example_text = "\n\n".join([
+            f"Input: {ex['input']}\nOutput: {ex['output']}"
+            for ex in examples
+        ])
+        return f"{example_text}\n\n{self.template}"
+
+## Usage
+summarizer = PromptTemplate(
+    template="Summarize the following text in {style} style:\n\n{text}",
+    variables=["style", "text"]
+)
+
+prompt = summarizer.format(
+    style="professional",
+    text="Long article content..."
+)
+```
+
+### 3.2 Prompt Versioning & A/B Testing
+
+```python
+class PromptRegistry:
+    def __init__(self, db):
+        self.db = db
+
+    def register(self, name: str, template: str, version: str):
+        """Store prompt with version"""
+        self.db.save({
+            "name": name,
+            "template": template,
+            "version": version,
+            "created_at": datetime.now(),
+            "metrics": {}
+        })
+
+    def get(self, name: str, version: str = "latest") -> str:
+        """Retrieve specific version"""
+        return self.db.get(name, version)
+
+    def ab_test(self, name: str, user_id: str) -> str:
+        """Return variant based on user bucket"""
+        # The adapter returns the frozen, ordered variants for this experiment,
+        # not every prompt version ever created. Include an experiment salt.
+        import hashlib
+        experiment = self.db.get_active_experiment(name)
+        variants = experiment["variants"]
+        if not variants:
+            raise ValueError("Experiment has no variants")
+        key = f"{experiment['id']}:{user_id}".encode("utf-8")
+        bucket = int.from_bytes(hashlib.sha256(key).digest()[:8], "big") % len(variants)
+        return variants[bucket]
+
+    def record_outcome(self, prompt_id: str, outcome: dict):
+        """Track prompt performance"""
+        self.db.update_metrics(prompt_id, outcome)
+```
+
+### 3.3 Prompt Chaining
+
+```python
+class PromptChain:
+    """
+    Chain prompts together, passing output as input to next
+    """
+
+    def __init__(self, steps: list[dict]):
+        if not steps:
+            raise ValueError("Prompt chain requires at least one step")
+        self.steps = steps
+
+    def run(self, initial_input: str) -> dict:
+        context = {"input": initial_input}
+        results = []
+
+        for step in self.steps:
+            prompt = step["prompt"].format(**context)
+            output = llm.generate(prompt)
+
+            # Parse output if needed
+            if step.get("parser"):
+                parse_output = step["parser"]
+                output = parse_output(output)
+
+            context[step["output_key"]] = output
+            results.append({
+                "step": step["name"],
+                "output": output
+            })
+
+        return {
+            "final_output": context[self.steps[-1]["output_key"]],
+            "intermediate_results": results
+        }
+
+## Example: Research → Analyze → Summarize
+chain = PromptChain([
+    {
+        "name": "research",
+        "prompt": "Research the topic: {input}",
+        "output_key": "research"
+    },
+    {
+        "name": "analyze",
+        "prompt": "Analyze these findings:\n{research}",
+        "output_key": "analysis"
+    },
+    {
+        "name": "summarize",
+        "prompt": "Summarize this analysis in 3 bullet points:\n{analysis}",
+        "output_key": "summary"
+    }
+])
+```
+
+---
+
+## 4. LLMOps & Observability
+
+### 4.1 Metrics to Track
+
+```python
+LLM_METRICS = {
+    # Performance
+    "latency_p50": "50th percentile response time",
+    "latency_p99": "99th percentile response time",
+    "tokens_per_second": "Generation speed",
+
+    # Quality
+    "user_satisfaction": "Thumbs up/down ratio",
+    "task_completion": "% tasks completed successfully",
+    "hallucination_rate": "% responses with factual errors",
+
+    # Cost
+    "cost_per_request": "Average $ per API call",
+    "tokens_per_request": "Average tokens used",
+    "cache_hit_rate": "% requests served from cache",
+
+    # Reliability
+    "error_rate": "% failed requests",
+    "timeout_rate": "% requests that timed out",
+    "retry_rate": "% requests needing retry"
+}
+```
+
+### 4.2 Logging & Tracing
+
+```python
+import logging
+from opentelemetry import trace
+
+tracer = trace.get_tracer(__name__)
+
+class LLMLogger:
+    def log_request(self, request_id: str, data: dict):
+        """Log LLM request for debugging and analysis"""
+        log_entry = {
+            "request_id": request_id,
+            "timestamp": datetime.now().isoformat(),
+            "model": data["model"],
+            # Raw prompt omitted: truncation is not redaction.
+            "prompt_tokens": data["prompt_tokens"],
+            "temperature": data.get("temperature", 1.0),
+            # User identifiers require an explicit, scoped privacy policy.
+        }
+        logging.info(f"LLM_REQUEST: {json.dumps(log_entry)}")
+
+    def log_response(self, request_id: str, data: dict):
+        """Log LLM response"""
+        log_entry = {
+            "request_id": request_id,
+            "completion_tokens": data["completion_tokens"],
+            "total_tokens": data["total_tokens"],
+            "latency_ms": data["latency_ms"],
+            "finish_reason": data["finish_reason"],
+            "cost_usd": self._calculate_cost(data),
+        }
+        logging.info(f"LLM_RESPONSE: {json.dumps(log_entry)}")
 
 (Shortened: the skill continues in its source.)
 

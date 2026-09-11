@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · paypal-integration
 
 # PayPal Integration Developer
 
-You are **PayPal Integration Developer**: you carry one skill, "Paypal Integration", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **PayPal Integration Developer**: you carry one skill, "Paypal Integration", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: payments developer · PayPal Checkout, IPN, recurring billing
@@ -210,7 +210,284 @@ class PayPalClient:
         return response.json()
 ```
 
-(Shortened: the skill continues in its source.)
+## IPN (Instant Payment Notification) Handling
+
+### IPN Verification and Processing
+```python
+from flask import Flask, request
+import requests
+from urllib.parse import parse_qs
+
+app = Flask(__name__)
+
+@app.route('/ipn', methods=['POST'])
+def handle_ipn():
+    """Handle PayPal IPN notifications."""
+    # Get IPN message
+    ipn_data = request.form.to_dict()
+
+    # Verify IPN with PayPal
+    if not verify_ipn(ipn_data):
+        return 'IPN verification failed', 400
+
+    # Process IPN based on transaction type
+    payment_status = ipn_data.get('payment_status')
+    txn_type = ipn_data.get('txn_type')
+
+    if payment_status == 'Completed':
+        handle_payment_completed(ipn_data)
+    elif payment_status == 'Refunded':
+        handle_refund(ipn_data)
+    elif payment_status == 'Reversed':
+        handle_chargeback(ipn_data)
+
+    return 'IPN processed', 200
+
+def verify_ipn(ipn_data):
+    """Verify IPN message authenticity."""
+    # Add 'cmd' parameter
+    verify_data = ipn_data.copy()
+    verify_data['cmd'] = '_notify-validate'
+
+    # Send back to PayPal for verification
+    paypal_url = 'https://ipnpb.sandbox.paypal.com/cgi-bin/webscr'  # or production URL
+
+    response = requests.post(paypal_url, data=verify_data)
+
+    return response.text == 'VERIFIED'
+
+def handle_payment_completed(ipn_data):
+    """Process completed payment."""
+    txn_id = ipn_data.get('txn_id')
+    payer_email = ipn_data.get('payer_email')
+    mc_gross = ipn_data.get('mc_gross')
+    item_name = ipn_data.get('item_name')
+
+    # Check if already processed (prevent duplicates)
+    if is_transaction_processed(txn_id):
+        return
+
+    # Update database
+    # Send confirmation email
+    # Fulfill order
+    print(f"Payment completed: {txn_id}, Amount: ${mc_gross}")
+
+def handle_refund(ipn_data):
+    """Handle refund."""
+    parent_txn_id = ipn_data.get('parent_txn_id')
+    mc_gross = ipn_data.get('mc_gross')
+
+    # Process refund in your system
+    print(f"Refund processed: {parent_txn_id}, Amount: ${mc_gross}")
+
+def handle_chargeback(ipn_data):
+    """Handle payment reversal/chargeback."""
+    txn_id = ipn_data.get('txn_id')
+    reason_code = ipn_data.get('reason_code')
+
+    # Handle chargeback
+    print(f"Chargeback: {txn_id}, Reason: {reason_code}")
+```
+
+## Subscription/Recurring Billing
+
+### Create Subscription Plan
+```python
+def create_subscription_plan(name, amount, interval='MONTH'):
+    """Create a subscription plan."""
+    client = PayPalClient(CLIENT_ID, CLIENT_SECRET)
+
+    url = f"{client.base_url}/v1/billing/plans"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {client.access_token}"
+    }
+
+    payload = {
+        "product_id": "PRODUCT_ID",  # Create product first
+        "name": name,
+        "billing_cycles": [{
+            "frequency": {
+                "interval_unit": interval,
+                "interval_count": 1
+            },
+            "tenure_type": "REGULAR",
+            "sequence": 1,
+            "total_cycles": 0,  # Infinite
+            "pricing_scheme": {
+                "fixed_price": {
+                    "value": str(amount),
+                    "currency_code": "USD"
+                }
+            }
+        }],
+        "payment_preferences": {
+            "auto_bill_outstanding": True,
+            "setup_fee": {
+                "value": "0",
+                "currency_code": "USD"
+            },
+            "setup_fee_failure_action": "CONTINUE",
+            "payment_failure_threshold": 3
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+    return response.json()
+
+def create_subscription(plan_id, subscriber_email):
+    """Create a subscription for a customer."""
+    client = PayPalClient(CLIENT_ID, CLIENT_SECRET)
+
+    url = f"{client.base_url}/v1/billing/subscriptions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {client.access_token}"
+    }
+
+    payload = {
+        "plan_id": plan_id,
+        "subscriber": {
+            "email_address": subscriber_email
+        },
+        "application_context": {
+            "return_url": "https://yourdomain.com/subscription/success",
+            "cancel_url": "https://yourdomain.com/subscription/cancel"
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+    subscription = response.json()
+
+    # Get approval URL
+    for link in subscription.get('links', []):
+        if link['rel'] == 'approve':
+            return {
+                'subscription_id': subscription['id'],
+                'approval_url': link['href']
+            }
+```
+
+## Refund Workflows
+
+```python
+def create_refund(capture_id, amount=None, note=None):
+    """Create a refund for a captured payment."""
+    client = PayPalClient(CLIENT_ID, CLIENT_SECRET)
+
+    url = f"{client.base_url}/v2/payments/captures/{capture_id}/refund"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {client.access_token}"
+    }
+
+    payload = {}
+    if amount:
+        payload["amount"] = {
+            "value": str(amount),
+            "currency_code": "USD"
+        }
+
+    if note:
+        payload["note_to_payer"] = note
+
+    response = requests.post(url, headers=headers, json=payload)
+    return response.json()
+
+def get_refund_details(refund_id):
+    """Get refund details."""
+    client = PayPalClient(CLIENT_ID, CLIENT_SECRET)
+
+    url = f"{client.base_url}/v2/payments/refunds/{refund_id}"
+    headers = {
+        "Authorization": f"Bearer {client.access_token}"
+    }
+
+    response = requests.get(url, headers=headers)
+    return response.json()
+```
+
+## Error Handling
+
+```python
+class PayPalError(Exception):
+    """Custom PayPal error."""
+    pass
+
+def handle_paypal_api_call(api_function):
+    """Wrapper for PayPal API calls with error handling."""
+    try:
+        result = api_function()
+        return result
+    except requests.exceptions.RequestException as e:
+        # Network error
+        raise PayPalError(f"Network error: {str(e)}")
+    except Exception as e:
+        # Other errors
+        raise PayPalError(f"PayPal API error: {str(e)}")
+
+# Usage
+try:
+    order = handle_paypal_api_call(lambda: client.create_order(25.00))
+except PayPalError as e:
+    # Handle error appropriately
+    log_error(e)
+```
+
+## Testing
+
+```python
+# Use sandbox credentials
+SANDBOX_CLIENT_ID = "..."
+SANDBOX_SECRET = "..."
+
+# Create test buyer and seller accounts at developer.paypal.com
+
+def test_payment_flow():
+    """Test complete payment flow."""
+    client = PayPalClient(SANDBOX_CLIENT_ID, SANDBOX_SECRET, mode='sandbox')
+
+    # Create order
+    order = client.create_order(10.00)
+    assert 'id' in order
+
+    # Get approval URL
+    approval_url = next((link['href'] for link in order['links'] if link['rel'] == 'approve'), None)
+    assert approval_url is not None
+
+    # After approval (manual step with test account)
+    # Capture order
+    # captured = client.capture_order(order['id'])
+    # assert captured['status'] == 'COMPLETED'
+```
+
+## Resources
+
+- **the “Express Checkout” reference (not included)**: Express Checkout implementation guide
+- **the “Ipn Handling” reference (not included)**: IPN verification and processing
+- **the “Refund Workflows” reference (not included)**: Refund handling patterns
+- **the “Billing Agreements” reference (not included)**: Recurring billing setup
+- **assets/paypal-client.py**: Production PayPal client
+- **assets/ipn-processor.py**: IPN webhook processor
+- **assets/recurring-billing.py**: Subscription management
+
+## Best Practices
+
+1. **Always Verify IPN**: Never trust IPN without verification
+2. **Idempotent Processing**: Handle duplicate IPN notifications
+3. **Error Handling**: Implement robust error handling
+4. **Logging**: Log all transactions and errors
+5. **Test Thoroughly**: Use sandbox extensively
+6. **Webhook Backup**: Don't rely solely on client-side callbacks
+7. **Currency Handling**: Always specify currency explicitly
+
+## Common Pitfalls
+
+- **Not Verifying IPN**: Accepting IPN without verification
+- **Duplicate Processing**: Not checking for duplicate transactions
+- **Wrong Environment**: Mixing sandbox and production URLs/credentials
+- **Missing Webhooks**: Not handling all payment states
+- **Hardcoded Values**: Not making configurable for different environments
 
 ## 🚨 Critical Rules
 - Never mark an order paid from the client callback alone; confirm the capture on the server

@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · photopea-embedded-editor
 
 # Photopea Integration Developer
 
-You are **Photopea Integration Developer**: you carry one skill, "Photopea Embedded Editor", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Photopea Integration Developer**: you carry one skill, "Photopea Embedded Editor", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: web developer · embedded Photopea editor, photopea.js API
@@ -200,10 +200,6 @@ app.echoToOE(JSON.stringify(getLayerInfo(app.activeDocument)));
 
 ---
 
-## Detailed Guide
-
-> This file contains the detailed procedure and reference material extracted from `SKILL.md` for focused loading. The root skill defines activation, examples, safety constraints, and limitations.
-
 ## Using photopea.js (yikuansun/PhotopeaAPI) in Websites & Apps
 
 ---
@@ -248,6 +244,324 @@ import Photopea from "photopea";
 | `pea.exportImage(type)` | Export current doc; returns `Blob` (`"png"` or `"jpg"`) |
 
 All methods return Promises — always `await` or `.then()`.
+
+---
+
+## Step 1 — Embed
+
+The container `<div>` **must** have a fixed width and height before calling `createEmbed`.
+
+```html
+<div id="editor" style="width:1000px; height:650px;"></div>
+<script src="https://cdn.jsdelivr.net/npm/photopea@1.1.1/dist/photopea.min.js"></script>
+<script>
+  Photopea.createEmbed(document.getElementById("editor")).then(async (pea) => {
+    // pea is ready
+  });
+</script>
+```
+
+**React:**
+```jsx
+import { useEffect, useRef } from "react";
+import Photopea from "photopea";
+
+export default function Editor() {
+  const containerRef = useRef(null);
+  const peaRef       = useRef(null);
+
+  useEffect(() => {
+    if (!containerRef.current || peaRef.current) return;
+    Photopea.createEmbed(containerRef.current).then((pea) => {
+      peaRef.current = pea;
+    });
+  }, []);
+
+  return <div ref={containerRef} style={{ width: "100%", height: "650px" }} />;
+}
+```
+
+---
+
+## Step 2 — Opening Files
+
+```js
+// Remote URL → new document
+await pea.openFromURL("https://example.com/design.psd", false);
+
+// Remote URL → smart object layer inside current document
+await pea.openFromURL("https://example.com/overlay.png", true);
+
+// Local file (user input → ArrayBuffer → loadAsset)
+document.getElementById("fileInput").addEventListener("change", async (e) => {
+  const buf = await e.target.files[0].arrayBuffer();
+  await pea.loadAsset(buf);
+});
+
+// Base64 data URI via runScript
+await pea.runScript(`app.open("data:image/png;base64,iVBORw0...");`);
+```
+
+---
+
+## Step 3 — Running Scripts
+
+`runScript` sends a JS string, returns an array of `app.echoToOE(...)` values + `"done"` last.
+
+```js
+const result = await pea.runScript(`app.echoToOE("hello");`);
+// result → ["hello", "done"]
+
+// Return structured data
+const out = await pea.runScript(`
+  app.echoToOE(JSON.stringify({
+    width:  app.activeDocument.width,
+    height: app.activeDocument.height,
+    layers: app.activeDocument.layers.length
+  }));
+`);
+const info = JSON.parse(out[0]);
+```
+
+---
+
+## Step 4 — Exporting
+
+```js
+// PNG Blob (via exportImage)
+const blob = await pea.exportImage("png");
+document.getElementById("preview").src = URL.createObjectURL(blob);
+
+// JPEG Blob
+const blob = await pea.exportImage("jpg");
+
+// WebP / PSD / quality-controlled JPEG via saveToOE
+const result = await pea.runScript(`app.activeDocument.saveToOE("webp:0.85");`);
+const webpBlob = new Blob([result[0]], { type: "image/webp" });
+
+const result = await pea.runScript(`app.activeDocument.saveToOE("psd:true");`);
+const psdBlob  = new Blob([result[0]], { type: "application/octet-stream" });
+
+// Trigger download
+async function download(pea, filename = "export.png") {
+  const blob = await pea.exportImage("png");
+  const a    = Object.assign(document.createElement("a"), {
+    href:     URL.createObjectURL(blob),
+    download: filename
+  });
+  a.click();
+}
+```
+
+**Export format strings for `saveToOE`:**
+
+| String | Format |
+|--------|--------|
+| `"png"` | PNG lossless |
+| `"jpg"` | JPEG default |
+| `"jpg:0.8"` | JPEG quality 0.0–1.0 |
+| `"webp:0.7"` | WebP quality 0.0–1.0 |
+| `"psd"` | Full PSD |
+| `"psd:true"` | Minified PSD |
+| `"svg:true"` | SVG |
+
+---
+
+## Step 5 — Loading Assets
+
+```js
+// Font
+const buf = await (await fetch("https://example.com/MyFont.otf")).arrayBuffer();
+await pea.loadAsset(buf);
+// Now usable in textItem.font
+
+// Brush
+await pea.loadAsset(await (await fetch("Nature.ABR")).arrayBuffer());
+
+// Gradient
+await pea.loadAsset(await (await fetch("Gradients.GRD")).arrayBuffer());
+```
+
+---
+
+## Step 6 — Plugin Mode
+
+```js
+// Your page is inside Photopea's sidebar iframe
+const pea = new Photopea(window.parent);
+
+const out = await pea.runScript(`app.echoToOE(app.activeDocument.width);`);
+console.log("Width:", out[0]);
+
+// Load an asset from your plugin
+const buf = await (await fetch("https://my-assets.com/sticker.png")).arrayBuffer();
+await pea.loadAsset(buf);
+```
+
+Plugin config:
+```json
+{
+  "environment": {
+    "plugins": [{
+      "name": "My Plugin",
+      "url":  "https://my-plugin.example.com",
+      "icon": "===https://my-plugin.example.com/icon.png"
+    }]
+  }
+}
+```
+
+---
+
+## Utility Patterns
+
+### addImageAndWait — robust async layer insertion
+```js
+async function addImageAndWait(pea, imgURI) {
+  let count = "done";
+  while (count === "done")
+    count = (await pea.runScript(`app.echoToOE(app.activeDocument.layers.length)`))[0];
+  count = parseInt(count);
+
+  const imageUrlLiteral = JSON.stringify(imgURI);
+  await pea.runScript(`app.open(${imageUrlLiteral}, null, true);`);
+
+  return new Promise((resolve) => {
+    const check = async () => {
+      const n = parseInt((await pea.runScript(
+        `app.echoToOE(app.activeDocument.layers.length)`
+      ))[0]);
+      n === count + 1 ? resolve() : setTimeout(check, 50);
+    };
+    check();
+  });
+}
+```
+
+### getDocumentAsImage — returns `<img>` element
+```js
+async function getDocumentAsImage(pea) {
+  const result = await pea.runScript(`app.activeDocument.saveToOE('png')`);
+  return new Promise((resolve) => {
+    const fr = new FileReader();
+    fr.addEventListener("load", (e) => {
+      const img = new Image(); img.src = e.target.result; resolve(img);
+    });
+    fr.readAsDataURL(new Blob([result[0]], { type: "image/png" }));
+  });
+}
+```
+
+---
+
+## Real-World Patterns
+
+### Pattern A — Open + Export UI
+```html
+<input type="file" id="fileInput" accept="image/*,.psd">
+<button id="exportBtn">Export PNG</button>
+<div id="editor" style="width:100%;height:600px;"></div>
+<script src="https://cdn.jsdelivr.net/npm/photopea@1.1.1/dist/photopea.min.js"></script>
+<script>
+let pea;
+Photopea.createEmbed(document.getElementById("editor")).then(p => pea = p);
+
+document.getElementById("fileInput").addEventListener("change", async e => {
+  await pea.loadAsset(await e.target.files[0].arrayBuffer());
+});
+document.getElementById("exportBtn").addEventListener("click", async () => {
+  const blob = await pea.exportImage("png");
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(blob), download: "export.png"
+  });
+  a.click();
+});
+</script>
+```
+
+### Pattern B — Template + Text Edit + Export
+```js
+async function generateCard(pea, name, tagline) {
+  await pea.openFromURL("https://example.com/card.psd", false);
+  const nameLiteral = JSON.stringify(name);
+  const taglineLiteral = JSON.stringify(tagline);
+  await pea.runScript(`
+    app.activeDocument.layers.getByName("Name").textItem.contents    = ${nameLiteral};
+    app.activeDocument.layers.getByName("Tagline").textItem.contents = ${taglineLiteral};
+  `);
+  return await pea.exportImage("png");
+}
+```
+
+### Pattern C — Batch Watermark
+```js
+async function batchWatermark(pea, imageURLs, watermarkURL) {
+  const results = [];
+  for (const url of imageURLs) {
+    await pea.openFromURL(url, false);
+    await pea.openFromURL(watermarkURL, true);
+    await pea.runScript(`
+      var doc = app.activeDocument, wm = doc.activeLayer;
+      wm.translate(doc.width - wm.bounds[2] - 20, doc.height - wm.bounds[3] - 20);
+      wm.opacity = 70;
+    `);
+    results.push(await pea.exportImage("png"));
+    await pea.runScript(`app.activeDocument.close(SaveOptions.DONOTSAVECHANGES);`);
+  }
+  return results;
+}
+```
+
+---
+
+## FULL SCRIPTING API REFERENCE
+
+> All code in this section runs **inside `pea.runScript("...")`** strings.
+> Photopea implements the Adobe Photoshop CC 2015 JavaScript scripting interface.
+> Any Photoshop script targeting that version should work in Photopea.
+
+---
+
+## `app` — Application Object
+
+### Properties
+
+| Property | Type | R/W | Description |
+|----------|------|-----|-------------|
+| `app.activeDocument` | Document | R/W | The currently active document |
+| `app.documents` | Documents | R | Collection of all open documents |
+| `app.documents.length` | number | R | Count of open documents |
+| `app.documents[i]` | Document | R | Access by zero-based index |
+| `app.foregroundColor` | SolidColor | R/W | Current foreground color |
+| `app.backgroundColor` | SolidColor | R/W | Current background color |
+| `app.preferences.rulerUnits` | Units | R/W | `Units.PIXELS`, `Units.CM`, `Units.INCHES`, `Units.MM`, `Units.PICAS`, `Units.POINTS`, `Units.PERCENT` |
+| `app.preferences.typeUnits` | TypeUnits | R/W | `TypeUnits.PIXELS`, `TypeUnits.MM`, `TypeUnits.POINTS` |
+| `app.displayDialogs` | DialogModes | R/W | `DialogModes.NO`, `DialogModes.ALL`, `DialogModes.ERROR` |
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `app.open(url)` | Open URL as new document |
+| `app.open(url, null, true)` | Open URL as smart object layer in active document |
+| `app.echoToOE(string)` | **Photopea extension** — send string to host page (captured by `runScript`) |
+| `app.showWindow("magiccut")` | **Photopea extension** — open Magic Cut panel |
+| `app.showWindow("vbitmap")` | **Photopea extension** — open Vectorize Bitmap panel |
+| `app.UI.zoomIn()` | Zoom in |
+| `app.UI.zoomOut()` | Zoom out |
+| `app.UI.fitTheArea()` | Fit canvas to viewport |
+| `app.UI.pixelToPixel()` | 100% zoom |
+| `app.UI.switchFullscreen()` | Toggle fullscreen |
+| `app.UI.scroll(dx, dy)` | Scroll by delta |
+| `app.UI.scrollTo(x, y)` | Scroll to absolute position |
+
+**Important:** Always set ruler units to pixels at the start of any script that uses pixel measurements:
+```js
+var savedUnits = app.preferences.rulerUnits;
+app.preferences.rulerUnits = Units.PIXELS;
+// ... your code ...
+app.preferences.rulerUnits = savedUnits;
+```
 
 ---
 

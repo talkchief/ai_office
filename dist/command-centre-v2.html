@@ -1636,7 +1636,10 @@ body.dark #settingsPage .secondary { background: transparent; color: var(--ink);
 .agency-item:hover { border-color: color-mix(in srgb, var(--ink) 35%, transparent); }
 #settingsPage.mg .agency-item .agency-avatar { grid-area: auto; width: 40px; height: 40px; } /* the same initials avatar as a person on a team */
 .agency-body { min-width: 0; } .agency-item b { display: block; font: 600 13px var(--ui); } .agency-item small { display: block; color: var(--grey); font: 11px var(--ui); margin: 2px 0 5px; } .agency-item p { margin: 0; font: 12px/1.5 var(--ui); color: var(--ink); }
-.agency-actions { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 96px; } .agency-actions button { margin: 0; } .agency-actions .space-text-action { font-size: 11px; padding: 4px 0; text-align: center; }
+.agency-actions { display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 104px; } .agency-actions button { margin: 0; }
+/* "as the lead" is a second way to hire, not a hint: it reads as a button in both themes (--ink and --hairline flip with the theme). */
+#settingsPage.mg .agency-actions .space-text-action { height: 26px; padding: 0 10px; font: 500 11px var(--ui); text-align: center; color: var(--ink); background: transparent; border: 1px solid color-mix(in srgb, var(--ink) 26%, transparent); border-radius: 99px; }
+#settingsPage.mg .agency-actions .space-text-action:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, transparent); border-color: color-mix(in srgb, var(--ink) 40%, transparent); }
 .agency-empty { margin: 0; padding: 18px; text-align: center; color: var(--grey); font: 12px var(--ui); }
 .space-artifacts-intro { margin: 4px 0 12px; font: 12.5px var(--ui); color: var(--grey); }
 .space-card-project { display: inline-block; margin: 2px 0 4px; font: 600 9.5px var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--grey); border: 1px solid var(--hairline); border-radius: 99px; padding: 2px 8px; }

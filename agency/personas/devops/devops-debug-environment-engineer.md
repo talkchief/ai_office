@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · distributed-debugging-debug-trace
 
 # Debug Environment Engineer
 
-You are **Debug Environment Engineer**: you carry one skill, "Distributed Debugging Debug Trace", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Debug Environment Engineer**: you carry one skill, "Distributed Debugging Debug Trace", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: debugging infrastructure engineer · tracing, diagnostics
@@ -245,7 +245,423 @@ const http = require('http');
 
 class RemoteDebugServer {
     constructor(options = {}) {
-        this.port = options.port |
+        this.port = options.port || 9229;
+        this.host = options.host || '0.0.0.0';
+        this.wsPort = options.wsPort || 9230;
+        this.sessions = new Map();
+    }
+    
+    start() {
+        // Open inspector
+        inspector.open(this.port, this.host, true);
+        
+        // Create WebSocket server for remote connections
+        this.wss = new WebSocket.Server({ port: this.wsPort });
+        
+        this.wss.on('connection', (ws) => {
+            const sessionId = this.generateSessionId();
+            this.sessions.set(sessionId, ws);
+            
+            ws.on('message', (message) => {
+                this.handleDebugCommand(sessionId, message);
+            });
+            
+            ws.on('close', () => {
+                this.sessions.delete(sessionId);
+            });
+            
+            // Send initial session info
+            ws.send(JSON.stringify({
+                type: 'session',
+                sessionId,
+                debugUrl: `chrome-devtools://devtools/bundled/inspector.html?ws=${this.host}:${this.port}`
+            }));
+        });
+        
+        console.log(`Remote debug server listening on ws://${this.host}:${this.wsPort}`);
+    }
+    
+    handleDebugCommand(sessionId, message) {
+        const command = JSON.parse(message);
+        
+        switch (command.type) {
+            case 'evaluate':
+                this.evaluateExpression(sessionId, command.expression);
+                break;
+            case 'setBreakpoint':
+                this.setBreakpoint(command.file, command.line);
+                break;
+            case 'heapSnapshot':
+                this.takeHeapSnapshot(sessionId);
+                break;
+            case 'profile':
+                this.startProfiling(sessionId, command.duration);
+                break;
+        }
+    }
+    
+    evaluateExpression(sessionId, expression) {
+        const session = new inspector.Session();
+        session.connect();
+        
+        session.post('Runtime.evaluate', {
+            expression,
+            generatePreview: true,
+            includeCommandLineAPI: true
+        }, (error, result) => {
+            const ws = this.sessions.get(sessionId);
+            if (ws) {
+                ws.send(JSON.stringify({
+                    type: 'evaluateResult',
+                    result: result || error
+                }));
+            }
+        });
+        
+        session.disconnect();
+    }
+}
+
+// Docker remote debugging setup
+FROM node:18
+RUN apt-get update && apt-get install -y \
+    chromium \
+    gdb \
+    strace \
+    tcpdump \
+    vim
+    
+EXPOSE 9229 9230
+ENV NODE_OPTIONS="--inspect=0.0.0.0:9229"
+CMD ["node", "--inspect-brk=0.0.0.0:9229", "index.js"]
+```
+
+### 3. Distributed Tracing
+
+Implement comprehensive distributed tracing:
+
+**OpenTelemetry Setup**
+```javascript
+// tracing.js
+const { NodeSDK } = require('@opentelemetry/sdk-node');
+const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
+const { Resource } = require('@opentelemetry/resources');
+const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventions');
+const { JaegerExporter } = require('@opentelemetry/exporter-jaeger');
+const { BatchSpanProcessor } = require('@opentelemetry/sdk-trace-base');
+
+class TracingSystem {
+    constructor(serviceName) {
+        this.serviceName = serviceName;
+        this.sdk = null;
+    }
+    
+    initialize() {
+        const jaegerExporter = new JaegerExporter({
+            endpoint: process.env.JAEGER_ENDPOINT || 'http://localhost:14268/api/traces',
+        });
+        
+        const resource = Resource.default().merge(
+            new Resource({
+                [SemanticResourceAttributes.SERVICE_NAME]: this.serviceName,
+                [SemanticResourceAttributes.SERVICE_VERSION]: process.env.SERVICE_VERSION || '1.0.0',
+                [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV || 'development',
+            })
+        );
+        
+        this.sdk = new NodeSDK({
+            resource,
+            spanProcessor: new BatchSpanProcessor(jaegerExporter),
+            instrumentations: [
+                getNodeAutoInstrumentations({
+                    '@opentelemetry/instrumentation-fs': {
+                        enabled: false, // Too noisy
+                    },
+                    '@opentelemetry/instrumentation-http': {
+                        requestHook: (span, request) => {
+                            span.setAttribute('http.request.body', JSON.stringify(request.body));
+                        },
+                        responseHook: (span, response) => {
+                            span.setAttribute('http.response.size', response.length);
+                        },
+                    },
+                    '@opentelemetry/instrumentation-express': {
+                        requestHook: (span, req) => {
+                            span.setAttribute('user.id', req.user?.id);
+                            span.setAttribute('session.id', req.session?.id);
+                        },
+                    },
+                }),
+            ],
+        });
+        
+        this.sdk.start();
+        
+        // Graceful shutdown
+        process.on('SIGTERM', () => {
+            this.sdk.shutdown()
+                .then(() => console.log('Tracing terminated'))
+                .catch((error) => console.error('Error terminating tracing', error))
+                .finally(() => process.exit(0));
+        });
+    }
+    
+    // Custom span creation
+    createSpan(name, fn, attributes = {}) {
+        const tracer = trace.getTracer(this.serviceName);
+        return tracer.startActiveSpan(name, async (span) => {
+            try {
+                // Add custom attributes
+                Object.entries(attributes).forEach(([key, value]) => {
+                    span.setAttribute(key, value);
+                });
+                
+                // Execute function
+                const result = await fn(span);
+                
+                span.setStatus({ code: SpanStatusCode.OK });
+                return result;
+            } catch (error) {
+                span.recordException(error);
+                span.setStatus({
+                    code: SpanStatusCode.ERROR,
+                    message: error.message,
+                });
+                throw error;
+            } finally {
+                span.end();
+            }
+        });
+    }
+}
+
+// Distributed tracing middleware
+class TracingMiddleware {
+    constructor() {
+        this.tracer = trace.getTracer('http-middleware');
+    }
+    
+    express() {
+        return (req, res, next) => {
+            const span = this.tracer.startSpan(`${req.method} ${req.path}`, {
+                kind: SpanKind.SERVER,
+                attributes: {
+                    'http.method': req.method,
+                    'http.url': req.url,
+                    'http.target': req.path,
+                    'http.host': req.hostname,
+                    'http.scheme': req.protocol,
+                    'http.user_agent': req.get('user-agent'),
+                    'http.request_content_length': req.get('content-length'),
+                },
+            });
+            
+            // Inject trace context into request
+            req.span = span;
+            req.traceId = span.spanContext().traceId;
+            
+            // Add trace ID to response headers
+            res.setHeader('X-Trace-Id', req.traceId);
+            
+            // Override res.end to capture response data
+            const originalEnd = res.end;
+            res.end = function(...args) {
+                span.setAttribute('http.status_code', res.statusCode);
+                span.setAttribute('http.response_content_length', res.get('content-length'));
+                
+                if (res.statusCode >= 400) {
+                    span.setStatus({
+                        code: SpanStatusCode.ERROR,
+                        message: `HTTP ${res.statusCode}`,
+                    });
+                }
+                
+                span.end();
+                originalEnd.apply(res, args);
+            };
+            
+            next();
+        };
+    }
+}
+```
+
+### 4. Debug Logging Framework
+
+Implement structured debug logging:
+
+**Advanced Logger**
+```javascript
+// debug-logger.js
+const winston = require('winston');
+const { ElasticsearchTransport } = require('winston-elasticsearch');
+
+class DebugLogger {
+    constructor(options = {}) {
+        this.service = options.service || 'app';
+        this.level = process.env.LOG_LEVEL || 'debug';
+        this.logger = this.createLogger();
+    }
+    
+    createLogger() {
+        const formats = [
+            winston.format.timestamp(),
+            winston.format.errors({ stack: true }),
+            winston.format.splat(),
+            winston.format.json(),
+        ];
+        
+        if (process.env.NODE_ENV === 'development') {
+            formats.push(winston.format.colorize());
+            formats.push(winston.format.printf(this.devFormat));
+        }
+        
+        const transports = [
+            new winston.transports.Console({
+                level: this.level,
+                handleExceptions: true,
+                handleRejections: true,
+            }),
+        ];
+        
+        // Add file transport for debugging
+        if (process.env.DEBUG_LOG_FILE) {
+            transports.push(
+                new winston.transports.File({
+                    filename: process.env.DEBUG_LOG_FILE,
+                    level: 'debug',
+                    maxsize: 10485760, // 10MB
+                    maxFiles: 5,
+                })
+            );
+        }
+        
+        // Add Elasticsearch for production
+        if (process.env.ELASTICSEARCH_URL) {
+            transports.push(
+                new ElasticsearchTransport({
+                    level: 'info',
+                    clientOpts: {
+                        node: process.env.ELASTICSEARCH_URL,
+                    },
+                    index: `logs-${this.service}`,
+                })
+            );
+        }
+        
+        return winston.createLogger({
+            level: this.level,
+            format: winston.format.combine(...formats),
+            defaultMeta: {
+                service: this.service,
+                environment: process.env.NODE_ENV,
+                hostname: require('os').hostname(),
+                pid: process.pid,
+            },
+            transports,
+        });
+    }
+    
+    devFormat(info) {
+        const { timestamp, level, message, ...meta } = info;
+        const metaString = Object.keys(meta).length ? 
+            '\n' + JSON.stringify(meta, null, 2) : '';
+        
+        return `${timestamp} [${level}]: ${message}${metaString}`;
+    }
+    
+    // Debug-specific methods
+    trace(message, meta = {}) {
+        const stack = new Error().stack;
+        this.logger.debug(message, {
+            ...meta,
+            trace: stack,
+            timestamp: Date.now(),
+        });
+    }
+    
+    timing(label, fn) {
+        const start = process.hrtime.bigint();
+        const result = fn();
+        const end = process.hrtime.bigint();
+        const duration = Number(end - start) / 1000000; // Convert to ms
+        
+        this.logger.debug(`Timing: ${label}`, {
+            duration,
+            unit: 'ms',
+        });
+        
+        return result;
+    }
+    
+    memory() {
+        const usage = process.memoryUsage();
+        this.logger.debug('Memory usage', {
+            rss: `${Math.round(usage.rss / 1024 / 1024)}MB`,
+            heapTotal: `${Math.round(usage.heapTotal / 1024 / 1024)}MB`,
+            heapUsed: `${Math.round(usage.heapUsed / 1024 / 1024)}MB`,
+            external: `${Math.round(usage.external / 1024 / 1024)}MB`,
+        });
+    }
+}
+
+// Debug context manager
+class DebugContext {
+    constructor() {
+        this.contexts = new Map();
+    }
+    
+    create(id, metadata = {}) {
+        const context = {
+            id,
+            startTime: Date.now(),
+            metadata,
+            logs: [],
+            spans: [],
+        };
+        
+        this.contexts.set(id, context);
+        return context;
+    }
+    
+    log(contextId, level, message, data = {}) {
+        const context = this.contexts.get(contextId);
+        if (context) {
+            context.logs.push({
+                timestamp: Date.now(),
+                level,
+                message,
+                data,
+            });
+        }
+    }
+    
+    export(contextId) {
+        const context = this.contexts.get(contextId);
+        if (!context) return null;
+        
+        return {
+            ...context,
+            duration: Date.now() - context.startTime,
+            logCount: context.logs.length,
+        };
+    }
+}
+```
+
+### 5. Source Map Configuration
+
+Set up source map support for production debugging:
+
+**Source Map Setup**
+```javascript
+// webpack.config.js
+module.exports = {
+    mode: 'production',
+    devtool: 'hidden-source-map', // Generate source maps but don't reference them
+    
+    output: {
+        filename: '[name].[c
 
 (Shortened: the skill continues in its source.)
 

@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · swiftui-ui-patterns
 
 # SwiftUI Screen Developer
 
-You are **SwiftUI Screen Developer**: you carry one skill, "Swiftui UI Patterns", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **SwiftUI Screen Developer**: you carry one skill, "Swiftui UI Patterns", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: iOS developer · navigation, sheets, async state, reusable screens
@@ -113,6 +113,284 @@ Use “Reference: Components Index” below as the entry point. Each component r
 - Minimal usage pattern with local conventions.
 - Pitfalls and performance notes.
 - Paths to existing examples in the current repo.
+
+## Adding a new component reference
+
+- Create `references/<component>.md`.
+- Keep it short and actionable; link to concrete files in the current repo.
+- Update “Reference: Components Index” below with the new entry.
+
+## Reference: Components Index
+
+Use this file to find component and cross-cutting guidance. Each entry lists when to use it.
+
+## Available components
+
+- TabView: the “Tabview” reference (not included) — Use when building a tab-based app or any tabbed feature set.
+- NavigationStack: “Reference: Navigationstack” below — Use when you need push navigation and programmatic routing, especially per-tab history.
+- Sheets and presentation: “Reference: Sheets” below — Use for local item-driven sheets, centralized modal routing, and sheet-specific action patterns.
+- Form and Settings: the “Form” reference (not included) — Use for settings, grouped inputs, and structured data entry.
+- macOS Settings: the “macOS Settings” reference (not included) — Use when building a macOS Settings window with SwiftUI's Settings scene.
+- Split views and columns: the “Split Views” reference (not included) — Use for iPad/macOS multi-column layouts or custom secondary columns.
+- List and Section: the “List” reference (not included) — Use for feed-style content and settings rows.
+- ScrollView and Lazy stacks: the “Scrollview” reference (not included) — Use for custom layouts, horizontal scrollers, or grids.
+- Scroll-reveal detail surfaces: “Reference: Scroll Reveal” below — Use when a detail screen reveals secondary content or actions as the user scrolls or swipes between full-screen sections.
+- Grids: the “Grids” reference (not included) — Use for icon pickers, media galleries, and tiled layouts.
+- Theming and dynamic type: the “Theming” reference (not included) — Use for app-wide theme tokens, colors, and type scaling.
+- Controls (toggles, pickers, sliders): the “Controls” reference (not included) — Use for settings controls and input selection.
+- Input toolbar (bottom anchored): the “Input Toolbar” reference (not included) — Use for chat/composer screens with a sticky input bar.
+- Top bar overlays (iOS 26+ and fallback): the “Top Bar” reference (not included) — Use for pinned selectors or pills above scroll content.
+- Overlay and toasts: the “Overlay” reference (not included) — Use for transient UI like banners or toasts.
+- Focus handling: the “Focus” reference (not included) — Use for chaining fields and keyboard focus management.
+- Searchable: the “Searchable” reference (not included) — Use for native search UI with scopes and async results.
+- Async images and media: the “Media” reference (not included) — Use for remote media, previews, and media viewers.
+- Haptics: the “Haptics” reference (not included) — Use for tactile feedback tied to key actions.
+- Matched transitions: the “Matched Transitions” reference (not included) — Use for smooth source-to-destination animations.
+- Deep links and URL routing: “Reference: Deeplinks” below — Use for in-app navigation from URLs.
+- Title menus: the “Title Menus” reference (not included) — Use for filter or context menus in the navigation title.
+- Menu bar commands: the “Menu Bar” reference (not included) — Use when adding or customizing macOS/iPadOS menu bar commands.
+- Loading & placeholders: the “Loading Placeholders” reference (not included) — Use for redacted skeletons, empty states, and loading UX.
+- Lightweight clients: the “Lightweight Clients” reference (not included) — Use for small, closure-based API clients injected into stores.
+
+## Cross-cutting references
+
+- App wiring and dependency graph: “Reference: App Wiring” below — Use to wire the app shell, install shared dependencies, and decide what belongs in the environment.
+- Async state and task lifecycle: “Reference: Async State” below — Use when a view loads data, reacts to changing input, or needs cancellation/debouncing guidance.
+- Previews: “Reference: Previews” below — Use when adding `#Preview`, fixtures, mock environments, or isolated preview setup.
+- Performance guardrails: “Reference: Performance” below — Use when a screen is large, scroll-heavy, frequently updated, or showing signs of avoidable re-renders.
+
+## Planned components (create files as needed)
+
+- Web content: create the “Webview” reference (not included) — Use for embedded web content or in-app browsing.
+- Status composer patterns: create the “Composer” reference (not included) — Use for composition or editor workflows.
+- Text input and validation: create the “Text Input” reference (not included) — Use for forms, validation, and text-heavy input.
+- Design system usage: create the “Design System” reference (not included) — Use when applying shared styling rules.
+
+## Adding entries
+
+- Add the component file and link it here with a short “when to use” description.
+- Keep each component reference short and actionable.
+
+## Intent
+
+Use this pattern when a detail screen has a primary surface first and secondary content behind it, and you want the user to reveal that secondary layer by scrolling or swiping instead of tapping a separate button.
+
+Typical fits:
+
+- media detail screens that reveal actions or metadata
+- maps, cards, or canvases that transition into structured detail
+- full-screen viewers with a second "actions" or "insights" page
+
+## Core pattern
+
+Build the interaction as a paged vertical `ScrollView` with two sections:
+
+1. a primary section sized to the viewport
+2. a secondary section below it
+
+Derive a normalized `progress` value from the vertical content offset and drive all visual changes from that one value.
+
+Avoid treating the reveal as a separate gesture system unless scroll alone cannot express it.
+
+## Minimal structure
+
+```swift
+private enum DetailSection: Hashable {
+  case primary
+  case secondary
+}
+
+struct DetailSurface: View {
+  @State private var revealProgress: CGFloat = 0
+  @State private var secondaryHeight: CGFloat = 1
+
+  var body: some View {
+    GeometryReader { geometry in
+      ScrollViewReader { proxy in
+        ScrollView(.vertical, showsIndicators: false) {
+          VStack(spacing: 0) {
+            PrimaryContent(progress: revealProgress)
+              .frame(height: geometry.size.height)
+              .id(DetailSection.primary)
+
+            SecondaryContent(progress: revealProgress)
+              .id(DetailSection.secondary)
+              .onGeometryChange(for: CGFloat.self) { geo in
+                geo.size.height
+              } action: { newHeight in
+                secondaryHeight = max(newHeight, 1)
+              }
+          }
+          .scrollTargetLayout()
+        }
+        .scrollTargetBehavior(.paging)
+        .onScrollGeometryChange(for: CGFloat.self, of: { scroll in
+          scroll.contentOffset.y + scroll.contentInsets.top
+        }) { _, offset in
+          revealProgress = (offset / secondaryHeight).clamped(to: 0...1)
+        }
+        .safeAreaInset(edge: .bottom) {
+          ChevronAffordance(progress: revealProgress) {
+            withAnimation(.smooth) {
+              let target: DetailSection = revealProgress < 0.5 ? .secondary : .primary
+              proxy.scrollTo(target, anchor: .top)
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## Design choices to keep
+
+- Make the primary section exactly viewport-sized when the interaction should feel like paging between states.
+- Compute `progress` from real scroll offset, not from duplicated booleans like `isExpanded`, `isShowingSecondary`, and `isSnapped`.
+- Use `progress` to drive `offset`, `opacity`, `blur`, `scaleEffect`, and toolbar state so the whole surface stays synchronized.
+- Use `ScrollViewReader` for programmatic snapping from taps on the primary content or chevron affordances.
+- Use `onScrollTargetVisibilityChange` when you need a settled section state for haptics, tooltip dismissal, analytics, or accessibility announcements.
+
+## Morphing a shared control
+
+If a control appears to move from the primary surface into the secondary content, do not render two fully visible copies.
+
+Instead:
+
+- expose a source anchor in the primary area
+- expose a destination anchor in the secondary area
+- render one overlay that interpolates position and size using `progress`
+
+```swift
+Color.clear
+  .anchorPreference(key: ControlAnchorKey.self, value: .bounds) { anchor in
+    ["source": anchor]
+  }
+
+Color.clear
+  .anchorPreference(key: ControlAnchorKey.self, value: .bounds) { anchor in
+    ["destination": anchor]
+  }
+
+.overlayPreferenceValue(ControlAnchorKey.self) { anchors in
+  MorphingControlOverlay(anchors: anchors, progress: revealProgress)
+}
+```
+
+This keeps the motion coherent and avoids duplicate-hit-target bugs.
+
+## Haptics and affordances
+
+- Use light threshold haptics when the reveal begins and stronger haptics near the committed state.
+- Keep a visible affordance like a chevron or pill while `progress` is near zero.
+- Flip, fade, or blur the affordance as the secondary section becomes active.
+
+## Interaction guards
+
+- Disable vertical scrolling when a conflicting mode is active, such as pinch-to-zoom, crop, or full-screen media manipulation.
+- Disable hit testing on overlays that should disappear once the secondary content is revealed.
+- Avoid same-axis nested scroll views unless the inner view is effectively static or disabled during the reveal.
+
+## Pitfalls
+
+- Do not hard-code the progress divisor. Measure the secondary section height or another real reveal distance.
+- Do not mix multiple animation sources for the same property. If `progress` drives it, keep other animations off that property.
+- Do not store derived state like `isSecondaryVisible` unless another API requires it. Prefer deriving it from `progress` or visible scroll targets.
+- Beware of layout feedback loops when measuring heights. Clamp zero values and update only when the measured height actually changes.
+
+## Concrete example
+
+- Pool iOS tile detail reveal: `/Users/dimillian/Documents/Dev/Pool/pool-ios/Pool/Sources/Features/Tile/Detail/TileDetailView.swift`
+- Secondary content anchor example: `/Users/dimillian/Documents/Dev/Pool/pool-ios/Pool/Sources/Features/Tile/Detail/TileDetailIntentListView.swift`
+
+## Intent
+
+Show how to wire the app shell (TabView + NavigationStack + sheets) and install a global dependency graph (environment objects, services, streaming clients, SwiftData ModelContainer) in one place.
+
+## Recommended structure
+
+1) Root view sets up tabs, per-tab routers, and sheets.
+2) A dedicated view modifier installs global dependencies and lifecycle tasks (auth state, streaming watchers, push tokens, data containers).
+3) Feature views pull only what they need from the environment; feature-specific state stays local.
+
+## Dependency selection
+
+- Use `@Environment` for app-level services, shared clients, theme/configuration, and values that many descendants genuinely need.
+- Prefer initializer injection for feature-local dependencies and models. Do not move a dependency into the environment just to avoid passing one or two arguments.
+- Keep mutable feature state out of the environment unless it is intentionally shared across broad parts of the app.
+- Use `@EnvironmentObject` only as a legacy fallback or when the project already standardizes on it for a truly shared object.
+
+## Root shell example (generic)
+
+```swift
+@MainActor
+struct AppView: View {
+  @State private var selectedTab: AppTab = .home
+  @State private var tabRouter = TabRouter()
+
+  var body: some View {
+    TabView(selection: $selectedTab) {
+      ForEach(AppTab.allCases) { tab in
+        let router = tabRouter.router(for: tab)
+        NavigationStack(path: tabRouter.binding(for: tab)) {
+          tab.makeContentView()
+        }
+        .withSheetDestinations(sheet: Binding(
+          get: { router.presentedSheet },
+          set: { router.presentedSheet = $0 }
+        ))
+        .environment(router)
+        .tabItem { tab.label }
+        .tag(tab)
+      }
+    }
+    .withAppDependencyGraph()
+  }
+}
+```
+
+Minimal `AppTab` example:
+
+```swift
+@MainActor
+enum AppTab: Identifiable, Hashable, CaseIterable {
+  case home, notifications, settings
+  var id: String { String(describing: self) }
+
+  @ViewBuilder
+  func makeContentView() -> some View {
+    switch self {
+    case .home: HomeView()
+    case .notifications: NotificationsView()
+    case .settings: SettingsView()
+    }
+  }
+
+  @ViewBuilder
+  var label: some View {
+    switch self {
+    case .home: Label("Home", systemImage: "house")
+    case .notifications: Label("Notifications", systemImage: "bell")
+    case .settings: Label("Settings", systemImage: "gear")
+    }
+  }
+}
+```
+
+Router skeleton:
+
+```swift
+@MainActor
+@Observable
+final class RouterPath {
+  var path: [Route] = []
+  var presentedSheet: SheetDestination?
+}
+
+enum Route: Hashable {
+  case detail(id: String)
+}
+```
 
 (Shortened: the skill continues in its source.)
 

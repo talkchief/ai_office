@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · hybrid-search-implementation
 
 # Hybrid Search Engineer
 
-You are **Hybrid Search Engineer**: you carry one skill, "Hybrid Search Implementation", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Hybrid Search Engineer**: you carry one skill, "Hybrid Search Implementation", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: retrieval engineer · vector plus keyword search for RAG
@@ -239,8 +239,375 @@ class PostgresHybridSearch:
                     ORDER BY ts_rank(ts_content, websearch_to_tsquery('english', $2)) DESC
                     LIMIT $3
                 )
+                SELECT
+                    COALESCE(v.id, k.id) as id,
+                    COALESCE(v.content, k.content) as content,
+                    COALESCE(v.metadata, k.metadata) as metadata,
+                    v.vector_score,
+                    k.keyword_score,
+                    -- RRF fusion
+                    COALESCE(1.0 / (60 + v.vector_rank), 0) * $4::float +
+                    COALESCE(1.0 / (60 + k.keyword_rank), 0) * (1 - $4::float) as rrf_score
+                FROM vector_search v
+                FULL OUTER JOIN keyword_search k ON v.id = k.id
+                ORDER BY rrf_score DESC
+                LIMIT $3 / 3
+            """, *params, vector_weight)
 
-(Shortened: the skill continues in its source.)
+            return [dict(row) for row in results]
+
+    async def search_with_rerank(
+        self,
+        query: str,
+        query_embedding: List[float],
+        limit: int = 10,
+        rerank_candidates: int = 50
+    ) -> List[Dict]:
+        """Hybrid search with cross-encoder reranking."""
+        from sentence_transformers import CrossEncoder
+
+        # Get candidates
+        candidates = await self.hybrid_search(
+            query, query_embedding, limit=rerank_candidates
+        )
+
+        if not candidates:
+            return []
+
+        # Rerank with cross-encoder
+        model = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+
+        pairs = [(query, c["content"]) for c in candidates]
+        scores = model.predict(pairs)
+
+        for candidate, score in zip(candidates, scores):
+            candidate["rerank_score"] = float(score)
+
+        # Sort by rerank score and return top results
+        reranked = sorted(candidates, key=lambda x: x["rerank_score"], reverse=True)
+        return reranked[:limit]
+```
+
+### Template 3: Elasticsearch Hybrid Search
+
+```python
+from elasticsearch import Elasticsearch
+from typing import List, Dict, Optional
+
+class ElasticsearchHybridSearch:
+    """Hybrid search with Elasticsearch and dense vectors."""
+
+    def __init__(
+        self,
+        es_client: Elasticsearch,
+        index_name: str = "documents"
+    ):
+        self.es = es_client
+        self.index_name = index_name
+
+    def create_index(self, vector_dims: int = 1536):
+        """Create index with dense vector and text fields."""
+        mapping = {
+            "mappings": {
+                "properties": {
+                    "content": {
+                        "type": "text",
+                        "analyzer": "english"
+                    },
+                    "embedding": {
+                        "type": "dense_vector",
+                        "dims": vector_dims,
+                        "index": True,
+                        "similarity": "cosine"
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "enabled": True
+                    }
+                }
+            }
+        }
+        self.es.indices.create(index=self.index_name, body=mapping, ignore=400)
+
+    def hybrid_search(
+        self,
+        query: str,
+        query_embedding: List[float],
+        limit: int = 10,
+        boost_vector: float = 1.0,
+        boost_text: float = 1.0,
+        filter: Optional[Dict] = None
+    ) -> List[Dict]:
+        """
+        Hybrid search using Elasticsearch's built-in capabilities.
+        """
+        # Build the hybrid query
+        search_body = {
+            "size": limit,
+            "query": {
+                "bool": {
+                    "should": [
+                        # Vector search (kNN)
+                        {
+                            "script_score": {
+                                "query": {"match_all": {}},
+                                "script": {
+                                    "source": f"cosineSimilarity(params.query_vector, 'embedding') * {boost_vector} + 1.0",
+                                    "params": {"query_vector": query_embedding}
+                                }
+                            }
+                        },
+                        # Text search (BM25)
+                        {
+                            "match": {
+                                "content": {
+                                    "query": query,
+                                    "boost": boost_text
+                                }
+                            }
+                        }
+                    ],
+                    "minimum_should_match": 1
+                }
+            }
+        }
+
+        # Add filter if provided
+        if filter:
+            search_body["query"]["bool"]["filter"] = filter
+
+        response = self.es.search(index=self.index_name, body=search_body)
+
+        return [
+            {
+                "id": hit["_id"],
+                "content": hit["_source"]["content"],
+                "metadata": hit["_source"].get("metadata", {}),
+                "score": hit["_score"]
+            }
+            for hit in response["hits"]["hits"]
+        ]
+
+    def hybrid_search_rrf(
+        self,
+        query: str,
+        query_embedding: List[float],
+        limit: int = 10,
+        window_size: int = 100
+    ) -> List[Dict]:
+        """
+        Hybrid search using Elasticsearch 8.x RRF.
+        """
+        search_body = {
+            "size": limit,
+            "sub_searches": [
+                {
+                    "query": {
+                        "match": {
+                            "content": query
+                        }
+                    }
+                },
+                {
+                    "query": {
+                        "knn": {
+                            "field": "embedding",
+                            "query_vector": query_embedding,
+                            "k": window_size,
+                            "num_candidates": window_size * 2
+                        }
+                    }
+                }
+            ],
+            "rank": {
+                "rrf": {
+                    "window_size": window_size,
+                    "rank_constant": 60
+                }
+            }
+        }
+
+        response = self.es.search(index=self.index_name, body=search_body)
+
+        return [
+            {
+                "id": hit["_id"],
+                "content": hit["_source"]["content"],
+                "score": hit["_score"]
+            }
+            for hit in response["hits"]["hits"]
+        ]
+```
+
+### Template 4: Custom Hybrid RAG Pipeline
+
+```python
+from typing import List, Dict, Optional, Callable
+from dataclasses import dataclass
+
+@dataclass
+class SearchResult:
+    id: str
+    content: str
+    score: float
+    source: str  # "vector", "keyword", "hybrid"
+    metadata: Dict = None
+
+class HybridRAGPipeline:
+    """Complete hybrid search pipeline for RAG."""
+
+    def __init__(
+        self,
+        vector_store,
+        keyword_store,
+        embedder,
+        reranker=None,
+        fusion_method: str = "rrf",
+        vector_weight: float = 0.5
+    ):
+        self.vector_store = vector_store
+        self.keyword_store = keyword_store
+        self.embedder = embedder
+        self.reranker = reranker
+        self.fusion_method = fusion_method
+        self.vector_weight = vector_weight
+
+    async def search(
+        self,
+        query: str,
+        top_k: int = 10,
+        filter: Optional[Dict] = None,
+        use_rerank: bool = True
+    ) -> List[SearchResult]:
+        """Execute hybrid search pipeline."""
+
+        # Step 1: Get query embedding
+        query_embedding = self.embedder.embed(query)
+
+        # Step 2: Execute parallel searches
+        vector_results, keyword_results = await asyncio.gather(
+            self._vector_search(query_embedding, top_k * 3, filter),
+            self._keyword_search(query, top_k * 3, filter)
+        )
+
+        # Step 3: Fuse results
+        if self.fusion_method == "rrf":
+            fused = self._rrf_fusion(vector_results, keyword_results)
+        else:
+            fused = self._linear_fusion(vector_results, keyword_results)
+
+        # Step 4: Rerank if enabled
+        if use_rerank and self.reranker:
+            fused = await self._rerank(query, fused[:top_k * 2])
+
+        return fused[:top_k]
+
+    async def _vector_search(
+        self,
+        embedding: List[float],
+        limit: int,
+        filter: Dict
+    ) -> List[SearchResult]:
+        results = await self.vector_store.search(embedding, limit, filter)
+        return [
+            SearchResult(
+                id=r["id"],
+                content=r["content"],
+                score=r["score"],
+                source="vector",
+                metadata=r.get("metadata")
+            )
+            for r in results
+        ]
+
+    async def _keyword_search(
+        self,
+        query: str,
+        limit: int,
+        filter: Dict
+    ) -> List[SearchResult]:
+        results = await self.keyword_store.search(query, limit, filter)
+        return [
+            SearchResult(
+                id=r["id"],
+                content=r["content"],
+                score=r["score"],
+                source="keyword",
+                metadata=r.get("metadata")
+            )
+            for r in results
+        ]
+
+    def _rrf_fusion(
+        self,
+        vector_results: List[SearchResult],
+        keyword_results: List[SearchResult]
+    ) -> List[SearchResult]:
+        """Fuse with RRF."""
+        k = 60
+        scores = {}
+        content_map = {}
+
+        for rank, result in enumerate(vector_results):
+            scores[result.id] = scores.get(result.id, 0) + 1 / (k + rank + 1)
+            content_map[result.id] = result
+
+        for rank, result in enumerate(keyword_results):
+            scores[result.id] = scores.get(result.id, 0) + 1 / (k + rank + 1)
+            if result.id not in content_map:
+                content_map[result.id] = result
+
+        sorted_ids = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)
+
+        return [
+            SearchResult(
+                id=doc_id,
+                content=content_map[doc_id].content,
+                score=scores[doc_id],
+                source="hybrid",
+                metadata=content_map[doc_id].metadata
+            )
+            for doc_id in sorted_ids
+        ]
+
+    async def _rerank(
+        self,
+        query: str,
+        results: List[SearchResult]
+    ) -> List[SearchResult]:
+        """Rerank with cross-encoder."""
+        if not results:
+            return results
+
+        pairs = [(query, r.content) for r in results]
+        scores = self.reranker.predict(pairs)
+
+        for result, score in zip(results, scores):
+            result.score = float(score)
+
+        return sorted(results, key=lambda x: x.score, reverse=True)
+```
+
+## Best Practices
+
+### Do's
+- **Tune weights empirically** - Test on your data
+- **Use RRF for simplicity** - Works well without tuning
+- **Add reranking** - Significant quality improvement
+- **Log both scores** - Helps with debugging
+- **A/B test** - Measure real user impact
+
+### Don'ts
+- **Don't assume one size fits all** - Different queries need different weights
+- **Don't skip keyword search** - Handles exact matches better
+- **Don't over-fetch** - Balance recall vs latency
+- **Don't ignore edge cases** - Empty results, single word queries
+
+## Resources
+
+- [RRF Paper](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)
+- [Vespa Hybrid Search](https://blog.vespa.ai/improving-text-ranking-with-few-shot-prompting/)
+- [Cohere Rerank](https://docs.cohere.com/docs/reranking)
 
 ## 🚨 Critical Rules
 - Keyword search earns its place on names, codes and rare terms that embeddings blur together

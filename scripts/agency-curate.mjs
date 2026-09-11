@@ -20,19 +20,20 @@ import { cutAtHeading, inlineReferences, readFrontMatter, reindex, renderSkillPe
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), AGENCY = path.join(ROOT, 'agency'), PERSONAS = path.join(AGENCY, 'personas');
 const one = (s, max) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
-const METHOD = '\n## 📋 The skill, as written\n';
+const METHOD = '\n## 📋 The skill, as written\n', AUTHORED = '\n## 📋 The method\n'; // the catalogue's own text, or a method written for the office
 
 // The pieces of a persona made by import-skills, read back out of its file (null for a hand-written persona).
 export function skillParts(markdown) {
-  const text = markdown.replace(/\r\n/g, '\n'), at = text.indexOf(METHOD); if (at < 0) return null;
+  const text = markdown.replace(/\r\n/g, '\n'), authored = text.includes(AUTHORED), head = authored ? AUTHORED : METHOD, at = text.indexOf(head); if (at < 0) return null;
   const { meta } = readFrontMatter(text), end = text.lastIndexOf('\n## 🚨 Critical Rules');
-  const experience = /^- \*\*Experience\*\*: The .+? skill from the (.+?) catalogue(?:, (.+))?$/m.exec(text) || [];
+  // "The X skill from the Y catalogue, category" or, for a method written for the office, "The X method, written for the office, category".
+  const experience = /^- \*\*Experience\*\*: The (.+?) (?:skill from the (.+?) catalogue|method, written for the office)(?:, (.+))?$/m.exec(text) || [];
   // The persona's own mission and rules, without the office's operating lines the template always adds.
   const section = heading => { const i = text.indexOf(`\n## ${heading}\n`); if (i < 0) return []; const rest = text.slice(i + heading.length + 5), stop = rest.indexOf('\n## ');
     return (stop < 0 ? rest : rest.slice(0, stop)).split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2).trim()).filter(b => !OFFICE_LINE.test(b)); };
-  return { source: meta.source || '', title: titleOf((/you carry one skill, "([^"]+)"/.exec(text) || [])[1] || meta.name), catalogue: experience[1] || 'Agentic Awesome Skills', category: experience[2] || '', method: text.slice(at + METHOD.length, end > at ? end : undefined).trim(), mission: section('🎯 Core Mission'), rules: section('🚨 Critical Rules') };
+  return { source: meta.source || '', title: titleOf((/you carry one skill, "([^"]+)"/.exec(text) || [])[1] || experience[1] || meta.name), catalogue: experience[2] || 'Agentic Awesome Skills', category: experience[3] || '', authored, method: text.slice(at + head.length, end > at ? end : undefined).trim(), mission: section('🎯 Core Mission'), rules: section('🚨 Critical Rules') };
 }
-const OFFICE_LINE = /^(Apply the .+ skill to the assignment|Hand finished work to the lead|Stop and report when the skill needs|Cite the skill by name|Follow the skill's own rules|Never invent numbers or facts|Deliverables go to \/work\/|Say which step of the skill produced)/;
+const OFFICE_LINE = /^(Apply the .+ (skill|method) to the assignment|Hand finished work to the lead|Stop and report when the skill needs|Cite the skill by name|Follow the skill's own rules|Never invent numbers or facts|Deliverables go to \/work\/|Say which step of the skill produced)/;
 
 // New front matter for a hand-written persona: its other keys (color, vibe, …) and its body stay; the old name in the body follows.
 export function withFrontMatter(markdown, { name, description, role, tags = [], emoji }) {
@@ -113,14 +114,31 @@ export function applyMissions(entries, { dryRun = false } = {}) {
   return { applied, skipped: skipped.length, skippedIds: skipped.slice(0, 20), ...(dryRun ? {} : reindex()) };
 }
 
+// Methods written for the office, where the catalogue's own text was a marketing page, a table of contents or a list of
+// other skills to invoke rather than a method (node scripts/agency-curate.mjs --methods <file.json>): a JSON array of
+// { id, method }. The persona then says its method was written for the office, and --refresh leaves it alone.
+export function applyMethods(entries, { min = 600, max = 9000, dryRun = false } = {}) {
+  const index = JSON.parse(fs.readFileSync(path.join(AGENCY, 'index.json'), 'utf8')), where = new Map(index.personas.map(p => [p.id, p.division])), skipped = [];
+  let applied = 0;
+  for (const e of entries) {
+    const method = String(e.method || '').replace(/\r\n?/g, '\n').trim();
+    const file = where.has(e.id) && path.join(PERSONAS, where.get(e.id), e.id + '.md'), text = file && fs.readFileSync(file, 'utf8'), parts = text && skillParts(text);
+    if (!parts || method.length < min || method.length > max) { skipped.push(e.id); continue; }
+    if (!dryRun) fs.writeFileSync(file, rerender(text, { ...parts, method, authored: true }));
+    applied++;
+  }
+  return { applied, skipped: skipped.length, skippedIds: skipped.slice(0, 20), ...(dryRun ? {} : reindex()) };
+}
+
 // Imported personas whose method points into the skill's references/ or resources/ folder get their method again from the source skill
 // (node scripts/agency-curate.mjs --refresh <skills folder>), with the references inlined; the title, role, tags and
 // description stay. Any imported persona that still carries less than `min` characters of method is removed.
-export function refreshMethods(skillsDir, { min = 1500, max = 7000, dryRun = false } = {}) {
+export function refreshMethods(skillsDir, { min = 1500, max = 20000, dryRun = false } = {}) {
   const index = JSON.parse(fs.readFileSync(path.join(AGENCY, 'index.json'), 'utf8')), writes = [], dropped = [];
   let refreshed = 0;
   for (const p of index.personas) {
     const file = path.join(PERSONAS, p.division, p.id + '.md'), text = fs.readFileSync(file, 'utf8'), parts = skillParts(text); if (!parts) continue;
+    if (parts.authored) continue; // a method written for the office is not overwritten from the catalogue
     let method = parts.method; const dir = path.join(skillsDir, parts.source.split(' · ').pop());
     if (fs.existsSync(path.join(dir, 'SKILL.md'))) { // from the source: references inlined, stock lines out, cut at the budget
       method = cutAtHeading(stripStock(inlineReferences(readFrontMatter(fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8')).body.replace(/^#\s+.+\n/, '').trim(), dir)), max); refreshed++;
@@ -135,6 +153,11 @@ export function refreshMethods(skillsDir, { min = 1500, max = 7000, dryRun = fal
   return { ...summary, ...reindex() };
 }
 
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv.includes('--methods')) {
+  const argv = process.argv.slice(2), file = argv[argv.indexOf('--methods') + 1];
+  if (!file || !fs.existsSync(file)) { console.error('usage: node scripts/agency-curate.mjs --methods <methods.json> [--dry-run]'); process.exit(2); }
+  console.log(JSON.stringify(applyMethods(JSON.parse(fs.readFileSync(file, 'utf8')), { dryRun: argv.includes('--dry-run') }), null, 1)); process.exit(0);
+}
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv.includes('--missions')) {
   const argv = process.argv.slice(2), file = argv[argv.indexOf('--missions') + 1];
   if (!file || !fs.existsSync(file)) { console.error('usage: node scripts/agency-curate.mjs --missions <missions.json> [--dry-run]'); process.exit(2); }

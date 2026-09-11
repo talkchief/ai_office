@@ -1,7 +1,7 @@
 {
  "source": "https://github.com/msitarzewski/agency-agents",
  "license": "MIT",
- "syncedAt": "2026-09-11T11:44:25.596Z",
+ "syncedAt": "2026-09-11T12:05:37.051Z",
  "divisions": {
   "engineering": "Software Engineering",
   "ai": "AI & Agents",
@@ -44,7 +44,7 @@
     "csharp",
     "aspnet-core"
    ],
-   "bytes": 9171
+   "bytes": 9108
   },
   {
    "id": "engineering-net-backend-developer",
@@ -61,7 +61,7 @@
     "web-api",
     "mcp"
    ],
-   "bytes": 9709
+   "bytes": 22389
   },
   {
    "id": "engineering-net-entra-auth-extension-developer",
@@ -78,7 +78,7 @@
     "entra-id",
     "authentication"
    ],
-   "bytes": 9829
+   "bytes": 6167
   },
   {
    "id": "engineering-net-full-stack-mentor",
@@ -204,7 +204,7 @@
     "3d",
     "frontend"
    ],
-   "bytes": 9033
+   "bytes": 10290
   },
   {
    "id": "engineering-aem-frontend-developer",
@@ -239,7 +239,7 @@
     "ai-agents",
     "developer-tools"
    ],
-   "bytes": 9615
+   "bytes": 14978
   },
   {
    "id": "engineering-ai-assisted-code-reviewer",
@@ -256,7 +256,7 @@
     "sonarqube",
     "semgrep"
    ],
-   "bytes": 9323
+   "bytes": 17364
   },
   {
    "id": "engineering-ai-generated-code-auditor",
@@ -273,7 +273,7 @@
     "architecture",
     "production-readiness"
    ],
-   "bytes": 9692
+   "bytes": 17903
   },
   {
    "id": "engineering-alexa-skill-developer",
@@ -291,7 +291,7 @@
     "lambda",
     "smart-home"
    ],
-   "bytes": 7211
+   "bytes": 19265
   },
   {
    "id": "engineering-algolia-search-developer",
@@ -309,7 +309,7 @@
     "instantsearch",
     "relevance"
    ],
-   "bytes": 9559
+   "bytes": 22547
   },
   {
    "id": "engineering-algorithm-correctness-engineer",
@@ -326,7 +326,7 @@
     "correctness",
     "edge-cases"
    ],
-   "bytes": 8067
+   "bytes": 20106
   },
   {
    "id": "engineering-algorithm-design-engineer",
@@ -344,7 +344,7 @@
     "complexity",
     "sparc"
    ],
-   "bytes": 9237
+   "bytes": 5791
   },
   {
    "id": "engineering-algorithm-efficiency-reviewer",
@@ -362,7 +362,7 @@
     "performance",
     "code-review"
    ],
-   "bytes": 9535
+   "bytes": 18376
   },
   {
    "id": "engineering-amplitude-experiment-developer",
@@ -398,7 +398,7 @@
     "react-native",
     "mobile"
    ],
-   "bytes": 9662
+   "bytes": 21397
   },
   {
    "id": "engineering-android-thermal-diagnostician",
@@ -415,7 +415,7 @@
     "diagnostics",
     "battery"
    ],
-   "bytes": 9796
+   "bytes": 22105
   },
   {
    "id": "engineering-android-tooling-engineer",
@@ -433,7 +433,7 @@
     "sdk",
     "mobile"
    ],
-   "bytes": 6730
+   "bytes": 21603
   },
   {
    "id": "engineering-angular-developer",
@@ -451,7 +451,7 @@
     "ssr",
     "frontend"
    ],
-   "bytes": 8287
+   "bytes": 22292
   },
   {
    "id": "engineering-angular-performance-engineer",
@@ -469,7 +469,7 @@
     "bundle-size",
     "frontend"
    ],
-   "bytes": 8189
+   "bytes": 5672
   },
   {
    "id": "engineering-angular-state-management-developer",
@@ -487,7 +487,7 @@
     "signals",
     "state-management"
    ],
-   "bytes": 8433
+   "bytes": 17467
   },
   {
    "id": "engineering-angular-ui-developer",
@@ -504,7 +504,7 @@
     "frontend",
     "async"
    ],
-   "bytes": 9110
+   "bytes": 13348
   },
   {
    "id": "engineering-angularjs-migration-developer",
@@ -521,7 +521,7 @@
     "migration",
     "typescript"
    ],
-   "bytes": 9063
+   "bytes": 12552
   },
   {
    "id": "engineering-animation-code-reviewer",
@@ -540,7 +540,7 @@
     "accessibility",
     "performance"
    ],
-   "bytes": 9106
+   "bytes": 11394
   },
   {
    "id": "engineering-animation-performance-engineer",
@@ -610,7 +610,7 @@
     "cross-platform",
     "release"
    ],
-   "bytes": 9382
+   "bytes": 11290
   },
   {
    "id": "engineering-api-designer",
@@ -628,7 +628,7 @@
     "graphql",
     "standards"
    ],
-   "bytes": 9441
+   "bytes": 16740
   },
   {
    "id": "engineering-api-platform-engineer",
@@ -681,7 +681,7 @@
     "retries",
     "resilience"
    ],
-   "bytes": 9572
+   "bytes": 11871
   },
   {
    "id": "engineering-application-performance-engineer",
@@ -699,7 +699,7 @@
     "observability",
     "load-testing"
    ],
-   "bytes": 8184
+   "bytes": 13693
   },
   {
    "id": "engineering-architecture-auditor",
@@ -733,7 +733,7 @@
     "distributed-systems",
     "scalability"
    ],
-   "bytes": 9423
+   "bytes": 10534
   },
   {
    "id": "engineering-arm-cortex-m-firmware-engineer",
@@ -751,7 +751,7 @@
     "arm",
     "c"
    ],
-   "bytes": 9331
+   "bytes": 14691
   },
   {
    "id": "engineering-asp-net-core-developer",
@@ -768,7 +768,7 @@
     "csharp",
     "ef-core"
    ],
-   "bytes": 9192
+   "bytes": 9976
   },
   {
    "id": "engineering-astro-developer",
@@ -785,7 +785,7 @@
     "mdx",
     "static-sites"
    ],
-   "bytes": 8077
+   "bytes": 12241
   },
   {
    "id": "engineering-async-python-developer",
@@ -802,7 +802,7 @@
     "fastapi",
     "concurrency"
    ],
-   "bytes": 8301
+   "bytes": 21742
   },
   {
    "id": "engineering-async-rust-developer",
@@ -819,7 +819,7 @@
     "async",
     "concurrency"
    ],
-   "bytes": 9578
+   "bytes": 15241
   },
   {
    "id": "engineering-ats-validator-architect",
@@ -890,25 +890,7 @@
     "desktop-ui",
     "zafiro"
    ],
-   "bytes": 4734
-  },
-  {
-   "id": "engineering-avalonia-viewmodel-developer",
-   "division": "engineering",
-   "label": "Software Engineering",
-   "name": "Avalonia ViewModel Developer",
-   "description": "Writes ViewModels, wizards and navigation for Avalonia apps using ReactiveUI and Zafiro enhanced commands in a functional-reactive style.",
-   "emoji": "🧩",
-   "role": "MVVM developer · Avalonia, ReactiveUI, Zafiro",
-   "tags": [
-    "developer",
-    "avalonia",
-    "reactiveui",
-    "mvvm",
-    "csharp",
-    "dotnet"
-   ],
-   "bytes": 3992
+   "bytes": 4617
   },
   {
    "id": "engineering-avalonia-zafiro-developer",
@@ -926,7 +908,7 @@
     "dynamicdata",
     "csharp"
    ],
-   "bytes": 4233
+   "bytes": 5920
   },
   {
    "id": "engineering-aws-serverless-developer",
@@ -944,7 +926,7 @@
     "dynamodb",
     "sam"
    ],
-   "bytes": 7510
+   "bytes": 22596
   },
   {
    "id": "engineering-azure-app-config-typescript-develope",
@@ -961,7 +943,7 @@
     "feature-flags",
     "typescript"
    ],
-   "bytes": 9606
+   "bytes": 6340
   },
   {
    "id": "engineering-azure-app-configuration-java-develop",
@@ -978,7 +960,7 @@
     "feature-flags",
     "java"
    ],
-   "bytes": 8522
+   "bytes": 5609
   },
   {
    "id": "engineering-azure-app-configuration-python-devel",
@@ -995,7 +977,7 @@
     "feature-flags",
     "python"
    ],
-   "bytes": 7746
+   "bytes": 7629
   },
   {
    "id": "engineering-azure-blob-storage-java-developer",
@@ -1011,7 +993,7 @@
     "blob-storage",
     "java"
    ],
-   "bytes": 9550
+   "bytes": 5981
   },
   {
    "id": "engineering-azure-blob-storage-python-developer",
@@ -1027,7 +1009,7 @@
     "blob-storage",
     "python"
    ],
-   "bytes": 8032
+   "bytes": 5806
   },
   {
    "id": "engineering-azure-blob-storage-rust-developer",
@@ -1043,7 +1025,7 @@
     "blob-storage",
     "rust"
    ],
-   "bytes": 5440
+   "bytes": 5323
   },
   {
    "id": "engineering-azure-blob-storage-typescript-develo",
@@ -1059,7 +1041,7 @@
     "blob-storage",
     "typescript"
    ],
-   "bytes": 9532
+   "bytes": 5657
   },
   {
    "id": "engineering-azure-call-automation-java-developer",
@@ -1077,7 +1059,7 @@
     "java",
     "acs"
    ],
-   "bytes": 9589
+   "bytes": 6102
   },
   {
    "id": "engineering-azure-communication-chat-developer",
@@ -1094,7 +1076,7 @@
     "java",
     "acs"
    ],
-   "bytes": 9372
+   "bytes": 5791
   },
   {
    "id": "engineering-azure-communication-identity-develop",
@@ -1111,7 +1093,7 @@
     "authentication",
     "java"
    ],
-   "bytes": 9126
+   "bytes": 5835
   },
   {
    "id": "engineering-azure-event-grid-net-developer",
@@ -1128,7 +1110,7 @@
     "cloudevents",
     "dotnet"
    ],
-   "bytes": 9185
+   "bytes": 5588
   },
   {
    "id": "engineering-azure-event-grid-java-developer",
@@ -1145,7 +1127,7 @@
     "pub-sub",
     "java"
    ],
-   "bytes": 8260
+   "bytes": 5539
   },
   {
    "id": "engineering-azure-event-grid-python-developer",
@@ -1162,7 +1144,7 @@
     "cloudevents",
     "python"
    ],
-   "bytes": 6800
+   "bytes": 5494
   },
   {
    "id": "engineering-azure-files-python-developer",
@@ -1179,7 +1161,7 @@
     "smb",
     "python"
    ],
-   "bytes": 7157
+   "bytes": 5515
   },
   {
    "id": "engineering-azure-files-typescript-developer",
@@ -1196,7 +1178,7 @@
     "smb",
     "typescript"
    ],
-   "bytes": 9415
+   "bytes": 5579
   },
   {
    "id": "engineering-azure-functions-developer",
@@ -1214,7 +1196,7 @@
     "dotnet",
     "python"
    ],
-   "bytes": 7305
+   "bytes": 22184
   },
   {
    "id": "engineering-azure-queue-storage-python-developer",
@@ -1231,7 +1213,7 @@
     "messaging",
     "python"
    ],
-   "bytes": 7341
+   "bytes": 5740
   },
   {
    "id": "engineering-azure-queue-storage-rust-developer",
@@ -1248,7 +1230,7 @@
     "messaging",
     "rust"
    ],
-   "bytes": 9311
+   "bytes": 9523
   },
   {
    "id": "engineering-azure-queue-storage-typescript-devel",
@@ -1265,7 +1247,7 @@
     "messaging",
     "typescript"
    ],
-   "bytes": 8095
+   "bytes": 5673
   },
   {
    "id": "engineering-azure-saas-architect",
@@ -1299,7 +1281,7 @@
     "messaging",
     "dotnet"
    ],
-   "bytes": 9670
+   "bytes": 6477
   },
   {
    "id": "engineering-azure-service-bus-python-developer",
@@ -1316,7 +1298,7 @@
     "messaging",
     "python"
    ],
-   "bytes": 9392
+   "bytes": 10116
   },
   {
    "id": "engineering-azure-service-bus-rust-developer",
@@ -1333,7 +1315,7 @@
     "messaging",
     "rust"
    ],
-   "bytes": 9515
+   "bytes": 9727
   },
   {
    "id": "engineering-azure-service-bus-typescript-develop",
@@ -1350,7 +1332,7 @@
     "messaging",
     "typescript"
    ],
-   "bytes": 8632
+   "bytes": 6876
   },
   {
    "id": "engineering-azure-sms-java-developer",
@@ -1367,7 +1349,7 @@
     "otp",
     "java"
    ],
-   "bytes": 9490
+   "bytes": 6698
   },
   {
    "id": "engineering-azure-web-pubsub-java-developer",
@@ -1384,7 +1366,7 @@
     "realtime",
     "java"
    ],
-   "bytes": 9249
+   "bytes": 6209
   },
   {
    "id": "engineering-azure-web-pubsub-python-developer",
@@ -1401,7 +1383,7 @@
     "realtime",
     "python"
    ],
-   "bytes": 7986
+   "bytes": 7869
   },
   {
    "id": "engineering-azure-web-pubsub-typescript-develope",
@@ -1418,7 +1400,7 @@
     "realtime",
     "typescript"
    ],
-   "bytes": 9494
+   "bytes": 6248
   },
   {
    "id": "engineering-backend-api-developer",
@@ -1487,7 +1469,7 @@
     "performance",
     "optimization"
    ],
-   "bytes": 6301
+   "bytes": 17150
   },
   {
    "id": "engineering-big-picture-systems-architect",
@@ -1522,7 +1504,7 @@
     "defi",
     "solidity"
    ],
-   "bytes": 9494
+   "bytes": 11569
   },
   {
    "id": "engineering-blunt-code-reviewer",
@@ -1556,7 +1538,7 @@
     "async",
     "tls"
    ],
-   "bytes": 8636
+   "bytes": 22149
   },
   {
    "id": "engineering-bug-fix-engineer",
@@ -1574,7 +1556,7 @@
     "regression",
     "testing"
    ],
-   "bytes": 9402
+   "bytes": 9692
   },
   {
    "id": "engineering-bug-hunting-code-reviewer",
@@ -1608,7 +1590,7 @@
     "root-cause",
     "triage"
    ],
-   "bytes": 9375
+   "bytes": 13051
   },
   {
    "id": "engineering-bullmq-queue-developer",
@@ -1626,7 +1608,7 @@
     "typescript",
     "queues"
    ],
-   "bytes": 7385
+   "bytes": 12152
   },
   {
    "id": "engineering-bun-runtime-developer",
@@ -1643,7 +1625,7 @@
     "typescript",
     "runtime"
    ],
-   "bytes": 7936
+   "bytes": 5934
   },
   {
    "id": "engineering-c-net-developer",
@@ -1677,7 +1659,7 @@
     "dotnet",
     "async"
    ],
-   "bytes": 3915
+   "bytes": 3858
   },
   {
    "id": "engineering-c-software-engineer",
@@ -1712,7 +1694,7 @@
     "documentation",
     "diagrams"
    ],
-   "bytes": 6754
+   "bytes": 18350
   },
   {
    "id": "engineering-c4-code-documentation-writer",
@@ -1729,7 +1711,7 @@
     "code-structure",
     "architecture"
    ],
-   "bytes": 9016
+   "bytes": 9350
   },
   {
    "id": "engineering-c4-component-architect",
@@ -1746,7 +1728,7 @@
     "documentation",
     "diagrams"
    ],
-   "bytes": 6276
+   "bytes": 6193
   },
   {
    "id": "engineering-c4-container-architect",
@@ -1763,7 +1745,7 @@
     "deployment",
     "documentation"
    ],
-   "bytes": 7048
+   "bytes": 6964
   },
   {
    "id": "engineering-c4-system-context-writer",
@@ -1780,7 +1762,7 @@
     "system-context",
     "documentation"
    ],
-   "bytes": 6637
+   "bytes": 6558
   },
   {
    "id": "engineering-cast-imaging-discovery-analyst",
@@ -1865,7 +1847,7 @@
     "code-quality",
     "refactoring"
    ],
-   "bytes": 5966
+   "bytes": 5570
   },
   {
    "id": "engineering-clean-architecture-specialist",
@@ -1883,7 +1865,7 @@
     "hexagonal",
     "backend"
    ],
-   "bytes": 9141
+   "bytes": 18573
   },
   {
    "id": "engineering-clean-code-advisor",
@@ -1918,7 +1900,7 @@
     "refactoring",
     "architecture"
    ],
-   "bytes": 8614
+   "bytes": 22652
   },
   {
    "id": "engineering-clerk-auth-developer",
@@ -1935,7 +1917,7 @@
     "next-js",
     "webhooks"
    ],
-   "bytes": 9566
+   "bytes": 22464
   },
   {
    "id": "engineering-clojure-repl-developer",
@@ -2004,7 +1986,7 @@
     "cleanup",
     "readability"
    ],
-   "bytes": 8681
+   "bytes": 11821
   },
   {
    "id": "engineering-code-comprehension-coach",
@@ -2054,7 +2036,7 @@
     "refactoring",
     "codemods"
    ],
-   "bytes": 9534
+   "bytes": 22517
   },
   {
    "id": "engineering-code-quality-reviewer",
@@ -2106,7 +2088,7 @@
     "performance",
     "sparc"
    ],
-   "bytes": 8671
+   "bytes": 5411
   },
   {
    "id": "engineering-code-review-comment-editor",
@@ -2140,7 +2122,7 @@
     "pull-requests",
     "quality"
    ],
-   "bytes": 5041
+   "bytes": 4924
   },
   {
    "id": "engineering-code-review-mentor",
@@ -2157,7 +2139,7 @@
     "mentoring",
     "feedback"
    ],
-   "bytes": 9489
+   "bytes": 16840
   },
   {
    "id": "engineering-code-review-standards-lead",
@@ -2174,7 +2156,7 @@
     "standards",
     "pull-requests"
    ],
-   "bytes": 9180
+   "bytes": 13983
   },
   {
    "id": "engineering-code-reviewer",
@@ -2208,7 +2190,7 @@
     "readability",
     "simplification"
    ],
-   "bytes": 6728
+   "bytes": 16024
   },
   {
    "id": "engineering-code-simplification-reviewer",
@@ -2328,7 +2310,7 @@
     "research",
     "code-reading"
    ],
-   "bytes": 5578
+   "bytes": 5460
   },
   {
    "id": "engineering-codebase-researcher",
@@ -2378,7 +2360,7 @@
     "troubleshooting",
     "root-cause"
    ],
-   "bytes": 8150
+   "bytes": 8074
   },
   {
    "id": "engineering-component-library-developer",
@@ -2396,7 +2378,7 @@
     "react",
     "design-system"
    ],
-   "bytes": 7163
+   "bytes": 7046
   },
   {
    "id": "engineering-comprehensive-review-lead",
@@ -2413,7 +2395,7 @@
     "security",
     "performance"
    ],
-   "bytes": 8765
+   "bytes": 12024
   },
   {
    "id": "engineering-continuous-improvement-engineer",
@@ -2431,7 +2413,7 @@
     "kaizen",
     "process"
    ],
-   "bytes": 9554
+   "bytes": 19752
   },
   {
    "id": "engineering-conventional-commit-writer",
@@ -2465,7 +2447,7 @@
     "backend",
     "real-time"
    ],
-   "bytes": 6769
+   "bytes": 22680
   },
   {
    "id": "engineering-cqrs-architect",
@@ -2482,7 +2464,7 @@
     "event-sourcing",
     "microservices"
    ],
-   "bytes": 9691
+   "bytes": 18927
   },
   {
    "id": "engineering-cqrs-read-model-developer",
@@ -2499,7 +2481,7 @@
     "projections",
     "read-models"
    ],
-   "bytes": 9907
+   "bytes": 19634
   },
   {
    "id": "engineering-creative-3d-web-developer",
@@ -2551,7 +2533,7 @@
     "manifest-v3",
     "javascript"
    ],
-   "bytes": 8985
+   "bytes": 11011
   },
   {
    "id": "engineering-cross-functional-developer",
@@ -2586,7 +2568,7 @@
     "dashboards",
     "typescript"
    ],
-   "bytes": 9751
+   "bytes": 16750
   },
   {
    "id": "engineering-dbos-go-developer",
@@ -2603,7 +2585,7 @@
     "dbos",
     "durable-workflows"
    ],
-   "bytes": 8606
+   "bytes": 9826
   },
   {
    "id": "engineering-dbos-python-developer",
@@ -2654,7 +2636,7 @@
     "integration",
     "microservices"
    ],
-   "bytes": 4523
+   "bytes": 5832
   },
   {
    "id": "engineering-ddd-strategic-design-architect",
@@ -2671,7 +2653,7 @@
     "strategic-design",
     "monolith-split"
    ],
-   "bytes": 4570
+   "bytes": 5407
   },
   {
    "id": "engineering-ddd-tactical-patterns-developer",
@@ -2722,7 +2704,7 @@
     "profiling",
     "methodology"
    ],
-   "bytes": 8764
+   "bytes": 15320
   },
   {
    "id": "engineering-debugging-specialist",
@@ -2739,7 +2721,7 @@
     "root-cause-analysis",
     "troubleshooting"
    ],
-   "bytes": 9579
+   "bytes": 13652
   },
   {
    "id": "engineering-defi-protocol-developer",
@@ -2756,7 +2738,7 @@
     "smart-contracts",
     "blockchain"
    ],
-   "bytes": 9535
+   "bytes": 16600
   },
   {
    "id": "engineering-defi-transaction-agent-developer",
@@ -2774,7 +2756,7 @@
     "blockchain",
     "mcp"
    ],
-   "bytes": 9540
+   "bytes": 11173
   },
   {
    "id": "engineering-delphi-developer",
@@ -2807,7 +2789,7 @@
     "upgrades",
     "compatibility"
    ],
-   "bytes": 9451
+   "bytes": 6005
   },
   {
    "id": "engineering-deprecation-migration-engineer",
@@ -2824,7 +2806,7 @@
     "migration",
     "legacy"
    ],
-   "bytes": 9385
+   "bytes": 11486
   },
   {
    "id": "engineering-design-prototype-developer",
@@ -2858,7 +2840,7 @@
     "risk-analysis",
     "brainstorming"
    ],
-   "bytes": 7908
+   "bytes": 5822
   },
   {
    "id": "engineering-design-smell-reviewer",
@@ -2911,7 +2893,7 @@
     "tailwind",
     "ui"
    ],
-   "bytes": 9526
+   "bytes": 20912
   },
   {
    "id": "engineering-desktop-app-engineer",
@@ -2945,7 +2927,7 @@
     "onboarding",
     "productivity"
    ],
-   "bytes": 4302
+   "bytes": 5896
   },
   {
    "id": "engineering-developer-tooling-engineer",
@@ -2979,7 +2961,7 @@
     "javascript",
     "python"
    ],
-   "bytes": 9447
+   "bytes": 20157
   },
   {
    "id": "engineering-distributed-systems-architect",
@@ -2996,7 +2978,7 @@
     "scalability",
     "architecture"
    ],
-   "bytes": 9395
+   "bytes": 17649
   },
   {
    "id": "engineering-distributed-transactions-architect",
@@ -3014,7 +2996,7 @@
     "distributed-systems",
     "event-driven"
    ],
-   "bytes": 9925
+   "bytes": 18976
   },
   {
    "id": "engineering-django-developer",
@@ -3031,7 +3013,7 @@
     "drf",
     "celery"
    ],
-   "bytes": 9400
+   "bytes": 9831
   },
   {
    "id": "engineering-django-performance-reviewer",
@@ -3048,7 +3030,7 @@
     "orm",
     "performance"
    ],
-   "bytes": 8446
+   "bytes": 13583
   },
   {
    "id": "engineering-universal-document-compiler",
@@ -3083,7 +3065,7 @@
     "frameworks",
     "code-quality"
    ],
-   "bytes": 9243
+   "bytes": 10694
   },
   {
    "id": "engineering-domain-modeler",
@@ -3117,7 +3099,7 @@
     "event-driven",
     "architecture"
    ],
-   "bytes": 5422
+   "bytes": 6245
   },
   {
    "id": "engineering-drizzle-orm-developer",
@@ -3134,7 +3116,7 @@
     "orm",
     "postgresql"
    ],
-   "bytes": 9374
+   "bytes": 12582
   },
   {
    "id": "engineering-drupal-developer",
@@ -3239,7 +3221,7 @@
     "code-signing",
     "auto-update"
    ],
-   "bytes": 9866
+   "bytes": 20448
   },
   {
    "id": "engineering-email-intelligence-engineer",
@@ -3275,7 +3257,7 @@
     "spf-dkim",
     "automation"
    ],
-   "bytes": 9537
+   "bytes": 20080
   },
   {
    "id": "engineering-embedded-c-engineer",
@@ -3364,7 +3346,7 @@
     "circuit-breaker",
     "api"
    ],
-   "bytes": 7225
+   "bytes": 20300
   },
   {
    "id": "engineering-event-sourcing-architect",
@@ -3399,7 +3381,7 @@
     "event-sourcing",
     "databases"
    ],
-   "bytes": 10359
+   "bytes": 18483
   },
   {
    "id": "engineering-evidence-based-repair-engineer",
@@ -3417,7 +3399,7 @@
     "regression",
     "rollback"
    ],
-   "bytes": 9222
+   "bytes": 16852
   },
   {
    "id": "engineering-expo-api-routes-developer",
@@ -3435,7 +3417,7 @@
     "eas-hosting",
     "webhooks"
    ],
-   "bytes": 9525
+   "bytes": 11461
   },
   {
    "id": "engineering-expo-dev-client-engineer",
@@ -3470,7 +3452,7 @@
     "webview",
     "mobile"
    ],
-   "bytes": 8504
+   "bytes": 12296
   },
   {
    "id": "engineering-expo-integration-developer",
@@ -3488,7 +3470,7 @@
     "stripe",
     "supabase"
    ],
-   "bytes": 8703
+   "bytes": 13026
   },
   {
    "id": "engineering-expo-jetpack-compose-developer",
@@ -3523,7 +3505,7 @@
     "native-modules",
     "react-native"
    ],
-   "bytes": 9385
+   "bytes": 19936
   },
   {
    "id": "engineering-expo-networking-developer",
@@ -3541,7 +3523,7 @@
     "networking",
     "mobile"
    ],
-   "bytes": 9592
+   "bytes": 22364
   },
   {
    "id": "engineering-expo-router-app-developer",
@@ -3559,7 +3541,7 @@
     "ios",
     "animations"
    ],
-   "bytes": 8925
+   "bytes": 22304
   },
   {
    "id": "engineering-expo-sdk-upgrade-developer",
@@ -3576,7 +3558,7 @@
     "mobile",
     "upgrades"
    ],
-   "bytes": 9597
+   "bytes": 22621
   },
   {
    "id": "engineering-expo-swiftui-developer",
@@ -3611,7 +3593,7 @@
     "react-native",
     "ui"
    ],
-   "bytes": 9459
+   "bytes": 21721
   },
   {
    "id": "engineering-express-next-js-api-developer",
@@ -3629,7 +3611,7 @@
     "api",
     "backend"
    ],
-   "bytes": 8784
+   "bytes": 5905
   },
   {
    "id": "engineering-fastapi-backend-developer",
@@ -3647,7 +3629,7 @@
     "rest-api",
     "backend"
    ],
-   "bytes": 7070
+   "bytes": 6375
   },
   {
    "id": "engineering-fastapi-developer",
@@ -3665,7 +3647,7 @@
     "pydantic",
     "async"
    ],
-   "bytes": 9368
+   "bytes": 9403
   },
   {
    "id": "engineering-fastapi-project-setup-developer",
@@ -3682,7 +3664,7 @@
     "scaffolding",
     "backend"
    ],
-   "bytes": 9152
+   "bytes": 19327
   },
   {
    "id": "engineering-fault-localization-engineer",
@@ -3716,7 +3698,7 @@
     "planning",
     "implementation"
    ],
-   "bytes": 8859
+   "bytes": 19212
   },
   {
    "id": "engineering-feature-flag-cleanup-engineer",
@@ -3805,7 +3787,7 @@
     "storage",
     "security"
    ],
-   "bytes": 7693
+   "bytes": 6233
   },
   {
    "id": "engineering-firebase-developer",
@@ -3822,7 +3804,7 @@
     "cloud-functions",
     "security-rules"
    ],
-   "bytes": 8312
+   "bytes": 6575
   },
   {
    "id": "engineering-flutter-developer",
@@ -3839,7 +3821,7 @@
     "mobile",
     "cross-platform"
    ],
-   "bytes": 8921
+   "bytes": 17399
   },
   {
    "id": "engineering-formal-logic-code-reviewer",
@@ -3874,7 +3856,7 @@
     "yup",
     "validation"
    ],
-   "bytes": 8584
+   "bytes": 5901
   },
   {
    "id": "engineering-fp-ts-async-pipeline-developer",
@@ -3891,7 +3873,7 @@
     "functional-programming",
     "async"
    ],
-   "bytes": 9088
+   "bytes": 5767
   },
   {
    "id": "engineering-fp-ts-backend-developer",
@@ -3909,7 +3891,7 @@
     "backend",
     "functional-programming"
    ],
-   "bytes": 8319
+   "bytes": 5885
   },
   {
    "id": "engineering-fp-ts-error-handling-developer",
@@ -3926,7 +3908,7 @@
     "error-handling",
     "either"
    ],
-   "bytes": 6652
+   "bytes": 17812
   },
   {
    "id": "engineering-fp-ts-react-developer",
@@ -3943,7 +3925,7 @@
     "typescript",
     "next-js"
    ],
-   "bytes": 8810
+   "bytes": 20866
   },
   {
    "id": "engineering-fp-ts-refactoring-engineer",
@@ -3960,7 +3942,7 @@
     "typescript",
     "refactoring"
    ],
-   "bytes": 9455
+   "bytes": 6009
   },
   {
    "id": "engineering-fresh-eyes-decision-reviewer",
@@ -3977,7 +3959,7 @@
     "assumptions",
     "quality"
    ],
-   "bytes": 9646
+   "bytes": 18681
   },
   {
    "id": "engineering-frontend-api-integration-developer",
@@ -3994,7 +3976,7 @@
     "react",
     "async"
    ],
-   "bytes": 9254
+   "bytes": 9740
   },
   {
    "id": "engineering-frontend-architect",
@@ -4011,7 +3993,7 @@
     "react-native",
     "frontend-architecture"
    ],
-   "bytes": 9936
+   "bytes": 22888
   },
   {
    "id": "engineering-frontend-developer",
@@ -4047,7 +4029,7 @@
     "react",
     "react-native"
    ],
-   "bytes": 6917
+   "bytes": 22460
   },
   {
    "id": "engineering-frontend-redesign-developer",
@@ -4065,7 +4047,7 @@
     "css",
     "responsive"
    ],
-   "bytes": 9742
+   "bytes": 6298
   },
   {
    "id": "engineering-frontend-ui-engineer",
@@ -4083,7 +4065,7 @@
     "design-systems",
     "accessibility"
    ],
-   "bytes": 7955
+   "bytes": 13067
   },
   {
    "id": "engineering-full-cycle-software-developer",
@@ -4117,7 +4099,7 @@
     "web-apps",
     "architecture"
    ],
-   "bytes": 5455
+   "bytes": 5338
   },
   {
    "id": "engineering-full-stack-application-developer",
@@ -4134,7 +4116,7 @@
     "mobile",
     "backend"
    ],
-   "bytes": 8733
+   "bytes": 5535
   },
   {
    "id": "engineering-full-stack-developer",
@@ -4151,7 +4133,7 @@
     "code-quality",
     "web"
    ],
-   "bytes": 9263
+   "bytes": 11217
   },
   {
    "id": "engineering-full-stack-feature-engineer",
@@ -4169,7 +4151,7 @@
     "api",
     "frontend"
    ],
-   "bytes": 9344
+   "bytes": 12479
   },
   {
    "id": "engineering-function-logic-reviewer",
@@ -4186,7 +4168,7 @@
     "bugs",
     "logic"
    ],
-   "bytes": 7572
+   "bytes": 16148
   },
   {
    "id": "engineering-functional-data-transform-developer",
@@ -4203,7 +4185,7 @@
     "data-transformation",
     "fp-ts"
    ],
-   "bytes": 8881
+   "bytes": 5947
   },
   {
    "id": "engineering-functional-typescript-developer",
@@ -4220,7 +4202,7 @@
     "functional-programming",
     "pipe"
    ],
-   "bytes": 9532
+   "bytes": 17986
   },
   {
    "id": "engineering-gdb-debugging-engineer",
@@ -4255,7 +4237,7 @@
     "solid",
     "ai-generated-code"
    ],
-   "bytes": 8450
+   "bytes": 21985
   },
   {
    "id": "engineering-git-branch-integration-engineer",
@@ -4273,7 +4255,7 @@
     "merge",
     "workflow"
    ],
-   "bytes": 7388
+   "bytes": 7271
   },
   {
    "id": "engineering-git-branching-specialist",
@@ -4322,7 +4304,7 @@
     "rebase",
     "developer"
    ],
-   "bytes": 8720
+   "bytes": 10347
   },
   {
    "id": "engineering-git-hooks-engineer",
@@ -4340,7 +4322,7 @@
     "linting",
     "developer"
    ],
-   "bytes": 8239
+   "bytes": 13410
   },
   {
    "id": "engineering-git-workflow-automation-engineer",
@@ -4392,7 +4374,7 @@
     "worktrees",
     "branching"
    ],
-   "bytes": 7846
+   "bytes": 7729
   },
   {
    "id": "engineering-github-attachments-specialist",
@@ -4426,7 +4408,7 @@
     "pull-requests",
     "security"
    ],
-   "bytes": 9393
+   "bytes": 5484
   },
   {
    "id": "engineering-github-issue-resolution-developer",
@@ -4443,7 +4425,7 @@
     "pull-requests",
     "debugging"
    ],
-   "bytes": 9373
+   "bytes": 21478
   },
   {
    "id": "engineering-github-issue-writer",
@@ -4529,7 +4511,7 @@
     "concurrency",
     "backend"
    ],
-   "bytes": 9575
+   "bytes": 16428
   },
   {
    "id": "engineering-go-developer",
@@ -4546,7 +4528,7 @@
     "microservices",
     "performance"
    ],
-   "bytes": 9071
+   "bytes": 9570
   },
   {
    "id": "engineering-graphql-api-developer",
@@ -4563,7 +4545,7 @@
     "backend",
     "performance"
    ],
-   "bytes": 9061
+   "bytes": 6097
   },
   {
    "id": "engineering-graphql-architect",
@@ -4580,7 +4562,7 @@
     "federation",
     "api"
    ],
-   "bytes": 9098
+   "bytes": 9034
   },
   {
    "id": "engineering-graphql-client-developer",
@@ -4614,7 +4596,7 @@
     "protobuf",
     "microservices"
    ],
-   "bytes": 9089
+   "bytes": 21685
   },
   {
    "id": "engineering-gsap-motion-frontend-developer",
@@ -4631,7 +4613,7 @@
     "animation",
     "landing-pages"
    ],
-   "bytes": 9159
+   "bytes": 10912
   },
   {
    "id": "engineering-gsap-motion-ui-developer",
@@ -4665,7 +4647,7 @@
     "debugging",
     "diagnostics"
    ],
-   "bytes": 8099
+   "bytes": 8023
   },
   {
    "id": "engineering-hard-bug-diagnostician",
@@ -4682,7 +4664,7 @@
     "performance",
     "regressions"
    ],
-   "bytes": 9384
+   "bytes": 11465
   },
   {
    "id": "engineering-haskell-developer",
@@ -4698,7 +4680,7 @@
     "functional-programming",
     "type-systems"
    ],
-   "bytes": 4182
+   "bytes": 4124
   },
   {
    "id": "engineering-hono-api-developer",
@@ -4715,7 +4697,7 @@
     "cloudflare-workers",
     "api"
    ],
-   "bytes": 8246
+   "bytes": 12285
   },
   {
    "id": "engineering-identity-access-engineer",
@@ -4749,7 +4731,7 @@
     "testing",
     "refactoring"
    ],
-   "bytes": 9479
+   "bytes": 11716
   },
   {
    "id": "engineering-indie-tool-developer",
@@ -4766,7 +4748,7 @@
     "local-first",
     "side-projects"
    ],
-   "bytes": 8309
+   "bytes": 19593
   },
   {
    "id": "engineering-inngest-background-jobs-developer",
@@ -4783,7 +4765,7 @@
     "serverless",
     "event-driven"
    ],
-   "bytes": 9520
+   "bytes": 14443
   },
   {
    "id": "engineering-integration-architect",
@@ -4818,7 +4800,7 @@
     "breakpoints",
     "debugger"
    ],
-   "bytes": 8048
+   "bytes": 16366
   },
   {
    "id": "engineering-interface-contract-architect",
@@ -4836,7 +4818,7 @@
     "rest",
     "typescript"
    ],
-   "bytes": 9368
+   "bytes": 12779
   },
   {
    "id": "engineering-i18n-engineer",
@@ -4872,7 +4854,7 @@
     "react-native",
     "mobile"
    ],
-   "bytes": 9077
+   "bytes": 13601
   },
   {
    "id": "engineering-ios-developer",
@@ -4889,7 +4871,7 @@
     "swiftui",
     "mobile"
    ],
-   "bytes": 9231
+   "bytes": 12073
   },
   {
    "id": "engineering-ios-simulator-debugging-engineer",
@@ -4957,7 +4939,7 @@
     "code-review",
     "specs"
    ],
-   "bytes": 9220
+   "bytes": 9823
   },
   {
    "id": "engineering-java-developer",
@@ -4974,7 +4956,7 @@
     "backend",
     "graalvm"
    ],
-   "bytes": 9242
+   "bytes": 9732
   },
   {
    "id": "engineering-javascript-coding-standards-lead",
@@ -4992,7 +4974,7 @@
     "react",
     "coding-standards"
    ],
-   "bytes": 9110
+   "bytes": 6543
   },
   {
    "id": "engineering-javascript-developer",
@@ -5026,7 +5008,7 @@
     "training",
     "developer"
    ],
-   "bytes": 9236
+   "bytes": 14834
   },
   {
    "id": "engineering-jetpack-compose-developer",
@@ -5060,7 +5042,7 @@
     "performance",
     "numerical"
    ],
-   "bytes": 9278
+   "bytes": 10325
   },
   {
    "id": "engineering-junior-developer-mentor",
@@ -5114,7 +5096,7 @@
     "conversion",
     "seo"
    ],
-   "bytes": 9311
+   "bytes": 12703
   },
   {
    "id": "engineering-laravel-developer",
@@ -5182,7 +5164,7 @@
     "refactoring",
     "idiomatic"
    ],
-   "bytes": 9333
+   "bytes": 10118
   },
   {
    "id": "engineering-legacy-modernization-architect",
@@ -5199,7 +5181,7 @@
     "strangler-fig",
     "migration"
    ],
-   "bytes": 9401
+   "bytes": 13000
   },
   {
    "id": "engineering-library-documentation-researcher",
@@ -5234,7 +5216,7 @@
     "customer-support",
     "full-stack"
    ],
-   "bytes": 10595
+   "bytes": 18598
   },
   {
    "id": "engineering-localization-developer",
@@ -5251,7 +5233,7 @@
     "translation",
     "rtl"
    ],
-   "bytes": 5467
+   "bytes": 5350
   },
   {
    "id": "engineering-london-school-tdd-developer",
@@ -5286,7 +5268,7 @@
     "cleanup",
     "frontend"
    ],
-   "bytes": 9733
+   "bytes": 21197
   },
   {
    "id": "lsp-index-engineer",
@@ -5389,7 +5371,7 @@
     "smtp",
     "api"
    ],
-   "bytes": 6867
+   "bytes": 13462
   },
   {
    "id": "engineering-makepad-animation-developer",
@@ -5406,7 +5388,7 @@
     "animation",
     "ui"
    ],
-   "bytes": 8737
+   "bytes": 9934
   },
   {
    "id": "engineering-makepad-app-architect",
@@ -5424,7 +5406,7 @@
     "robius",
     "wasm"
    ],
-   "bytes": 10713
+   "bytes": 14399
   },
   {
    "id": "engineering-makepad-cross-platform-developer",
@@ -5527,7 +5509,7 @@
     "sse",
     "integration"
    ],
-   "bytes": 9424
+   "bytes": 16246
   },
   {
    "id": "engineering-makepad-packaging-engineer",
@@ -5545,7 +5527,7 @@
     "github-actions",
     "wasm"
    ],
-   "bytes": 8957
+   "bytes": 13821
   },
   {
    "id": "engineering-makepad-rust-ui-developer",
@@ -5613,7 +5595,7 @@
     "state-management",
     "serde"
    ],
-   "bytes": 7765
+   "bytes": 14883
   },
   {
    "id": "engineering-makepad-text-rendering-developer",
@@ -5715,7 +5697,7 @@
     "streaming",
     "ssr"
    ],
-   "bytes": 9538
+   "bytes": 12454
   },
   {
    "id": "engineering-markstream-nuxt-developer",
@@ -5869,7 +5851,7 @@
     "memory-safety",
     "systems"
    ],
-   "bytes": 9634
+   "bytes": 16349
   },
   {
    "id": "engineering-microservices-architect",
@@ -5886,7 +5868,7 @@
     "distributed-systems",
     "event-driven"
    ],
-   "bytes": 7187
+   "bytes": 21671
   },
   {
    "id": "engineering-minimal-change-engineer",
@@ -5920,7 +5902,7 @@
     "code-quality",
     "pull-requests"
    ],
-   "bytes": 8258
+   "bytes": 13165
   },
   {
    "id": "engineering-mistake-proofing-engineer",
@@ -5938,7 +5920,7 @@
     "api-design",
     "defensive-programming"
    ],
-   "bytes": 9644
+   "bytes": 12687
   },
   {
    "id": "engineering-mobile-app-builder",
@@ -6009,7 +5991,7 @@
     "stl",
     "performance"
    ],
-   "bytes": 5069
+   "bytes": 5015
   },
   {
    "id": "engineering-modern-javascript-developer",
@@ -6026,7 +6008,7 @@
     "functional-programming",
     "refactoring"
    ],
-   "bytes": 8505
+   "bytes": 22121
   },
   {
    "id": "engineering-module-design-architect",
@@ -6061,7 +6043,7 @@
     "refactoring",
     "legacy-code"
    ],
-   "bytes": 9757
+   "bytes": 13538
   },
   {
    "id": "engineering-monday-com-bug-fix-developer",
@@ -6114,7 +6096,7 @@
     "turborepo",
     "tooling"
    ],
-   "bytes": 8553
+   "bytes": 15299
   },
   {
    "id": "engineering-moodle-api-developer",
@@ -6132,7 +6114,7 @@
     "lms",
     "e-learning"
    ],
-   "bytes": 9579
+   "bytes": 20378
   },
   {
    "id": "engineering-multi-agent-code-review-lead",
@@ -6184,7 +6166,7 @@
     "desktop",
     "api-first"
    ],
-   "bytes": 8419
+   "bytes": 13047
   },
   {
    "id": "engineering-multi-tenant-saas-architect",
@@ -6202,7 +6184,7 @@
     "multi-tenancy",
     "typescript"
    ],
-   "bytes": 9354
+   "bytes": 14859
   },
   {
    "id": "engineering-nativewind-styling-developer",
@@ -6220,7 +6202,7 @@
     "react-native",
     "styling"
    ],
-   "bytes": 9559
+   "bytes": 14644
   },
   {
    "id": "engineering-neo4j-client-library-developer",
@@ -6255,7 +6237,7 @@
     "node-js",
     "postgres"
    ],
-   "bytes": 7808
+   "bytes": 16722
   },
   {
    "id": "engineering-neon-object-storage-developer",
@@ -6272,7 +6254,7 @@
     "object-storage",
     "postgres"
    ],
-   "bytes": 8326
+   "bytes": 13562
   },
   {
    "id": "engineering-nestjs-developer",
@@ -6289,7 +6271,7 @@
     "typescript",
     "backend"
    ],
-   "bytes": 9501
+   "bytes": 22200
   },
   {
    "id": "engineering-next-js-app-router-architect",
@@ -6307,7 +6289,7 @@
     "app-router",
     "full-stack"
    ],
-   "bytes": 9727
+   "bytes": 16439
   },
   {
    "id": "engineering-next-js-app-router-developer",
@@ -6325,7 +6307,7 @@
     "tailwind",
     "frontend"
    ],
-   "bytes": 7514
+   "bytes": 5975
   },
   {
    "id": "engineering-next-js-developer",
@@ -6359,7 +6341,7 @@
     "authentication",
     "react"
    ],
-   "bytes": 8796
+   "bytes": 10014
   },
   {
    "id": "engineering-nft-smart-contract-developer",
@@ -6377,7 +6359,7 @@
     "blockchain",
     "web3"
    ],
-   "bytes": 8756
+   "bytes": 6581
   },
   {
    "id": "engineering-node-js-architecture-advisor",
@@ -6394,7 +6376,7 @@
     "architecture",
     "security"
    ],
-   "bytes": 9805
+   "bytes": 10751
   },
   {
    "id": "engineering-node-js-backend-developer",
@@ -6412,7 +6394,7 @@
     "api",
     "graphql"
    ],
-   "bytes": 9723
+   "bytes": 22390
   },
   {
    "id": "engineering-node-js-backend-engineer",
@@ -6430,7 +6412,7 @@
     "typescript",
     "prisma"
    ],
-   "bytes": 9669
+   "bytes": 9769
   },
   {
    "id": "engineering-nuxt-developer",
@@ -6465,7 +6447,7 @@
     "build-caching",
     "ci"
    ],
-   "bytes": 9518
+   "bytes": 12931
   },
   {
    "id": "engineering-odoo-api-integration-developer",
@@ -6568,7 +6550,7 @@
     "erp",
     "oca"
    ],
-   "bytes": 7578
+   "bytes": 6529
   },
   {
    "id": "engineering-odoo-xml-views-developer",
@@ -6654,7 +6636,7 @@
     "api-design",
     "sdk"
    ],
-   "bytes": 9738
+   "bytes": 20598
   },
   {
    "id": "engineering-optimistic-ui-developer",
@@ -6671,7 +6653,7 @@
     "react-query",
     "caching"
    ],
-   "bytes": 9325
+   "bytes": 16281
   },
   {
    "id": "engineering-orgscript-engineer",
@@ -6707,7 +6689,7 @@
     "performance",
     "accessibility"
    ],
-   "bytes": 6379
+   "bytes": 22691
   },
   {
    "id": "engineering-pair-programmer",
@@ -6742,7 +6724,7 @@
     "pakistan",
     "saas"
    ],
-   "bytes": 9849
+   "bytes": 10055
   },
   {
    "id": "engineering-parallel-diff-reviewer",
@@ -6760,7 +6742,7 @@
     "regressions",
     "security"
    ],
-   "bytes": 9607
+   "bytes": 6176
   },
   {
    "id": "engineering-payment-integration-developer",
@@ -6778,7 +6760,7 @@
     "subscriptions",
     "webhooks"
    ],
-   "bytes": 5709
+   "bytes": 5643
   },
   {
    "id": "engineering-payments-billing-engineer",
@@ -6813,7 +6795,7 @@
     "subscriptions",
     "checkout"
    ],
-   "bytes": 7602
+   "bytes": 15867
   },
   {
    "id": "engineering-pdf-engine-architect",
@@ -6848,7 +6830,7 @@
     "observability",
     "scalability"
    ],
-   "bytes": 9629
+   "bytes": 13226
   },
   {
    "id": "engineering-performance-optimization-engineer",
@@ -6866,7 +6848,7 @@
     "api",
     "optimization"
    ],
-   "bytes": 9466
+   "bytes": 10756
   },
   {
    "id": "engineering-performance-profiling-engineer",
@@ -6883,7 +6865,7 @@
     "performance",
     "measurement"
    ],
-   "bytes": 5755
+   "bytes": 5638
   },
   {
    "id": "engineering-phase-gated-debugging-engineer",
@@ -6917,7 +6899,7 @@
     "image-editing",
     "embed"
    ],
-   "bytes": 9483
+   "bytes": 18672
   },
   {
    "id": "engineering-php-developer",
@@ -6934,7 +6916,7 @@
     "oop",
     "performance"
    ],
-   "bytes": 4575
+   "bytes": 4521
   },
   {
    "id": "engineering-pimcore-developer",
@@ -6971,7 +6953,7 @@
     "ach",
     "webhooks"
    ],
-   "bytes": 9722
+   "bytes": 7217
   },
   {
    "id": "engineering-plan-execution-engineer",
@@ -6988,7 +6970,7 @@
     "planning",
     "code-review"
    ],
-   "bytes": 4928
+   "bytes": 5618
   },
   {
    "id": "engineering-plan-driven-tdd-developer",
@@ -7005,7 +6987,7 @@
     "testing",
     "workflow"
    ],
-   "bytes": 9116
+   "bytes": 10466
   },
   {
    "id": "engineering-platform-engineer",
@@ -7040,7 +7022,7 @@
     "web-design",
     "personal-brand"
    ],
-   "bytes": 9675
+   "bytes": 13878
   },
   {
    "id": "engineering-posix-shell-script-developer",
@@ -7058,7 +7040,7 @@
     "scripting",
     "unix"
    ],
-   "bytes": 9114
+   "bytes": 17159
   },
   {
    "id": "engineering-pr-debate-reviewer",
@@ -7075,7 +7057,7 @@
     "github",
     "gitlab"
    ],
-   "bytes": 9282
+   "bytes": 12997
   },
   {
    "id": "engineering-pr-maintainability-reviewer",
@@ -7092,7 +7074,7 @@
     "maintainability",
     "design-smells"
    ],
-   "bytes": 4255
+   "bytes": 6102
   },
   {
    "id": "engineering-pr-review-follow-up-engineer",
@@ -7110,7 +7092,7 @@
     "gitlab",
     "pull-requests"
    ],
-   "bytes": 9284
+   "bytes": 21364
   },
   {
    "id": "engineering-pr-review-queue-coordinator",
@@ -7161,7 +7143,7 @@
     "pull-requests",
     "security"
    ],
-   "bytes": 8326
+   "bytes": 21115
   },
   {
    "id": "engineering-pre-release-codebase-auditor",
@@ -7179,7 +7161,7 @@
     "cleanup",
     "github"
    ],
-   "bytes": 9127
+   "bytes": 10553
   },
   {
    "id": "engineering-principal-software-engineer",
@@ -7215,7 +7197,7 @@
     "postgresql",
     "migrations"
    ],
-   "bytes": 9724
+   "bytes": 12486
   },
   {
    "id": "engineering-privacy-engineer",
@@ -7250,7 +7232,7 @@
     "probabilistic-data-structures",
     "performance"
    ],
-   "bytes": 8250
+   "bytes": 20697
   },
   {
    "id": "engineering-production-cleanup-developer",
@@ -7286,7 +7268,7 @@
     "code-quality",
     "performance"
    ],
-   "bytes": 9835
+   "bytes": 18193
   },
   {
    "id": "engineering-production-error-analyst",
@@ -7304,7 +7286,7 @@
     "distributed-systems",
     "observability"
    ],
-   "bytes": 9310
+   "bytes": 13075
   },
   {
    "id": "engineering-production-issue-resolver",
@@ -7321,7 +7303,7 @@
     "root-cause",
     "observability"
    ],
-   "bytes": 7773
+   "bytes": 17808
   },
   {
    "id": "engineering-progressive-web-app-developer",
@@ -7339,7 +7321,7 @@
     "frontend",
     "offline"
    ],
-   "bytes": 8451
+   "bytes": 14839
   },
   {
    "id": "engineering-pull-request-ci-engineer",
@@ -7356,7 +7338,7 @@
     "pull-requests",
     "github"
    ],
-   "bytes": 9516
+   "bytes": 9759
   },
   {
    "id": "engineering-pull-request-description-writer",
@@ -7373,7 +7355,7 @@
     "git",
     "code-review"
    ],
-   "bytes": 9004
+   "bytes": 22294
   },
   {
    "id": "engineering-pull-request-manager",
@@ -7407,7 +7389,7 @@
     "git",
     "developer"
    ],
-   "bytes": 8685
+   "bytes": 21918
   },
   {
    "id": "engineering-pull-request-readiness-reviewer",
@@ -7458,7 +7440,7 @@
     "api",
     "fastapi"
    ],
-   "bytes": 4302
+   "bytes": 6480
   },
   {
    "id": "engineering-python-application-architect",
@@ -7475,7 +7457,7 @@
     "async",
     "architecture"
    ],
-   "bytes": 10254
+   "bytes": 11943
   },
   {
    "id": "engineering-python-developer",
@@ -7510,7 +7492,7 @@
     "pypi",
     "pyproject"
    ],
-   "bytes": 9662
+   "bytes": 21229
   },
   {
    "id": "engineering-python-performance-engineer",
@@ -7527,7 +7509,7 @@
     "profiling",
     "performance"
    ],
-   "bytes": 9485
+   "bytes": 22692
   },
   {
    "id": "engineering-python-project-scaffolding-developer",
@@ -7545,7 +7527,7 @@
     "fastapi",
     "django"
    ],
-   "bytes": 10167
+   "bytes": 10094
   },
   {
    "id": "engineering-python-uv-packaging-engineer",
@@ -7563,7 +7545,7 @@
     "dependencies",
     "packaging"
    ],
-   "bytes": 9284
+   "bytes": 18951
   },
   {
    "id": "engineering-radix-ui-component-developer",
@@ -7581,7 +7563,7 @@
     "accessibility",
     "components"
    ],
-   "bytes": 9606
+   "bytes": 22660
   },
   {
    "id": "engineering-rails-project-setup-developer",
@@ -7615,7 +7597,7 @@
     "upgrades",
     "migration"
    ],
-   "bytes": 9747
+   "bytes": 14850
   },
   {
    "id": "engineering-rapid-prototyper",
@@ -7666,7 +7648,7 @@
     "frontend",
     "typescript"
    ],
-   "bytes": 9271
+   "bytes": 9755
   },
   {
    "id": "engineering-react-18-batching-fix-engineer",
@@ -7836,7 +7818,7 @@
     "data-fetching",
     "frontend"
    ],
-   "bytes": 9101
+   "bytes": 8984
   },
   {
    "id": "engineering-react-best-practices-reviewer",
@@ -7854,7 +7836,7 @@
     "performance",
     "vercel"
    ],
-   "bytes": 7697
+   "bytes": 7579
   },
   {
    "id": "engineering-react-component-architect",
@@ -7888,7 +7870,7 @@
     "typescript",
     "frontend"
    ],
-   "bytes": 6716
+   "bytes": 5880
   },
   {
    "id": "engineering-react-component-scaffolding-develope",
@@ -7906,7 +7888,7 @@
     "typescript",
     "scaffolding"
    ],
-   "bytes": 9934
+   "bytes": 13891
   },
   {
    "id": "engineering-react-flow-application-architect",
@@ -7923,7 +7905,7 @@
     "react",
     "state-management"
    ],
-   "bytes": 6300
+   "bytes": 6509
   },
   {
    "id": "engineering-react-flow-node-developer",
@@ -7940,7 +7922,7 @@
     "react",
     "components"
    ],
-   "bytes": 4315
+   "bytes": 5898
   },
   {
    "id": "engineering-react-frontend-developer",
@@ -7957,7 +7939,7 @@
     "frontend",
     "state-management"
    ],
-   "bytes": 9186
+   "bytes": 6023
   },
   {
    "id": "engineering-react-frontend-engineer",
@@ -7993,7 +7975,7 @@
     "suspense",
     "standards"
    ],
-   "bytes": 9830
+   "bytes": 10483
   },
   {
    "id": "engineering-react-modernization-developer",
@@ -8010,7 +7992,7 @@
     "hooks",
     "codemods"
    ],
-   "bytes": 7823
+   "bytes": 15002
   },
   {
    "id": "engineering-react-native-architect",
@@ -8028,7 +8010,7 @@
     "mobile",
     "offline-first"
    ],
-   "bytes": 9865
+   "bytes": 20293
   },
   {
    "id": "engineering-react-native-brownfield-developer",
@@ -8046,7 +8028,7 @@
     "android",
     "brownfield"
    ],
-   "bytes": 8345
+   "bytes": 18316
   },
   {
    "id": "engineering-react-native-developer",
@@ -8063,7 +8045,7 @@
     "ios",
     "android"
    ],
-   "bytes": 4541
+   "bytes": 6530
   },
   {
    "id": "engineering-react-native-performance-engineer",
@@ -8116,7 +8098,7 @@
     "react-query",
     "state-management"
    ],
-   "bytes": 9838
+   "bytes": 13958
   },
   {
    "id": "engineering-react-ui-state-developer",
@@ -8150,7 +8132,7 @@
     "animation",
     "view-transitions"
    ],
-   "bytes": 9973
+   "bytes": 22933
   },
   {
    "id": "engineering-realtime-collaboration-engineer",
@@ -8185,7 +8167,7 @@
     "solid",
     "design-patterns"
    ],
-   "bytes": 7644
+   "bytes": 21608
   },
   {
    "id": "engineering-repository-architect",
@@ -8270,7 +8252,7 @@
     "code-review",
     "feedback"
    ],
-   "bytes": 8829
+   "bytes": 8712
   },
   {
    "id": "engineering-robius-action-event-developer",
@@ -8287,7 +8269,7 @@
     "events",
     "ui"
    ],
-   "bytes": 9056
+   "bytes": 6412
   },
   {
    "id": "engineering-robius-widget-pattern-developer",
@@ -8304,7 +8286,7 @@
     "widgets",
     "ui-components"
    ],
-   "bytes": 9694
+   "bytes": 14572
   },
   {
    "id": "engineering-root-cause-analysis-engineer",
@@ -8355,7 +8337,7 @@
     "systems-programming",
     "scaffolding"
    ],
-   "bytes": 10379
+   "bytes": 11517
   },
   {
    "id": "engineering-rust-refactoring-specialist",
@@ -8390,7 +8372,7 @@
     "async",
     "performance"
    ],
-   "bytes": 9411
+   "bytes": 9897
   },
   {
    "id": "engineering-saas-mvp-developer",
@@ -8477,7 +8459,7 @@
     "apex",
     "salesforce-dx"
    ],
-   "bytes": 7269
+   "bytes": 22874
   },
   {
    "id": "engineering-salesforce-technical-architect",
@@ -8529,7 +8511,7 @@
     "sql",
     "erp"
    ],
-   "bytes": 9931
+   "bytes": 19580
   },
   {
    "id": "engineering-scala-developer",
@@ -8547,7 +8529,7 @@
     "zio",
     "functional-programming"
    ],
-   "bytes": 7789
+   "bytes": 7733
   },
   {
    "id": "engineering-scroll-experience-developer",
@@ -8564,7 +8546,7 @@
     "parallax",
     "storytelling"
    ],
-   "bytes": 9367
+   "bytes": 15321
   },
   {
    "id": "engineering-sdk-developer",
@@ -8599,7 +8581,7 @@
     "api-design",
     "developer-experience"
    ],
-   "bytes": 8577
+   "bytes": 15824
   },
   {
    "id": "engineering-search-relevance-engineer",
@@ -8705,7 +8687,7 @@
     "tailwind",
     "frontend"
    ],
-   "bytes": 8777
+   "bytes": 6621
   },
   {
    "id": "engineering-senior-software-engineer",
@@ -8740,7 +8722,7 @@
     "dependencies",
     "system-design"
    ],
-   "bytes": 9547
+   "bytes": 11501
   },
   {
    "id": "engineering-service-lifecycle-engineer",
@@ -8757,7 +8739,7 @@
     "reliability",
     "kubernetes"
    ],
-   "bytes": 7864
+   "bytes": 16371
   },
   {
    "id": "engineering-shadcn-ui-developer",
@@ -8774,7 +8756,7 @@
     "tailwind",
     "design-system"
    ],
-   "bytes": 8997
+   "bytes": 18652
   },
   {
    "id": "engineering-shopify-app-developer",
@@ -8792,7 +8774,7 @@
     "polaris",
     "e-commerce"
    ],
-   "bytes": 9753
+   "bytes": 22471
   },
   {
    "id": "engineering-shopify-extensions-developer",
@@ -8809,7 +8791,7 @@
     "shopify-functions",
     "graphql"
    ],
-   "bytes": 9223
+   "bytes": 21919
   },
   {
    "id": "engineering-shopify-theme-developer",
@@ -8844,7 +8826,7 @@
     "shadcn-ui",
     "frontend"
    ],
-   "bytes": 5511
+   "bytes": 5394
   },
   {
    "id": "engineering-software-architect",
@@ -8935,23 +8917,6 @@
    "bytes": 21797
   },
   {
-   "id": "engineering-solution-architect",
-   "division": "engineering",
-   "label": "Software Engineering",
-   "name": "Solution Architect",
-   "description": "Makes architecture decisions by analyzing requirements, weighing trade-offs between options and recording the rationale in architecture decision records.",
-   "emoji": "🏛️",
-   "role": "architecture decision-maker · requirements, trade-offs, ADRs",
-   "tags": [
-    "architect",
-    "architecture",
-    "trade-offs",
-    "adr",
-    "system-design"
-   ],
-   "bytes": 4022
-  },
-  {
    "id": "engineering-sparc-implementation-developer",
    "division": "engineering",
    "label": "Software Engineering",
@@ -9017,7 +8982,7 @@
     "requirements",
     "planning"
    ],
-   "bytes": 9224
+   "bytes": 10814
   },
   {
    "id": "engineering-spline-3d-web-developer",
@@ -9068,7 +9033,7 @@
     "websites",
     "ai-ui"
    ],
-   "bytes": 8651
+   "bytes": 12749
   },
   {
    "id": "engineering-stripe-integration-developer",
@@ -9086,7 +9051,7 @@
     "backend",
     "subscriptions"
    ],
-   "bytes": 9589
+   "bytes": 18516
   },
   {
    "id": "engineering-structured-debugging-engineer",
@@ -9138,7 +9103,7 @@
     "tailwind",
     "react"
    ],
-   "bytes": 9007
+   "bytes": 9864
   },
   {
    "id": "engineering-styleseed-upgrade-engineer",
@@ -9155,7 +9120,7 @@
     "design-system",
     "frontend"
    ],
-   "bytes": 7831
+   "bytes": 5916
   },
   {
    "id": "engineering-supabase-developer",
@@ -9173,7 +9138,7 @@
     "edge-functions",
     "backend"
    ],
-   "bytes": 9480
+   "bytes": 14786
   },
   {
    "id": "engineering-surgical-change-developer",
@@ -9208,7 +9173,7 @@
     "full-stack",
     "frontend"
    ],
-   "bytes": 9271
+   "bytes": 10807
   },
   {
    "id": "engineering-swift-concurrency-engineer",
@@ -9226,7 +9191,7 @@
     "ios",
     "async-await"
    ],
-   "bytes": 6747
+   "bytes": 21298
   },
   {
    "id": "engineering-swiftui-developer",
@@ -9244,7 +9209,7 @@
     "swift",
     "mobile"
    ],
-   "bytes": 9695
+   "bytes": 21023
   },
   {
    "id": "engineering-swiftui-liquid-glass-developer",
@@ -9261,7 +9226,7 @@
     "ios",
     "ui"
    ],
-   "bytes": 8323
+   "bytes": 14197
   },
   {
    "id": "engineering-swiftui-performance-auditor",
@@ -9278,7 +9243,7 @@
     "ios",
     "instruments"
    ],
-   "bytes": 9494
+   "bytes": 21387
   },
   {
    "id": "engineering-swiftui-refactoring-developer",
@@ -9295,7 +9260,7 @@
     "ios",
     "architecture"
    ],
-   "bytes": 9228
+   "bytes": 15624
   },
   {
    "id": "engineering-swiftui-screen-developer",
@@ -9312,7 +9277,7 @@
     "navigation",
     "ui-components"
    ],
-   "bytes": 9492
+   "bytes": 22444
   },
   {
    "id": "engineering-systems-architecture-reviewer",
@@ -9363,7 +9328,7 @@
     "next-js",
     "data-fetching"
    ],
-   "bytes": 7636
+   "bytes": 11204
   },
   {
    "id": "engineering-tdd-developer",
@@ -9380,7 +9345,7 @@
     "regression-testing",
     "red-green-refactor"
    ],
-   "bytes": 9490
+   "bytes": 10573
   },
   {
    "id": "engineering-tdd-green-phase-developer",
@@ -9414,7 +9379,7 @@
     "coordination",
     "quality"
    ],
-   "bytes": 9204
+   "bytes": 11934
   },
   {
    "id": "engineering-tdd-refactor-phase-developer",
@@ -9465,7 +9430,7 @@
     "git",
     "verification"
    ],
-   "bytes": 8826
+   "bytes": 16412
   },
   {
    "id": "engineering-tech-debt-cleanup-engineer",
@@ -9516,7 +9481,7 @@
     "prioritization",
     "git-history"
    ],
-   "bytes": 9707
+   "bytes": 13320
   },
   {
    "id": "engineering-technical-implementation-planner",
@@ -9602,7 +9567,7 @@
     "chatbots",
     "monetization"
    ],
-   "bytes": 9468
+   "bytes": 10658
   },
   {
    "id": "engineering-telegram-integration-developer",
@@ -9620,7 +9585,7 @@
     "node-js",
     "python"
    ],
-   "bytes": 9431
+   "bytes": 17729
   },
   {
    "id": "engineering-telegram-mini-app-developer",
@@ -9638,7 +9603,7 @@
     "web-apps",
     "payments"
    ],
-   "bytes": 9297
+   "bytes": 16074
   },
   {
    "id": "engineering-temporal-go-developer",
@@ -9655,7 +9620,7 @@
     "workflows",
     "distributed-systems"
    ],
-   "bytes": 9336
+   "bytes": 22149
   },
   {
    "id": "engineering-temporal-python-developer",
@@ -9672,7 +9637,7 @@
     "workflows",
     "sagas"
    ],
-   "bytes": 9022
+   "bytes": 12324
   },
   {
    "id": "engineering-temporal-workflow-architect",
@@ -9689,7 +9654,7 @@
     "distributed-systems",
     "sagas"
    ],
-   "bytes": 8717
+   "bytes": 11476
   },
   {
    "id": "terminal-integration-specialist",
@@ -9723,7 +9688,7 @@
     "3d",
     "creative-coding"
    ],
-   "bytes": 7309
+   "bytes": 20436
   },
   {
    "id": "engineering-three-js-animation-developer",
@@ -9740,7 +9705,7 @@
     "webgl",
     "gltf"
    ],
-   "bytes": 8636
+   "bytes": 15300
   },
   {
    "id": "engineering-three-js-asset-loading-developer",
@@ -9757,7 +9722,7 @@
     "asset-loading",
     "webgl"
    ],
-   "bytes": 7192
+   "bytes": 6266
   },
   {
    "id": "engineering-three-js-developer",
@@ -9774,7 +9739,7 @@
     "3d",
     "javascript"
    ],
-   "bytes": 9066
+   "bytes": 6143
   },
   {
    "id": "engineering-three-js-geometry-developer",
@@ -9791,7 +9756,7 @@
     "webgl",
     "instancing"
    ],
-   "bytes": 6818
+   "bytes": 6546
   },
   {
    "id": "engineering-three-js-interaction-developer",
@@ -9808,7 +9773,7 @@
     "interaction",
     "webgl"
    ],
-   "bytes": 6446
+   "bytes": 6231
   },
   {
    "id": "engineering-three-js-lighting-developer",
@@ -9825,7 +9790,7 @@
     "shadows",
     "webgl"
    ],
-   "bytes": 9361
+   "bytes": 14512
   },
   {
    "id": "engineering-three-js-materials-developer",
@@ -9842,7 +9807,7 @@
     "pbr",
     "webgl"
    ],
-   "bytes": 9246
+   "bytes": 16618
   },
   {
    "id": "engineering-three-js-post-processing-developer",
@@ -9859,7 +9824,7 @@
     "bloom",
     "shaders"
    ],
-   "bytes": 9442
+   "bytes": 6374
   },
   {
    "id": "engineering-three-js-shader-developer",
@@ -9876,7 +9841,7 @@
     "shaders",
     "webgl"
    ],
-   "bytes": 7002
+   "bytes": 6424
   },
   {
    "id": "engineering-three-js-texture-developer",
@@ -9893,7 +9858,7 @@
     "uv-mapping",
     "webgl"
    ],
-   "bytes": 9064
+   "bytes": 6451
   },
   {
    "id": "engineering-trigger-dev-developer",
@@ -9910,7 +9875,7 @@
     "typescript",
     "workflows"
    ],
-   "bytes": 9353
+   "bytes": 22088
   },
   {
    "id": "engineering-trpc-full-stack-developer",
@@ -9927,7 +9892,7 @@
     "next-js",
     "api"
    ],
-   "bytes": 9432
+   "bytes": 17504
   },
   {
    "id": "engineering-twilio-communications-developer",
@@ -9945,7 +9910,7 @@
     "whatsapp",
     "2fa"
    ],
-   "bytes": 6797
+   "bytes": 22098
   },
   {
    "id": "engineering-typed-api-client-developer",
@@ -9963,7 +9928,7 @@
     "validation",
     "zod"
    ],
-   "bytes": 9517
+   "bytes": 16526
   },
   {
    "id": "engineering-typescript-architect",
@@ -9997,7 +9962,7 @@
     "monorepo",
     "tooling"
    ],
-   "bytes": 6765
+   "bytes": 15906
   },
   {
    "id": "engineering-typescript-scaffolding-developer",
@@ -10014,7 +9979,7 @@
     "vite",
     "next-js"
    ],
-   "bytes": 10142
+   "bytes": 10691
   },
   {
    "id": "engineering-typescript-type-system-developer",
@@ -10031,7 +9996,7 @@
     "type-safety",
     "libraries"
    ],
-   "bytes": 9014
+   "bytes": 19986
   },
   {
    "id": "engineering-ui-cleanup-developer",
@@ -10101,7 +10066,7 @@
     "queues",
     "cron"
    ],
-   "bytes": 9182
+   "bytes": 22281
   },
   {
    "id": "engineering-upstash-redis-developer",
@@ -10154,7 +10119,7 @@
     "versioning",
     "developer"
    ],
-   "bytes": 8929
+   "bytes": 12822
   },
   {
    "id": "engineering-video-streaming-engineer",
@@ -10243,7 +10208,7 @@
     "caching",
     "frontend"
    ],
-   "bytes": 8882
+   "bytes": 6265
   },
   {
    "id": "engineering-webassembly-engineer",
@@ -10330,7 +10295,7 @@
     "php",
     "payments"
    ],
-   "bytes": 9468
+   "bytes": 21325
   },
   {
    "id": "engineering-wordpress-developer",
@@ -10347,7 +10312,7 @@
     "woocommerce",
     "cms"
    ],
-   "bytes": 9551
+   "bytes": 6636
   },
   {
    "id": "engineering-wordpress-performance",
@@ -10382,7 +10347,7 @@
     "plugins",
     "rest-api"
    ],
-   "bytes": 9576
+   "bytes": 6434
   },
   {
    "id": "engineering-wordpress-shopping-cart",
@@ -10417,7 +10382,7 @@
     "php",
     "maintenance"
    ],
-   "bytes": 9576
+   "bytes": 21533
   },
   {
    "id": "engineering-wordpress-theme-conversion-developer",
@@ -10452,7 +10417,7 @@
     "php",
     "block-editor"
    ],
-   "bytes": 9524
+   "bytes": 6519
   },
   {
    "id": "engineering-x402-paywall-developer",
@@ -10487,7 +10452,7 @@
     "validation",
     "trpc"
    ],
-   "bytes": 7810
+   "bytes": 11768
   },
   {
    "id": "ai-agent-context-designer",
@@ -10504,7 +10469,7 @@
     "prompts",
     "ai-agents"
    ],
-   "bytes": 9483
+   "bytes": 14016
   },
   {
    "id": "ai-agent-context-engineer",
@@ -10521,7 +10486,7 @@
     "memory",
     "llm"
    ],
-   "bytes": 9499
+   "bytes": 15609
   },
   {
    "id": "ai-agent-evaluation-engineer",
@@ -10538,7 +10503,7 @@
     "benchmarks",
     "llm"
    ],
-   "bytes": 9173
+   "bytes": 12741
   },
   {
    "id": "ai-agent-evaluation-report-analyst",
@@ -10555,7 +10520,7 @@
     "reporting",
     "benchmarks"
    ],
-   "bytes": 9602
+   "bytes": 10397
   },
   {
    "id": "ai-agent-harness-engineer",
@@ -10573,7 +10538,7 @@
     "repository",
     "developer-experience"
    ],
-   "bytes": 7550
+   "bytes": 21250
   },
   {
    "id": "ai-agent-loop-designer",
@@ -10590,7 +10555,7 @@
     "automation",
     "guardrails"
    ],
-   "bytes": 9212
+   "bytes": 22410
   },
   {
    "id": "ai-agent-memory-architect",
@@ -10608,7 +10573,7 @@
     "embeddings",
     "rag"
    ],
-   "bytes": 9516
+   "bytes": 7030
   },
   {
    "id": "ai-agent-memory-mcp-developer",
@@ -10626,7 +10591,7 @@
     "knowledge-management",
     "node-js"
    ],
-   "bytes": 5232
+   "bytes": 5115
   },
   {
    "id": "ai-agent-networking-engineer",
@@ -10678,7 +10643,7 @@
     "replay",
     "observability"
    ],
-   "bytes": 9598
+   "bytes": 17343
   },
   {
    "id": "ai-agent-scheduling-engineer",
@@ -10713,7 +10678,7 @@
     "agents",
     "memory"
    ],
-   "bytes": 9128
+   "bytes": 9593
   },
   {
    "id": "ai-agent-telemetry-engineer",
@@ -10730,7 +10695,7 @@
     "agents",
     "monitoring"
    ],
-   "bytes": 5601
+   "bytes": 5555
   },
   {
    "id": "ai-agent-tool-engineer",
@@ -10748,7 +10713,7 @@
     "json-schema",
     "tool-use"
    ],
-   "bytes": 8721
+   "bytes": 20482
   },
   {
    "id": "ai-agent-tool-readiness-evaluator",
@@ -10818,7 +10783,7 @@
     "asana",
     "ci"
    ],
-   "bytes": 9328
+   "bytes": 9960
   },
   {
    "id": "agents-orchestrator",
@@ -10852,7 +10817,7 @@
     "planning",
     "tool-use"
    ],
-   "bytes": 9493
+   "bytes": 12369
   },
   {
    "id": "ai-ai-agent-developer",
@@ -10870,7 +10835,7 @@
     "multi-agent",
     "python"
    ],
-   "bytes": 5794
+   "bytes": 6182
   },
   {
    "id": "ai-ai-agent-discovery-specialist",
@@ -10904,7 +10869,7 @@
     "regression-testing",
     "prompts"
    ],
-   "bytes": 9294
+   "bytes": 22628
   },
   {
    "id": "ai-ai-agent-governance-reviewer",
@@ -10956,7 +10921,7 @@
     "sqlite",
     "rust"
    ],
-   "bytes": 8991
+   "bytes": 10558
   },
   {
    "id": "ai-ai-agent-optimization-engineer",
@@ -10973,7 +10938,7 @@
     "optimization",
     "evaluation"
    ],
-   "bytes": 7996
+   "bytes": 12393
   },
   {
    "id": "ai-ai-agent-session-auditor",
@@ -11007,7 +10972,7 @@
     "llm",
     "function-calling"
    ],
-   "bytes": 9326
+   "bytes": 17573
   },
   {
    "id": "ai-ai-assistant-developer",
@@ -11024,7 +10989,7 @@
     "conversational-ai",
     "nlp"
    ],
-   "bytes": 9503
+   "bytes": 22489
   },
   {
    "id": "ai-ai-coding-context-engineer",
@@ -11041,7 +11006,7 @@
     "rules-files",
     "llm"
    ],
-   "bytes": 9421
+   "bytes": 13575
   },
   {
    "id": "ai-ai-context-file-engineer",
@@ -11076,7 +11041,7 @@
     "rate-limits",
     "budgets"
    ],
-   "bytes": 9644
+   "bytes": 22176
   },
   {
    "id": "engineering-ai-engineer",
@@ -11111,7 +11076,7 @@
     "llm",
     "evaluation"
    ],
-   "bytes": 9495
+   "bytes": 14387
   },
   {
    "id": "ai-ai-knowledge-context-architect",
@@ -11128,7 +11093,7 @@
     "knowledge-graphs",
     "ai-memory"
    ],
-   "bytes": 9478
+   "bytes": 10019
   },
   {
    "id": "ai-ai-model-behavior-auditor",
@@ -11180,7 +11145,7 @@
     "podcast",
     "websocket"
    ],
-   "bytes": 5819
+   "bytes": 5702
   },
   {
    "id": "ai-ai-product-engineer",
@@ -11198,7 +11163,7 @@
     "ai-ux",
     "product"
    ],
-   "bytes": 9099
+   "bytes": 21531
   },
   {
    "id": "ai-ai-readiness-analyst",
@@ -11232,7 +11197,7 @@
     "open-source",
     "llm"
    ],
-   "bytes": 9321
+   "bytes": 22659
   },
   {
    "id": "ai-ai-research-strategy-advisor",
@@ -11249,7 +11214,7 @@
     "deep-learning",
     "strategy"
    ],
-   "bytes": 9039
+   "bytes": 23219
   },
   {
    "id": "ai-ai-solutions-consultant",
@@ -11284,7 +11249,7 @@
     "plugins",
     "prompts"
    ],
-   "bytes": 9506
+   "bytes": 13354
   },
   {
    "id": "ai-ai-team-orchestrator",
@@ -11319,7 +11284,7 @@
     "webhooks",
     "api"
    ],
-   "bytes": 9515
+   "bytes": 22593
   },
   {
    "id": "ai-ai-wrapper-product-developer",
@@ -11337,7 +11302,7 @@
     "anthropic",
     "pricing"
    ],
-   "bytes": 9575
+   "bytes": 17427
   },
   {
    "id": "ai-applied-ai-engineer",
@@ -11355,7 +11320,7 @@
     "rag",
     "ml-pipelines"
    ],
-   "bytes": 7784
+   "bytes": 6160
   },
   {
    "id": "ai-arize-ai-observability-net-developer",
@@ -11372,7 +11337,7 @@
     "llm-observability",
     "dotnet"
    ],
-   "bytes": 9384
+   "bytes": 9267
   },
   {
    "id": "ai-automated-lookdev-engineer",
@@ -11389,7 +11354,7 @@
     "visual-tuning",
     "automation"
    ],
-   "bytes": 7810
+   "bytes": 6348
   },
   {
    "id": "ai-autonomous-agent-engineer",
@@ -11407,7 +11372,7 @@
     "planning",
     "llm"
    ],
-   "bytes": 9617
+   "bytes": 6740
   },
   {
    "id": "ai-aws-bedrock-agentcore-engineer",
@@ -11425,7 +11390,7 @@
     "mcp",
     "observability"
    ],
-   "bytes": 9150
+   "bytes": 14765
   },
   {
    "id": "ai-azure-ai-agent-developer",
@@ -11443,7 +11408,7 @@
     "azure-ai-foundry",
     "mcp"
    ],
-   "bytes": 9592
+   "bytes": 12378
   },
   {
    "id": "ai-azure-ai-agents-net-developer",
@@ -11461,7 +11426,7 @@
     "csharp",
     "foundry"
    ],
-   "bytes": 9654
+   "bytes": 7362
   },
   {
    "id": "ai-azure-ai-agents-java-developer",
@@ -11478,7 +11443,7 @@
     "java",
     "foundry"
    ],
-   "bytes": 5832
+   "bytes": 5715
   },
   {
    "id": "ai-azure-ai-foundry-net-developer",
@@ -11495,7 +11460,7 @@
     "ai-agents",
     "dotnet"
    ],
-   "bytes": 9632
+   "bytes": 6326
   },
   {
    "id": "ai-azure-ai-foundry-agent-developer",
@@ -11512,7 +11477,7 @@
     "python",
     "ai-agents"
    ],
-   "bytes": 8266
+   "bytes": 12712
   },
   {
    "id": "ai-azure-ai-foundry-java-developer",
@@ -11529,7 +11494,7 @@
     "java",
     "evaluations"
    ],
-   "bytes": 6964
+   "bytes": 6847
   },
   {
    "id": "ai-azure-ai-foundry-python-developer",
@@ -11546,7 +11511,7 @@
     "python",
     "ai-agents"
    ],
-   "bytes": 9394
+   "bytes": 10740
   },
   {
    "id": "ai-azure-ai-foundry-typescript-developer",
@@ -11563,7 +11528,7 @@
     "typescript",
     "opentelemetry"
    ],
-   "bytes": 9079
+   "bytes": 6196
   },
   {
    "id": "ai-azure-ai-notebook-developer",
@@ -11598,7 +11563,7 @@
     "rag",
     "dotnet"
    ],
-   "bytes": 9357
+   "bytes": 6619
   },
   {
    "id": "ai-azure-ai-search-python-developer",
@@ -11615,7 +11580,7 @@
     "rag",
     "python"
    ],
-   "bytes": 9487
+   "bytes": 6716
   },
   {
    "id": "ai-azure-ai-search-typescript-developer",
@@ -11632,7 +11597,7 @@
     "rag",
     "typescript"
    ],
-   "bytes": 8776
+   "bytes": 5814
   },
   {
    "id": "ai-azure-anomaly-detection-java-developer",
@@ -11649,7 +11614,7 @@
     "time-series",
     "java"
    ],
-   "bytes": 9454
+   "bytes": 6636
   },
   {
    "id": "ai-azure-content-safety-java-developer",
@@ -11666,7 +11631,7 @@
     "java",
     "trust-safety"
    ],
-   "bytes": 9424
+   "bytes": 6434
   },
   {
    "id": "ai-azure-content-safety-python-developer",
@@ -11683,7 +11648,7 @@
     "python",
     "trust-safety"
    ],
-   "bytes": 7973
+   "bytes": 7856
   },
   {
    "id": "ai-azure-content-understanding-developer",
@@ -11701,7 +11666,7 @@
     "rag",
     "document-ai"
    ],
-   "bytes": 9585
+   "bytes": 10106
   },
   {
    "id": "ai-azure-document-translation-developer",
@@ -11718,7 +11683,7 @@
     "documents",
     "python"
    ],
-   "bytes": 9052
+   "bytes": 8935
   },
   {
    "id": "ai-azure-language-understanding-developer",
@@ -11754,7 +11719,7 @@
     "mlops",
     "python"
    ],
-   "bytes": 8128
+   "bytes": 8011
   },
   {
    "id": "ai-azure-openai-net-developer",
@@ -11772,7 +11737,7 @@
     "dotnet",
     "csharp"
    ],
-   "bytes": 8939
+   "bytes": 6748
   },
   {
    "id": "ai-azure-speech-rest-api-developer",
@@ -11789,24 +11754,7 @@
     "rest-api",
     "python"
    ],
-   "bytes": 8691
-  },
-  {
-   "id": "ai-azure-speech-transcription-developer",
-   "division": "ai",
-   "label": "AI & Agents",
-   "name": "Azure Speech Transcription Developer",
-   "description": "Builds real-time and batch speech-to-text transcription with timestamps and speaker diarization into Python apps using the Azure AI Transcription SDK.",
-   "emoji": "🎙️",
-   "role": "speech-to-text developer · Azure AI Transcription, Python",
-   "tags": [
-    "developer",
-    "azure",
-    "speech-to-text",
-    "transcription",
-    "python"
-   ],
-   "bytes": 3990
+   "bytes": 12689
   },
   {
    "id": "ai-azure-text-analytics-developer",
@@ -11824,7 +11772,7 @@
     "pii",
     "python"
    ],
-   "bytes": 8878
+   "bytes": 8761
   },
   {
    "id": "ai-azure-text-translation-python-developer",
@@ -11841,7 +11789,7 @@
     "localization",
     "python"
    ],
-   "bytes": 9546
+   "bytes": 9483
   },
   {
    "id": "ai-azure-translator-typescript-developer",
@@ -11858,7 +11806,7 @@
     "typescript",
     "nodejs"
    ],
-   "bytes": 9327
+   "bytes": 6460
   },
   {
    "id": "ai-azure-vision-java-developer",
@@ -11875,7 +11823,7 @@
     "ocr",
     "java"
    ],
-   "bytes": 9544
+   "bytes": 6004
   },
   {
    "id": "ai-azure-vision-python-developer",
@@ -11892,7 +11840,7 @@
     "ocr",
     "python"
    ],
-   "bytes": 8846
+   "bytes": 8729
   },
   {
    "id": "ai-azure-voice-ai-net-developer",
@@ -11910,7 +11858,7 @@
     "dotnet",
     "realtime"
    ],
-   "bytes": 9290
+   "bytes": 10484
   },
   {
    "id": "ai-azure-voice-ai-java-developer",
@@ -11927,7 +11875,7 @@
     "websocket",
     "java"
    ],
-   "bytes": 9488
+   "bytes": 9425
   },
   {
    "id": "ai-azure-voice-ai-python-developer",
@@ -11944,7 +11892,7 @@
     "websocket",
     "python"
    ],
-   "bytes": 9429
+   "bytes": 6127
   },
   {
    "id": "ai-azure-voice-ai-typescript-developer",
@@ -11961,7 +11909,7 @@
     "typescript",
     "browser"
    ],
-   "bytes": 9375
+   "bytes": 6398
   },
   {
    "id": "ai-bdi-agent-architect",
@@ -11979,7 +11927,7 @@
     "ontology",
     "neuro-symbolic"
    ],
-   "bytes": 8942
+   "bytes": 12340
   },
   {
    "id": "ai-c-mcp-server-developer",
@@ -12014,7 +11962,7 @@
     "sdk",
     "api"
    ],
-   "bytes": 6366
+   "bytes": 20572
   },
   {
    "id": "ai-codebase-mapping-engineer",
@@ -12031,7 +11979,7 @@
     "dependency-graph",
     "coding-agents"
    ],
-   "bytes": 9132
+   "bytes": 11894
   },
   {
    "id": "ai-coding-agent-architect",
@@ -12048,7 +11996,7 @@
     "coding-agents",
     "sandboxing"
    ],
-   "bytes": 6907
+   "bytes": 6716
   },
   {
    "id": "ai-coding-agent-benchmark-engineer",
@@ -12082,7 +12030,7 @@
     "api",
     "image-generation"
    ],
-   "bytes": 10275
+   "bytes": 23487
   },
   {
    "id": "ai-computer-vision-engineer",
@@ -12117,7 +12065,7 @@
     "automation",
     "sandboxing"
    ],
-   "bytes": 9641
+   "bytes": 22614
   },
   {
    "id": "ai-content-safety-typescript-developer",
@@ -12134,7 +12082,7 @@
     "typescript",
     "nodejs"
    ],
-   "bytes": 9492
+   "bytes": 9849
   },
   {
    "id": "ai-context-budget-engineer",
@@ -12168,7 +12116,7 @@
     "compression",
     "ai-agents"
    ],
-   "bytes": 8612
+   "bytes": 14593
   },
   {
    "id": "ai-context-window-optimization-engineer",
@@ -12185,7 +12133,7 @@
     "prompt-caching",
     "optimization"
    ],
-   "bytes": 9430
+   "bytes": 10593
   },
   {
    "id": "ai-conversation-memory-engineer",
@@ -12202,7 +12150,7 @@
     "memory",
     "ai-agents"
    ],
-   "bytes": 9261
+   "bytes": 6696
   },
   {
    "id": "ai-copilot-studio-connector-developer",
@@ -12237,7 +12185,7 @@
     "python",
     "llm"
    ],
-   "bytes": 9433
+   "bytes": 12609
   },
   {
    "id": "ai-deep-learning-mentor",
@@ -12254,7 +12202,7 @@
     "persona",
     "ai-safety"
    ],
-   "bytes": 8120
+   "bytes": 22409
   },
   {
    "id": "ai-document-extraction-typescript-developer",
@@ -12271,7 +12219,7 @@
     "document-ai",
     "typescript"
    ],
-   "bytes": 9499
+   "bytes": 6880
   },
   {
    "id": "ai-document-intelligence-net-developer",
@@ -12289,7 +12237,7 @@
     "dotnet",
     "csharp"
    ],
-   "bytes": 9670
+   "bytes": 13256
   },
   {
    "id": "ai-embedding-model-engineer",
@@ -12306,7 +12254,7 @@
     "rag",
     "retrieval"
    ],
-   "bytes": 9594
+   "bytes": 17554
   },
   {
    "id": "ai-evaluation-harness-engineer",
@@ -12341,7 +12289,7 @@
     "java",
     "forms"
    ],
-   "bytes": 8043
+   "bytes": 6794
   },
   {
    "id": "ai-gemini-api-developer",
@@ -12375,7 +12323,7 @@
     "streaming",
     "ai-agents"
    ],
-   "bytes": 8236
+   "bytes": 21716
   },
   {
    "id": "ai-gemini-live-api-developer",
@@ -12392,7 +12340,7 @@
     "voice-ai",
     "websockets"
    ],
-   "bytes": 6885
+   "bytes": 16856
   },
   {
    "id": "ai-gemini-video-generation-developer",
@@ -12409,7 +12357,7 @@
     "ffmpeg",
     "generative-ai"
    ],
-   "bytes": 9649
+   "bytes": 18697
   },
   {
    "id": "ai-github-copilot-sdk-developer",
@@ -12427,7 +12375,7 @@
     "nodejs",
     "python"
    ],
-   "bytes": 8242
+   "bytes": 17044
   },
   {
    "id": "ai-go-mcp-server-developer",
@@ -12461,7 +12409,7 @@
     "ml-demos",
     "chatbots"
    ],
-   "bytes": 9370
+   "bytes": 6514
   },
   {
    "id": "ai-grok-build-delegation-engineer",
@@ -12478,7 +12426,7 @@
     "delegation",
     "code-review"
    ],
-   "bytes": 9610
+   "bytes": 13251
   },
   {
    "id": "ai-hosted-agent-infrastructure-engineer",
@@ -12495,7 +12443,7 @@
     "modal",
     "infrastructure"
    ],
-   "bytes": 9588
+   "bytes": 14094
   },
   {
    "id": "ai-hugging-face-api-tool-developer",
@@ -12529,7 +12477,7 @@
     "models",
     "datasets"
    ],
-   "bytes": 9604
+   "bytes": 22728
   },
   {
    "id": "ai-hugging-face-dataset-engineer",
@@ -12546,7 +12494,7 @@
     "sql",
     "training-data"
    ],
-   "bytes": 9197
+   "bytes": 18656
   },
   {
    "id": "ai-hugging-face-hub-specialist",
@@ -12580,7 +12528,7 @@
     "ml-ops",
     "batch-jobs"
    ],
-   "bytes": 9480
+   "bytes": 22401
   },
   {
    "id": "ai-hugging-face-spaces-developer",
@@ -12597,7 +12545,7 @@
     "gradio",
     "docker"
    ],
-   "bytes": 8964
+   "bytes": 22649
   },
   {
    "id": "ai-hybrid-search-engineer",
@@ -12614,7 +12562,7 @@
     "bm25",
     "retrieval"
    ],
-   "bytes": 9596
+   "bytes": 20925
   },
   {
    "id": "identity-graph-operator",
@@ -12700,7 +12648,7 @@
     "agents",
     "python"
    ],
-   "bytes": 9052
+   "bytes": 9574
   },
   {
    "id": "ai-langchain-architect",
@@ -12718,7 +12666,7 @@
     "agents",
     "python"
    ],
-   "bytes": 8867
+   "bytes": 12445
   },
   {
    "id": "ai-langfuse-observability-engineer",
@@ -12754,7 +12702,7 @@
     "langchain",
     "python"
    ],
-   "bytes": 9516
+   "bytes": 14982
   },
   {
    "id": "ai-langgraph-multi-agent-architect",
@@ -12772,7 +12720,7 @@
     "multi-agent",
     "ai-agents"
    ],
-   "bytes": 8259
+   "bytes": 14234
   },
   {
    "id": "ai-llm-application-architect",
@@ -12789,7 +12737,7 @@
     "ai-architecture",
     "tool-calling"
    ],
-   "bytes": 9991
+   "bytes": 21472
   },
   {
    "id": "ai-llm-application-engineer",
@@ -12807,7 +12755,7 @@
     "vector-search",
     "ai-agents"
    ],
-   "bytes": 9304
+   "bytes": 11080
   },
   {
    "id": "ai-llm-caching-engineer",
@@ -12825,7 +12773,7 @@
     "performance",
     "cost"
    ],
-   "bytes": 8579
+   "bytes": 15513
   },
   {
    "id": "ai-llm-context-failure-analyst",
@@ -12842,7 +12790,7 @@
     "reliability",
     "ai-agents"
    ],
-   "bytes": 9616
+   "bytes": 17664
   },
   {
    "id": "ai-llm-council-engineer",
@@ -12859,7 +12807,7 @@
     "ensembles",
     "open-weight"
    ],
-   "bytes": 8576
+   "bytes": 22176
   },
   {
    "id": "ai-llm-evaluation-engineer",
@@ -12876,7 +12824,7 @@
     "testing",
     "metrics"
    ],
-   "bytes": 8873
+   "bytes": 16116
   },
   {
    "id": "ai-llm-fine-tuning-engineer",
@@ -12893,7 +12841,7 @@
     "trl",
     "hugging-face"
    ],
-   "bytes": 9454
+   "bytes": 21742
   },
   {
    "id": "ai-llm-knowledge-extraction-engineer",
@@ -12962,7 +12910,7 @@
     "pipelines",
     "architecture"
    ],
-   "bytes": 8063
+   "bytes": 16848
   },
   {
    "id": "ai-llm-structured-output-engineer",
@@ -12980,7 +12928,7 @@
     "structured-output",
     "api"
    ],
-   "bytes": 7700
+   "bytes": 17451
   },
   {
    "id": "ai-llm-as-judge-evaluation-engineer",
@@ -12998,7 +12946,7 @@
     "rubrics",
     "quality"
    ],
-   "bytes": 8605
+   "bytes": 19688
   },
   {
    "id": "ai-llmops-engineer",
@@ -13016,7 +12964,7 @@
     "fine-tuning",
     "embeddings"
    ],
-   "bytes": 9381
+   "bytes": 9980
   },
   {
    "id": "ai-local-llm-deployment-engineer",
@@ -13033,7 +12981,7 @@
     "local-llm",
     "quantization"
    ],
-   "bytes": 8923
+   "bytes": 18615
   },
   {
    "id": "ai-local-llm-engineer",
@@ -13102,7 +13050,7 @@
     "hugging-face",
     "image-generation"
    ],
-   "bytes": 9200
+   "bytes": 16076
   },
   {
    "id": "ai-m365-agents-net-developer",
@@ -13120,7 +13068,7 @@
     "teams",
     "copilot-studio"
    ],
-   "bytes": 7290
+   "bytes": 7036
   },
   {
    "id": "ai-m365-agents-python-developer",
@@ -13137,7 +13085,7 @@
     "teams",
     "copilot-studio"
    ],
-   "bytes": 8257
+   "bytes": 6820
   },
   {
    "id": "ai-m365-agents-typescript-developer",
@@ -13154,7 +13102,7 @@
     "microsoft-365",
     "teams"
    ],
-   "bytes": 8395
+   "bytes": 8278
   },
   {
    "id": "ai-m365-copilot-mcp-agent-developer",
@@ -13189,7 +13137,7 @@
     "machine-learning",
     "mlops"
    ],
-   "bytes": 9367
+   "bytes": 11170
   },
   {
    "id": "specialized-mcp-builder",
@@ -13224,7 +13172,7 @@
     "ai-agents",
     "apis"
    ],
-   "bytes": 6721
+   "bytes": 5994
   },
   {
    "id": "ai-microsoft-365-agent-architect",
@@ -13260,7 +13208,7 @@
     "python",
     "microsoft"
    ],
-   "bytes": 9622
+   "bytes": 13822
   },
   {
    "id": "ai-ml-experiment-tracking-engineer",
@@ -13277,7 +13225,7 @@
     "trackio",
     "training"
    ],
-   "bytes": 9286
+   "bytes": 22649
   },
   {
    "id": "ai-ml-pipeline-engineer",
@@ -13311,7 +13259,7 @@
     "kubeflow",
     "machine-learning"
    ],
-   "bytes": 9570
+   "bytes": 12715
   },
   {
    "id": "ai-model-card-evaluation-specialist",
@@ -13328,7 +13276,7 @@
     "benchmarks",
     "hugging-face"
    ],
-   "bytes": 9385
+   "bytes": 22550
   },
   {
    "id": "specialized-model-qa",
@@ -13364,7 +13312,7 @@
     "chat-ui",
     "wasm"
    ],
-   "bytes": 7765
+   "bytes": 12499
   },
   {
    "id": "ai-multi-agent-coordination-architect",
@@ -13398,7 +13346,7 @@
     "orchestration",
     "llm"
    ],
-   "bytes": 9709
+   "bytes": 16890
   },
   {
    "id": "ai-multi-agent-performance-engineer",
@@ -13468,7 +13416,7 @@
     "state-machine",
     "reliability"
    ],
-   "bytes": 9457
+   "bytes": 12508
   },
   {
    "id": "ai-multi-agent-workshop-coordinator",
@@ -13502,7 +13450,7 @@
     "ai-gateway",
     "postgres"
    ],
-   "bytes": 7120
+   "bytes": 16978
   },
   {
    "id": "ai-nika-workflow-engineer",
@@ -13520,7 +13468,7 @@
     "ollama",
     "automation"
    ],
-   "bytes": 9058
+   "bytes": 12544
   },
   {
    "id": "ai-open-dynamic-workflows-engineer",
@@ -13642,7 +13590,7 @@
     "codebase",
     "documentation"
    ],
-   "bytes": 8185
+   "bytes": 22330
   },
   {
    "id": "ai-prompt-analysis-engineer",
@@ -13692,7 +13640,7 @@
     "llm",
     "few-shot"
    ],
-   "bytes": 8047
+   "bytes": 7930
   },
   {
    "id": "ai-prompt-framework-writer",
@@ -13708,7 +13656,7 @@
     "llm",
     "frameworks"
    ],
-   "bytes": 9438
+   "bytes": 5920
   },
   {
    "id": "ai-prompt-library-curator",
@@ -13724,7 +13672,7 @@
     "templates",
     "llm"
    ],
-   "bytes": 9429
+   "bytes": 9653
   },
   {
    "id": "ai-prompt-optimization-engineer",
@@ -13774,7 +13722,7 @@
     "ai-agents",
     "structured-output"
    ],
-   "bytes": 9015
+   "bytes": 13887
   },
   {
    "id": "ai-python-mcp-server-developer",
@@ -13808,7 +13756,7 @@
     "verification",
     "llm"
    ],
-   "bytes": 8934
+   "bytes": 22156
   },
   {
    "id": "engineering-rag-pipeline-engineer",
@@ -13844,7 +13792,7 @@
     "llm",
     "retrieval"
    ],
-   "bytes": 9557
+   "bytes": 11940
   },
   {
    "id": "ai-real-time-voice-ai-developer",
@@ -13862,7 +13810,7 @@
     "webrtc",
     "realtime"
    ],
-   "bytes": 9510
+   "bytes": 16486
   },
   {
    "id": "ai-reasoning-scaffold-engineer",
@@ -13914,7 +13862,7 @@
     "checkpointing",
     "runpod"
    ],
-   "bytes": 9047
+   "bytes": 22984
   },
   {
    "id": "ai-responsible-ai-reviewer",
@@ -14018,7 +13966,7 @@
     "python",
     "model-evaluation"
    ],
-   "bytes": 6608
+   "bytes": 17736
   },
   {
    "id": "ai-self-supervised-learning-researcher",
@@ -14035,7 +13983,7 @@
     "self-supervised",
     "cnn"
    ],
-   "bytes": 8950
+   "bytes": 17469
   },
   {
    "id": "ai-sentence-transformers-trainer",
@@ -14053,7 +14001,7 @@
     "fine-tuning",
     "rag"
    ],
-   "bytes": 9073
+   "bytes": 22736
   },
   {
    "id": "ai-spectral-search-engineer",
@@ -14104,7 +14052,7 @@
     "summarization",
     "context-engineering"
    ],
-   "bytes": 9634
+   "bytes": 11514
   },
   {
    "id": "ai-transformers-js-developer",
@@ -14121,7 +14069,7 @@
     "machine-learning",
     "onnx"
    ],
-   "bytes": 6128
+   "bytes": 22180
   },
   {
    "id": "ai-trl-fine-tuning-engineer",
@@ -14139,7 +14087,7 @@
     "rlhf",
     "hugging-face"
    ],
-   "bytes": 8663
+   "bytes": 11258
   },
   {
    "id": "ai-typescript-mcp-server-developer",
@@ -14174,7 +14122,7 @@
     "python",
     "gguf"
    ],
-   "bytes": 9725
+   "bytes": 18657
   },
   {
    "id": "ai-vector-database-engineer",
@@ -14209,7 +14157,7 @@
     "embeddings",
     "vector-database"
    ],
-   "bytes": 10036
+   "bytes": 20784
   },
   {
    "id": "ai-vercel-ai-sdk-developer",
@@ -14227,7 +14175,7 @@
     "llm",
     "streaming"
    ],
-   "bytes": 8989
+   "bytes": 10617
   },
   {
    "id": "ai-video-intelligence-analyst",
@@ -14262,7 +14210,7 @@
     "search",
     "python"
    ],
-   "bytes": 6833
+   "bytes": 15694
   },
   {
    "id": "ai-vision-model-training-engineer",
@@ -14279,7 +14227,7 @@
     "segmentation",
     "training"
    ],
-   "bytes": 8815
+   "bytes": 21351
   },
   {
    "id": "ai-voice-agent-architect",
@@ -14296,7 +14244,7 @@
     "realtime",
     "llm"
    ],
-   "bytes": 8460
+   "bytes": 22000
   },
   {
    "id": "ai-voice-ai-app-developer",
@@ -14314,7 +14262,7 @@
     "deepgram",
     "elevenlabs"
    ],
-   "bytes": 9501
+   "bytes": 19306
   },
   {
    "id": "ai-voice-ai-engine-engineer",
@@ -14332,7 +14280,7 @@
     "stt",
     "python"
    ],
-   "bytes": 9572
+   "bytes": 21826
   },
   {
    "id": "ai-vs-code-agent-designer",
@@ -14367,7 +14315,7 @@
     "python",
     "full-stack"
    ],
-   "bytes": 9564
+   "bytes": 19372
   },
   {
    "id": "ai-weights-biases-azure-developer",
@@ -14384,7 +14332,7 @@
     "mlops",
     "dotnet"
    ],
-   "bytes": 9148
+   "bytes": 6286
   },
   {
    "id": "ai-zerogpu-spaces-developer",
@@ -14401,7 +14349,7 @@
     "hugging-face",
     "gpu"
    ],
-   "bytes": 8993
+   "bytes": 22467
   },
   {
    "id": "engineering-ai-data-remediation-engineer",
@@ -14437,7 +14385,7 @@
     "orchestration",
     "data-pipelines"
    ],
-   "bytes": 9085
+   "bytes": 17548
   },
   {
    "id": "support-analytics-reporter",
@@ -14473,7 +14421,7 @@
     "measurement",
     "utm"
    ],
-   "bytes": 9209
+   "bytes": 11520
   },
   {
    "id": "data-azure-data-lake-python-developer",
@@ -14490,7 +14438,7 @@
     "data-lake",
     "python"
    ],
-   "bytes": 7710
+   "bytes": 6201
   },
   {
    "id": "data-azure-event-hubs-net-developer",
@@ -14507,7 +14455,7 @@
     "streaming",
     "dotnet"
    ],
-   "bytes": 9158
+   "bytes": 12302
   },
   {
    "id": "data-azure-event-hubs-java-developer",
@@ -14524,7 +14472,7 @@
     "streaming",
     "java"
    ],
-   "bytes": 9489
+   "bytes": 6361
   },
   {
    "id": "data-azure-event-hubs-python-developer",
@@ -14541,7 +14489,7 @@
     "streaming",
     "python"
    ],
-   "bytes": 9108
+   "bytes": 8991
   },
   {
    "id": "data-azure-event-hubs-rust-developer",
@@ -14558,7 +14506,7 @@
     "streaming",
     "rust"
    ],
-   "bytes": 5632
+   "bytes": 5515
   },
   {
    "id": "data-azure-event-hubs-typescript-developer",
@@ -14575,7 +14523,7 @@
     "streaming",
     "typescript"
    ],
-   "bytes": 9351
+   "bytes": 6492
   },
   {
    "id": "data-azure-mysql-net-developer",
@@ -14592,7 +14540,7 @@
     "arm",
     "dotnet"
    ],
-   "bytes": 9665
+   "bytes": 6357
   },
   {
    "id": "data-azure-postgresql-net-developer",
@@ -14609,7 +14557,7 @@
     "arm",
     "dotnet"
    ],
-   "bytes": 9615
+   "bytes": 6458
   },
   {
    "id": "data-azure-postgresql-node-js-developer",
@@ -14626,7 +14574,7 @@
     "nodejs",
     "typescript"
    ],
-   "bytes": 8984
+   "bytes": 6727
   },
   {
    "id": "data-azure-redis-net-developer",
@@ -14643,7 +14591,7 @@
     "arm",
     "dotnet"
    ],
-   "bytes": 9428
+   "bytes": 13406
   },
   {
    "id": "data-azure-sql-net-developer",
@@ -14660,7 +14608,7 @@
     "arm",
     "dotnet"
    ],
-   "bytes": 9139
+   "bytes": 11775
   },
   {
    "id": "data-azure-tables-java-developer",
@@ -14677,7 +14625,7 @@
     "nosql",
     "java"
    ],
-   "bytes": 8882
+   "bytes": 6702
   },
   {
    "id": "data-azure-tables-python-developer",
@@ -14694,7 +14642,7 @@
     "nosql",
     "python"
    ],
-   "bytes": 7820
+   "bytes": 7703
   },
   {
    "id": "data-clickhouse-analytics-engineer",
@@ -14712,7 +14660,7 @@
     "analytics",
     "data-engineering"
    ],
-   "bytes": 8482
+   "bytes": 6297
   },
   {
    "id": "data-cosmos-db-java-developer",
@@ -14730,7 +14678,7 @@
     "java",
     "reactive"
    ],
-   "bytes": 8970
+   "bytes": 9494
   },
   {
    "id": "data-cosmos-db-python-developer",
@@ -14748,7 +14696,7 @@
     "python",
     "tdd"
    ],
-   "bytes": 10358
+   "bytes": 11153
   },
   {
    "id": "data-cosmos-db-rust-developer",
@@ -14765,7 +14713,7 @@
     "nosql",
     "rust"
    ],
-   "bytes": 5369
+   "bytes": 5252
   },
   {
    "id": "data-cosmos-db-typescript-developer",
@@ -14782,7 +14730,7 @@
     "typescript",
     "nodejs"
    ],
-   "bytes": 9292
+   "bytes": 6172
   },
   {
    "id": "data-d3-js-visualization-developer",
@@ -14799,7 +14747,7 @@
     "javascript",
     "charts"
    ],
-   "bytes": 8523
+   "bytes": 22110
   },
   {
    "id": "data-data-alert-triage-engineer",
@@ -14816,7 +14764,7 @@
     "alerts",
     "triage"
    ],
-   "bytes": 7887
+   "bytes": 14768
   },
   {
    "id": "engineering-data-engineer",
@@ -14851,7 +14799,7 @@
     "etl",
     "airflow"
    ],
-   "bytes": 9169
+   "bytes": 9096
   },
   {
    "id": "data-data-quality-engineer",
@@ -14868,7 +14816,7 @@
     "dbt",
     "data-contracts"
    ],
-   "bytes": 9451
+   "bytes": 18925
   },
   {
    "id": "data-data-scientist",
@@ -14885,7 +14833,7 @@
     "python",
     "analytics"
    ],
-   "bytes": 9582
+   "bytes": 12221
   },
   {
    "id": "data-data-storyteller",
@@ -14902,7 +14850,7 @@
     "presentations",
     "insights"
    ],
-   "bytes": 8654
+   "bytes": 5710
   },
   {
    "id": "engineering-data-visualization-engineer",
@@ -14954,7 +14902,7 @@
     "mysql",
     "cloud-databases"
    ],
-   "bytes": 8824
+   "bytes": 11499
   },
   {
    "id": "data-database-architect",
@@ -14971,7 +14919,7 @@
     "replication",
     "scalability"
    ],
-   "bytes": 9523
+   "bytes": 19219
   },
   {
    "id": "data-database-developer",
@@ -14988,7 +14936,7 @@
     "migrations",
     "schema-design"
    ],
-   "bytes": 6534
+   "bytes": 6290
   },
   {
    "id": "engineering-database-optimizer",
@@ -15039,7 +14987,7 @@
     "analytics-engineering",
     "data-warehouse"
    ],
-   "bytes": 9691
+   "bytes": 16388
   },
   {
    "id": "data-document-data-extraction-specialist",
@@ -15074,7 +15022,7 @@
     "migrations",
     "typescript"
    ],
-   "bytes": 9138
+   "bytes": 21256
   },
   {
    "id": "data-elasticsearch-engineer",
@@ -15109,7 +15057,7 @@
     "financial-modeling",
     "openpyxl"
    ],
-   "bytes": 9198
+   "bytes": 12638
   },
   {
    "id": "data-fabric-capacity-net-developer",
@@ -15126,7 +15074,7 @@
     "capacity",
     "dotnet"
    ],
-   "bytes": 9343
+   "bytes": 12915
   },
   {
    "id": "data-fabric-capacity-python-developer",
@@ -15143,7 +15091,7 @@
     "capacity",
     "python"
    ],
-   "bytes": 8517
+   "bytes": 8400
   },
   {
    "id": "data-formula-workbook-engineer",
@@ -15212,7 +15160,7 @@
     "bi",
     "metrics"
    ],
-   "bytes": 13048
+   "bytes": 19580
   },
   {
    "id": "data-kusto-kql-analyst",
@@ -15247,7 +15195,7 @@
     "data-visualization",
     "charts"
    ],
-   "bytes": 9332
+   "bytes": 13452
   },
   {
    "id": "data-migration-observability-engineer",
@@ -15264,7 +15212,7 @@
     "migrations",
     "monitoring"
    ],
-   "bytes": 9601
+   "bytes": 15224
   },
   {
    "id": "data-mongodb-atlas-on-azure-developer",
@@ -15281,7 +15229,7 @@
     "marketplace",
     "dotnet"
    ],
-   "bytes": 8330
+   "bytes": 12963
   },
   {
    "id": "data-mongodb-performance-advisor",
@@ -15316,7 +15264,7 @@
     "alerting",
     "data-quality"
    ],
-   "bytes": 8901
+   "bytes": 15045
   },
   {
    "id": "data-monte-carlo-asset-health-analyst",
@@ -15333,7 +15281,7 @@
     "data-quality",
     "tables"
    ],
-   "bytes": 9745
+   "bytes": 11499
   },
   {
    "id": "data-monte-carlo-change-impact-reviewer",
@@ -15351,7 +15299,7 @@
     "lineage",
     "impact-analysis"
    ],
-   "bytes": 8409
+   "bytes": 22718
   },
   {
    "id": "data-monte-carlo-dbt-validation-engineer",
@@ -15369,7 +15317,7 @@
     "monte-carlo",
     "notebooks"
    ],
-   "bytes": 6696
+   "bytes": 20943
   },
   {
    "id": "data-monte-carlo-ingestion-engineer",
@@ -15387,7 +15335,7 @@
     "ingestion",
     "api"
    ],
-   "bytes": 9318
+   "bytes": 22371
   },
   {
    "id": "data-monte-carlo-monitor-engineer",
@@ -15405,7 +15353,7 @@
     "ci-cd",
     "data-observability"
    ],
-   "bytes": 6822
+   "bytes": 21618
   },
   {
    "id": "data-monte-carlo-monitoring-advisor",
@@ -15422,7 +15370,7 @@
     "coverage",
     "agent-observability"
    ],
-   "bytes": 9340
+   "bytes": 22336
   },
   {
    "id": "data-monte-carlo-pipeline-performance-analyst",
@@ -15440,7 +15388,7 @@
     "databricks",
     "performance"
    ],
-   "bytes": 9676
+   "bytes": 10055
   },
   {
    "id": "data-monte-carlo-remediation-engineer",
@@ -15457,7 +15405,7 @@
     "remediation",
     "incident-response"
    ],
-   "bytes": 9702
+   "bytes": 17960
   },
   {
    "id": "data-monte-carlo-root-cause-analyst",
@@ -15475,7 +15423,7 @@
     "lineage",
     "data-quality"
    ],
-   "bytes": 7651
+   "bytes": 17873
   },
   {
    "id": "data-monte-carlo-storage-cost-analyst",
@@ -15492,7 +15440,7 @@
     "cost-optimization",
     "data-warehouse"
    ],
-   "bytes": 8962
+   "bytes": 10948
   },
   {
    "id": "data-neon-branching-engineer",
@@ -15509,7 +15457,7 @@
     "branching",
     "test-environments"
    ],
-   "bytes": 9390
+   "bytes": 15293
   },
   {
    "id": "data-neon-migration-engineer",
@@ -15544,7 +15492,7 @@
     "serverless",
     "database"
    ],
-   "bytes": 7816
+   "bytes": 18721
   },
   {
    "id": "data-neon-postgres-specialist",
@@ -15561,7 +15509,7 @@
     "databases",
     "prototyping"
    ],
-   "bytes": 9109
+   "bytes": 14834
   },
   {
    "id": "data-neon-query-performance-analyst",
@@ -15595,7 +15543,7 @@
     "graph-analysis",
     "data-science"
    ],
-   "bytes": 9492
+   "bytes": 6644
   },
   {
    "id": "data-nosql-data-architect",
@@ -15612,7 +15560,7 @@
     "dynamodb",
     "data-modeling"
    ],
-   "bytes": 8312
+   "bytes": 6693
   },
   {
    "id": "data-oracle-to-postgresql-migration-engineer",
@@ -15648,7 +15596,7 @@
     "typeorm",
     "sequelize"
    ],
-   "bytes": 8347
+   "bytes": 6540
   },
   {
    "id": "data-plotly-visualization-developer",
@@ -15684,7 +15632,7 @@
     "etl",
     "arrow"
    ],
-   "bytes": 8741
+   "bytes": 11824
   },
   {
    "id": "data-postgres-egress-cost-engineer",
@@ -15701,7 +15649,7 @@
     "cost-optimization",
     "neon"
    ],
-   "bytes": 6342
+   "bytes": 11965
   },
   {
    "id": "data-postgresql-cli-specialist",
@@ -15719,7 +15667,7 @@
     "sql",
     "scripting"
    ],
-   "bytes": 9573
+   "bytes": 22592
   },
   {
    "id": "data-postgresql-performance-engineer",
@@ -15737,7 +15685,7 @@
     "indexing",
     "vacuum"
    ],
-   "bytes": 6137
+   "bytes": 6744
   },
   {
    "id": "data-postgresql-read-only-query-analyst",
@@ -15773,7 +15721,7 @@
     "rls",
     "sql"
    ],
-   "bytes": 9670
+   "bytes": 19295
   },
   {
    "id": "data-power-bi-data-modeler",
@@ -15876,7 +15824,7 @@
     "cache",
     "database"
    ],
-   "bytes": 9546
+   "bytes": 19119
   },
   {
    "id": "data-consolidation-agent",
@@ -15927,7 +15875,7 @@
     "python",
     "statistics"
    ],
-   "bytes": 9161
+   "bytes": 22008
   },
   {
    "id": "data-segment-cdp-engineer",
@@ -15944,7 +15892,7 @@
     "tracking-plan",
     "analytics"
    ],
-   "bytes": 9639
+   "bytes": 6622
   },
   {
    "id": "data-snowflake-data-engineer",
@@ -15962,7 +15910,7 @@
     "snowpark",
     "data-pipelines"
    ],
-   "bytes": 9512
+   "bytes": 10247
   },
   {
    "id": "data-spark-performance-engineer",
@@ -15980,7 +15928,7 @@
     "pyspark",
     "data-pipelines"
    ],
-   "bytes": 9513
+   "bytes": 14218
   },
   {
    "id": "data-sql-database-engineer",
@@ -15998,7 +15946,7 @@
     "analytics",
     "databases"
    ],
-   "bytes": 9274
+   "bytes": 9870
   },
   {
    "id": "data-sql-migration-engineer",
@@ -16034,7 +15982,7 @@
     "postgresql",
     "performance"
    ],
-   "bytes": 8999
+   "bytes": 18549
   },
   {
    "id": "data-sql-server-database-administrator",
@@ -16070,7 +16018,7 @@
     "econometrics",
     "time-series"
    ],
-   "bytes": 7297
+   "bytes": 6743
   },
   {
    "id": "data-supabase-postgres-engineer",
@@ -16121,7 +16069,7 @@
     "quantization",
     "performance"
    ],
-   "bytes": 9740
+   "bytes": 18691
   },
   {
    "id": "data-video-frame-ocr-engineer",
@@ -16173,7 +16121,7 @@
     "search",
     "python"
    ],
-   "bytes": 9126
+   "bytes": 22674
   },
   {
    "id": "devops-api-management-net-developer",
@@ -16190,7 +16138,7 @@
     "api-gateway",
     "dotnet"
    ],
-   "bytes": 9438
+   "bytes": 11726
   },
   {
    "id": "devops-api-management-python-developer",
@@ -16207,7 +16155,7 @@
     "api-gateway",
     "python"
    ],
-   "bytes": 9042
+   "bytes": 8925
   },
   {
    "id": "devops-application-insights-net-developer",
@@ -16224,7 +16172,7 @@
     "monitoring",
     "dotnet"
    ],
-   "bytes": 9684
+   "bytes": 6536
   },
   {
    "id": "devops-application-insights-node-js-developer",
@@ -16241,7 +16189,7 @@
     "nodejs",
     "typescript"
    ],
-   "bytes": 9417
+   "bytes": 6293
   },
   {
    "id": "devops-application-insights-python-developer",
@@ -16258,7 +16206,7 @@
     "python",
     "monitoring"
    ],
-   "bytes": 7259
+   "bytes": 7142
   },
   {
    "id": "devops-application-insights-rum-engineer",
@@ -16276,7 +16224,7 @@
     "typescript",
     "rum"
    ],
-   "bytes": 9314
+   "bytes": 22279
   },
   {
    "id": "devops-arch-linux-administrator",
@@ -16364,7 +16312,7 @@
     "typescript",
     "python"
    ],
-   "bytes": 9311
+   "bytes": 11886
   },
   {
    "id": "devops-aws-cdk-engineer",
@@ -16435,7 +16383,7 @@
     "cloudtrail",
     "monitoring"
    ],
-   "bytes": 9381
+   "bytes": 11231
   },
   {
    "id": "devops-aws-cost-cleanup-engineer",
@@ -16452,7 +16400,7 @@
     "cost-optimization",
     "cleanup"
    ],
-   "bytes": 9267
+   "bytes": 10283
   },
   {
    "id": "devops-aws-cost-optimization-analyst",
@@ -16487,7 +16435,7 @@
     "serverless",
     "sqs"
    ],
-   "bytes": 9443
+   "bytes": 14642
   },
   {
    "id": "devops-aws-incident-triage-engineer",
@@ -16627,7 +16575,7 @@
     "api-center",
     "dotnet"
    ],
-   "bytes": 9501
+   "bytes": 14644
   },
   {
    "id": "devops-azure-api-center-python-developer",
@@ -16644,7 +16592,7 @@
     "api-center",
     "python"
    ],
-   "bytes": 8532
+   "bytes": 8415
   },
   {
    "id": "devops-azure-batch-hpc-developer",
@@ -16661,7 +16609,7 @@
     "batch",
     "java"
    ],
-   "bytes": 7975
+   "bytes": 6470
   },
   {
    "id": "devops-azure-bicep-engineer",
@@ -16713,7 +16661,7 @@
     "docker",
     "deployment"
    ],
-   "bytes": 9488
+   "bytes": 10176
   },
   {
    "id": "devops-azure-container-registry-developer",
@@ -16730,7 +16678,7 @@
     "containers",
     "python"
    ],
-   "bytes": 8354
+   "bytes": 8237
   },
   {
    "id": "devops-azure-iac-export-engineer",
@@ -16765,7 +16713,7 @@
     "java",
     "observability"
    ],
-   "bytes": 9362
+   "bytes": 9245
   },
   {
    "id": "devops-azure-log-ingestion-python-developer",
@@ -16782,7 +16730,7 @@
     "python",
     "observability"
    ],
-   "bytes": 7546
+   "bytes": 7429
   },
   {
    "id": "devops-azure-log-query-java-developer",
@@ -16799,7 +16747,7 @@
     "log-analytics",
     "java"
    ],
-   "bytes": 6209
+   "bytes": 15219
   },
   {
    "id": "devops-azure-log-query-python-developer",
@@ -16816,7 +16764,7 @@
     "log-analytics",
     "python"
    ],
-   "bytes": 8104
+   "bytes": 5956
   },
   {
    "id": "devops-azure-principal-architect",
@@ -16902,7 +16850,7 @@
     "automation",
     "sysadmin"
    ],
-   "bytes": 8981
+   "bytes": 14536
   },
   {
    "id": "devops-bash-scripting-engineer",
@@ -16920,7 +16868,7 @@
     "ci-cd",
     "linux"
    ],
-   "bytes": 9212
+   "bytes": 14853
   },
   {
    "id": "devops-bazel-build-engineer",
@@ -16937,7 +16885,7 @@
     "monorepo",
     "remote-execution"
    ],
-   "bytes": 9563
+   "bytes": 11756
   },
   {
    "id": "devops-buttercup-crs-troubleshooter",
@@ -16954,7 +16902,7 @@
     "redis",
     "buttercup"
    ],
-   "bytes": 9203
+   "bytes": 11799
   },
   {
    "id": "devops-centos-linux-administrator",
@@ -16990,7 +16938,7 @@
     "semver",
     "ci-cd"
    ],
-   "bytes": 8593
+   "bytes": 16729
   },
   {
    "id": "engineering-china-network-engineer",
@@ -17025,7 +16973,7 @@
     "pipelines",
     "deployment"
    ],
-   "bytes": 9520
+   "bytes": 13798
   },
   {
    "id": "devops-ci-cd-pipeline-architect",
@@ -17042,7 +16990,7 @@
     "canary",
     "blue-green"
    ],
-   "bytes": 9571
+   "bytes": 10689
   },
   {
    "id": "devops-ci-cd-pipeline-engineer",
@@ -17076,7 +17024,7 @@
     "composio",
     "pipelines"
    ],
-   "bytes": 8820
+   "bytes": 8703
   },
   {
    "id": "devops-cloud-architect",
@@ -17130,7 +17078,7 @@
     "ci-cd",
     "monitoring"
    ],
-   "bytes": 7514
+   "bytes": 5949
   },
   {
    "id": "devops-cloud-infrastructure-architect",
@@ -17148,7 +17096,7 @@
     "terraform",
     "finops"
    ],
-   "bytes": 8757
+   "bytes": 9378
   },
   {
    "id": "devops-cloud-network-engineer",
@@ -17165,7 +17113,7 @@
     "zero-trust",
     "load-balancing"
    ],
-   "bytes": 9058
+   "bytes": 11503
   },
   {
    "id": "devops-cloud-run-serverless-engineer",
@@ -17183,7 +17131,7 @@
     "pub-sub",
     "containers"
    ],
-   "bytes": 9166
+   "bytes": 22557
   },
   {
    "id": "devops-cloud-spend-reduction-analyst",
@@ -17200,7 +17148,7 @@
     "rightsizing",
     "aws"
    ],
-   "bytes": 9580
+   "bytes": 22566
   },
   {
    "id": "devops-cloudformation-engineer",
@@ -17234,7 +17182,7 @@
     "databases",
     "hosting"
    ],
-   "bytes": 8611
+   "bytes": 20874
   },
   {
    "id": "devops-configuration-validation-engineer",
@@ -17251,7 +17199,7 @@
     "json-schema",
     "deployment"
    ],
-   "bytes": 9649
+   "bytes": 16241
   },
   {
    "id": "devops-cosmos-db-provisioning-net-developer",
@@ -17268,7 +17216,7 @@
     "arm",
     "dotnet"
    ],
-   "bytes": 9696
+   "bytes": 9941
   },
   {
    "id": "devops-cron-schedule-reviewer",
@@ -17285,7 +17233,7 @@
     "devops",
     "validation"
    ],
-   "bytes": 9438
+   "bytes": 11384
   },
   {
    "id": "devops-debian-linux-administrator",
@@ -17319,7 +17267,7 @@
     "observability",
     "diagnostics"
    ],
-   "bytes": 9622
+   "bytes": 22608
   },
   {
    "id": "devops-deploy-verification-engineer",
@@ -17353,7 +17301,7 @@
     "deployment",
     "progressive-delivery"
    ],
-   "bytes": 9208
+   "bytes": 11695
   },
   {
    "id": "devops-dev-environment-engineer",
@@ -17370,7 +17318,7 @@
     "tooling",
     "dependencies"
    ],
-   "bytes": 8100
+   "bytes": 13767
   },
   {
    "id": "devops-devcontainer-engineer",
@@ -17387,7 +17335,7 @@
     "vscode",
     "developer-experience"
    ],
-   "bytes": 9306
+   "bytes": 9985
   },
   {
    "id": "engineering-devops-automator",
@@ -17455,7 +17403,7 @@
     "debugging",
     "sre"
    ],
-   "bytes": 8782
+   "bytes": 12551
   },
   {
    "id": "devops-devops-workflow-automation-engineer",
@@ -17472,7 +17420,7 @@
     "automation",
     "release-management"
    ],
-   "bytes": 9593
+   "bytes": 22551
   },
   {
    "id": "devops-distributed-tracing-engineer",
@@ -17507,7 +17455,7 @@
     "security",
     "devops"
    ],
-   "bytes": 9508
+   "bytes": 16059
   },
   {
    "id": "devops-droid-cli-automation-engineer",
@@ -17541,7 +17489,7 @@
     "arm",
     "dotnet"
    ],
-   "bytes": 8941
+   "bytes": 6501
   },
   {
    "id": "devops-dynatrace-observability-engineer",
@@ -17612,7 +17560,7 @@
     "monitoring",
     "sentry"
    ],
-   "bytes": 9591
+   "bytes": 22269
   },
   {
    "id": "devops-expo-performance-engineer",
@@ -17630,7 +17578,7 @@
     "monitoring",
     "react-native"
    ],
-   "bytes": 7595
+   "bytes": 20984
   },
   {
    "id": "devops-expo-release-engineer",
@@ -17648,7 +17596,7 @@
     "google-play",
     "release"
    ],
-   "bytes": 9559
+   "bytes": 22501
   },
   {
    "id": "devops-expo-update-health-analyst",
@@ -17666,7 +17614,7 @@
     "react-native",
     "monitoring"
    ],
-   "bytes": 8640
+   "bytes": 18395
   },
   {
    "id": "devops-fedora-hyprland-administrator",
@@ -17684,7 +17632,7 @@
     "wayland",
     "gpu"
    ],
-   "bytes": 9557
+   "bytes": 15245
   },
   {
    "id": "devops-fedora-linux-administrator",
@@ -17754,7 +17702,7 @@
     "automation",
     "yaml"
    ],
-   "bytes": 9389
+   "bytes": 22535
   },
   {
    "id": "devops-github-actions-pipeline-architect",
@@ -17822,7 +17770,7 @@
     "ai",
     "triage"
    ],
-   "bytes": 9126
+   "bytes": 22124
   },
   {
    "id": "devops-github-cli-operator",
@@ -17839,7 +17787,7 @@
     "pull-requests",
     "issues"
    ],
-   "bytes": 3896
+   "bytes": 5479
   },
   {
    "id": "devops-github-release-manager",
@@ -17890,7 +17838,7 @@
     "flux",
     "kubernetes"
    ],
-   "bytes": 9543
+   "bytes": 14433
   },
   {
    "id": "devops-grafana-dashboard-engineer",
@@ -17907,7 +17855,7 @@
     "monitoring",
     "dashboards"
    ],
-   "bytes": 9701
+   "bytes": 12453
   },
   {
    "id": "devops-hcp-terraform-engineer",
@@ -17941,7 +17889,7 @@
     "packaging",
     "deployment"
    ],
-   "bytes": 9445
+   "bytes": 14383
   },
   {
    "id": "devops-hybrid-cloud-architect",
@@ -17959,7 +17907,7 @@
     "gcp",
     "openstack"
    ],
-   "bytes": 8951
+   "bytes": 11453
   },
   {
    "id": "devops-hybrid-cloud-network-engineer",
@@ -18011,7 +17959,7 @@
     "sre",
     "root-cause"
    ],
-   "bytes": 9222
+   "bytes": 15516
   },
   {
    "id": "engineering-incident-response-commander",
@@ -18045,7 +17993,7 @@
     "sre",
     "communication"
    ],
-   "bytes": 8473
+   "bytes": 12789
   },
   {
    "id": "devops-incident-runbook-writer",
@@ -18062,7 +18010,7 @@
     "sre",
     "documentation"
    ],
-   "bytes": 9209
+   "bytes": 12717
   },
   {
    "id": "support-infrastructure-maintainer",
@@ -18097,7 +18045,7 @@
     "metrics",
     "tracing"
    ],
-   "bytes": 9683
+   "bytes": 14436
   },
   {
    "id": "devops-istio-service-mesh-engineer",
@@ -18148,7 +18096,7 @@
     "governance",
     "service-management"
    ],
-   "bytes": 8959
+   "bytes": 10159
   },
   {
    "id": "devops-jq-json-pipeline-engineer",
@@ -18183,7 +18131,7 @@
     "deployment",
     "service-mesh"
    ],
-   "bytes": 5549
+   "bytes": 6391
   },
   {
    "id": "devops-kubernetes-manifest-engineer",
@@ -18200,7 +18148,7 @@
     "manifests",
     "containers"
    ],
-   "bytes": 9591
+   "bytes": 15613
   },
   {
    "id": "devops-kubernetes-platform-architect",
@@ -18218,7 +18166,7 @@
     "flux",
     "cloud-native"
    ],
-   "bytes": 9199
+   "bytes": 12102
   },
   {
    "id": "devops-kubernetes-reliability-engineer",
@@ -18288,7 +18236,7 @@
     "kubernetes",
     "mtls"
    ],
-   "bytes": 10292
+   "bytes": 10452
   },
   {
    "id": "devops-linux-command-line-administrator",
@@ -18305,7 +18253,7 @@
     "terminal",
     "macos"
    ],
-   "bytes": 6412
+   "bytes": 6295
   },
   {
    "id": "devops-linux-systems-administrator",
@@ -18322,7 +18270,7 @@
     "performance",
     "sysadmin"
    ],
-   "bytes": 6253
+   "bytes": 5722
   },
   {
    "id": "devops-macos-container-engineer",
@@ -18340,7 +18288,7 @@
     "docker",
     "apple-silicon"
    ],
-   "bytes": 8642
+   "bytes": 22278
   },
   {
    "id": "devops-macos-session-administrator",
@@ -18392,7 +18340,7 @@
     "dashboards",
     "logs"
    ],
-   "bytes": 9577
+   "bytes": 18300
   },
   {
    "id": "devops-multi-cloud-architect",
@@ -18481,7 +18429,7 @@
     "deployment",
     "hosting"
    ],
-   "bytes": 7163
+   "bytes": 19604
   },
   {
    "id": "devops-observability-engineer",
@@ -18499,7 +18447,7 @@
     "logging",
     "tracing"
    ],
-   "bytes": 9519
+   "bytes": 16711
   },
   {
    "id": "devops-odoo-backup-administrator",
@@ -18551,7 +18499,7 @@
     "postgresql",
     "profiling"
    ],
-   "bytes": 7128
+   "bytes": 6776
   },
   {
    "id": "devops-on-call-handoff-coordinator",
@@ -18568,7 +18516,7 @@
     "incident-response",
     "handoffs"
    ],
-   "bytes": 9452
+   "bytes": 13293
   },
   {
    "id": "devops-opentelemetry-azure-java-developer",
@@ -18585,7 +18533,7 @@
     "tracing",
     "java"
    ],
-   "bytes": 9585
+   "bytes": 10762
   },
   {
    "id": "devops-opentelemetry-exporter-python-developer",
@@ -18654,7 +18602,7 @@
     "postmortem",
     "observability"
    ],
-   "bytes": 9106
+   "bytes": 13054
   },
   {
    "id": "devops-powershell-script-developer",
@@ -18671,7 +18619,7 @@
     "scripting",
     "automation"
    ],
-   "bytes": 5815
+   "bytes": 5698
   },
   {
    "id": "devops-production-launch-engineer",
@@ -18688,7 +18636,7 @@
     "monitoring",
     "rollback"
    ],
-   "bytes": 9726
+   "bytes": 12612
   },
   {
    "id": "devops-production-release-engineer",
@@ -18705,7 +18653,7 @@
     "deployment",
     "verification"
    ],
-   "bytes": 8011
+   "bytes": 7894
   },
   {
    "id": "devops-prometheus-monitoring-engineer",
@@ -18722,7 +18670,7 @@
     "observability",
     "alerting"
    ],
-   "bytes": 9208
+   "bytes": 6484
   },
   {
    "id": "devops-python-wheel-build-engineer",
@@ -18757,7 +18705,7 @@
     "sync",
     "cli"
    ],
-   "bytes": 9487
+   "bytes": 21600
   },
   {
    "id": "devops-secure-ci-cd-pipeline-engineer",
@@ -18793,7 +18741,7 @@
     "scaling",
     "systemd"
    ],
-   "bytes": 6215
+   "bytes": 6278
   },
   {
    "id": "devops-service-mesh-architect",
@@ -18828,7 +18776,7 @@
     "prometheus",
     "tracing"
    ],
-   "bytes": 9963
+   "bytes": 12580
   },
   {
    "id": "devops-shell-command-specialist",
@@ -18863,7 +18811,7 @@
     "windows",
     "sysadmin"
    ],
-   "bytes": 9447
+   "bytes": 5720
   },
   {
    "id": "devops-shellcheck-linting-engineer",
@@ -18880,7 +18828,7 @@
     "linting",
     "ci"
    ],
-   "bytes": 9332
+   "bytes": 11416
   },
   {
    "id": "engineering-sre",
@@ -18915,7 +18863,7 @@
     "error-budgets",
     "monitoring"
    ],
-   "bytes": 8988
+   "bytes": 14372
   },
   {
    "id": "devops-slo-implementation-engineer",
@@ -18932,7 +18880,7 @@
     "error-budgets",
     "reliability"
    ],
-   "bytes": 9505
+   "bytes": 19159
   },
   {
    "id": "devops-sre-incident-responder",
@@ -18949,7 +18897,7 @@
     "observability",
     "on-call"
    ],
-   "bytes": 9328
+   "bytes": 13401
   },
   {
    "id": "devops-ssh-server-operations-engineer",
@@ -18985,7 +18933,7 @@
     "typescript",
     "iac"
    ],
-   "bytes": 9649
+   "bytes": 12672
   },
   {
    "id": "devops-system-performance-engineer",
@@ -19020,7 +18968,7 @@
     "iac",
     "ci-cd"
    ],
-   "bytes": 7768
+   "bytes": 17899
   },
   {
    "id": "devops-terraform-iac-reviewer",
@@ -19054,7 +19002,7 @@
     "multi-environment",
     "cloud"
    ],
-   "bytes": 5586
+   "bytes": 6092
   },
   {
    "id": "devops-terraform-platform-engineer",
@@ -19071,7 +19019,7 @@
     "policy-as-code",
     "platform-engineering"
    ],
-   "bytes": 8899
+   "bytes": 11272
   },
   {
    "id": "devops-tmux-workflow-engineer",
@@ -19088,7 +19036,7 @@
     "ssh",
     "shell-scripting"
    ],
-   "bytes": 9423
+   "bytes": 12159
   },
   {
    "id": "devops-turborepo-build-engineer",
@@ -19105,7 +19053,7 @@
     "build-caching",
     "ci"
    ],
-   "bytes": 9575
+   "bytes": 5878
   },
   {
    "id": "devops-vercel-cli-deployment-engineer",
@@ -19122,7 +19070,7 @@
     "ci-cd",
     "deployment"
    ],
-   "bytes": 9180
+   "bytes": 13305
   },
   {
    "id": "devops-vercel-deployment-engineer",
@@ -19139,7 +19087,7 @@
     "nextjs",
     "hosting"
    ],
-   "bytes": 9456
+   "bytes": 14110
   },
   {
    "id": "devops-vercel-performance-auditor",
@@ -19156,7 +19104,7 @@
     "cost-optimization",
     "observability"
    ],
-   "bytes": 9669
+   "bytes": 22459
   },
   {
    "id": "devops-web-app-deployment-engineer",
@@ -19173,7 +19121,7 @@
     "api",
     "web-apps"
    ],
-   "bytes": 9424
+   "bytes": 11010
   },
   {
    "id": "devops-windows-scripting-engineer",
@@ -19207,7 +19155,7 @@
     "malware-analysis",
     "deobfuscation"
    ],
-   "bytes": 12772
+   "bytes": 29793
   },
   {
    "id": "security-agent-config-security-reviewer",
@@ -19276,7 +19224,7 @@
     "ai-agents",
     "supply-chain"
    ],
-   "bytes": 9678
+   "bytes": 22018
   },
   {
    "id": "security-ai-generated-code-auditor",
@@ -19311,7 +19259,7 @@
     "configuration",
     "cryptography"
    ],
-   "bytes": 9367
+   "bytes": 13368
   },
   {
    "id": "security-api-security-engineer",
@@ -19328,7 +19276,7 @@
     "authorization",
     "owasp"
    ],
-   "bytes": 9275
+   "bytes": 13609
   },
   {
    "id": "security-api-security-tester",
@@ -19345,7 +19293,7 @@
     "graphql",
     "rest"
    ],
-   "bytes": 5710
+   "bytes": 6084
   },
   {
    "id": "security-appsec-engineer",
@@ -19381,7 +19329,7 @@
     "rbac",
     "sessions"
    ],
-   "bytes": 9547
+   "bytes": 22052
   },
   {
    "id": "security-azure-identity-net-developer",
@@ -19398,7 +19346,7 @@
     "authentication",
     "dotnet"
    ],
-   "bytes": 8591
+   "bytes": 11737
   },
   {
    "id": "security-azure-identity-java-developer",
@@ -19415,7 +19363,7 @@
     "authentication",
     "java"
    ],
-   "bytes": 9032
+   "bytes": 13153
   },
   {
    "id": "security-azure-identity-python-developer",
@@ -19432,7 +19380,7 @@
     "authentication",
     "python"
    ],
-   "bytes": 7586
+   "bytes": 7469
   },
   {
    "id": "security-azure-identity-rust-developer",
@@ -19449,7 +19397,7 @@
     "authentication",
     "rust"
    ],
-   "bytes": 5667
+   "bytes": 5550
   },
   {
    "id": "security-azure-identity-typescript-developer",
@@ -19466,7 +19414,7 @@
     "authentication",
     "typescript"
    ],
-   "bytes": 9030
+   "bytes": 8913
   },
   {
    "id": "security-azure-key-vault-python-developer",
@@ -19483,7 +19431,7 @@
     "secrets",
     "python"
    ],
-   "bytes": 9003
+   "bytes": 8886
   },
   {
    "id": "security-backend-security-engineer",
@@ -19501,7 +19449,7 @@
     "authentication",
     "backend"
    ],
-   "bytes": 9195
+   "bytes": 12805
   },
   {
    "id": "security-binary-diffing-analyst",
@@ -19518,7 +19466,7 @@
     "symbols",
     "binaries"
    ],
-   "bytes": 11981
+   "bytes": 13435
   },
   {
    "id": "security-binary-reverse-engineer",
@@ -19535,7 +19483,7 @@
     "disassembly",
     "binaries"
    ],
-   "bytes": 9239
+   "bytes": 5729
   },
   {
    "id": "security-blockchain-security-auditor",
@@ -19569,7 +19517,7 @@
     "pentest",
     "appsec"
    ],
-   "bytes": 7070
+   "bytes": 14627
   },
   {
    "id": "security-ci-cd-secrets-management-engineer",
@@ -19639,7 +19587,7 @@
     "code-review",
     "architecture"
    ],
-   "bytes": 9487
+   "bytes": 11926
   },
   {
    "id": "security-code-security-auditor",
@@ -19693,7 +19641,7 @@
     "supply-chain",
     "hardening"
    ],
-   "bytes": 9709
+   "bytes": 22426
   },
   {
    "id": "security-cryptographic-timing-auditor",
@@ -19710,7 +19658,7 @@
     "timing-attacks",
     "secure-code-review"
    ],
-   "bytes": 9584
+   "bytes": 12082
   },
   {
    "id": "security-defender-kql-threat-hunter",
@@ -19761,7 +19709,7 @@
     "dependencies",
     "cve"
    ],
-   "bytes": 9556
+   "bytes": 20791
   },
   {
    "id": "security-dependency-security-auditor",
@@ -19778,7 +19726,7 @@
     "licenses",
     "vulnerabilities"
    ],
-   "bytes": 9556
+   "bytes": 15373
   },
   {
    "id": "security-devsecops-governance-engineer",
@@ -19813,7 +19761,7 @@
     "compliance",
     "sdlc"
    ],
-   "bytes": 9539
+   "bytes": 13437
   },
   {
    "id": "security-digital-forensics-analyst",
@@ -19847,7 +19795,7 @@
     "access-control",
     "python"
    ],
-   "bytes": 8920
+   "bytes": 12950
   },
   {
    "id": "security-document-forensics-analyst",
@@ -19916,7 +19864,7 @@
     "csp",
     "javascript"
    ],
-   "bytes": 9530
+   "bytes": 14542
   },
   {
    "id": "security-frontend-xss-security-reviewer",
@@ -19933,7 +19881,7 @@
     "javascript",
     "code-review"
    ],
-   "bytes": 9638
+   "bytes": 11269
   },
   {
    "id": "security-gdpr-privacy-engineer",
@@ -19950,7 +19898,7 @@
     "consent",
     "compliance"
    ],
-   "bytes": 9646
+   "bytes": 22606
   },
   {
    "id": "security-ghidra-reverse-engineer",
@@ -19984,7 +19932,7 @@
     "supply-chain",
     "appsec"
    ],
-   "bytes": 9544
+   "bytes": 10943
   },
   {
    "id": "security-ida-reverse-engineer",
@@ -20001,7 +19949,7 @@
     "malware-analysis",
     "binaries"
    ],
-   "bytes": 9597
+   "bytes": 20388
   },
   {
    "id": "security-incident-responder",
@@ -20052,7 +20000,7 @@
     "certificates",
     "rust"
    ],
-   "bytes": 6820
+   "bytes": 6703
   },
   {
    "id": "security-key-vault-keys-net-developer",
@@ -20069,7 +20017,7 @@
     "cryptography",
     "dotnet"
    ],
-   "bytes": 9372
+   "bytes": 6443
   },
   {
    "id": "security-key-vault-keys-java-developer",
@@ -20086,7 +20034,7 @@
     "cryptography",
     "java"
    ],
-   "bytes": 7876
+   "bytes": 6040
   },
   {
    "id": "security-key-vault-keys-rust-developer",
@@ -20103,7 +20051,7 @@
     "cryptography",
     "rust"
    ],
-   "bytes": 6178
+   "bytes": 6061
   },
   {
    "id": "security-key-vault-keys-typescript-developer",
@@ -20120,7 +20068,7 @@
     "cryptography",
     "typescript"
    ],
-   "bytes": 8502
+   "bytes": 6166
   },
   {
    "id": "security-key-vault-secrets-java-developer",
@@ -20137,7 +20085,7 @@
     "secrets",
     "java"
    ],
-   "bytes": 9050
+   "bytes": 6628
   },
   {
    "id": "security-key-vault-secrets-rust-developer",
@@ -20154,7 +20102,7 @@
     "secrets",
     "rust"
    ],
-   "bytes": 5764
+   "bytes": 5647
   },
   {
    "id": "security-key-vault-secrets-typescript-developer",
@@ -20171,7 +20119,7 @@
     "secrets",
     "typescript"
    ],
-   "bytes": 8436
+   "bytes": 6378
   },
   {
    "id": "security-kubernetes-security-engineer",
@@ -20188,7 +20136,7 @@
     "network-policy",
     "cloud-security"
    ],
-   "bytes": 9672
+   "bytes": 13650
   },
   {
    "id": "security-laravel-security-auditor",
@@ -20223,7 +20171,7 @@
     "malware",
     "mach-o"
    ],
-   "bytes": 4451
+   "bytes": 6640
   },
   {
    "id": "security-malware-analyst",
@@ -20240,7 +20188,7 @@
     "threat-intelligence",
     "incident-response"
    ],
-   "bytes": 8415
+   "bytes": 8349
   },
   {
    "id": "security-malware-detection-engineer",
@@ -20257,7 +20205,7 @@
     "sigma",
     "threat-detection"
    ],
-   "bytes": 12649
+   "bytes": 7338
   },
   {
    "id": "security-mcp-governance-engineer",
@@ -20275,7 +20223,7 @@
     "access-control",
     "audit"
    ],
-   "bytes": 9326
+   "bytes": 10883
   },
   {
    "id": "security-memory-forensics-analyst",
@@ -20292,7 +20240,7 @@
     "memory-analysis",
     "malware"
    ],
-   "bytes": 8859
+   "bytes": 7279
   },
   {
    "id": "security-mobile-security-developer",
@@ -20311,7 +20259,7 @@
     "webview",
     "appsec"
    ],
-   "bytes": 9673
+   "bytes": 14598
   },
   {
    "id": "security-mtls-zero-trust-engineer",
@@ -20329,7 +20277,7 @@
     "service-mesh",
     "tls"
    ],
-   "bytes": 9580
+   "bytes": 6812
   },
   {
    "id": "security-network-traffic-analyst",
@@ -20346,7 +20294,7 @@
     "packet-analysis",
     "forensics"
    ],
-   "bytes": 9158
+   "bytes": 14129
   },
   {
    "id": "security-odoo-access-control-developer",
@@ -20380,7 +20328,7 @@
     "ioc",
     "scams"
    ],
-   "bytes": 12734
+   "bytes": 13640
   },
   {
    "id": "security-pci-compliance-reviewer",
@@ -20468,7 +20416,7 @@
     "webhooks",
     "stripe"
    ],
-   "bytes": 9639
+   "bytes": 12934
   },
   {
    "id": "security-protocol-reverse-engineer",
@@ -20503,7 +20451,7 @@
     "compliance",
     "specifications"
    ],
-   "bytes": 9672
+   "bytes": 12740
   },
   {
    "id": "security-radare2-binary-analyst",
@@ -20520,7 +20468,7 @@
     "binary-analysis",
     "disassembly"
    ],
-   "bytes": 14207
+   "bytes": 18070
   },
   {
    "id": "security-regulatory-compliance-auditor",
@@ -20538,7 +20486,7 @@
     "soc2",
     "pci-dss"
    ],
-   "bytes": 9686
+   "bytes": 17372
   },
   {
    "id": "security-reverse-engineer",
@@ -20556,7 +20504,7 @@
     "angr",
     "binary-analysis"
    ],
-   "bytes": 10423
+   "bytes": 23585
   },
   {
    "id": "security-reverse-engineering-automation-engineer",
@@ -20660,7 +20608,7 @@
     "api-keys",
     "vault"
    ],
-   "bytes": 9665
+   "bytes": 22475
   },
   {
    "id": "security-secure-code-reviewer",
@@ -20677,7 +20625,7 @@
     "authentication",
     "api-security"
    ],
-   "bytes": 9724
+   "bytes": 14585
   },
   {
    "id": "security-secure-web-developer",
@@ -20694,7 +20642,7 @@
     "authentication",
     "input-validation"
    ],
-   "bytes": 6304
+   "bytes": 22610
   },
   {
    "id": "security-architect",
@@ -20728,7 +20676,7 @@
     "vulnerability-scanning",
     "hardening"
    ],
-   "bytes": 7348
+   "bytes": 6781
   },
   {
    "id": "security-security-case-reviewer",
@@ -20779,7 +20727,7 @@
     "remediation",
     "threat-modeling"
    ],
-   "bytes": 9924
+   "bytes": 22911
   },
   {
    "id": "security-security-diff-reviewer",
@@ -20847,7 +20795,7 @@
     "hardening",
     "code-review"
    ],
-   "bytes": 8836
+   "bytes": 22508
   },
   {
    "id": "security-security-hardening-lead",
@@ -20864,7 +20812,7 @@
     "devsecops",
     "monitoring"
    ],
-   "bytes": 8375
+   "bytes": 13242
   },
   {
    "id": "security-security-policy-writer",
@@ -20898,7 +20846,7 @@
     "ctf",
     "documentation"
    ],
-   "bytes": 11886
+   "bytes": 31358
   },
   {
    "id": "security-security-requirements-analyst",
@@ -20915,7 +20863,7 @@
     "user-stories",
     "compliance"
    ],
-   "bytes": 6574
+   "bytes": 22600
   },
   {
    "id": "security-semgrep-rule-author",
@@ -20949,7 +20897,7 @@
     "polyglot",
     "rules"
    ],
-   "bytes": 9130
+   "bytes": 9897
   },
   {
    "id": "security-senior-secops",
@@ -20984,7 +20932,7 @@
     "defi",
     "blockchain"
    ],
-   "bytes": 8425
+   "bytes": 17245
   },
   {
    "id": "security-stackhawk-api-security-engineer",
@@ -21019,7 +20967,7 @@
     "security-architecture",
     "risk"
    ],
-   "bytes": 8257
+   "bytes": 22574
   },
   {
    "id": "security-supply-chain-security-engineer",
@@ -21037,7 +20985,7 @@
     "containers",
     "ci-cd"
    ],
-   "bytes": 11759
+   "bytes": 12857
   },
   {
    "id": "security-supply-chain-exposure-analyst",
@@ -21054,7 +21002,7 @@
     "endpoint-security",
     "advisories"
    ],
-   "bytes": 9672
+   "bytes": 11945
   },
   {
    "id": "security-threat-detection-engineer",
@@ -21122,7 +21070,7 @@
     "varlock",
     "security"
    ],
-   "bytes": 9193
+   "bytes": 11760
   },
   {
    "id": "security-vulnerability-analyst",
@@ -21139,7 +21087,7 @@
     "supply-chain",
     "appsec"
    ],
-   "bytes": 9246
+   "bytes": 9914
   },
   {
    "id": "security-web-security-tester",
@@ -21156,7 +21104,7 @@
     "xss",
     "web-security"
    ],
-   "bytes": 6147
+   "bytes": 7267
   },
   {
    "id": "testing-accessibility-auditor",
@@ -21246,7 +21194,7 @@
     "edge-cases",
     "qa"
    ],
-   "bytes": 9529
+   "bytes": 12732
   },
   {
    "id": "testing-agent-fault-injection-engineer",
@@ -21264,7 +21212,7 @@
     "resilience",
     "mcp"
    ],
-   "bytes": 9831
+   "bytes": 13936
   },
   {
    "id": "testing-agent-qa-debugging-engineer",
@@ -21333,7 +21281,7 @@
     "verification",
     "traces"
    ],
-   "bytes": 9129
+   "bytes": 10748
   },
   {
    "id": "testing-android-emulator-test-engineer",
@@ -21369,7 +21317,7 @@
     "ui-testing",
     "json"
    ],
-   "bytes": 9015
+   "bytes": 9665
   },
   {
    "id": "testing-api-mocking-engineer",
@@ -21386,7 +21334,7 @@
     "testing",
     "integration"
    ],
-   "bytes": 9589
+   "bytes": 12852
   },
   {
    "id": "testing-api-request-reviewer",
@@ -21439,7 +21387,7 @@
     "android",
     "ios"
    ],
-   "bytes": 9571
+   "bytes": 13135
   },
   {
    "id": "testing-browser-regression-investigator",
@@ -21474,7 +21422,7 @@
     "performance",
     "accessibility"
    ],
-   "bytes": 9610
+   "bytes": 17112
   },
   {
    "id": "testing-code-validation-engineer",
@@ -21509,7 +21457,7 @@
     "release-checks",
     "evidence"
    ],
-   "bytes": 9483
+   "bytes": 9654
   },
   {
    "id": "testing-completion-verification-reviewer",
@@ -21526,7 +21474,7 @@
     "evidence",
     "release"
    ],
-   "bytes": 6616
+   "bytes": 6498
   },
   {
    "id": "testing-component-accessibility-auditor",
@@ -21597,7 +21545,7 @@
     "javascript",
     "typescript"
    ],
-   "bytes": 9295
+   "bytes": 9507
   },
   {
    "id": "testing-diffblue-java-test-engineer",
@@ -21633,7 +21581,7 @@
     "cypress",
     "playwright"
    ],
-   "bytes": 6207
+   "bytes": 19781
   },
   {
    "id": "testing-email-sandbox-test-engineer",
@@ -21650,7 +21598,7 @@
     "mailtrap",
     "ci"
    ],
-   "bytes": 9627
+   "bytes": 10029
   },
   {
    "id": "testing-evidence-collector",
@@ -21701,7 +21649,7 @@
     "hyperexecute",
     "ci-cd"
    ],
-   "bytes": 6984
+   "bytes": 7093
   },
   {
    "id": "testing-independent-quality-reviewer",
@@ -21736,7 +21684,7 @@
     "vitest",
     "jest"
    ],
-   "bytes": 9542
+   "bytes": 20839
   },
   {
    "id": "testing-jest-test-engineer",
@@ -21789,7 +21737,7 @@
     "performance",
     "ci-cd"
    ],
-   "bytes": 9025
+   "bytes": 16440
   },
   {
    "id": "testing-keyboard-accessibility-tester",
@@ -21824,7 +21772,7 @@
     "performance",
     "ci"
    ],
-   "bytes": 9031
+   "bytes": 17070
   },
   {
    "id": "testing-mobile-e2e-tester",
@@ -21878,7 +21826,7 @@
     "jenkins",
     "ci-cd"
    ],
-   "bytes": 9227
+   "bytes": 10127
   },
   {
    "id": "testing-newman-api-test-engineer",
@@ -21896,7 +21844,7 @@
     "api-testing",
     "ci-cd"
    ],
-   "bytes": 8550
+   "bytes": 10847
   },
   {
    "id": "testing-next-js-launch-qa-engineer",
@@ -21914,7 +21862,7 @@
     "seo",
     "security"
    ],
-   "bytes": 9764
+   "bytes": 19884
   },
   {
    "id": "testing-odoo-test-engineer",
@@ -21983,7 +21931,7 @@
     "performance",
     "regression"
    ],
-   "bytes": 9479
+   "bytes": 6817
   },
   {
    "id": "testing-performance-benchmarker",
@@ -22018,7 +21966,7 @@
     "e2e",
     "typescript"
    ],
-   "bytes": 8385
+   "bytes": 6425
   },
   {
    "id": "testing-playwright-e2e-test-engineer",
@@ -22036,7 +21984,7 @@
     "visual-regression",
     "ci-cd"
    ],
-   "bytes": 5596
+   "bytes": 6230
   },
   {
    "id": "testing-playwright-java-test-engineer",
@@ -22055,7 +22003,7 @@
     "e2e",
     "allure"
    ],
-   "bytes": 9789
+   "bytes": 15805
   },
   {
    "id": "testing-playwright-workspace-net-developer",
@@ -22072,7 +22020,7 @@
     "arm",
     "dotnet"
    ],
-   "bytes": 9583
+   "bytes": 11784
   },
   {
    "id": "testing-postman-collection-engineer",
@@ -22142,7 +22090,7 @@
     "tdd",
     "mocking"
    ],
-   "bytes": 9447
+   "bytes": 21996
   },
   {
    "id": "testing-qa-engineer",
@@ -22177,7 +22125,7 @@
     "e2e",
     "quality-gates"
    ],
-   "bytes": 6965
+   "bytes": 6352
   },
   {
    "id": "testing-qa-test-engineer",
@@ -22281,7 +22229,7 @@
     "go-live",
     "checklist"
    ],
-   "bytes": 9214
+   "bytes": 22629
   },
   {
    "id": "testing-robot-framework-test-engineer",
@@ -22316,7 +22264,7 @@
     "aria",
     "wcag"
    ],
-   "bytes": 9452
+   "bytes": 15234
   },
   {
    "id": "testing-selenium-test-automation-engineer",
@@ -22334,7 +22282,7 @@
     "test-automation",
     "cross-browser"
    ],
-   "bytes": 9626
+   "bytes": 11632
   },
   {
    "id": "testing-self-healing-test-automation-engineer",
@@ -22351,7 +22299,7 @@
     "self-healing-tests",
     "qa"
    ],
-   "bytes": 9263
+   "bytes": 12996
   },
   {
    "id": "testing-shell-script-test-engineer",
@@ -22369,7 +22317,7 @@
     "unit-testing",
     "ci-cd"
    ],
-   "bytes": 8673
+   "bytes": 15106
   },
   {
    "id": "testing-smart-contract-test-engineer",
@@ -22387,7 +22335,7 @@
     "foundry",
     "web3"
    ],
-   "bytes": 8279
+   "bytes": 6549
   },
   {
    "id": "testing-smartui-visual-test-engineer",
@@ -22439,7 +22387,7 @@
     "python",
     "workflow-testing"
    ],
-   "bytes": 7478
+   "bytes": 21905
   },
   {
    "id": "testing-terratest-test-engineer",
@@ -22491,7 +22439,7 @@
     "unit-testing",
     "quality"
    ],
-   "bytes": 9303
+   "bytes": 20322
   },
   {
    "id": "testing-test-framework-migration-engineer",
@@ -22508,7 +22456,7 @@
     "cypress",
     "migration"
    ],
-   "bytes": 9293
+   "bytes": 10754
   },
   {
    "id": "testing-test-repair-engineer",
@@ -22610,7 +22558,7 @@
     "accessibility",
     "design-system"
    ],
-   "bytes": 9346
+   "bytes": 11576
   },
   {
    "id": "testing-unit-test-engineer",
@@ -22628,7 +22576,7 @@
     "mocks",
     "tdd"
    ],
-   "bytes": 9495
+   "bytes": 12954
   },
   {
    "id": "testing-unit-test-patterns-engineer",
@@ -22645,7 +22593,7 @@
     "unit-testing",
     "mocking"
    ],
-   "bytes": 8136
+   "bytes": 8019
   },
   {
    "id": "testing-vitest-test-engineer",
@@ -22680,7 +22628,7 @@
     "a11y",
     "section-508"
    ],
-   "bytes": 8992
+   "bytes": 15650
   },
   {
    "id": "testing-web-accessibility-engineer",
@@ -22714,7 +22662,7 @@
     "python",
     "e2e"
    ],
-   "bytes": 6113
+   "bytes": 5996
   },
   {
    "id": "testing-webdriverio-test-engineer",
@@ -22748,7 +22696,7 @@
     "test-automation",
     "wjttc"
    ],
-   "bytes": 9542
+   "bytes": 15381
   },
   {
    "id": "testing-wjttc-test-engineer",
@@ -22765,7 +22713,7 @@
     "test-reports",
     "wjttc"
    ],
-   "bytes": 9506
+   "bytes": 10416
   },
   {
    "id": "automation-activecampaign-automation-specialist",
@@ -22783,7 +22731,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 9018
+   "bytes": 10497
   },
   {
    "id": "automation-agentmail-integration-developer",
@@ -22801,7 +22749,7 @@
     "webhooks",
     "ai-agents"
    ],
-   "bytes": 8871
+   "bytes": 10886
   },
   {
    "id": "automation-airtable-automation-specialist",
@@ -22818,7 +22766,7 @@
     "mcp",
     "no-code"
    ],
-   "bytes": 8955
+   "bytes": 8838
   },
   {
    "id": "automation-amplitude-automation-specialist",
@@ -22836,7 +22784,7 @@
     "mcp",
     "cohorts"
    ],
-   "bytes": 8732
+   "bytes": 10169
   },
   {
    "id": "automation-anytype-automation-specialist",
@@ -22870,7 +22818,7 @@
     "javascript",
     "python"
    ],
-   "bytes": 8514
+   "bytes": 22352
   },
   {
    "id": "automation-apify-actorization-engineer",
@@ -22887,7 +22835,7 @@
     "docker",
     "serverless"
    ],
-   "bytes": 9459
+   "bytes": 19341
   },
   {
    "id": "automation-apify-integration-developer",
@@ -22921,7 +22869,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 8324
+   "bytes": 8207
   },
   {
    "id": "automation-automation-discovery-consultant",
@@ -22972,7 +22920,7 @@
     "teams",
     "dotnet"
    ],
-   "bytes": 9311
+   "bytes": 11728
   },
   {
    "id": "automation-azure-bot-service-python-developer",
@@ -22989,7 +22937,7 @@
     "channels",
     "python"
    ],
-   "bytes": 9443
+   "bytes": 9800
   },
   {
    "id": "automation-azure-logic-apps-developer",
@@ -23023,7 +22971,7 @@
     "automation",
     "composio"
    ],
-   "bytes": 8691
+   "bytes": 10577
   },
   {
    "id": "automation-basecamp-automation-specialist",
@@ -23040,7 +22988,7 @@
     "automation",
     "composio"
    ],
-   "bytes": 9413
+   "bytes": 14540
   },
   {
    "id": "automation-bitbucket-automation-specialist",
@@ -23057,7 +23005,7 @@
     "automation",
     "composio"
    ],
-   "bytes": 9504
+   "bytes": 14416
   },
   {
    "id": "automation-box-automation-specialist",
@@ -23074,7 +23022,7 @@
     "automation",
     "composio"
    ],
-   "bytes": 9490
+   "bytes": 14516
   },
   {
    "id": "automation-brevo-email-automation-specialist",
@@ -23091,7 +23039,7 @@
     "email-marketing",
     "composio"
    ],
-   "bytes": 9296
+   "bytes": 9873
   },
   {
    "id": "automation-browser-automation-engineer",
@@ -23109,7 +23057,7 @@
     "selenium",
     "browser-automation"
    ],
-   "bytes": 9376
+   "bytes": 22514
   },
   {
    "id": "automation-browseract-automation-specialist",
@@ -23143,7 +23091,7 @@
     "composio",
     "webhooks"
    ],
-   "bytes": 8669
+   "bytes": 9532
   },
   {
    "id": "automation-calendly-automation-specialist",
@@ -23160,7 +23108,7 @@
     "composio",
     "calendar"
    ],
-   "bytes": 9285
+   "bytes": 12870
   },
   {
    "id": "automation-canva-automation-specialist",
@@ -23177,7 +23125,7 @@
     "composio",
     "brand-templates"
    ],
-   "bytes": 8696
+   "bytes": 10250
   },
   {
    "id": "automation-cdp-browser-automation-specialist",
@@ -23194,7 +23142,7 @@
     "chrome",
     "web-automation"
    ],
-   "bytes": 8961
+   "bytes": 14360
   },
   {
    "id": "automation-clickup-automation-specialist",
@@ -23211,7 +23159,7 @@
     "composio",
     "tasks"
    ],
-   "bytes": 9490
+   "bytes": 13952
   },
   {
    "id": "automation-close-crm-automation-specialist",
@@ -23228,7 +23176,7 @@
     "composio",
     "sales-ops"
    ],
-   "bytes": 8764
+   "bytes": 8647
   },
   {
    "id": "automation-coda-automation-specialist",
@@ -23245,7 +23193,7 @@
     "composio",
     "tables"
    ],
-   "bytes": 9235
+   "bytes": 11084
   },
   {
    "id": "automation-confluence-automation-specialist",
@@ -23262,7 +23210,7 @@
     "composio",
     "documentation"
    ],
-   "bytes": 9517
+   "bytes": 13449
   },
   {
    "id": "automation-convertkit-automation-specialist",
@@ -23279,7 +23227,7 @@
     "email-marketing",
     "composio"
    ],
-   "bytes": 9327
+   "bytes": 9210
   },
   {
    "id": "automation-datadog-automation-specialist",
@@ -23296,7 +23244,7 @@
     "observability",
     "automation"
    ],
-   "bytes": 9111
+   "bytes": 11337
   },
   {
    "id": "automation-deepapi-automation-specialist",
@@ -23313,7 +23261,7 @@
     "email",
     "automation"
    ],
-   "bytes": 9408
+   "bytes": 22394
   },
   {
    "id": "automation-discord-automation-specialist",
@@ -23330,7 +23278,7 @@
     "community",
     "webhooks"
    ],
-   "bytes": 9502
+   "bytes": 9385
   },
   {
    "id": "automation-docusign-automation-specialist",
@@ -23347,7 +23295,7 @@
     "contracts",
     "automation"
    ],
-   "bytes": 9478
+   "bytes": 9957
   },
   {
    "id": "automation-dropbox-automation-specialist",
@@ -23364,7 +23312,7 @@
     "automation",
     "cloud-storage"
    ],
-   "bytes": 9490
+   "bytes": 14546
   },
   {
    "id": "automation-e-commerce-scraping-specialist",
@@ -23381,7 +23329,7 @@
     "pricing",
     "apify"
    ],
-   "bytes": 8513
+   "bytes": 11041
   },
   {
    "id": "automation-famulor-automation-specialist",
@@ -23399,7 +23347,7 @@
     "campaigns",
     "mcp"
    ],
-   "bytes": 7954
+   "bytes": 12705
   },
   {
    "id": "automation-figma-automation-specialist",
@@ -23416,7 +23364,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 9184
+   "bytes": 9067
   },
   {
    "id": "automation-flow-nexus-account-administrator",
@@ -23450,7 +23398,7 @@
     "tickets",
     "composio"
    ],
-   "bytes": 9516
+   "bytes": 13703
   },
   {
    "id": "automation-freshservice-automation-specialist",
@@ -23467,7 +23415,7 @@
     "tickets",
     "composio"
    ],
-   "bytes": 9232
+   "bytes": 10449
   },
   {
    "id": "automation-github-automation-specialist",
@@ -23501,7 +23449,7 @@
     "mcp",
     "automation"
    ],
-   "bytes": 9494
+   "bytes": 15612
   },
   {
    "id": "automation-gmail-automation-specialist",
@@ -23535,7 +23483,7 @@
     "browser-automation",
     "scraping"
    ],
-   "bytes": 7203
+   "bytes": 10290
   },
   {
    "id": "automation-go-rod-scraping-developer",
@@ -23552,7 +23500,7 @@
     "scraping",
     "browser-automation"
    ],
-   "bytes": 8795
+   "bytes": 20042
   },
   {
    "id": "automation-google-analytics-automation-specialis",
@@ -23569,7 +23517,7 @@
     "reporting",
     "composio"
    ],
-   "bytes": 8477
+   "bytes": 11153
   },
   {
    "id": "automation-google-calendar-automation-specialist",
@@ -23671,7 +23619,7 @@
     "cli",
     "web-data"
    ],
-   "bytes": 9491
+   "bytes": 22525
   },
   {
    "id": "automation-hasdata-scraping-developer",
@@ -23688,7 +23636,7 @@
     "web-data",
     "api"
    ],
-   "bytes": 9184
+   "bytes": 21684
   },
   {
    "id": "automation-helpdesk-automation-specialist",
@@ -23705,7 +23653,7 @@
     "support",
     "composio"
    ],
-   "bytes": 7973
+   "bytes": 7856
   },
   {
    "id": "automation-hubspot-crm-automation-specialist",
@@ -23722,7 +23670,7 @@
     "composio",
     "automation"
    ],
-   "bytes": 9440
+   "bytes": 11577
   },
   {
    "id": "automation-hubspot-integration-developer",
@@ -23739,7 +23687,7 @@
     "api",
     "webhooks"
    ],
-   "bytes": 9515
+   "bytes": 7012
   },
   {
    "id": "automation-instagram-automation-specialist",
@@ -23756,7 +23704,7 @@
     "social-media",
     "automation"
    ],
-   "bytes": 8981
+   "bytes": 9957
   },
   {
    "id": "automation-intercom-automation-specialist",
@@ -23773,7 +23721,7 @@
     "composio",
     "automation"
    ],
-   "bytes": 8682
+   "bytes": 11748
   },
   {
    "id": "automation-jira-automation-specialist",
@@ -23790,7 +23738,7 @@
     "project-tracking",
     "automation"
    ],
-   "bytes": 9065
+   "bytes": 8948
   },
   {
    "id": "automation-klaviyo-automation-specialist",
@@ -23808,7 +23756,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 9444
+   "bytes": 9381
   },
   {
    "id": "automation-linear-automation-specialist",
@@ -23825,7 +23773,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 8177
+   "bytes": 8060
   },
   {
    "id": "automation-linkedin-automation-specialist",
@@ -23842,7 +23790,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 8560
+   "bytes": 8443
   },
   {
    "id": "automation-linkedin-cli-automation-specialist",
@@ -23859,7 +23807,7 @@
     "outreach",
     "sales-navigator"
    ],
-   "bytes": 7584
+   "bytes": 17472
   },
   {
    "id": "automation-mailchimp-automation-specialist",
@@ -23876,7 +23824,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 9478
+   "bytes": 14536
   },
   {
    "id": "automation-mailtrap-contacts-administrator",
@@ -23893,7 +23841,7 @@
     "email-marketing",
     "crm"
    ],
-   "bytes": 9123
+   "bytes": 9743
   },
   {
    "id": "automation-make-automation-specialist",
@@ -23910,7 +23858,7 @@
     "composio",
     "workflows"
    ],
-   "bytes": 9323
+   "bytes": 9260
   },
   {
    "id": "automation-mercury-workspace-coordinator",
@@ -23944,7 +23892,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 9472
+   "bytes": 10684
   },
   {
    "id": "automation-miro-automation-specialist",
@@ -23961,7 +23909,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 9075
+   "bytes": 9732
   },
   {
    "id": "automation-mixpanel-automation-specialist",
@@ -23978,7 +23926,7 @@
     "composio",
     "funnels"
    ],
-   "bytes": 9162
+   "bytes": 10730
   },
   {
    "id": "automation-monday-com-automation-specialist",
@@ -23996,7 +23944,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 9490
+   "bytes": 14318
   },
   {
    "id": "automation-n8n-ai-agent-engineer",
@@ -24014,7 +23962,7 @@
     "llm",
     "workflow-automation"
    ],
-   "bytes": 9641
+   "bytes": 21982
   },
   {
    "id": "automation-n8n-custom-code-tool-developer",
@@ -24031,7 +23979,7 @@
     "javascript",
     "python"
    ],
-   "bytes": 9075
+   "bytes": 19673
   },
   {
    "id": "automation-n8n-error-handling-engineer",
@@ -24049,7 +23997,7 @@
     "alerting",
     "reliability"
    ],
-   "bytes": 8347
+   "bytes": 22658
   },
   {
    "id": "automation-n8n-expression-specialist",
@@ -24066,7 +24014,7 @@
     "webhooks",
     "workflow-automation"
    ],
-   "bytes": 9233
+   "bytes": 11946
   },
   {
    "id": "automation-n8n-file-handling-engineer",
@@ -24083,7 +24031,7 @@
     "binary-data",
     "workflow-automation"
    ],
-   "bytes": 9449
+   "bytes": 22521
   },
   {
    "id": "automation-n8n-javascript-developer",
@@ -24100,7 +24048,7 @@
     "code-node",
     "workflow-automation"
    ],
-   "bytes": 9373
+   "bytes": 17992
   },
   {
    "id": "automation-n8n-mcp-workflow-builder",
@@ -24117,7 +24065,7 @@
     "workflow-automation",
     "templates"
    ],
-   "bytes": 9306
+   "bytes": 18700
   },
   {
    "id": "automation-n8n-multi-instance-administrator",
@@ -24134,7 +24082,7 @@
     "credentials",
     "mcp"
    ],
-   "bytes": 8969
+   "bytes": 15316
   },
   {
    "id": "automation-n8n-node-configuration-specialist",
@@ -24150,7 +24098,7 @@
     "node-configuration",
     "workflow-automation"
    ],
-   "bytes": 9480
+   "bytes": 19689
   },
   {
    "id": "automation-n8n-python-developer",
@@ -24167,7 +24115,7 @@
     "code-node",
     "workflow-automation"
    ],
-   "bytes": 9514
+   "bytes": 19807
   },
   {
    "id": "automation-n8n-sub-workflow-engineer",
@@ -24184,7 +24132,7 @@
     "reusability",
     "ai-tools"
    ],
-   "bytes": 8696
+   "bytes": 22514
   },
   {
    "id": "automation-n8n-workflow-architect",
@@ -24201,7 +24149,7 @@
     "webhooks",
     "integrations"
    ],
-   "bytes": 9253
+   "bytes": 13544
   },
   {
    "id": "automation-n8n-workflow-engineer",
@@ -24218,7 +24166,7 @@
     "mcp",
     "automation"
    ],
-   "bytes": 8549
+   "bytes": 6588
   },
   {
    "id": "automation-n8n-workflow-validation-specialist",
@@ -24235,7 +24183,7 @@
     "debugging",
     "workflow-automation"
    ],
-   "bytes": 8772
+   "bytes": 16841
   },
   {
    "id": "automation-notion-automation-specialist",
@@ -24253,7 +24201,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 9398
+   "bytes": 10766
   },
   {
    "id": "automation-notion-time-tracking-specialist",
@@ -24304,7 +24252,7 @@
     "templates",
     "knowledge-management"
    ],
-   "bytes": 9108
+   "bytes": 21671
   },
   {
    "id": "automation-odoo-edi-integration-developer",
@@ -24374,7 +24322,7 @@
     "composio",
     "automation"
    ],
-   "bytes": 9608
+   "bytes": 14983
   },
   {
    "id": "automation-outlook-automation-specialist",
@@ -24392,7 +24340,7 @@
     "composio",
     "automation"
    ],
-   "bytes": 8712
+   "bytes": 9812
   },
   {
    "id": "automation-outlook-calendar-automation-specialis",
@@ -24409,7 +24357,7 @@
     "scheduling",
     "composio"
    ],
-   "bytes": 8797
+   "bytes": 11842
   },
   {
    "id": "automation-pagerduty-automation-specialist",
@@ -24426,7 +24374,7 @@
     "on-call",
     "composio"
    ],
-   "bytes": 9540
+   "bytes": 12602
   },
   {
    "id": "automation-pipedrive-automation-specialist",
@@ -24444,7 +24392,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 9585
+   "bytes": 14547
   },
   {
    "id": "automation-playwright-automation-engineer",
@@ -24462,7 +24410,7 @@
     "javascript",
     "scraping"
    ],
-   "bytes": 9553
+   "bytes": 15949
   },
   {
    "id": "automation-posthog-automation-specialist",
@@ -24480,7 +24428,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 8647
+   "bytes": 10237
   },
   {
    "id": "automation-postmark-email-automation-specialist",
@@ -24498,7 +24446,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 9104
+   "bytes": 10064
   },
   {
    "id": "automation-power-platform-developer",
@@ -24552,7 +24500,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 9191
+   "bytes": 10072
   },
   {
    "id": "automation-render-automation-specialist",
@@ -24570,7 +24518,7 @@
     "composio",
     "mcp"
    ],
-   "bytes": 8887
+   "bytes": 8770
   },
   {
    "id": "report-distribution-agent",
@@ -24604,7 +24552,7 @@
     "composio",
     "soql"
    ],
-   "bytes": 9164
+   "bytes": 9047
   },
   {
    "id": "automation-salesforce-flow-automation-engineer",
@@ -24638,7 +24586,7 @@
     "composio",
     "event-tracking"
    ],
-   "bytes": 9335
+   "bytes": 10931
   },
   {
    "id": "automation-sendgrid-automation-specialist",
@@ -24655,7 +24603,7 @@
     "composio",
     "campaigns"
    ],
-   "bytes": 9623
+   "bytes": 15176
   },
   {
    "id": "automation-sentry-automation-specialist",
@@ -24672,7 +24620,7 @@
     "composio",
     "monitoring"
    ],
-   "bytes": 9370
+   "bytes": 12089
   },
   {
    "id": "automation-shopify-store-automation-specialist",
@@ -24689,7 +24637,7 @@
     "composio",
     "inventory"
    ],
-   "bytes": 8254
+   "bytes": 8137
   },
   {
    "id": "automation-skyvern-browser-automation-specialist",
@@ -24706,7 +24654,7 @@
     "scraping",
     "forms"
    ],
-   "bytes": 9492
+   "bytes": 16472
   },
   {
    "id": "automation-slack-app-developer",
@@ -24723,7 +24671,7 @@
     "block-kit",
     "chatbots"
    ],
-   "bytes": 8991
+   "bytes": 21495
   },
   {
    "id": "automation-slack-automation-specialist",
@@ -24740,7 +24688,7 @@
     "messaging",
     "workflows"
    ],
-   "bytes": 9080
+   "bytes": 11852
   },
   {
    "id": "automation-square-automation-specialist",
@@ -24757,7 +24705,7 @@
     "invoices",
     "composio"
    ],
-   "bytes": 8801
+   "bytes": 8684
   },
   {
    "id": "automation-stripe-automation-specialist",
@@ -24774,7 +24722,7 @@
     "subscriptions",
     "composio"
    ],
-   "bytes": 8329
+   "bytes": 9786
   },
   {
    "id": "automation-supabase-automation-specialist",
@@ -24791,7 +24739,7 @@
     "composio",
     "database"
    ],
-   "bytes": 9622
+   "bytes": 14981
   },
   {
    "id": "automation-taisly-video-publishing-specialist",
@@ -24826,7 +24774,7 @@
     "composio",
     "bots"
    ],
-   "bytes": 9233
+   "bytes": 10216
   },
   {
    "id": "automation-telegram-notification-specialist",
@@ -24860,7 +24808,7 @@
     "composio",
     "video"
    ],
-   "bytes": 8881
+   "bytes": 8764
   },
   {
    "id": "automation-todoist-automation-specialist",
@@ -24877,7 +24825,7 @@
     "productivity",
     "composio"
    ],
-   "bytes": 9464
+   "bytes": 14207
   },
   {
    "id": "automation-trello-automation-specialist",
@@ -24894,7 +24842,7 @@
     "composio",
     "kanban"
    ],
-   "bytes": 8790
+   "bytes": 9829
   },
   {
    "id": "automation-twitter-data-extraction-specialist",
@@ -24929,7 +24877,7 @@
     "deployments",
     "dns"
    ],
-   "bytes": 9485
+   "bytes": 11398
   },
   {
    "id": "automation-web-scraping-developer",
@@ -24946,7 +24894,7 @@
     "csv",
     "json"
    ],
-   "bytes": 8718
+   "bytes": 21977
   },
   {
    "id": "automation-web-scraping-specialist",
@@ -24963,7 +24911,7 @@
     "data-extraction",
     "web"
    ],
-   "bytes": 9478
+   "bytes": 12786
   },
   {
    "id": "automation-webflow-automation-specialist",
@@ -24980,7 +24928,7 @@
     "composio",
     "automation"
    ],
-   "bytes": 9618
+   "bytes": 13606
   },
   {
    "id": "automation-whatsapp-business-automation-speciali",
@@ -24997,7 +24945,7 @@
     "composio",
     "automation"
    ],
-   "bytes": 9435
+   "bytes": 10388
   },
   {
    "id": "automation-whatsapp-cloud-api-developer",
@@ -25015,7 +24963,7 @@
     "node-js",
     "python"
    ],
-   "bytes": 9694
+   "bytes": 21927
   },
   {
    "id": "automation-workflow-automation-engineer",
@@ -25032,7 +24980,7 @@
     "inngest",
     "workflows"
    ],
-   "bytes": 9405
+   "bytes": 22812
   },
   {
    "id": "automation-wrike-automation-specialist",
@@ -25049,7 +24997,7 @@
     "composio",
     "automation"
    ],
-   "bytes": 9378
+   "bytes": 11395
   },
   {
    "id": "automation-x-twitter-automation-specialist",
@@ -25066,7 +25014,7 @@
     "social-media",
     "composio"
    ],
-   "bytes": 9221
+   "bytes": 11026
   },
   {
    "id": "automation-x-data-automation-specialist",
@@ -25083,7 +25031,7 @@
     "webhooks",
     "api"
    ],
-   "bytes": 8823
+   "bytes": 9916
   },
   {
    "id": "automation-youtube-automation-specialist",
@@ -25100,7 +25048,7 @@
     "video",
     "automation"
    ],
-   "bytes": 8909
+   "bytes": 11002
   },
   {
    "id": "automation-youtube-data-integration-specialist",
@@ -25168,7 +25116,7 @@
     "no-code",
     "workflows"
    ],
-   "bytes": 9028
+   "bytes": 22275
   },
   {
    "id": "automation-zendesk-automation-specialist",
@@ -25185,7 +25133,7 @@
     "composio",
     "tickets"
    ],
-   "bytes": 9318
+   "bytes": 10276
   },
   {
    "id": "automation-zoho-crm-automation-specialist",
@@ -25202,7 +25150,7 @@
     "composio",
     "sales"
    ],
-   "bytes": 9117
+   "bytes": 9744
   },
   {
    "id": "automation-zoom-automation-specialist",
@@ -25219,7 +25167,7 @@
     "webinars",
     "composio"
    ],
-   "bytes": 9502
+   "bytes": 13076
   },
   {
    "id": "design-ai-image-studio-designer",
@@ -25236,7 +25184,7 @@
     "illustration",
     "photography"
    ],
-   "bytes": 9493
+   "bytes": 10859
   },
   {
    "id": "design-algorithmic-art-designer",
@@ -25253,7 +25201,7 @@
     "javascript",
     "creative-coding"
    ],
-   "bytes": 9363
+   "bytes": 21852
   },
   {
    "id": "design-anthropic-brand-designer",
@@ -25288,7 +25236,7 @@
     "walkthrough",
     "react"
    ],
-   "bytes": 9238
+   "bytes": 15083
   },
   {
    "id": "design-apple-alerts-sheets-designer",
@@ -25305,7 +25253,7 @@
     "modals",
     "ui"
    ],
-   "bytes": 6692
+   "bytes": 6698
   },
   {
    "id": "design-apple-app-design-brief-writer",
@@ -25322,7 +25270,7 @@
     "design-brief",
     "ios"
    ],
-   "bytes": 6534
+   "bytes": 6417
   },
   {
    "id": "design-apple-content-components-designer",
@@ -25339,7 +25287,7 @@
     "ui",
     "components"
    ],
-   "bytes": 9298
+   "bytes": 6474
   },
   {
    "id": "design-apple-controls-ui-designer",
@@ -25356,7 +25304,7 @@
     "controls",
     "ui"
    ],
-   "bytes": 9177
+   "bytes": 22032
   },
   {
    "id": "design-apple-hig-foundations-designer",
@@ -25373,7 +25321,7 @@
     "color",
     "accessibility"
    ],
-   "bytes": 9199
+   "bytes": 6761
   },
   {
    "id": "design-apple-input-methods-designer",
@@ -25390,7 +25338,7 @@
     "input",
     "ux"
    ],
-   "bytes": 8278
+   "bytes": 21676
   },
   {
    "id": "design-apple-interaction-pattern-designer",
@@ -25407,7 +25355,7 @@
     "interaction-design",
     "onboarding"
    ],
-   "bytes": 9240
+   "bytes": 22582
   },
   {
    "id": "design-apple-menus-buttons-designer",
@@ -25424,7 +25372,7 @@
     "menus",
     "buttons"
    ],
-   "bytes": 9622
+   "bytes": 22226
   },
   {
    "id": "design-apple-multi-platform-designer",
@@ -25442,7 +25390,7 @@
     "visionos",
     "watchos"
    ],
-   "bytes": 7446
+   "bytes": 6560
   },
   {
    "id": "design-apple-navigation-layout-designer",
@@ -25459,7 +25407,7 @@
     "navigation",
     "layout"
    ],
-   "bytes": 8906
+   "bytes": 6404
   },
   {
    "id": "design-apple-progress-status-designer",
@@ -25476,7 +25424,7 @@
     "progress",
     "ui"
    ],
-   "bytes": 9272
+   "bytes": 6522
   },
   {
    "id": "design-apple-search-ui-designer",
@@ -25493,7 +25441,7 @@
     "search",
     "navigation"
    ],
-   "bytes": 9129
+   "bytes": 6796
   },
   {
    "id": "design-apple-technologies-ux-designer",
@@ -25510,7 +25458,7 @@
     "siri",
     "ux"
    ],
-   "bytes": 9390
+   "bytes": 16573
   },
   {
    "id": "design-apple-widgets-notifications-designer",
@@ -25527,7 +25475,7 @@
     "notifications",
     "ios"
    ],
-   "bytes": 7372
+   "bytes": 7085
   },
   {
    "id": "design-article-illustrator",
@@ -25561,7 +25509,7 @@
     "api",
     "atlas-cloud"
    ],
-   "bytes": 9565
+   "bytes": 13154
   },
   {
    "id": "design-behavioral-ux-designer",
@@ -25613,7 +25561,7 @@
     "dashboards",
     "typography"
    ],
-   "bytes": 9451
+   "bytes": 11611
   },
   {
    "id": "design-canvas-art-designer",
@@ -25630,7 +25578,7 @@
     "pdf",
     "art-direction"
    ],
-   "bytes": 9175
+   "bytes": 13992
   },
   {
    "id": "design-design-direction-strategist",
@@ -25663,7 +25611,7 @@
     "process",
     "governance"
    ],
-   "bytes": 5986
+   "bytes": 6132
   },
   {
    "id": "design-design-system-documenter",
@@ -25680,7 +25628,7 @@
     "documentation",
     "tokens"
    ],
-   "bytes": 9173
+   "bytes": 9958
   },
   {
    "id": "design-design-system-engineer",
@@ -25697,7 +25645,7 @@
     "typography",
     "css"
    ],
-   "bytes": 7432
+   "bytes": 22230
   },
   {
    "id": "design-design-system-lint-reviewer",
@@ -25749,7 +25697,7 @@
     "oauth",
     "developer-experience"
    ],
-   "bytes": 8585
+   "bytes": 14471
   },
   {
    "id": "design-favicon-web-icon-specialist",
@@ -25766,7 +25714,7 @@
     "web-assets",
     "html"
    ],
-   "bytes": 7811
+   "bytes": 11328
   },
   {
    "id": "design-frontend-art-director",
@@ -25800,7 +25748,7 @@
     "ui-design",
     "css"
    ],
-   "bytes": 9268
+   "bytes": 10533
   },
   {
    "id": "design-frontend-visual-designer",
@@ -25818,7 +25766,7 @@
     "css",
     "frontend"
    ],
-   "bytes": 9538
+   "bytes": 11303
   },
   {
    "id": "design-gemini-image-generation-designer",
@@ -25835,7 +25783,7 @@
     "ai-art",
     "logos"
    ],
-   "bytes": 9360
+   "bytes": 16979
   },
   {
    "id": "design-gemini-image-generation-specialist",
@@ -25852,7 +25800,7 @@
     "gemini",
     "video"
    ],
-   "bytes": 9530
+   "bytes": 20357
   },
   {
    "id": "design-gemini-image-prompt-designer",
@@ -25869,7 +25817,7 @@
     "prompts",
     "photography"
    ],
-   "bytes": 9239
+   "bytes": 21040
   },
   {
    "id": "design-html-presentation-developer",
@@ -25887,7 +25835,7 @@
     "animation",
     "pptx"
    ],
-   "bytes": 7984
+   "bytes": 15024
   },
   {
    "id": "design-iconsax-icon-designer",
@@ -25956,7 +25904,7 @@
     "ui",
     "motion"
    ],
-   "bytes": 6861
+   "bytes": 21458
   },
   {
    "id": "design-jobs-to-be-done-ux-researcher",
@@ -25991,7 +25939,7 @@
     "ui",
     "spacing"
    ],
-   "bytes": 8881
+   "bytes": 20413
   },
   {
    "id": "design-lookdev-studio-designer",
@@ -26008,7 +25956,7 @@
     "review",
     "ui"
    ],
-   "bytes": 6934
+   "bytes": 22051
   },
   {
    "id": "design-magic-animator-motion-designer",
@@ -26042,7 +25990,7 @@
     "product-marketing",
     "visuals"
    ],
-   "bytes": 8010
+   "bytes": 14919
   },
   {
    "id": "design-micro-interaction-designer",
@@ -26076,7 +26024,7 @@
     "design-system",
     "css"
    ],
-   "bytes": 9211
+   "bytes": 11179
   },
   {
    "id": "design-minimax-media-producer",
@@ -26110,7 +26058,7 @@
     "ios",
     "android"
    ],
-   "bytes": 9599
+   "bytes": 11462
   },
   {
    "id": "design-modellix-ai-media-producer",
@@ -26145,7 +26093,7 @@
     "muapi",
     "generative-ai"
    ],
-   "bytes": 9550
+   "bytes": 13066
   },
   {
    "id": "design-persona-walkthrough",
@@ -26196,7 +26144,7 @@
     "typography",
     "motion"
    ],
-   "bytes": 9211
+   "bytes": 13816
   },
   {
    "id": "design-presentation-theme-designer",
@@ -26213,7 +26161,7 @@
     "color-palettes",
     "presentations"
    ],
-   "bytes": 5247
+   "bytes": 5130
   },
   {
    "id": "design-product-concept-designer",
@@ -26230,7 +26178,7 @@
     "ui",
     "storytelling"
    ],
-   "bytes": 9843
+   "bytes": 22085
   },
   {
    "id": "design-product-designer",
@@ -26248,7 +26196,7 @@
     "ux",
     "accessibility"
    ],
-   "bytes": 9733
+   "bytes": 12431
   },
   {
    "id": "design-product-rendering-designer",
@@ -26316,7 +26264,7 @@
     "video",
     "animation"
    ],
-   "bytes": 5835
+   "bytes": 7245
   },
   {
    "id": "design-runapi-media-generation-specialist",
@@ -26385,7 +26333,7 @@
     "seo",
     "infographics"
    ],
-   "bytes": 9227
+   "bytes": 10170
   },
   {
    "id": "design-slack-gif-designer",
@@ -26402,7 +26350,7 @@
     "slack",
     "emoji"
    ],
-   "bytes": 8988
+   "bytes": 9738
   },
   {
    "id": "design-spectral-ui-effects-designer",
@@ -26420,7 +26368,7 @@
     "webgl",
     "css"
    ],
-   "bytes": 9349
+   "bytes": 16890
   },
   {
    "id": "design-stability-ai-image-designer",
@@ -26437,7 +26385,7 @@
     "inpainting",
     "ai-art"
    ],
-   "bytes": 9536
+   "bytes": 21027
   },
   {
    "id": "design-stitch-design-system-designer",
@@ -26454,7 +26402,7 @@
     "typography",
     "ui"
    ],
-   "bytes": 9675
+   "bytes": 14836
   },
   {
    "id": "design-stitch-ui-prompt-designer",
@@ -26471,7 +26419,7 @@
     "prompts",
     "mobile"
    ],
-   "bytes": 9389
+   "bytes": 12891
   },
   {
    "id": "design-stock-media-researcher",
@@ -26523,7 +26471,7 @@
     "design-tokens",
     "css"
    ],
-   "bytes": 6462
+   "bytes": 21555
   },
   {
    "id": "design-technical-diagram-designer",
@@ -26540,7 +26488,7 @@
     "plantuml",
     "architecture"
    ],
-   "bytes": 9163
+   "bytes": 16298
   },
   {
    "id": "design-ui-design-reviewer",
@@ -26644,7 +26592,7 @@
     "styleseed",
     "ui"
    ],
-   "bytes": 9089
+   "bytes": 12197
   },
   {
    "id": "design-ui-prompt-engineer",
@@ -26713,7 +26661,7 @@
     "color",
     "typography"
    ],
-   "bytes": 8159
+   "bytes": 14716
   },
   {
    "id": "design-ui-style-designer",
@@ -26748,7 +26696,7 @@
     "design-system",
     "accessibility"
    ],
-   "bytes": 9339
+   "bytes": 11151
   },
   {
    "id": "design-unsplash-image-curator",
@@ -26937,7 +26885,7 @@
     "url-structure",
     "seo"
    ],
-   "bytes": 8360
+   "bytes": 22730
   },
   {
    "id": "design-whimsy-injector",
@@ -26972,7 +26920,7 @@
     "api",
     "narration"
    ],
-   "bytes": 9457
+   "bytes": 19852
   },
   {
    "id": "writing-agent-instructions-engineer",
@@ -26989,7 +26937,7 @@
     "monorepo",
     "developer-tools"
    ],
-   "bytes": 9597
+   "bytes": 21927
   },
   {
    "id": "writing-agents-md-writer",
@@ -27006,7 +26954,7 @@
     "repositories",
     "coding-agents"
    ],
-   "bytes": 9290
+   "bytes": 11220
   },
   {
    "id": "writing-ai-text-cleanup-editor",
@@ -27074,7 +27022,7 @@
     "rest",
     "graphql"
    ],
-   "bytes": 8786
+   "bytes": 13444
   },
   {
    "id": "writing-api-reference-writer",
@@ -27091,7 +27039,7 @@
     "documentation",
     "technical-writing"
    ],
-   "bytes": 6986
+   "bytes": 6870
   },
   {
    "id": "writing-app-store-release-notes-writer",
@@ -27125,7 +27073,7 @@
     "documentation",
     "decisions"
    ],
-   "bytes": 9568
+   "bytes": 11224
   },
   {
    "id": "writing-architecture-records-writer",
@@ -27142,7 +27090,7 @@
     "documentation",
     "decisions"
    ],
-   "bytes": 9409
+   "bytes": 15081
   },
   {
    "id": "writing-audio-transcriptionist",
@@ -27159,7 +27107,7 @@
     "markdown",
     "audio"
    ],
-   "bytes": 9532
+   "bytes": 6383
   },
   {
    "id": "marketing-book-co-author",
@@ -27210,7 +27158,7 @@
     "diagrams",
     "user-guides"
    ],
-   "bytes": 6989
+   "bytes": 21821
   },
   {
    "id": "writing-code-walkthrough-writer",
@@ -27227,7 +27175,7 @@
     "diagrams",
     "documentation"
    ],
-   "bytes": 9465
+   "bytes": 22240
   },
   {
    "id": "writing-code-wiki-architect",
@@ -27244,7 +27192,7 @@
     "wiki",
     "onboarding"
    ],
-   "bytes": 5181
+   "bytes": 6788
   },
   {
    "id": "writing-code-wiki-page-writer",
@@ -27261,7 +27209,7 @@
     "mermaid",
     "codebase"
    ],
-   "bytes": 4985
+   "bytes": 4867
   },
   {
    "id": "writing-codetour-onboarding-writer",
@@ -27329,7 +27277,7 @@
     "commentary",
     "chinese"
    ],
-   "bytes": 13531
+   "bytes": 36522
   },
   {
    "id": "writing-crossframe-response-writer",
@@ -27397,7 +27345,7 @@
     "developer-education",
     "documentation"
    ],
-   "bytes": 9507
+   "bytes": 18094
   },
   {
    "id": "writing-developer-onboarding-writer",
@@ -27414,7 +27362,7 @@
     "developer-experience",
     "docs"
    ],
-   "bytes": 9115
+   "bytes": 16191
   },
   {
    "id": "writing-developer-portal-writer",
@@ -27432,7 +27380,7 @@
     "sdk",
     "documentation"
    ],
-   "bytes": 9180
+   "bytes": 10323
   },
   {
    "id": "writing-development-log-writer",
@@ -27449,7 +27397,7 @@
     "obsidian",
     "productivity"
    ],
-   "bytes": 8609
+   "bytes": 11070
   },
   {
    "id": "writing-docs-accessibility-editor",
@@ -27483,7 +27431,7 @@
     "documentation",
     "api-docs"
    ],
-   "bytes": 5521
+   "bytes": 5404
   },
   {
    "id": "writing-document-co-author",
@@ -27500,7 +27448,7 @@
     "editing",
     "structure"
    ],
-   "bytes": 7306
+   "bytes": 17721
   },
   {
    "id": "specialized-document-generator",
@@ -27535,7 +27483,7 @@
     "technical-writing",
     "codebase"
    ],
-   "bytes": 6026
+   "bytes": 6632
   },
   {
    "id": "writing-documentation-humanizing-editor",
@@ -27552,7 +27500,7 @@
     "humanize",
     "ai-text"
    ],
-   "bytes": 9284
+   "bytes": 13564
   },
   {
    "id": "writing-documentation-reviewer",
@@ -27569,7 +27517,7 @@
     "api-docs",
     "accuracy"
    ],
-   "bytes": 9106
+   "bytes": 6509
   },
   {
    "id": "writing-email-proofreader",
@@ -27603,7 +27551,7 @@
     "knowledge-management",
     "engineering"
    ],
-   "bytes": 7322
+   "bytes": 17012
   },
   {
    "id": "grant-writer",
@@ -27637,7 +27585,7 @@
     "documentation",
     "migration"
    ],
-   "bytes": 9485
+   "bytes": 22094
   },
   {
    "id": "writing-interactive-lesson-designer",
@@ -27655,7 +27603,7 @@
     "quizzes",
     "education"
    ],
-   "bytes": 7497
+   "bytes": 6089
   },
   {
    "id": "writing-internal-communications-writer",
@@ -27706,7 +27654,7 @@
     "documentation",
     "zettelkasten"
    ],
-   "bytes": 8874
+   "bytes": 10828
   },
   {
    "id": "language-translator",
@@ -27774,7 +27722,7 @@
     "slides",
     "pptx"
    ],
-   "bytes": 9259
+   "bytes": 10746
   },
   {
    "id": "writing-microsoft-learn-docs-writer",
@@ -27809,7 +27757,7 @@
     "flowcharts",
     "notes"
    ],
-   "bytes": 9016
+   "bytes": 16485
   },
   {
    "id": "writing-obsidian-markdown-writer",
@@ -27826,7 +27774,7 @@
     "notes",
     "knowledge-management"
    ],
-   "bytes": 9377
+   "bytes": 10854
   },
   {
    "id": "writing-office-document-automation-specialist",
@@ -27844,7 +27792,7 @@
     "libreoffice",
     "word"
    ],
-   "bytes": 6739
+   "bytes": 6807
   },
   {
    "id": "writing-onboarding-guide-writer",
@@ -27861,7 +27809,7 @@
     "codebase",
     "developer-experience"
    ],
-   "bytes": 6487
+   "bytes": 6369
   },
   {
    "id": "writing-openapi-documentation-writer",
@@ -27878,7 +27826,7 @@
     "api-docs",
     "documentation"
    ],
-   "bytes": 7279
+   "bytes": 6873
   },
   {
    "id": "writing-pdf-conversion-specialist",
@@ -27895,7 +27843,7 @@
     "markdown",
     "docx"
    ],
-   "bytes": 8932
+   "bytes": 17312
   },
   {
    "id": "writing-pdf-processing-developer",
@@ -27913,7 +27861,7 @@
     "documents",
     "forms"
    ],
-   "bytes": 9153
+   "bytes": 9036
   },
   {
    "id": "writing-powerpoint-file-specialist",
@@ -27930,7 +27878,7 @@
     "documents",
     "xml"
    ],
-   "bytes": 9410
+   "bytes": 13179
   },
   {
    "id": "writing-powerpoint-script-developer",
@@ -27964,7 +27912,7 @@
     "presentations",
     "slides"
    ],
-   "bytes": 9535
+   "bytes": 16651
   },
   {
    "id": "writing-project-context-writer",
@@ -27981,7 +27929,7 @@
     "ai-assisted-development",
     "team-alignment"
    ],
-   "bytes": 9014
+   "bytes": 13759
   },
   {
    "id": "writing-project-documentation-writer",
@@ -28015,7 +27963,7 @@
     "architecture",
     "knowledge-base"
    ],
-   "bytes": 9425
+   "bytes": 22010
   },
   {
    "id": "writing-proofreader",
@@ -28066,7 +28014,7 @@
     "documentation",
     "developer-education"
    ],
-   "bytes": 9050
+   "bytes": 14154
   },
   {
    "id": "writing-readme-api-docs-writer",
@@ -28099,7 +28047,7 @@
     "documentation",
     "technical-writing"
    ],
-   "bytes": 8479
+   "bytes": 21869
   },
   {
    "id": "writing-release-notes-writer",
@@ -28116,7 +28064,7 @@
     "product-updates",
     "developer-marketing"
    ],
-   "bytes": 9250
+   "bytes": 16928
   },
   {
    "id": "writing-repository-slide-deck-writer",
@@ -28133,7 +28081,7 @@
     "documentation",
     "code-citations"
    ],
-   "bytes": 9070
+   "bytes": 11036
   },
   {
    "id": "writing-research-wiki-editor",
@@ -28150,7 +28098,7 @@
     "research",
     "markdown"
    ],
-   "bytes": 9197
+   "bytes": 10875
   },
   {
    "id": "writing-resume-writer",
@@ -28167,7 +28115,7 @@
     "ats",
     "careers"
    ],
-   "bytes": 7527
+   "bytes": 6316
   },
   {
    "id": "writing-sentry-brand-copywriter",
@@ -28236,7 +28184,7 @@
     "documentation",
     "pki"
    ],
-   "bytes": 9403
+   "bytes": 7281
   },
   {
    "id": "writing-tech-news-digest-editor",
@@ -28253,7 +28201,7 @@
     "scraping",
     "markdown"
    ],
-   "bytes": 11259
+   "bytes": 6440
   },
   {
    "id": "writing-technical-blog-writer",
@@ -28270,7 +28218,7 @@
     "content",
     "editing"
    ],
-   "bytes": 8884
+   "bytes": 10457
   },
   {
    "id": "writing-technical-content-editor",
@@ -28304,7 +28252,7 @@
     "readme",
     "technical-writing"
    ],
-   "bytes": 7411
+   "bytes": 6383
   },
   {
    "id": "writing-technical-specification-writer",
@@ -28321,7 +28269,7 @@
     "documentation",
     "interfaces"
    ],
-   "bytes": 7954
+   "bytes": 7174
   },
   {
    "id": "engineering-technical-writer",
@@ -28355,7 +28303,7 @@
     "transcripts",
     "markdown"
    ],
-   "bytes": 9538
+   "bytes": 11320
   },
   {
    "id": "writing-video-summary-writer",
@@ -28372,7 +28320,7 @@
     "transcripts",
     "research"
    ],
-   "bytes": 10149
+   "bytes": 14534
   },
   {
    "id": "writing-vitepress-docs-site-developer",
@@ -28389,7 +28337,7 @@
     "static-site",
     "mermaid"
    ],
-   "bytes": 6696
+   "bytes": 6578
   },
   {
    "id": "writing-word-document-specialist",
@@ -28406,7 +28354,7 @@
     "documents",
     "ooxml"
    ],
-   "bytes": 5972
+   "bytes": 12060
   },
   {
    "id": "product-a-b-test-designer",
@@ -28423,7 +28371,7 @@
     "experiments",
     "statistics"
    ],
-   "bytes": 8744
+   "bytes": 11300
   },
   {
    "id": "product-app-ideation-coach",
@@ -28457,7 +28405,7 @@
     "shopify",
     "triage"
    ],
-   "bytes": 9684
+   "bytes": 22612
   },
   {
    "id": "product-behavioral-nudge-engine",
@@ -28491,7 +28439,7 @@
     "assumptions",
     "product"
    ],
-   "bytes": 8054
+   "bytes": 10681
   },
   {
    "id": "product-customer-researcher",
@@ -28508,7 +28456,7 @@
     "icp",
     "jobs-to-be-done"
    ],
-   "bytes": 7792
+   "bytes": 21569
   },
   {
    "id": "product-data-driven-feature-lead",
@@ -28525,7 +28473,7 @@
     "product-analytics",
     "features"
    ],
-   "bytes": 8548
+   "bytes": 13772
   },
   {
    "id": "product-developer-onboarding-strategist",
@@ -28542,7 +28490,7 @@
     "onboarding",
     "documentation"
    ],
-   "bytes": 8544
+   "bytes": 14918
   },
   {
    "id": "product-developer-playground-designer",
@@ -28559,7 +28507,7 @@
     "demos",
     "activation"
    ],
-   "bytes": 8992
+   "bytes": 18948
   },
   {
    "id": "project-management-experiment-tracker",
@@ -28610,7 +28558,7 @@
     "monetization",
     "conversion"
    ],
-   "bytes": 9391
+   "bytes": 15763
   },
   {
    "id": "product-greenfield-project-planner",
@@ -28627,7 +28575,7 @@
     "specifications",
     "greenfield"
    ],
-   "bytes": 9592
+   "bytes": 9825
   },
   {
    "id": "product-idea-evolution-facilitator",
@@ -28714,7 +28662,7 @@
     "saas",
     "churn"
    ],
-   "bytes": 9378
+   "bytes": 13342
   },
   {
    "id": "product-onboarding-psychology-strategist",
@@ -28749,7 +28697,7 @@
     "upgrades",
     "saas"
    ],
-   "bytes": 9540
+   "bytes": 16082
   },
   {
    "id": "product-prd-writer",
@@ -28818,7 +28766,7 @@
     "retention",
     "okrs"
    ],
-   "bytes": 9003
+   "bytes": 13369
   },
   {
    "id": "product-product-decision-advisor",
@@ -28836,7 +28784,7 @@
     "growth",
     "chinese"
    ],
-   "bytes": 19840
+   "bytes": 52084
   },
   {
    "id": "product-product-discovery-analyst",
@@ -28854,7 +28802,7 @@
     "prd",
     "prioritization"
    ],
-   "bytes": 9159
+   "bytes": 18373
   },
   {
    "id": "product-manager",
@@ -28923,7 +28871,7 @@
     "keynotes",
     "presentations"
    ],
-   "bytes": 9572
+   "bytes": 22626
   },
   {
    "id": "product-requirements-analyst",
@@ -28973,7 +28921,7 @@
     "clarification",
     "scoping"
    ],
-   "bytes": 8936
+   "bytes": 9904
   },
   {
    "id": "product-requirements-interviewer",
@@ -28991,7 +28939,7 @@
     "interviews",
     "scoping"
    ],
-   "bytes": 9148
+   "bytes": 13268
   },
   {
    "id": "product-saas-pricing-strategist",
@@ -29008,7 +28956,7 @@
     "monetization",
     "packaging"
    ],
-   "bytes": 9485
+   "bytes": 9368
   },
   {
    "id": "product-saas-product-manager",
@@ -29043,7 +28991,7 @@
     "design-review",
     "specification"
    ],
-   "bytes": 7709
+   "bytes": 7592
   },
   {
    "id": "product-sprint-prioritizer",
@@ -29113,7 +29061,7 @@
     "billing",
     "saas"
    ],
-   "bytes": 8983
+   "bytes": 16343
   },
   {
    "id": "product-web-project-concept-consultant",
@@ -29164,7 +29112,7 @@
     "sdlc",
     "coordination"
    ],
-   "bytes": 8570
+   "bytes": 13685
   },
   {
    "id": "project-management-build-blueprint-planner",
@@ -29198,7 +29146,7 @@
     "planning",
     "workflow"
    ],
-   "bytes": 9147
+   "bytes": 16578
   },
   {
    "id": "project-management-decision-log-coordinator",
@@ -29215,7 +29163,7 @@
     "knowledge-base",
     "requirements"
    ],
-   "bytes": 9363
+   "bytes": 21385
   },
   {
    "id": "project-management-delivery-estimation-analyst",
@@ -29283,7 +29231,7 @@
     "features",
     "roadmap"
    ],
-   "bytes": 8428
+   "bytes": 10107
   },
   {
    "id": "project-management-feature-tracking-coordinator",
@@ -29300,7 +29248,7 @@
     "decisions",
     "status"
    ],
-   "bytes": 9121
+   "bytes": 12288
   },
   {
    "id": "project-management-file-based-planning-coordinat",
@@ -29351,7 +29299,7 @@
     "intake",
     "triage"
    ],
-   "bytes": 9112
+   "bytes": 9671
   },
   {
    "id": "project-management-goal-integrity-auditor",
@@ -29368,7 +29316,7 @@
     "quality",
     "reviews"
    ],
-   "bytes": 9426
+   "bytes": 23438
   },
   {
    "id": "project-management-implementation-plan-writer",
@@ -29385,7 +29333,7 @@
     "tdd",
     "specs"
    ],
-   "bytes": 5718
+   "bytes": 5601
   },
   {
    "id": "project-management-implementation-task-planner",
@@ -29419,7 +29367,7 @@
     "vertical-slices",
     "planning"
    ],
-   "bytes": 6384
+   "bytes": 6715
   },
   {
    "id": "project-management-issue-triage-coordinator",
@@ -29504,7 +29452,7 @@
     "lessons-learned",
     "quality"
    ],
-   "bytes": 9403
+   "bytes": 17775
   },
   {
    "id": "project-management-meeting-notes-specialist",
@@ -29571,7 +29519,7 @@
     "decisions",
     "governance"
    ],
-   "bytes": 8500
+   "bytes": 22580
   },
   {
    "id": "project-manager-senior",
@@ -29605,7 +29553,7 @@
     "acceptance-criteria",
     "delivery"
    ],
-   "bytes": 9252
+   "bytes": 22478
   },
   {
    "id": "project-management-standup-notes-coordinator",
@@ -29622,7 +29570,7 @@
     "remote-teams",
     "status-updates"
    ],
-   "bytes": 9188
+   "bytes": 22523
   },
   {
    "id": "project-management-studio-operations",
@@ -29673,7 +29621,7 @@
     "acceptance-criteria",
     "estimation"
    ],
-   "bytes": 9486
+   "bytes": 9698
   },
   {
    "id": "project-management-task-orchestration-coordinato",
@@ -29796,7 +29744,7 @@
     "seo",
     "content"
    ],
-   "bytes": 6063
+   "bytes": 7001
   },
   {
    "id": "marketing-ai-search-optimization-specialist",
@@ -29813,7 +29761,7 @@
     "llms-txt",
     "citations"
    ],
-   "bytes": 9386
+   "bytes": 10608
   },
   {
    "id": "marketing-app-store-optimizer",
@@ -29882,7 +29830,7 @@
     "psychology",
     "conversion"
    ],
-   "bytes": 8493
+   "bytes": 8376
   },
   {
    "id": "marketing-bilibili-content-strategist",
@@ -29952,7 +29900,7 @@
     "social-media",
     "blogging"
    ],
-   "bytes": 8834
+   "bytes": 22589
   },
   {
    "id": "marketing-browserbase-competitor-researcher",
@@ -29969,7 +29917,7 @@
     "market-research",
     "reports"
    ],
-   "bytes": 8220
+   "bytes": 18646
   },
   {
    "id": "marketing-buyer-objection-strategist",
@@ -30003,7 +29951,7 @@
     "champions",
     "evangelists"
    ],
-   "bytes": 9486
+   "bytes": 19623
   },
   {
    "id": "marketing-china-ecommerce-operator",
@@ -30057,7 +30005,7 @@
     "dunning",
     "lifecycle"
    ],
-   "bytes": 10032
+   "bytes": 23028
   },
   {
    "id": "marketing-co-marketing-partnerships-manager",
@@ -30074,7 +30022,7 @@
     "saas",
     "campaigns"
    ],
-   "bytes": 8917
+   "bytes": 12751
   },
   {
    "id": "marketing-comparison-page-writer",
@@ -30091,7 +30039,7 @@
     "content",
     "positioning"
    ],
-   "bytes": 9502
+   "bytes": 21237
   },
   {
    "id": "marketing-competitive-intelligence-analyst",
@@ -30108,7 +30056,7 @@
     "positioning",
     "pricing"
    ],
-   "bytes": 9625
+   "bytes": 21572
   },
   {
    "id": "marketing-competitor-comparison-writer",
@@ -30126,7 +30074,7 @@
     "developer-tools",
     "conversion"
    ],
-   "bytes": 9146
+   "bytes": 13342
   },
   {
    "id": "marketing-competitor-intelligence-analyst",
@@ -30177,7 +30125,7 @@
     "authority",
     "content"
    ],
-   "bytes": 5415
+   "bytes": 5347
   },
   {
    "id": "marketing-content-creator",
@@ -30230,7 +30178,7 @@
     "updates",
     "freshness"
    ],
-   "bytes": 4872
+   "bytes": 4804
   },
   {
    "id": "marketing-content-strategist",
@@ -30247,7 +30195,7 @@
     "topic-clusters",
     "editorial"
    ],
-   "bytes": 9225
+   "bytes": 22400
   },
   {
    "id": "marketing-content-structure-specialist",
@@ -30264,7 +30212,7 @@
     "content-structure",
     "internal-linking"
    ],
-   "bytes": 4838
+   "bytes": 6839
   },
   {
    "id": "marketing-conversion-copywriter",
@@ -30281,7 +30229,7 @@
     "email",
     "conversion"
    ],
-   "bytes": 7500
+   "bytes": 7383
   },
   {
    "id": "marketing-conversion-rate-optimizer",
@@ -30298,7 +30246,7 @@
     "landing-pages",
     "ab-testing"
    ],
-   "bytes": 9126
+   "bytes": 21984
   },
   {
    "id": "marketing-cross-border-ecommerce",
@@ -30350,7 +30298,7 @@
     "serp",
     "backlinks"
    ],
-   "bytes": 8497
+   "bytes": 19204
   },
   {
    "id": "specialized-developer-advocate",
@@ -30384,7 +30332,7 @@
     "personas",
     "positioning"
    ],
-   "bytes": 9590
+   "bytes": 11305
   },
   {
    "id": "marketing-developer-blog-publisher",
@@ -30401,7 +30349,7 @@
     "technical-blogging",
     "content"
    ],
-   "bytes": 9174
+   "bytes": 6870
   },
   {
    "id": "marketing-developer-community-manager",
@@ -30418,7 +30366,7 @@
     "slack",
     "developer-relations"
    ],
-   "bytes": 9327
+   "bytes": 13788
   },
   {
    "id": "marketing-developer-newsletter-writer",
@@ -30435,7 +30383,7 @@
     "developer-marketing",
     "content"
    ],
-   "bytes": 9299
+   "bytes": 13318
   },
   {
    "id": "marketing-developer-retention-marketer",
@@ -30452,7 +30400,7 @@
     "win-back",
     "developer-marketing"
    ],
-   "bytes": 9290
+   "bytes": 18834
   },
   {
    "id": "marketing-developer-seo-strategist",
@@ -30469,7 +30417,7 @@
     "keywords",
     "content"
    ],
-   "bytes": 9286
+   "bytes": 11524
   },
   {
    "id": "marketing-developer-social-listening-analyst",
@@ -30486,7 +30434,7 @@
     "reddit",
     "developer-marketing"
    ],
-   "bytes": 8919
+   "bytes": 10282
   },
   {
    "id": "marketing-devrel-content-writer",
@@ -30503,7 +30451,7 @@
     "tutorials",
     "blogging"
    ],
-   "bytes": 8340
+   "bytes": 13939
   },
   {
    "id": "marketing-devrel-speaker",
@@ -30520,7 +30468,7 @@
     "live-coding",
     "community"
    ],
-   "bytes": 9203
+   "bytes": 14849
   },
   {
    "id": "marketing-devtools-competitor-analyst",
@@ -30537,7 +30485,7 @@
     "pricing",
     "positioning"
    ],
-   "bytes": 9042
+   "bytes": 11673
   },
   {
    "id": "marketing-digital-product-growth-marketer",
@@ -30555,7 +30503,7 @@
     "referrals",
     "email"
    ],
-   "bytes": 9452
+   "bytes": 10063
   },
   {
    "id": "marketing-docs-marketing-strategist",
@@ -30572,7 +30520,7 @@
     "seo",
     "conversion"
    ],
-   "bytes": 9250
+   "bytes": 13029
   },
   {
    "id": "marketing-douyin-strategist",
@@ -30606,7 +30554,7 @@
     "content-quality",
     "readability"
    ],
-   "bytes": 9347
+   "bytes": 7060
   },
   {
    "id": "marketing-email-strategist",
@@ -30641,7 +30589,7 @@
     "nurture",
     "copywriting"
    ],
-   "bytes": 8738
+   "bytes": 21957
   },
   {
    "id": "marketing-email-subject-line-strategist",
@@ -30692,7 +30640,7 @@
     "serp",
     "content-formatting"
    ],
-   "bytes": 4799
+   "bytes": 4734
   },
   {
    "id": "marketing-form-conversion-specialist",
@@ -30709,7 +30657,7 @@
     "lead-generation",
     "ux"
    ],
-   "bytes": 9379
+   "bytes": 10023
   },
   {
    "id": "marketing-fractional-cmo",
@@ -30726,7 +30674,7 @@
     "aarrr",
     "cmo"
    ],
-   "bytes": 9505
+   "bytes": 7037
   },
   {
    "id": "marketing-free-tool-marketing-strategist",
@@ -30743,7 +30691,7 @@
     "lead-generation",
     "seo"
    ],
-   "bytes": 9023
+   "bytes": 13246
   },
   {
    "id": "marketing-frontend-seo-developer",
@@ -30760,7 +30708,7 @@
     "structured-data",
     "metadata"
    ],
-   "bytes": 8164
+   "bytes": 22044
   },
   {
    "id": "marketing-github-presence-strategist",
@@ -30777,7 +30725,7 @@
     "open-source",
     "developer-marketing"
    ],
-   "bytes": 9450
+   "bytes": 15531
   },
   {
    "id": "marketing-global-podcast-strategist",
@@ -30812,7 +30760,7 @@
     "conversion",
     "cro"
    ],
-   "bytes": 8868
+   "bytes": 22494
   },
   {
    "id": "marketing-growth-hacker",
@@ -30846,7 +30794,7 @@
     "growth",
     "prioritization"
    ],
-   "bytes": 7472
+   "bytes": 7355
   },
   {
    "id": "marketing-headline-copywriter",
@@ -30982,7 +30930,7 @@
     "international",
     "localization"
    ],
-   "bytes": 8305
+   "bytes": 10881
   },
   {
    "id": "marketing-json-ld-implementation-developer",
@@ -30999,7 +30947,7 @@
     "next-js",
     "structured-data"
    ],
-   "bytes": 9517
+   "bytes": 10346
   },
   {
    "id": "marketing-keyword-cannibalization-analyst",
@@ -31016,7 +30964,7 @@
     "keywords",
     "content-audit"
    ],
-   "bytes": 5013
+   "bytes": 4938
   },
   {
    "id": "marketing-keyword-research-analyst",
@@ -31068,7 +31016,7 @@
     "conversion",
     "ab-testing"
    ],
-   "bytes": 9295
+   "bytes": 9178
   },
   {
    "id": "marketing-law-firm-local-seo-auditor",
@@ -31085,7 +31033,7 @@
     "legal",
     "law-firm"
    ],
-   "bytes": 7832
+   "bytes": 14680
   },
   {
    "id": "marketing-lead-magnet-strategist",
@@ -31102,7 +31050,7 @@
     "email-capture",
     "content"
    ],
-   "bytes": 9243
+   "bytes": 6880
   },
   {
    "id": "marketing-linkedin-content-creator",
@@ -31137,7 +31085,7 @@
     "newsletters",
     "content-calendar"
    ],
-   "bytes": 6328
+   "bytes": 20595
   },
   {
    "id": "marketing-linkedin-post-formatter",
@@ -31171,7 +31119,7 @@
     "hooks",
     "social-media"
    ],
-   "bytes": 9175
+   "bytes": 21910
   },
   {
    "id": "marketing-linkedin-profile-strategist",
@@ -31188,7 +31136,7 @@
     "seo",
     "career"
    ],
-   "bytes": 8174
+   "bytes": 12514
   },
   {
    "id": "marketing-livestream-commerce-coach",
@@ -31240,7 +31188,7 @@
     "landing-pages",
     "marketing"
    ],
-   "bytes": 9437
+   "bytes": 15147
   },
   {
    "id": "marketing-multi-platform-publisher",
@@ -31276,7 +31224,7 @@
     "search-console",
     "sitemaps"
    ],
-   "bytes": 9292
+   "bytes": 9604
   },
   {
    "id": "marketing-nurture-sequence-strategist",
@@ -31310,7 +31258,7 @@
     "copywriting",
     "conversion"
    ],
-   "bytes": 9376
+   "bytes": 21703
   },
   {
    "id": "marketing-omnichannel-content-marketer",
@@ -31327,7 +31275,7 @@
     "distribution",
     "analytics"
    ],
-   "bytes": 9219
+   "bytes": 10438
   },
   {
    "id": "marketing-on-page-keyword-strategist",
@@ -31344,7 +31292,7 @@
     "on-page",
     "semantic-seo"
    ],
-   "bytes": 4711
+   "bytes": 4642
   },
   {
    "id": "marketing-on-page-seo-analyst",
@@ -31379,7 +31327,7 @@
     "retention",
     "growth"
    ],
-   "bytes": 9295
+   "bytes": 13374
   },
   {
    "id": "marketing-open-source-marketer",
@@ -31396,7 +31344,7 @@
     "developer-marketing",
     "community"
    ],
-   "bytes": 9232
+   "bytes": 14577
   },
   {
    "id": "marketing-persuasion-copywriter",
@@ -31449,7 +31397,7 @@
     "lead-capture",
     "ux"
    ],
-   "bytes": 9292
+   "bytes": 9175
   },
   {
    "id": "marketing-pr-communications-manager",
@@ -31502,7 +31450,7 @@
     "icp",
     "messaging"
    ],
-   "bytes": 9261
+   "bytes": 9639
   },
   {
    "id": "marketing-programmatic-seo-strategist",
@@ -31519,7 +31467,7 @@
     "templates",
     "content"
    ],
-   "bytes": 9654
+   "bytes": 10499
   },
   {
    "id": "marketing-reddit-community-builder",
@@ -31570,7 +31518,7 @@
     "growth",
     "viral-loops"
    ],
-   "bytes": 9501
+   "bytes": 18796
   },
   {
    "id": "marketing-rich-result-schema-specialist",
@@ -31604,7 +31552,7 @@
     "product-launch",
     "go-to-market"
    ],
-   "bytes": 8565
+   "bytes": 14408
   },
   {
    "id": "marketing-schema-markup-auditor",
@@ -31672,7 +31620,7 @@
     "core-web-vitals",
     "best-practices"
    ],
-   "bytes": 8400
+   "bytes": 8283
   },
   {
    "id": "marketing-seo-audit-lead",
@@ -31689,7 +31637,7 @@
     "geo",
     "strategy"
    ],
-   "bytes": 8823
+   "bytes": 21863
   },
   {
    "id": "marketing-seo-content-planner",
@@ -31706,7 +31654,7 @@
     "outlines",
     "briefs"
    ],
-   "bytes": 5559
+   "bytes": 5493
   },
   {
    "id": "marketing-seo-content-writer",
@@ -31723,7 +31671,7 @@
     "articles",
     "keywords"
    ],
-   "bytes": 5785
+   "bytes": 5720
   },
   {
    "id": "marketing-seo-diagnostic-auditor",
@@ -31740,7 +31688,7 @@
     "indexation",
     "diagnostics"
    ],
-   "bytes": 9275
+   "bytes": 15544
   },
   {
    "id": "marketing-seo-incident-investigator",
@@ -31757,7 +31705,7 @@
     "penalties",
     "core-updates"
    ],
-   "bytes": 9147
+   "bytes": 11372
   },
   {
    "id": "marketing-seo-landing-page-copywriter",
@@ -31877,7 +31825,7 @@
     "onboarding",
     "conversion"
    ],
-   "bytes": 9119
+   "bytes": 12016
   },
   {
    "id": "marketing-social-audience-analyst",
@@ -31929,7 +31877,7 @@
     "scheduling",
     "engagement"
    ],
-   "bytes": 8240
+   "bytes": 22474
   },
   {
    "id": "marketing-social-media-copywriter",
@@ -32032,7 +31980,7 @@
     "social-listening",
     "prompts"
    ],
-   "bytes": 8912
+   "bytes": 6576
   },
   {
    "id": "marketing-socialclaw-publishing-specialist",
@@ -32066,7 +32014,7 @@
     "json-ld",
     "rich-results"
    ],
-   "bytes": 9453
+   "bytes": 10257
   },
   {
    "id": "marketing-talivia-revenue-analytics-specialist",
@@ -32100,7 +32048,7 @@
     "press",
     "launches"
    ],
-   "bytes": 9615
+   "bytes": 20566
   },
   {
    "id": "marketing-technical-seo-auditor",
@@ -32117,7 +32065,7 @@
     "robots-txt",
     "javascript-seo"
    ],
-   "bytes": 9536
+   "bytes": 10240
   },
   {
    "id": "marketing-tiktok-strategist",
@@ -32168,7 +32116,7 @@
     "content-strategy",
     "internal-linking"
    ],
-   "bytes": 8248
+   "bytes": 22269
   },
   {
    "id": "marketing-topic-cluster-strategist",
@@ -32271,7 +32219,7 @@
     "quizzes",
     "web-apps"
    ],
-   "bytes": 9418
+   "bytes": 9672
   },
   {
    "id": "marketing-web-metadata-specialist",
@@ -32340,7 +32288,7 @@
     "blogging",
     "yoast"
    ],
-   "bytes": 9625
+   "bytes": 7029
   },
   {
    "id": "marketing-x-twitter-intelligence-analyst",
@@ -32408,7 +32356,7 @@
     "seo",
     "podcasts"
    ],
-   "bytes": 8415
+   "bytes": 22127
   },
   {
    "id": "marketing-zhihu-strategist",
@@ -32443,7 +32391,7 @@
     "experiments",
     "ppc"
    ],
-   "bytes": 7346
+   "bytes": 19221
   },
   {
    "id": "paid-media-creative-strategist",
@@ -32479,7 +32427,7 @@
     "google-ads",
     "creative"
    ],
-   "bytes": 7674
+   "bytes": 17506
   },
   {
    "id": "paid-media-paid-ads-manager",
@@ -32497,7 +32445,7 @@
     "campaigns",
     "customer-acquisition"
    ],
-   "bytes": 8688
+   "bytes": 17077
   },
   {
    "id": "paid-media-auditor",
@@ -32551,7 +32499,7 @@
     "creative-testing",
     "tiktok"
    ],
-   "bytes": 9175
+   "bytes": 22188
   },
   {
    "id": "paid-media-ppc-strategist",
@@ -32658,7 +32606,7 @@
     "prospecting",
     "copywriting"
    ],
-   "bytes": 9558
+   "bytes": 22540
   },
   {
    "id": "sales-contact-data-researcher",
@@ -32814,7 +32762,7 @@
     "deliverability",
     "sequences"
    ],
-   "bytes": 7745
+   "bytes": 18742
   },
   {
    "id": "sales-outbound-strategist",
@@ -32903,7 +32851,7 @@
     "routing",
     "lifecycle"
    ],
-   "bytes": 9349
+   "bytes": 21955
   },
   {
    "id": "sales-coach",
@@ -32937,7 +32885,7 @@
     "playbooks",
     "b2b"
    ],
-   "bytes": 8788
+   "bytes": 21857
   },
   {
    "id": "sales-engineer",
@@ -32989,7 +32937,7 @@
     "token-listings",
     "exchanges"
    ],
-   "bytes": 9393
+   "bytes": 10091
   },
   {
    "id": "customer-service",
@@ -33075,7 +33023,7 @@
     "installation",
     "onboarding"
    ],
-   "bytes": 4750
+   "bytes": 6692
   },
   {
    "id": "support-support-automation-specialist",
@@ -33092,7 +33040,7 @@
     "ticketing",
     "sentiment-analysis"
    ],
-   "bytes": 9172
+   "bytes": 10457
   },
   {
    "id": "support-support-responder",
@@ -33145,7 +33093,7 @@
     "brazil",
     "valuation"
    ],
-   "bytes": 9670
+   "bytes": 18053
   },
   {
    "id": "finance-auction-property-market-analyst",
@@ -33163,7 +33111,7 @@
     "brazil",
     "investment"
    ],
-   "bytes": 9714
+   "bytes": 18536
   },
   {
    "id": "finance-auction-risk-analyst",
@@ -33180,7 +33128,7 @@
     "real-estate",
     "brazil"
    ],
-   "bytes": 9343
+   "bytes": 20265
   },
   {
    "id": "finance-backtesting-engineer",
@@ -33198,7 +33146,7 @@
     "trading",
     "python"
    ],
-   "bytes": 10245
+   "bytes": 22106
   },
   {
    "id": "finance-billing-systems-engineer",
@@ -33216,7 +33164,7 @@
     "saas",
     "payments"
    ],
-   "bytes": 7137
+   "bytes": 21537
   },
   {
    "id": "finance-bookkeeper-controller",
@@ -33287,7 +33235,7 @@
     "stock-research",
     "python"
    ],
-   "bytes": 9206
+   "bytes": 17578
   },
   {
    "id": "support-finance-tracker",
@@ -33566,7 +33514,7 @@
     "portfolio",
     "quant"
    ],
-   "bytes": 9548
+   "bytes": 21749
   },
   {
    "id": "finance-sr-ed-claim-writer",
@@ -33619,7 +33567,7 @@
     "forecasting",
     "fundraising"
    ],
-   "bytes": 8569
+   "bytes": 13402
   },
   {
    "id": "finance-tax-strategist",
@@ -33653,7 +33601,7 @@
     "notion",
     "investing"
    ],
-   "bytes": 9105
+   "bytes": 10714
   },
   {
    "id": "finance-value-investing-analyst",
@@ -33670,7 +33618,7 @@
     "buffett",
     "valuation"
    ],
-   "bytes": 8779
+   "bytes": 22442
   },
   {
    "id": "business-adaptive-learning-coach",
@@ -33687,7 +33635,7 @@
     "study-guides",
     "education"
    ],
-   "bytes": 8392
+   "bytes": 6681
   },
   {
    "id": "business-adverse-media-screening-analyst",
@@ -33722,7 +33670,7 @@
     "expert-panel",
     "synthesis"
    ],
-   "bytes": 9476
+   "bytes": 10779
   },
   {
    "id": "business-ai-adoption-coach",
@@ -33773,7 +33721,7 @@
     "y-combinator",
     "fundraising"
    ],
-   "bytes": 9069
+   "bytes": 22034
   },
   {
    "id": "business-ai-talent-market-researcher",
@@ -33791,7 +33739,7 @@
     "mcp",
     "hiring"
    ],
-   "bytes": 7790
+   "bytes": 6836
   },
   {
    "id": "business-apple-notes-knowledge-researcher",
@@ -33808,7 +33756,7 @@
     "mcp",
     "productivity"
    ],
-   "bytes": 9535
+   "bytes": 6614
   },
   {
    "id": "business-assumption-auditor",
@@ -33825,7 +33773,7 @@
     "decision-making",
     "strategy"
    ],
-   "bytes": 10856
+   "bytes": 27245
   },
   {
    "id": "business-auction-legal-analyst",
@@ -33842,7 +33790,7 @@
     "brazil",
     "real-estate"
    ],
-   "bytes": 10106
+   "bytes": 21097
   },
   {
    "id": "business-auction-notice-analyst",
@@ -33860,7 +33808,7 @@
     "brazil",
     "real-estate"
    ],
-   "bytes": 9055
+   "bytes": 21167
   },
   {
    "id": "business-brazilian-criminal-law-advisor",
@@ -33878,7 +33826,7 @@
     "domestic-violence",
     "portuguese"
    ],
-   "bytes": 9829
+   "bytes": 22907
   },
   {
    "id": "business-brazilian-law-advisor",
@@ -33896,7 +33844,7 @@
     "labor-law",
     "tax-law"
    ],
-   "bytes": 9567
+   "bytes": 22623
   },
   {
    "id": "business-business-analyst",
@@ -33914,7 +33862,7 @@
     "forecasting",
     "strategy"
    ],
-   "bytes": 8925
+   "bytes": 10671
   },
   {
    "id": "business-business-case-writer",
@@ -33931,7 +33879,7 @@
     "startups",
     "investors"
    ],
-   "bytes": 9698
+   "bytes": 13623
   },
   {
    "id": "business-business-idea-validator",
@@ -34001,7 +33949,7 @@
     "procurement",
     "negotiation"
    ],
-   "bytes": 9874
+   "bytes": 22423
   },
   {
    "id": "change-management-consultant",
@@ -34070,7 +34018,7 @@
     "matching",
     "networking"
    ],
-   "bytes": 6215
+   "bytes": 21454
   },
   {
    "id": "business-competitive-landscape-analyst",
@@ -34087,7 +34035,7 @@
     "strategy",
     "market-research"
    ],
-   "bytes": 8015
+   "bytes": 14841
   },
   {
    "id": "corporate-training-designer",
@@ -34139,7 +34087,7 @@
     "retrospectives",
     "chinese"
    ],
-   "bytes": 13645
+   "bytes": 20661
   },
   {
    "id": "business-customs-compliance-specialist",
@@ -34157,7 +34105,7 @@
     "incoterms",
     "logistics"
    ],
-   "bytes": 9858
+   "bytes": 21647
   },
   {
    "id": "data-privacy-officer",
@@ -34191,7 +34139,7 @@
     "productivity",
     "planning"
    ],
-   "bytes": 8804
+   "bytes": 11550
   },
   {
    "id": "business-devil-s-advocate-reviewer",
@@ -34225,7 +34173,7 @@
     "tariffs",
     "cost-management"
    ],
-   "bytes": 9756
+   "bytes": 19062
   },
   {
    "id": "business-engineering-onboarding-specialist",
@@ -34242,7 +34190,7 @@
     "hr",
     "remote-teams"
    ],
-   "bytes": 9050
+   "bytes": 16725
   },
   {
    "id": "esg-sustainability-officer",
@@ -34364,7 +34312,7 @@
     "persona",
     "roleplay"
    ],
-   "bytes": 9558
+   "bytes": 22670
   },
   {
    "id": "business-freight-exceptions-analyst",
@@ -34381,7 +34329,7 @@
     "claims",
     "supply-chain"
    ],
-   "bytes": 9699
+   "bytes": 19753
   },
   {
    "id": "specialized-french-consulting-market",
@@ -34415,7 +34363,7 @@
     "performance",
     "policies"
    ],
-   "bytes": 9449
+   "bytes": 10251
   },
   {
    "id": "business-hr-contracts-specialist",
@@ -34433,7 +34381,7 @@
     "policies",
     "legal"
    ],
-   "bytes": 9513
+   "bytes": 19263
   },
   {
    "id": "hr-onboarding",
@@ -34485,7 +34433,7 @@
     "forecasting",
     "retail"
    ],
-   "bytes": 9722
+   "bytes": 20092
   },
   {
    "id": "business-it-leadership-advisor",
@@ -34502,7 +34450,7 @@
     "cto",
     "strategy"
    ],
-   "bytes": 9457
+   "bytes": 12078
   },
   {
    "id": "business-job-search-automation-specialist",
@@ -34571,7 +34519,7 @@
     "tutoring",
     "education"
    ],
-   "bytes": 9443
+   "bytes": 12245
   },
   {
    "id": "legal-billing-time-tracking",
@@ -34659,7 +34607,7 @@
     "terms-of-service",
     "compliance"
    ],
-   "bytes": 4459
+   "bytes": 4399
   },
   {
    "id": "ma-integration-manager",
@@ -34711,7 +34659,7 @@
     "spc",
     "manufacturing"
    ],
-   "bytes": 9744
+   "bytes": 18474
   },
   {
    "id": "business-market-research-analyst",
@@ -34745,7 +34693,7 @@
     "startups",
     "strategy"
    ],
-   "bytes": 6780
+   "bytes": 22513
   },
   {
    "id": "business-micro-saas-launch-advisor",
@@ -34762,7 +34710,7 @@
     "indie-hacking",
     "mvp"
    ],
-   "bytes": 8287
+   "bytes": 13865
   },
   {
    "id": "business-notion-template-business-advisor",
@@ -34779,7 +34727,7 @@
     "digital-products",
     "creator-economy"
    ],
-   "bytes": 8687
+   "bytes": 14588
   },
   {
    "id": "business-obsidian-bases-specialist",
@@ -34796,7 +34744,7 @@
     "notes",
     "productivity"
    ],
-   "bytes": 8471
+   "bytes": 15248
   },
   {
    "id": "business-odoo-e-commerce-consultant",
@@ -34953,7 +34901,7 @@
     "operations",
     "line-balancing"
    ],
-   "bytes": 9565
+   "bytes": 22116
   },
   {
    "id": "business-property-auction-advisor",
@@ -34970,7 +34918,7 @@
     "brazil",
     "investment"
    ],
-   "bytes": 9280
+   "bytes": 16550
   },
   {
    "id": "recruitment-specialist",
@@ -35022,7 +34970,7 @@
     "operations",
     "warranty"
    ],
-   "bytes": 9641
+   "bytes": 22380
   },
   {
    "id": "business-startup-business-analyst",
@@ -35039,7 +34987,7 @@
     "financial-modeling",
     "strategy"
    ],
-   "bytes": 9478
+   "bytes": 13245
   },
   {
    "id": "business-startup-metrics-analyst",
@@ -35056,7 +35004,7 @@
     "startups",
     "saas"
    ],
-   "bytes": 9545
+   "bytes": 13351
   },
   {
    "id": "business-startup-team-planning-advisor",
@@ -35074,7 +35022,7 @@
     "startups",
     "org-design"
    ],
-   "bytes": 9106
+   "bytes": 11785
   },
   {
    "id": "supply-chain-strategist",
@@ -35126,7 +35074,7 @@
     "software-business",
     "philanthropy"
    ],
-   "bytes": 8873
+   "bytes": 22315
   },
   {
    "id": "business-travel-itinerary-planner",
@@ -35143,7 +35091,7 @@
     "budgeting",
     "planning"
    ],
-   "bytes": 19542
+   "bytes": 20413
   },
   {
    "id": "testing-workflow-optimizer",
@@ -35195,7 +35143,7 @@
     "citations",
     "literature-review"
    ],
-   "bytes": 9141
+   "bytes": 10378
   },
   {
    "id": "research-ai-literature-survey-writer",
@@ -35212,7 +35160,7 @@
     "bibliography",
     "academic"
    ],
-   "bytes": 9606
+   "bytes": 11135
   },
   {
    "id": "research-ai-output-fact-checker",
@@ -35246,7 +35194,7 @@
     "arxiv",
     "ai-research"
    ],
-   "bytes": 9547
+   "bytes": 11753
   },
   {
    "id": "research-astronomy-data-scientist",
@@ -35263,7 +35211,7 @@
     "astropy",
     "fits"
    ],
-   "bytes": 9491
+   "bytes": 16420
   },
   {
    "id": "research-bioinformatics-developer",
@@ -35280,7 +35228,7 @@
     "python",
     "genomics"
    ],
-   "bytes": 9595
+   "bytes": 16093
   },
   {
    "id": "research-cirq-quantum-developer",
@@ -35297,7 +35245,7 @@
     "python",
     "simulation"
    ],
-   "bytes": 7740
+   "bytes": 12982
   },
   {
    "id": "research-citation-fact-checker",
@@ -35365,7 +35313,7 @@
     "structural-analysis",
     "chinese"
    ],
-   "bytes": 14198
+   "bytes": 33282
   },
   {
    "id": "research-crossframe-public-policy-analyst",
@@ -35433,7 +35381,7 @@
     "chinese",
     "diagnosis"
    ],
-   "bytes": 13831
+   "bytes": 26883
   },
   {
    "id": "research-deep-reading-analyst",
@@ -35450,7 +35398,7 @@
     "knowledge-maps",
     "research"
    ],
-   "bytes": 9297
+   "bytes": 6399
   },
   {
    "id": "research-deep-research-analyst",
@@ -35484,7 +35432,7 @@
     "ros",
     "literature"
    ],
-   "bytes": 9317
+   "bytes": 20762
   },
   {
    "id": "research-fact-checked-research-analyst",
@@ -35518,7 +35466,7 @@
     "verification",
     "sources"
    ],
-   "bytes": 9106
+   "bytes": 10983
   },
   {
    "id": "research-gemini-deep-research-analyst",
@@ -35552,7 +35500,7 @@
     "hugging-face",
     "ai-research"
    ],
-   "bytes": 9517
+   "bytes": 6252
   },
   {
    "id": "research-mathematical-code-analyst",
@@ -35569,7 +35517,7 @@
     "complexity",
     "graph-theory"
    ],
-   "bytes": 9413
+   "bytes": 22472
   },
   {
    "id": "research-multi-source-research-analyst",
@@ -35586,7 +35534,7 @@
     "web-research",
     "evidence"
    ],
-   "bytes": 8158
+   "bytes": 9788
   },
   {
    "id": "research-news-intelligence-researcher",
@@ -35637,7 +35585,7 @@
     "documentation",
     "gemini"
    ],
-   "bytes": 9170
+   "bytes": 12037
   },
   {
    "id": "research-parallel-web-research-analyst",
@@ -35689,7 +35637,7 @@
     "mesh",
     "api"
    ],
-   "bytes": 9492
+   "bytes": 17567
   },
   {
    "id": "research-qiskit-quantum-developer",
@@ -35706,7 +35654,7 @@
     "ibm-quantum",
     "python"
    ],
-   "bytes": 8609
+   "bytes": 11316
   },
   {
    "id": "research-research-brief-writer",
@@ -35739,7 +35687,7 @@
     "pubmed",
     "academic-writing"
    ],
-   "bytes": 9583
+   "bytes": 22525
   },
   {
    "id": "research-synthesist",
@@ -35807,7 +35755,7 @@
     "evidence",
     "decision-making"
    ],
-   "bytes": 6523
+   "bytes": 22977
   },
   {
    "id": "research-scientific-writer",
@@ -35824,7 +35772,7 @@
     "citations",
     "academic"
    ],
-   "bytes": 8245
+   "bytes": 7792
   },
   {
    "id": "research-single-cell-rna-seq-analyst",
@@ -35842,7 +35790,7 @@
     "single-cell",
     "genomics"
    ],
-   "bytes": 9383
+   "bytes": 13482
   },
   {
    "id": "academic-statistician",
@@ -35876,7 +35824,7 @@
     "python",
     "symbolic-computation"
    ],
-   "bytes": 9497
+   "bytes": 15252
   },
   {
    "id": "research-technical-options-researcher",
@@ -35927,7 +35875,7 @@
     "github",
     "sources"
    ],
-   "bytes": 9255
+   "bytes": 13385
   },
   {
    "id": "research-web-researcher",
@@ -35944,7 +35892,7 @@
     "fact-checking",
     "sources"
    ],
-   "bytes": 4301
+   "bytes": 4237
   },
   {
    "id": "academic-anthropologist",
@@ -36081,7 +36029,7 @@
     "allergies",
     "patient-support"
    ],
-   "bytes": 12438
+   "bytes": 19354
   },
   {
    "id": "healthcare-family-health-analyst",
@@ -36098,7 +36046,7 @@
     "prevention",
     "health-reports"
    ],
-   "bytes": 5545
+   "bytes": 7337
   },
   {
    "id": "healthcare-fitness-data-analyst",
@@ -36132,7 +36080,7 @@
     "diet",
     "health"
    ],
-   "bytes": 11466
+   "bytes": 18437
   },
   {
    "id": "healthcare-health-data-analyst",
@@ -36166,7 +36114,7 @@
     "wearables",
     "api"
    ],
-   "bytes": 9496
+   "bytes": 22278
   },
   {
    "id": "healthcare-health-goal-analyst",
@@ -36183,7 +36131,7 @@
     "wellness",
     "tracking"
    ],
-   "bytes": 14874
+   "bytes": 16551
   },
   {
    "id": "healthcare-health-trend-analyst",
@@ -36268,7 +36216,7 @@
     "clinical-safety",
     "his"
    ],
-   "bytes": 9440
+   "bytes": 12690
   },
   {
    "id": "medical-billing-coding-specialist",
@@ -36320,7 +36268,7 @@
     "health-data",
     "risk"
    ],
-   "bytes": 16264
+   "bytes": 28247
   },
   {
    "id": "healthcare-nutrition-data-analyst",
@@ -36337,7 +36285,7 @@
     "diet",
     "wellness"
    ],
-   "bytes": 14768
+   "bytes": 23036
   },
   {
    "id": "healthcare-occupational-health-analyst",
@@ -36371,7 +36319,7 @@
     "health",
     "wellness"
    ],
-   "bytes": 14892
+   "bytes": 14662
   },
   {
    "id": "healthcare-quit-smoking-support-coach",
@@ -36388,7 +36336,7 @@
     "support",
     "wellbeing"
    ],
-   "bytes": 8633
+   "bytes": 9611
   },
   {
    "id": "healthcare-rehabilitation-data-analyst",
@@ -36405,7 +36353,7 @@
     "health-data",
     "progress-tracking"
    ],
-   "bytes": 15771
+   "bytes": 17135
   },
   {
    "id": "healthcare-sexual-health-data-analyst",
@@ -36422,7 +36370,7 @@
     "health-data",
     "risk-analysis"
    ],
-   "bytes": 16252
+   "bytes": 29138
   },
   {
    "id": "healthcare-skin-health-data-analyst",
@@ -36439,7 +36387,7 @@
     "health-data",
     "correlation"
    ],
-   "bytes": 18019
+   "bytes": 19239
   },
   {
    "id": "healthcare-sleep-data-analyst",
@@ -36456,7 +36404,7 @@
     "psqi",
     "wellness"
    ],
-   "bytes": 15734
+   "bytes": 21433
   },
   {
    "id": "healthcare-sovereign-health-systems-agent",
@@ -36491,7 +36439,7 @@
     "wellness",
     "health"
    ],
-   "bytes": 15202
+   "bytes": 16549
   },
   {
    "id": "healthcare-travel-health-advisor",
@@ -36561,7 +36509,7 @@
     "routing",
     "dotnet"
    ],
-   "bytes": 7282
+   "bytes": 8010
   },
   {
    "id": "gis-bim-specialist",
@@ -36877,7 +36825,7 @@
     "game-systems",
     "games"
    ],
-   "bytes": 9329
+   "bytes": 22414
   },
   {
    "id": "game-development-godot-4-migration-developer",
@@ -36928,7 +36876,7 @@
     "bukkit",
     "plugins"
    ],
-   "bytes": 7016
+   "bytes": 7449
   },
   {
    "id": "narrative-designer",
@@ -36981,7 +36929,7 @@
     "ai-assets",
     "prototyping"
    ],
-   "bytes": 9750
+   "bytes": 16640
   },
   {
    "id": "game-development-unity-developer",
@@ -36999,7 +36947,7 @@
     "urp",
     "hdrp"
    ],
-   "bytes": 9499
+   "bytes": 12486
   },
   {
    "id": "game-development-unity-dots-engineer",
@@ -37017,7 +36965,7 @@
     "ecs",
     "performance"
    ],
-   "bytes": 9577
+   "bytes": 19388
   },
   {
    "id": "game-development-unreal-engine-c-developer",
@@ -37172,7 +37120,7 @@
     "study-plan",
     "revision"
    ],
-   "bytes": 9395
+   "bytes": 18956
   },
   {
    "id": "specialized-focus-music-architect",

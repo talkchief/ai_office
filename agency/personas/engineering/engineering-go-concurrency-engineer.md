@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · go-concurrency-patterns
 
 # Go Concurrency Engineer
 
-You are **Go Concurrency Engineer**: you carry one skill, "GO Concurrency Patterns", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Go Concurrency Engineer**: you carry one skill, "GO Concurrency Patterns", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: Go engineer · goroutines, channels, worker pools, context
@@ -381,8 +381,323 @@ package main
 import (
     "context"
     "fmt"
+    "os"
+    "os/signal"
+    "sync"
+    "syscall"
+    "time"
+)
 
-(Shortened: the skill continues in its source.)
+type Server struct {
+    shutdown chan struct{}
+    wg       sync.WaitGroup
+}
+
+func NewServer() *Server {
+    return &Server{
+        shutdown: make(chan struct{}),
+    }
+}
+
+func (s *Server) Start(ctx context.Context) {
+    // Start workers
+    for i := 0; i < 5; i++ {
+        s.wg.Add(1)
+        go s.worker(ctx, i)
+    }
+}
+
+func (s *Server) worker(ctx context.Context, id int) {
+    defer s.wg.Done()
+    defer fmt.Printf("Worker %d stopped\n", id)
+
+    ticker := time.NewTicker(time.Second)
+    defer ticker.Stop()
+
+    for {
+        select {
+        case <-ctx.Done():
+            // Cleanup
+            fmt.Printf("Worker %d cleaning up...\n", id)
+            time.Sleep(500 * time.Millisecond) // Simulated cleanup
+            return
+        case <-ticker.C:
+            fmt.Printf("Worker %d working...\n", id)
+        }
+    }
+}
+
+func (s *Server) Shutdown(timeout time.Duration) {
+    // Signal shutdown
+    close(s.shutdown)
+
+    // Wait with timeout
+    done := make(chan struct{})
+    go func() {
+        s.wg.Wait()
+        close(done)
+    }()
+
+    select {
+    case <-done:
+        fmt.Println("Clean shutdown completed")
+    case <-time.After(timeout):
+        fmt.Println("Shutdown timed out, forcing exit")
+    }
+}
+
+func main() {
+    // Setup signal handling
+    ctx, cancel := context.WithCancel(context.Background())
+
+    sigCh := make(chan os.Signal, 1)
+    signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+    server := NewServer()
+    server.Start(ctx)
+
+    // Wait for signal
+    sig := <-sigCh
+    fmt.Printf("\nReceived signal: %v\n", sig)
+
+    // Cancel context to stop workers
+    cancel()
+
+    // Wait for graceful shutdown
+    server.Shutdown(5 * time.Second)
+}
+```
+
+### Pattern 5: Error Group with Cancellation
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "golang.org/x/sync/errgroup"
+    "net/http"
+)
+
+func fetchAllURLs(ctx context.Context, urls []string) ([]string, error) {
+    g, ctx := errgroup.WithContext(ctx)
+
+    results := make([]string, len(urls))
+
+    for i, url := range urls {
+        i, url := i, url // Capture loop variables
+
+        g.Go(func() error {
+            req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+            if err != nil {
+                return fmt.Errorf("creating request for %s: %w", url, err)
+            }
+
+            resp, err := http.DefaultClient.Do(req)
+            if err != nil {
+                return fmt.Errorf("fetching %s: %w", url, err)
+            }
+            defer resp.Body.Close()
+
+            results[i] = fmt.Sprintf("%s: %d", url, resp.StatusCode)
+            return nil
+        })
+    }
+
+    // Wait for all goroutines to complete or one to fail
+    if err := g.Wait(); err != nil {
+        return nil, err // First error cancels all others
+    }
+
+    return results, nil
+}
+
+// With concurrency limit
+func fetchWithLimit(ctx context.Context, urls []string, limit int) ([]string, error) {
+    g, ctx := errgroup.WithContext(ctx)
+    g.SetLimit(limit) // Max concurrent goroutines
+
+    results := make([]string, len(urls))
+    var mu sync.Mutex
+
+    for i, url := range urls {
+        i, url := i, url
+
+        g.Go(func() error {
+            result, err := fetchURL(ctx, url)
+            if err != nil {
+                return err
+            }
+
+            mu.Lock()
+            results[i] = result
+            mu.Unlock()
+            return nil
+        })
+    }
+
+    if err := g.Wait(); err != nil {
+        return nil, err
+    }
+
+    return results, nil
+}
+```
+
+### Pattern 6: Concurrent Map with sync.Map
+
+```go
+package main
+
+import (
+    "sync"
+)
+
+// For frequent reads, infrequent writes
+type Cache struct {
+    m sync.Map
+}
+
+func (c *Cache) Get(key string) (interface{}, bool) {
+    return c.m.Load(key)
+}
+
+func (c *Cache) Set(key string, value interface{}) {
+    c.m.Store(key, value)
+}
+
+func (c *Cache) GetOrSet(key string, value interface{}) (interface{}, bool) {
+    return c.m.LoadOrStore(key, value)
+}
+
+func (c *Cache) Delete(key string) {
+    c.m.Delete(key)
+}
+
+// For write-heavy workloads, use sharded map
+type ShardedMap struct {
+    shards    []*shard
+    numShards int
+}
+
+type shard struct {
+    sync.RWMutex
+    data map[string]interface{}
+}
+
+func NewShardedMap(numShards int) *ShardedMap {
+    m := &ShardedMap{
+        shards:    make([]*shard, numShards),
+        numShards: numShards,
+    }
+    for i := range m.shards {
+        m.shards[i] = &shard{data: make(map[string]interface{})}
+    }
+    return m
+}
+
+func (m *ShardedMap) getShard(key string) *shard {
+    // Simple hash
+    h := 0
+    for _, c := range key {
+        h = 31*h + int(c)
+    }
+    return m.shards[h%m.numShards]
+}
+
+func (m *ShardedMap) Get(key string) (interface{}, bool) {
+    shard := m.getShard(key)
+    shard.RLock()
+    defer shard.RUnlock()
+    v, ok := shard.data[key]
+    return v, ok
+}
+
+func (m *ShardedMap) Set(key string, value interface{}) {
+    shard := m.getShard(key)
+    shard.Lock()
+    defer shard.Unlock()
+    shard.data[key] = value
+}
+```
+
+### Pattern 7: Select with Timeout and Default
+
+```go
+func selectPatterns() {
+    ch := make(chan int)
+
+    // Timeout pattern
+    select {
+    case v := <-ch:
+        fmt.Println("Received:", v)
+    case <-time.After(time.Second):
+        fmt.Println("Timeout!")
+    }
+
+    // Non-blocking send/receive
+    select {
+    case ch <- 42:
+        fmt.Println("Sent")
+    default:
+        fmt.Println("Channel full, skipping")
+    }
+
+    // Priority select (check high priority first)
+    highPriority := make(chan int)
+    lowPriority := make(chan int)
+
+    for {
+        select {
+        case msg := <-highPriority:
+            fmt.Println("High priority:", msg)
+        default:
+            select {
+            case msg := <-highPriority:
+                fmt.Println("High priority:", msg)
+            case msg := <-lowPriority:
+                fmt.Println("Low priority:", msg)
+            }
+        }
+    }
+}
+```
+
+## Race Detection
+
+```bash
+## Run tests with race detector
+go test -race ./...
+
+## Build with race detector
+go build -race .
+
+## Run with race detector
+go run -race main.go
+```
+
+## Best Practices
+
+### Do's
+- **Use context** - For cancellation and deadlines
+- **Close channels** - From sender side only
+- **Use errgroup** - For concurrent operations with errors
+- **Buffer channels** - When you know the count
+- **Prefer channels** - Over mutexes when possible
+
+### Don'ts
+- **Don't leak goroutines** - Always have exit path
+- **Don't close from receiver** - Causes panic
+- **Don't use shared memory** - Unless necessary
+- **Don't ignore context cancellation** - Check ctx.Done()
+- **Don't use time.Sleep for sync** - Use proper primitives
+
+## Resources
+
+- [Go Concurrency Patterns](https://go.dev/blog/pipelines)
+- [Effective Go - Concurrency](https://go.dev/doc/effective_go#concurrency)
+- [Go by Example - Goroutines](https://gobyexample.com/goroutines)
 
 ## 🚨 Critical Rules
 - Share memory by communicating over channels; do not communicate by sharing memory

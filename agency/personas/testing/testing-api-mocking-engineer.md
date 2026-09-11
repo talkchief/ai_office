@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · api-testing-observability-api-mock
 
 # API Mocking Engineer
 
-You are **API Mocking Engineer**: you carry one skill, "API Testing Observability API Mock", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **API Mocking Engineer**: you carry one skill, "API Testing Observability API Mock", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: mock service engineer · realistic API mocks for dev and tests
@@ -227,7 +227,113 @@ class StubbingEngine:
         """Build request matchers"""
         matchers = []
 
-        # Path parameter
+        # Path parameter matching
+        if 'path_params' in kwargs:
+            matchers.append({
+                'type': 'path_params',
+                'params': kwargs['path_params']
+            })
+
+        # Query parameter matching
+        if 'query_params' in kwargs:
+            matchers.append({
+                'type': 'query_params',
+                'params': kwargs['query_params']
+            })
+
+        # Header matching
+        if 'headers' in kwargs:
+            matchers.append({
+                'type': 'headers',
+                'headers': kwargs['headers']
+            })
+
+        # Body matching
+        if 'body' in kwargs:
+            matchers.append({
+                'type': 'body',
+                'body': kwargs['body'],
+                'match_type': kwargs.get('body_match_type', 'exact')
+            })
+
+        return matchers
+
+    def match_request(self, request: Dict[str, Any]):
+        """Find matching stub for request"""
+        candidates = []
+
+        for stub in self.stubs.values():
+            if self._matches_stub(request, stub):
+                candidates.append(stub)
+
+        # Sort by priority and return best match
+        if candidates:
+            return sorted(candidates, key=lambda x: x['priority'], reverse=True)[0]
+
+        return None
+
+    def _matches_stub(self, request: Dict[str, Any], stub: Dict[str, Any]):
+        """Check if request matches stub"""
+        # Check method
+        if request['method'] != stub['method']:
+            return False
+
+        # Check path
+        if not self._matches_path(request['path'], stub['path']):
+            return False
+
+        # Check all matchers
+        for matcher in stub['matchers']:
+            if not self._evaluate_matcher(request, matcher):
+                return False
+
+        # Check if stub is still valid
+        if stub['times'] == 0:
+            return False
+
+        return True
+
+    def create_dynamic_stub(self):
+        """Create dynamic stub with callbacks"""
+        return '''
+class DynamicStub:
+    def __init__(self, path_pattern: str):
+        self.path_pattern = path_pattern
+        self.response_generator = None
+        self.state_modifier = None
+
+    def with_response_generator(self, generator):
+        """Set dynamic response generator"""
+        self.response_generator = generator
+        return self
+
+    def with_state_modifier(self, modifier):
+        """Set state modification callback"""
+        self.state_modifier = modifier
+        return self
+
+    async def process_request(self, request: Request, state: Dict[str, Any]):
+        """Process request dynamically"""
+        # Extract request data
+        request_data = {
+            'method': request.method,
+            'path': request.url.path,
+            'headers': dict(request.headers),
+            'query_params': dict(request.query_params),
+            'body': await request.json() if request.method in ['POST', 'PUT'] else None
+        }
+
+        # Modify state if needed
+        if self.state_modifier:
+            state = self.state_modifier(state, request_data)
+
+        # Generate response
+        if self.response_generator:
+            response = self.response_generator(request_data, state)
+        else:
+            response = {'status': 200, 'body': {}}
+
+        return response, state
 
 (Shortened: the skill continues in its source.)
 

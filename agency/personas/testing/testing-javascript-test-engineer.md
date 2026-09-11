@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · javascript-testing-patterns
 
 # JavaScript Test Engineer
 
-You are **JavaScript Test Engineer**: you carry one skill, "JavaScript Testing Patterns", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **JavaScript Test Engineer**: you carry one skill, "JavaScript Testing Patterns", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: test engineer · Jest, Vitest, Testing Library, mocks
@@ -303,7 +303,455 @@ describe('ApiService', () => {
       const user = await service.fetchUser('1');
 
       expect(user).toEqual(mockUser);
-      expect(fetch).toHaveBeenCalledWith('https://api.example.com
+      expect(fetch).toHaveBeenCalledWith('https://api.example.com/users/1');
+    });
+
+    it('should throw error if user not found', async () => {
+      (fetch as any).mockResolvedValueOnce({
+        ok: false,
+      });
+
+      await expect(service.fetchUser('999')).rejects.toThrow('User not found');
+    });
+  });
+
+  describe('createUser', () => {
+    it('should create user successfully', async () => {
+      const newUser = { name: 'John', email: 'john@example.com' };
+      const createdUser = { id: '1', ...newUser };
+
+      (fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: async () => createdUser,
+      });
+
+      const user = await service.createUser(newUser);
+
+      expect(user).toEqual(createdUser);
+      expect(fetch).toHaveBeenCalledWith(
+        'https://api.example.com/users',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify(newUser),
+        })
+      );
+    });
+  });
+});
+```
+
+## Mocking Patterns
+
+### Pattern 1: Mocking Modules
+
+```typescript
+// services/email.service.ts
+import nodemailer from 'nodemailer';
+
+export class EmailService {
+  private transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: 587,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+
+  async sendEmail(to: string, subject: string, html: string) {
+    await this.transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to,
+      subject,
+      html,
+    });
+  }
+}
+
+// services/email.service.test.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { EmailService } from './email.service';
+
+vi.mock('nodemailer', () => ({
+  default: {
+    createTransport: vi.fn(() => ({
+      sendMail: vi.fn().mockResolvedValue({ messageId: '123' }),
+    })),
+  },
+}));
+
+describe('EmailService', () => {
+  let service: EmailService;
+
+  beforeEach(() => {
+    service = new EmailService();
+  });
+
+  it('should send email successfully', async () => {
+    await service.sendEmail(
+      'test@example.com',
+      'Test Subject',
+      '<p>Test Body</p>'
+    );
+
+    expect(service['transporter'].sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'test@example.com',
+        subject: 'Test Subject',
+      })
+    );
+  });
+});
+```
+
+### Pattern 2: Dependency Injection for Testing
+
+```typescript
+// services/user.service.ts
+export interface IUserRepository {
+  findById(id: string): Promise<User | null>;
+  create(user: User): Promise<User>;
+}
+
+export class UserService {
+  constructor(private userRepository: IUserRepository) {}
+
+  async getUser(id: string): Promise<User> {
+    const user = await this.userRepository.findById(id);
+    if (!user) {
+      throw new Error('User not found');
+    }
+    return user;
+  }
+
+  async createUser(userData: CreateUserDTO): Promise<User> {
+    // Business logic here
+    const user = { id: generateId(), ...userData };
+    return this.userRepository.create(user);
+  }
+}
+
+// services/user.service.test.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { UserService, IUserRepository } from './user.service';
+
+describe('UserService', () => {
+  let service: UserService;
+  let mockRepository: IUserRepository;
+
+  beforeEach(() => {
+    mockRepository = {
+      findById: vi.fn(),
+      create: vi.fn(),
+    };
+    service = new UserService(mockRepository);
+  });
+
+  describe('getUser', () => {
+    it('should return user if found', async () => {
+      const mockUser = { id: '1', name: 'John', email: 'john@example.com' };
+      vi.mocked(mockRepository.findById).mockResolvedValue(mockUser);
+
+      const user = await service.getUser('1');
+
+      expect(user).toEqual(mockUser);
+      expect(mockRepository.findById).toHaveBeenCalledWith('1');
+    });
+
+    it('should throw error if user not found', async () => {
+      vi.mocked(mockRepository.findById).mockResolvedValue(null);
+
+      await expect(service.getUser('999')).rejects.toThrow('User not found');
+    });
+  });
+
+  describe('createUser', () => {
+    it('should create user successfully', async () => {
+      const userData = { name: 'John', email: 'john@example.com' };
+      const createdUser = { id: '1', ...userData };
+
+      vi.mocked(mockRepository.create).mockResolvedValue(createdUser);
+
+      const user = await service.createUser(userData);
+
+      expect(user).toEqual(createdUser);
+      expect(mockRepository.create).toHaveBeenCalled();
+    });
+  });
+});
+```
+
+### Pattern 3: Spying on Functions
+
+```typescript
+// utils/logger.ts
+export const logger = {
+  info: (message: string) => console.log(`INFO: ${message}`),
+  error: (message: string) => console.error(`ERROR: ${message}`),
+};
+
+// services/order.service.ts
+import { logger } from '../utils/logger';
+
+export class OrderService {
+  async processOrder(orderId: string): Promise<void> {
+    logger.info(`Processing order ${orderId}`);
+    // Process order logic
+    logger.info(`Order ${orderId} processed successfully`);
+  }
+}
+
+// services/order.service.test.ts
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { OrderService } from './order.service';
+import { logger } from '../utils/logger';
+
+describe('OrderService', () => {
+  let service: OrderService;
+  let loggerSpy: any;
+
+  beforeEach(() => {
+    service = new OrderService();
+    loggerSpy = vi.spyOn(logger, 'info');
+  });
+
+  afterEach(() => {
+    loggerSpy.mockRestore();
+  });
+
+  it('should log order processing', async () => {
+    await service.processOrder('123');
+
+    expect(loggerSpy).toHaveBeenCalledWith('Processing order 123');
+    expect(loggerSpy).toHaveBeenCalledWith('Order 123 processed successfully');
+    expect(loggerSpy).toHaveBeenCalledTimes(2);
+  });
+});
+```
+
+## Integration Testing
+
+### Pattern 1: API Integration Tests
+
+```typescript
+// tests/integration/user.api.test.ts
+import request from 'supertest';
+import { app } from '../../src/app';
+import { pool } from '../../src/config/database';
+
+describe('User API Integration Tests', () => {
+  beforeAll(async () => {
+    // Setup test database
+    await pool.query('CREATE TABLE IF NOT EXISTS users (...)');
+  });
+
+  afterAll(async () => {
+    // Cleanup
+    await pool.query('DROP TABLE IF EXISTS users');
+    await pool.end();
+  });
+
+  beforeEach(async () => {
+    // Clear data before each test
+    await pool.query('TRUNCATE TABLE users CASCADE');
+  });
+
+  describe('POST /api/users', () => {
+    it('should create a new user', async () => {
+      const userData = {
+        name: 'John Doe',
+        email: 'john@example.com',
+        password: 'password123',
+      };
+
+      const response = await request(app)
+        .post('/api/users')
+        .send(userData)
+        .expect(201);
+
+      expect(response.body).toMatchObject({
+        name: userData.name,
+        email: userData.email,
+      });
+      expect(response.body).toHaveProperty('id');
+      expect(response.body).not.toHaveProperty('password');
+    });
+
+    it('should return 400 if email is invalid', async () => {
+      const userData = {
+        name: 'John Doe',
+        email: 'invalid-email',
+        password: 'password123',
+      };
+
+      const response = await request(app)
+        .post('/api/users')
+        .send(userData)
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('should return 409 if email already exists', async () => {
+      const userData = {
+        name: 'John Doe',
+        email: 'john@example.com',
+        password: 'password123',
+      };
+
+      await request(app).post('/api/users').send(userData);
+
+      const response = await request(app)
+        .post('/api/users')
+        .send(userData)
+        .expect(409);
+
+      expect(response.body.error).toContain('already exists');
+    });
+  });
+
+  describe('GET /api/users/:id', () => {
+    it('should get user by id', async () => {
+      const createResponse = await request(app)
+        .post('/api/users')
+        .send({
+          name: 'John Doe',
+          email: 'john@example.com',
+          password: 'password123',
+        });
+
+      const userId = createResponse.body.id;
+
+      const response = await request(app)
+        .get(`/api/users/${userId}`)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        id: userId,
+        name: 'John Doe',
+        email: 'john@example.com',
+      });
+    });
+
+    it('should return 404 if user not found', async () => {
+      await request(app)
+        .get('/api/users/999')
+        .expect(404);
+    });
+  });
+
+  describe('Authentication', () => {
+    it('should require authentication for protected routes', async () => {
+      await request(app)
+        .get('/api/users/me')
+        .expect(401);
+    });
+
+    it('should allow access with valid token', async () => {
+      // Create user and login
+      await request(app)
+        .post('/api/users')
+        .send({
+          name: 'John Doe',
+          email: 'john@example.com',
+          password: 'password123',
+        });
+
+      const loginResponse = await request(app)
+        .post('/api/auth/login')
+        .send({
+          email: 'john@example.com',
+          password: 'password123',
+        });
+
+      const token = loginResponse.body.token;
+
+      const response = await request(app)
+        .get('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.email).toBe('john@example.com');
+    });
+  });
+});
+```
+
+### Pattern 2: Database Integration Tests
+
+```typescript
+// tests/integration/user.repository.test.ts
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { Pool } from 'pg';
+import { UserRepository } from '../../src/repositories/user.repository';
+
+describe('UserRepository Integration Tests', () => {
+  let pool: Pool;
+  let repository: UserRepository;
+
+  beforeAll(async () => {
+    pool = new Pool({
+      host: 'localhost',
+      port: 5432,
+      database: 'test_db',
+      user: 'test_user',
+      password: 'test_password',
+    });
+
+    repository = new UserRepository(pool);
+
+    // Create tables
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  });
+
+  afterAll(async () => {
+    await pool.query('DROP TABLE IF EXISTS users');
+    await pool.end();
+  });
+
+  beforeEach(async () => {
+    await pool.query('TRUNCATE TABLE users CASCADE');
+  });
+
+  it('should create a user', async () => {
+    const user = await repository.create({
+      name: 'John Doe',
+      email: 'john@example.com',
+      password: 'hashed_password',
+    });
+
+    expect(user).toHaveProperty('id');
+    expect(user.name).toBe('John Doe');
+    expect(user.email).toBe('john@example.com');
+  });
+
+  it('should find user by email', async () => {
+    await repository.create({
+      name: 'John Doe',
+      email: 'john@example.com',
+      password: 'hashed_password',
+    });
+
+    const user = await repository.findByEmail('john@example.com');
+
+    expect(user).toBeTruthy();
+    expect(user?.name).toBe('John Doe');
+  });
+
+  it('should return null if user not found', async () => {
+    const user = await repository.findByEmail('nonexistent@example.com');
+    expect(user).toBeNull();
+  });
+});
+```
 
 (Shortened: the skill continues in its source.)
 

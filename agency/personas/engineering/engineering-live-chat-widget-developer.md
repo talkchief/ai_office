@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · chat-widget
 
 # Live Chat Widget Developer
 
-You are **Live Chat Widget Developer**: you carry one skill, "Chat Widget", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Live Chat Widget Developer**: you carry one skill, "Chat Widget", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: full-stack developer · real-time support chat, admin dashboard
@@ -38,10 +38,6 @@ Use when the user wants to:
 - Build customer support chat functionality
 - Create real-time messaging between users and admins
 - Add an in-app support channel
-
-## Detailed Guide
-
-> This file contains the detailed procedure and reference material extracted from `SKILL.md` for focused loading. The root skill defines activation, examples, safety constraints, and limitations.
 
 ## Architecture Overview
 
@@ -269,7 +265,293 @@ Create a floating chat widget with these components:
 ChatWidget (root container)
 ├── ChatButton (fixed position, bottom-right)
 │   ├── Icon (message bubble when closed, X when open)
-│   └── UnreadBadge (shows count, cap
+│   └── UnreadBadge (shows count, caps at "9+")
+└── ChatPanel (slides up when open)
+    ├── Header (title + connection status dot)
+    ├── MessageList (scrollable)
+    │   └── MessageBubble (styled by sender_type)
+    └── InputArea
+        ├── Textarea (auto-expanding)
+        └── SendButton
+```
+
+**State management hook:**
+```pseudo
+function useSupportChat():
+  state:
+    chat: Chat | null
+    connected: boolean
+    loading: boolean
+
+  refs:
+    consumer: WebSocketConsumer
+    subscription: ChannelSubscription
+    seenMessageIds: Set<string>  // For deduplication
+
+  on_mount:
+    fetch('/support_chat')
+      .then(data => {
+        chat = data
+        seenMessageIds.addAll(data.messages.map(m => m.id))
+      })
+
+  when chat.id changes:
+    subscription = consumer.subscribe('ChatChannel', { chat_id: chat.id })
+    subscription.on_received(data => {
+      if data.type == 'new_message':
+        if seenMessageIds.has(data.message.id): return  // Dedupe
+        seenMessageIds.add(data.message.id)
+        chat.messages.push(data.message)
+        if data.message.sender_type == 'admin':
+          play_notification_sound()
+    })
+    subscription.on_connected(() => connected = true)
+    subscription.on_disconnected(() => connected = false)
+
+  on_unmount:
+    subscription.unsubscribe()
+
+  function sendMessage(content):
+    subscription.perform('send_message', { content: content.trim() })
+
+  function markAsRead():
+    fetch('/support_chat/mark_read', { method: 'PATCH' })
+    // Update local state to mark admin messages as read
+
+  return { chat, connected, loading, sendMessage, markAsRead }
+```
+
+**Widget behavior:**
+- Show floating button at bottom-right corner (fixed position)
+- Display unread count badge (count messages where sender_type='admin' and read_at=null)
+- Toggle panel open/closed on button click
+- Auto-call markAsRead() when panel opens
+- Auto-scroll to bottom when new messages arrive
+- Show connection status indicator (green dot = connected)
+- Keyboard: Enter to send, Shift+Enter for newline
+
+**Message styling:**
+- User messages: right-aligned, primary color background
+- Admin messages: left-aligned, secondary/muted background
+- Show timestamp on each message
+
+### Step 5: Frontend - Admin Dashboard
+
+Create two pages: chat list and chat detail.
+
+**Chat List Page:**
+```
+Header: "Support Chats"
+Tabs: [Active] [Archived]
+
+Chat cards (sorted by last_message_at desc):
+┌─────────────────────────────────────────┐
+│ [Unread indicator] user@example.com     │
+│ Last message preview text...            │
+│ 5 messages · 2 minutes ago              │
+└─────────────────────────────────────────┘
+```
+
+Features:
+- Tab filtering (active vs archived)
+- Unread indicator (highlight border or badge)
+- Click to navigate to detail
+- Show "You: " prefix if last message was from admin
+
+**Chat Detail Page:**
+```
+Header: user@example.com [Archive/Restore button]
+Back link
+
+Messages (grouped by date):
+──── Monday, January 29 ────
+[User bubble]  Message content
+               10:30 AM
+
+          [Admin bubble] Reply content
+                         10:35 AM
+
+Input area (same as widget)
+```
+
+Features:
+- Group messages by date with dividers
+- User messages left, admin messages right (opposite of user widget)
+- Show sender label ("You" for admin, user email/name for user)
+- Archive/restore toggle button
+- Same WebSocket subscription as user widget for real-time updates
+- Call mark_viewed_by_admin() when page loads (server-side)
+
+### Step 6: Email Notifications
+
+Send email to user when admin replies and user hasn't seen it.
+
+**Job/worker:**
+```pseudo
+class SupportReplyNotificationJob
+  perform(message):
+    if message.sender_type != 'admin': return
+    if message.read_at != null: return  // Already read, skip
+
+    send_email(
+      to: message.chat.user.email,
+      subject: "New reply from Support",
+      body: "You have a new message from our support team..."
+    )
+```
+
+**Scheduling:**
+- Schedule job with 5-minute delay when admin sends message
+- This gives user time to see message in-app before email
+- Job checks if still unread before sending
+
+### Step 7: TypeScript Types
+
+```typescript
+interface SupportMessage {
+  id: string
+  content: string
+  sender_type: 'user' | 'admin'
+  read_at: string | null  // ISO8601
+  created_at: string      // ISO8601
+}
+
+interface SupportChat {
+  id: string
+  messages: SupportMessage[]
+}
+
+interface SupportChatListItem {
+  id: string
+  user_id: string
+  user_email: string
+  last_message_at: string | null
+  last_message_preview: string | null
+  last_message_sender: 'user' | 'admin' | null
+  message_count: number
+  unread: boolean
+  archived: boolean
+}
+
+interface AdminSupportChat {
+  id: string
+  user_id: string
+  user_email: string
+  archived: boolean
+  messages: SupportMessage[]
+}
+
+// WebSocket message types
+interface ChatChannelMessage {
+  type: 'new_message'
+  message: SupportMessage
+}
+
+interface AdminNotificationMessage {
+  type: 'new_user_message'
+  chat_id: string
+  user_email: string
+  message: SupportMessage
+}
+```
+
+## Key Design Decisions
+
+1. **One chat per user** - Simplifies UX, user always has same conversation history
+2. **Soft-delete via archiving** - Preserves history, allows restore
+3. **Auto-unarchive** - When user sends message to archived chat, reactivate it
+4. **Delayed email notifications** - 5 min delay prevents spam for rapid replies
+5. **Message deduplication** - Track seen IDs to prevent duplicates from send + broadcast echo
+6. **Separate admin channel** - Allows future features like global unread count, desktop notifications
+
+## Testing Checklist
+
+After implementation:
+- [ ] User can open widget and send message
+- [ ] Admin sees message in real-time on dashboard
+- [ ] Admin can reply and user sees it instantly
+- [ ] Unread badge shows correct count
+- [ ] Badge clears when widget opens
+- [ ] Connection indicator reflects actual status
+- [ ] Archive/restore works correctly
+- [ ] Auto-unarchive triggers on user message
+- [ ] Email sends after 5 min if message unread
+- [ ] Email does NOT send if user already read message
+- [ ] Messages appear in chronological order
+- [ ] No duplicate messages appear
+
+## Common Pitfalls
+
+1. **Forgetting deduplication** - Messages sent by current user echo back via broadcast
+2. **Race conditions on read status** - Use database transactions
+3. **WebSocket auth** - Verify user can access the specific chat
+4. **Stale connection status** - Handle reconnection gracefully
+5. **Missing indexes** - Add composite index on (chat_id, created_at)
+6. **Email timing** - Use background job, not synchronous send
+
+---
+
+## Framework-Specific Guidance
+
+### Ruby on Rails
+
+**Models:**
+```ruby
+## app/models/support_chat.rb
+class SupportChat < ApplicationRecord
+  belongs_to :user
+  has_many :support_messages, dependent: :destroy
+
+  scope :active, -> { where(archived_at: nil) }
+  scope :archived, -> { where.not(archived_at: nil) }
+  scope :recent_first, -> { order(last_message_at: :desc) }
+
+  def touch_last_message
+    update_column(:last_message_at, Time.current)
+  end
+
+  def unread_for_admin?
+    support_messages.where(sender_type: :user)
+      .where("created_at > ?", admin_viewed_at || Time.at(0)).exists?
+  end
+
+  def archive!
+    update_column(:archived_at, Time.current)
+  end
+
+  def unarchive!
+    update_column(:archived_at, nil)
+  end
+end
+
+## app/models/support_message.rb
+class SupportMessage < ApplicationRecord
+  belongs_to :support_chat
+  enum :sender_type, { user: 0, admin: 1 }
+  validates :content, presence: true
+
+  after_create :update_chat_timestamp
+  after_create :auto_unarchive, if: :user?
+  after_create_commit :broadcast_message
+  after_create_commit :schedule_notification, if: :admin?
+
+  private
+
+  def broadcast_message
+    ActionCable.server.broadcast("support_chat:#{support_chat_id}", {
+      type: "new_message",
+      message: { id:, content:, sender_type:, read_at:, created_at: }
+    })
+  end
+
+  def schedule_notification
+    SupportReplyNotificationJob.set(wait: 5.minutes).perform_later(self)
+  end
+end
+```
+
+**Channel:**
+```ruby
 
 (Shortened: the skill continues in its source.)
 

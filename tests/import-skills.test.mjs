@@ -95,6 +95,17 @@ test('a persona can carry a mission and rules of its own, and keeps them when it
   assert.equal(renderSkillPersona({ ...again, name: 'Debugging Specialist', description: 'Finds the root cause first.' }), text, 'writing it again changes nothing');
 });
 
+test('a method written for the office says so, and a refresh from the catalogue leaves it alone', () => {
+  const parts = skillParts(personaFromSkill(SKILL, { id: 'systematic-debugging' }).text);
+  assert.equal(parts.authored, false);
+  const text = renderSkillPersona({ ...parts, name: 'Debugging Specialist', description: 'Finds the root cause first.', method: '## Reproduce\n\n1. Trigger it reliably.', authored: true });
+  assert.match(text, /## 📋 The method\n/); assert.doesNotMatch(text, /The skill, as written|you carry one skill/);
+  assert.match(text, /- \*\*Experience\*\*: The Systematic Debugging method, written for the office, development/);
+  const again = skillParts(text); assert.equal(again.authored, true); assert.equal(again.method, '## Reproduce\n\n1. Trigger it reliably.');
+  assert.equal(renderSkillPersona({ ...again, name: 'Debugging Specialist', description: 'Finds the root cause first.' }), text, 'writing it again keeps it authored');
+  const p = parsePersona(text, { division: 'engineering', file: 'x.md' }); assert.match(p.body, /## Reproduce/);
+});
+
 test('curation gives an imported persona a job title, a role line and tags, and keeps its method', () => {
   const raw = personaFromSkill(SKILL, { id: 'systematic-debugging', prefix: 'IT Professional ', source: 'agentic-awesome-skills (MIT)' }).text;
   const parts = skillParts(raw.replace(/\n/g, '\r\n')); // a CRLF checkout reads the same

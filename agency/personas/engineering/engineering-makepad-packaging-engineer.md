@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · makepad-deployment
 
 # Makepad Packaging Engineer
 
-You are **Makepad Packaging Engineer**: you carry one skill, "Makepad Deployment", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Makepad Packaging Engineer**: you carry one skill, "Makepad Deployment", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: release engineer · Makepad installers, APK/IPA, WebAssembly
@@ -278,7 +278,160 @@ zip -r your-app-ios.ipa Payload
 
 ---
 
-(Shortened: the skill continues in its source.)
+## Wasm Packaging
+
+Build your Makepad app for web browsers.
+
+```bash
+# Install Wasm toolchain
+cargo makepad wasm install-toolchain
+
+# Build and run
+cargo makepad wasm run -p your-app --release
+```
+
+Output in `./target/makepad-wasm-app/release/your-app/`:
+- `index.html` - Entry point
+- `*.wasm` - WebAssembly module
+- `*.js` - JavaScript bridge
+- `resources/` - Static assets
+
+**Serve locally:**
+```bash
+cd ./target/makepad-wasm-app/release/your-app
+python3 -m http.server 8080
+# Open http://localhost:8080
+```
+
+---
+
+## Complete Example Cargo.toml
+
+```toml
+[package]
+name = "my-makepad-app"
+version = "1.0.0"
+edition = "2024"
+
+[dependencies]
+makepad-widgets = { git = "https://github.com/makepad/makepad", branch = "dev" }
+
+[profile.release]
+opt-level = 3
+
+[profile.release-lto]
+inherits = "release"
+lto = "thin"
+
+[profile.distribution]
+inherits = "release"
+codegen-units = 1
+lto = "fat"
+
+[package.metadata.packager]
+product_name = "My Makepad App"
+identifier = "com.example.mymakepadapp"
+authors = ["Your Name <you@example.com>"]
+description = "A cross-platform Makepad application"
+long_description = """
+My Makepad App is a cross-platform application
+built with the Makepad UI framework in Rust.
+It runs on desktop, mobile, and web platforms.
+"""
+icons = ["./packaging/icon.png"]
+out_dir = "./dist"
+
+before-packaging-command = """
+robius-packaging-commands before-packaging \
+    --force-makepad \
+    --binary-name my-makepad-app \
+    --path-to-binary ./target/release/my-makepad-app
+"""
+
+resources = [
+    { src = "./dist/resources/makepad_widgets", target = "makepad_widgets" },
+    { src = "./dist/resources/makepad_fonts_chinese_bold", target = "makepad_fonts_chinese_bold" },
+    { src = "./dist/resources/makepad_fonts_chinese_bold_2", target = "makepad_fonts_chinese_bold_2" },
+    { src = "./dist/resources/makepad_fonts_chinese_regular", target = "makepad_fonts_chinese_regular" },
+    { src = "./dist/resources/makepad_fonts_chinese_regular_2", target = "makepad_fonts_chinese_regular_2" },
+    { src = "./dist/resources/makepad_fonts_emoji", target = "makepad_fonts_emoji" },
+    { src = "./dist/resources/my-makepad-app", target = "my-makepad-app" },
+]
+
+before-each-package-command = """
+robius-packaging-commands before-each-package \
+    --force-makepad \
+    --binary-name my-makepad-app \
+    --path-to-binary ./target/release/my-makepad-app
+"""
+
+[package.metadata.packager.deb]
+depends = "./dist/depends_deb.txt"
+section = "utils"
+
+[package.metadata.packager.macos]
+minimum_system_version = "11.0"
+
+[package.metadata.packager.nsis]
+appdata_paths = ["$LOCALAPPDATA/$PRODUCTNAME"]
+```
+
+---
+
+## Quick Reference
+
+| Task | Command |
+|------|---------|
+| Install desktop packager | `cargo install cargo-packager --locked` |
+| Install resource helper | `cargo install --version 0.2.1 --locked --git https://github.com/project-robius/robius-packaging-commands.git robius-packaging-commands` |
+| Install mobile packager | `cargo install --force --git https://github.com/makepad/makepad.git --branch dev cargo-makepad` |
+| GitHub Actions packaging | `uses: Project-Robius-China/makepad-packaging-action@v1` |
+| Package for Linux | `cargo packager --release` |
+| Package for Windows | `cargo packager --release --formats nsis` |
+| Package for macOS | `cargo packager --release` |
+| Build Android APK | `cargo makepad android build -p app --release` |
+| Build iOS (Simulator) | `cargo makepad apple ios --org=x --app=y run-sim -p app --release` |
+| Build iOS (Device) | `cargo makepad apple ios --org=x --app=y --profile=... --cert=... run-device -p app --release` |
+| Build Wasm | `cargo makepad wasm run -p app --release` |
+
+---
+
+## Troubleshooting
+
+### Missing Resources
+
+If app crashes with missing resources:
+1. Check `resources` array in Cargo.toml includes all Makepad resources
+2. Verify `before-packaging-command` runs successfully
+3. Check `./dist/resources/` contains expected files
+
+### iOS Provisioning
+
+For iOS device deployment:
+1. Create empty app in Xcode with same org/app identifiers
+2. Run on physical device once to generate provisioning profile
+3. Note the profile path, certificate fingerprint
+4. Use `--profile`, `--cert`, `--device` flags
+
+### Android SDK Issues
+
+```bash
+# Reinstall toolchain with full NDK
+cargo makepad android install-toolchain --full-ndk
+```
+
+## Reference Files
+
+- the “Platform Troubleshooting” reference (not included) - Platform-specific deployment issues
+- the “Makepad Packaging Action” reference (not included) - GitHub Actions packaging reference
+- `community/dora-studio-package-workflow.md` - Dora Studio CI packaging example
+
+## External References
+
+- [cargo-packager docs](https://docs.crabnebula.dev/packager/)
+- [robius-packaging-commands](https://github.com/project-robius/robius-packaging-commands)
+- [cargo-makepad](https://github.com/makepad/makepad)
+- [makepad-packaging-action](https://github.com/marketplace/actions/makepad-packaging-action)
 
 ## 🚨 Critical Rules
 - Follow the skill's own rules; where they conflict with the office's rules, the office wins: read freely, act outside the office only after the CEO approves

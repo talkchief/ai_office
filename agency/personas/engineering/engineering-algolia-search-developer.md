@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · algolia-search
 
 # Algolia Search Developer
 
-You are **Algolia Search Developer**: you carry one skill, "Algolia Search", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Algolia Search Developer**: you carry one skill, "Algolia Search", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: search developer · Algolia indexing, React InstantSearch, relevance
@@ -42,10 +42,6 @@ Expert patterns for Algolia search implementation, indexing strategies, React In
 - User mentions or implies: faceted search
 - User mentions or implies: search index
 - User mentions or implies: search as you type
-
-## Detailed Guide
-
-> This file contains the detailed procedure and reference material extracted from `SKILL.md` for focused loading. The root skill defines activation, examples, safety constraints, and limitations.
 
 ## Patterns
 
@@ -262,7 +258,456 @@ export async function indexProducts(products: Product[]) {
 
   // Batch in chunks of ~1000-5000 records
   const BATCH_SIZE = 1000;
-  fo
+  for (let i = 0; i < records.length; i += BATCH_SIZE) {
+    const batch = records.slice(i, i + BATCH_SIZE);
+    await index.saveObjects(batch);
+  }
+}
+
+// Partial update - update only specific fields
+export async function updateProductPrice(productId: string, price: number) {
+  await index.partialUpdateObject({
+    objectID: productId,
+    price,
+    updatedAt: Date.now(),
+  });
+}
+
+// Partial update with operations
+export async function incrementViewCount(productId: string) {
+  await index.partialUpdateObject({
+    objectID: productId,
+    viewCount: {
+      _operation: 'Increment',
+      value: 1,
+    },
+  });
+}
+
+// Delete records (prefer this over deleteBy)
+export async function deleteProducts(productIds: string[]) {
+  await index.deleteObjects(productIds);
+}
+
+// Full reindex with zero-downtime (atomic swap)
+export async function fullReindex(products: Product[]) {
+  const tempIndex = adminClient.initIndex('products_temp');
+
+  // Index to temp index
+  await tempIndex.saveObjects(
+    products.map((p) => ({
+      objectID: p.id,
+      ...p,
+    }))
+  );
+
+  // Copy settings from main index
+  await adminClient.copyIndex('products', 'products_temp', {
+    scope: ['settings', 'synonyms', 'rules'],
+  });
+
+  // Atomic swap
+  await adminClient.moveIndex('products_temp', 'products');
+}
+
+### Anti_patterns
+
+- Pattern: Using deleteBy for bulk deletions | Why: deleteBy is computationally expensive and rate limited | Fix: Use deleteObjects with array of objectIDs
+- Pattern: Indexing one record at a time | Why: Creates indexing queue, slows down process | Fix: Batch records in groups of 1K-10K
+- Pattern: Full reindex for small changes | Why: Wastes operations, slower than incremental | Fix: Use partialUpdateObject for attribute changes
+
+### References
+
+- https://www.algolia.com/doc/guides/sending-and-managing-data/send-and-update-your-data/in-depth/the-different-synchronization-strategies
+- https://www.algolia.com/blog/engineering/search-indexing-best-practices-for-top-performance-with-code-samples
+
+### API Key Security and Restrictions
+
+Secure API key configuration for Algolia.
+
+Key types:
+- Admin API Key: Full control (indexing, settings, deletion)
+- Search-Only API Key: Safe for frontend
+- Secured API Keys: Generated from base key with restrictions
+
+Restrictions available:
+- Indices: Limit accessible indices
+- Rate limit: Limit API calls per hour per IP
+- Validity: Set expiration time
+- HTTP referrers: Restrict to specific URLs
+- Query parameters: Enforce search parameters
+
+### Code Example
+
+// NEVER do this - admin key in frontend
+// const client = algoliasearch(appId, ADMIN_KEY);  // WRONG!
+
+// Correct: Use search-only key in frontend
+const searchClient = algoliasearch(
+  process.env.NEXT_PUBLIC_ALGOLIA_APP_ID!,
+  process.env.NEXT_PUBLIC_ALGOLIA_SEARCH_KEY!
+);
+
+// Server-side: Generate secured API key
+// lib/algolia-secured-key.ts
+import algoliasearch from 'algoliasearch';
+
+const adminClient = algoliasearch(
+  process.env.ALGOLIA_APP_ID!,
+  process.env.ALGOLIA_ADMIN_KEY!
+);
+
+// Generate user-specific secured key
+export function generateSecuredKey(userId: string) {
+  const searchKey = process.env.ALGOLIA_SEARCH_KEY!;
+
+  return adminClient.generateSecuredApiKey(searchKey, {
+    // User can only see their own data
+    filters: `userId:${userId}`,
+    // Key expires in 1 hour
+    validUntil: Math.floor(Date.now() / 1000) + 3600,
+    // Restrict to specific index
+    restrictIndices: ['user_documents'],
+  });
+}
+
+// Rate-limited key for public APIs
+export async function createRateLimitedKey() {
+  const { key } = await adminClient.addApiKey({
+    acl: ['search'],
+    indexes: ['products'],
+    description: 'Public search with rate limit',
+    maxQueriesPerIPPerHour: 1000,
+    referers: ['https://mysite.com/*'],
+    validity: 0,  // Never expires
+  });
+
+  return key;
+}
+
+// API endpoint to get user's secured key
+// app/api/search-key/route.ts
+import { auth } from '@/lib/auth';
+import { generateSecuredKey } from '@/lib/algolia-secured-key';
+
+export async function GET() {
+  const session = await auth();
+  if (!session?.user) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const securedKey = generateSecuredKey(session.user.id);
+
+  return Response.json({ key: securedKey });
+}
+
+### Anti_patterns
+
+- Pattern: Hardcoding Admin API key in client code | Why: Exposes full index control to attackers | Fix: Use search-only key with restrictions
+- Pattern: Using same key for all users | Why: Can't restrict data access per user | Fix: Generate secured API keys with user filters
+- Pattern: No rate limiting on public search | Why: Bots can exhaust your search quota | Fix: Set maxQueriesPerIPPerHour on API key
+
+### References
+
+- https://www.algolia.com/doc/guides/security/api-keys
+- https://support.algolia.com/hc/en-us/articles/14339249272977-What-are-the-best-practices-to-manage-Algolia-API-keys-in-my-code-and-protect-them
+
+### Custom Ranking and Relevance Tuning
+
+Configure searchable attributes and custom ranking for relevance.
+
+Searchable attributes (order matters):
+1. Most important fields first (title, name)
+2. Secondary fields next (description, tags)
+3. Exclude non-searchable fields (image_url, id)
+
+Custom ranking:
+- Add business metrics (popularity, rating, date)
+- Use desc() for descending, asc() for ascending
+
+### Code Example
+
+// scripts/configure-index.ts
+import algoliasearch from 'algoliasearch';
+
+const adminClient = algoliasearch(
+  process.env.ALGOLIA_APP_ID!,
+  process.env.ALGOLIA_ADMIN_KEY!
+);
+
+const index = adminClient.initIndex('products');
+
+async function configureIndex() {
+  await index.setSettings({
+    // Searchable attributes in order of importance
+    searchableAttributes: [
+      'name',              // Most important
+      'brand',
+      'category',
+      'description',       // Least important
+    ],
+
+    // Attributes for faceting/filtering
+    attributesForFaceting: [
+      'category',
+      'brand',
+      'filterOnly(inStock)',  // Filter only, not displayed
+      'searchable(tags)',     // Searchable facet
+    ],
+
+    // Custom ranking (after text relevance)
+    customRanking: [
+      'desc(popularity)',     // Most popular first
+      'desc(rating)',         // Then by rating
+      'desc(createdAt)',      // Then by recency
+    ],
+
+    // Typo tolerance
+    typoTolerance: true,
+    minWordSizefor1Typo: 4,
+    minWordSizefor2Typos: 8,
+
+    // Query settings
+    queryLanguages: ['en'],
+    removeStopWords: ['en'],
+
+    // Highlighting
+    attributesToHighlight: ['name', 'description'],
+    highlightPreTag: '<mark>',
+    highlightPostTag: '</mark>',
+
+    // Pagination
+    hitsPerPage: 20,
+    paginationLimitedTo: 1000,
+
+    // Distinct (deduplication)
+    attributeForDistinct: 'productFamily',
+    distinct: true,
+  });
+
+  // Add synonyms
+  await index.saveSynonyms([
+    {
+      objectID: 'phone-mobile',
+      type: 'synonym',
+      synonyms: ['phone', 'mobile', 'cell', 'smartphone'],
+    },
+    {
+      objectID: 'laptop-notebook',
+      type: 'oneWaySynonym',
+      input: 'laptop',
+      synonyms: ['notebook', 'portable computer'],
+    },
+  ]);
+
+  // Add rules (query-based customization)
+  await index.saveRules([
+    {
+      objectID: 'boost-sale-items',
+      condition: {
+        anchoring: 'contains',
+        pattern: 'sale',
+      },
+      consequence: {
+        params: {
+          filters: 'onSale:true',
+          optionalFilters: ['featured:true'],
+        },
+      },
+    },
+  ]);
+
+  console.log('Index configured successfully');
+}
+
+configureIndex();
+
+### Anti_patterns
+
+- Pattern: Searching all attributes equally | Why: Reduces relevance, matches in descriptions rank same as titles | Fix: Order searchableAttributes by importance
+- Pattern: No custom ranking | Why: Relies only on text matching, ignores business value | Fix: Add popularity, rating, or recency to customRanking
+- Pattern: Indexing raw dates as strings | Why: Can't sort by date correctly | Fix: Use timestamps (getTime()) for date sorting
+
+### References
+
+- https://www.algolia.com/doc/guides/managing-results/relevance-overview
+- https://www.algolia.com/doc/guides/managing-results/must-do/custom-ranking
+
+### Faceted Search and Filtering
+
+Implement faceted navigation with refinement lists, range sliders,
+and hierarchical menus.
+
+Widget types:
+- RefinementList: Multi-select checkboxes
+- Menu: Single-select list
+- HierarchicalMenu: Nested categories
+- RangeInput/RangeSlider: Numeric ranges
+- ToggleRefinement: Boolean filters
+
+### Code Example
+
+'use client';
+import {
+  InstantSearch,
+  SearchBox,
+  Hits,
+  RefinementList,
+  HierarchicalMenu,
+  RangeInput,
+  ToggleRefinement,
+  ClearRefinements,
+  CurrentRefinements,
+  Stats,
+  SortBy,
+} from 'react-instantsearch';
+import { searchClient, INDEX_NAME } from '@/lib/algolia';
+
+export function ProductSearch() {
+  return (
+    <InstantSearch searchClient={searchClient} indexName={INDEX_NAME}>
+      <div className="flex gap-8">
+        {/* Filters Sidebar */}
+        <aside className="w-64 space-y-6">
+          <ClearRefinements />
+          <CurrentRefinements />
+
+          {/* Category hierarchy */}
+          <div>
+            <h3 className="font-semibold mb-2">Categories</h3>
+            <HierarchicalMenu
+              attributes={[
+                'categories.lvl0',
+                'categories.lvl1',
+                'categories.lvl2',
+              ]}
+              limit={10}
+              showMore
+            />
+          </div>
+
+          {/* Brand filter */}
+          <div>
+            <h3 className="font-semibold mb-2">Brand</h3>
+            <RefinementList
+              attribute="brand"
+              searchable
+              searchablePlaceholder="Search brands..."
+              showMore
+              limit={5}
+              showMoreLimit={20}
+            />
+          </div>
+
+          {/* Price range */}
+          <div>
+            <h3 className="font-semibold mb-2">Price</h3>
+            <RangeInput
+              attribute="price"
+              precision={0}
+              classNames={{
+                input: 'w-20 px-2 py-1 border rounded',
+              }}
+            />
+          </div>
+
+          {/* In stock toggle */}
+          <ToggleRefinement
+            attribute="inStock"
+            label="In Stock Only"
+            on={true}
+          />
+
+          {/* Rating filter */}
+          <div>
+            <h3 className="font-semibold mb-2">Rating</h3>
+            <RefinementList
+              attribute="rating"
+              transformItems={(items) =>
+                items.map((item) => ({
+                  ...item,
+                  label: '★'.repeat(Number(item.label)),
+                }))
+              }
+            />
+          </div>
+        </aside>
+
+        {/* Results */}
+        <main className="flex-1">
+          <div className="flex justify-between items-center mb-4">
+            <SearchBox placeholder="Search products..." />
+            <SortBy
+              items={[
+                { label: 'Relevance', value: 'products' },
+                { label: 'Price (Low to High)', value: 'products_price_asc' },
+                { label: 'Price (High to Low)', value: 'products_price_desc' },
+                { label: 'Rating', value: 'products_rating_desc' },
+              ]}
+            />
+          </div>
+          <Stats />
+          <Hits hitComponent={ProductHit} />
+        </main>
+      </div>
+    </InstantSearch>
+  );
+}
+
+// For sorting, create replica indices
+// products_price_asc: customRanking: ['asc(price)']
+// products_price_desc: customRanking: ['desc(price)']
+// products_rating_desc: customRanking: ['desc(rating)']
+
+### Anti_patterns
+
+- Pattern: Faceting on non-faceted attributes | Why: Must declare attributesForFaceting in settings | Fix: Add attributes to attributesForFaceting array
+- Pattern: Not using filterOnly() for hidden filters | Why: Wastes facet computation on non-displayed attributes | Fix: Use filterOnly(attribute) for filters you won't show
+
+### References
+
+- https://www.algolia.com/doc/guides/managing-results/refine-results/faceting
+- https://www.algolia.com/doc/api-reference/widgets/refinement-list/react
+
+### Query Suggestions and Autocomplete
+
+Implement autocomplete with query suggestions and instant results.
+
+Uses @algolia/autocomplete-js for standalone autocomplete or
+integrate with InstantSearch using SearchBox.
+
+Query Suggestions require a separate index generated by Algolia.
+
+### Code Example
+
+// Standalone Autocomplete
+// components/Autocomplete.tsx
+'use client';
+import { autocomplete, getAlgoliaResults } from '@algolia/autocomplete-js';
+import algoliasearch from 'algoliasearch/lite';
+import { useEffect, useRef } from 'react';
+import '@algolia/autocomplete-theme-classic';
+
+const searchClient = algoliasearch(
+  process.env.NEXT_PUBLIC_ALGOLIA_APP_ID!,
+  process.env.NEXT_PUBLIC_ALGOLIA_SEARCH_KEY!
+);
+
+export function Autocomplete() {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const search = autocomplete({
+      container: containerRef.current,
+      placeholder: 'Search for products',
+      openOnFocus: true,
+      getSources({ query }) {
+        if (!query) return [];
+
+        return [
+          // Query suggestions
 
 (Shortened: the skill continues in its source.)
 

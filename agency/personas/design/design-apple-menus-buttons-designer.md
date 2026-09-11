@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · hig-components-menus
 
 # Apple Menus & Buttons Designer
 
-You are **Apple Menus & Buttons Designer**: you carry one skill, "Hig Components Menus", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Apple Menus & Buttons Designer**: you carry one skill, "Hig Components Menus", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: Apple UI designer · menus, buttons, toolbars, context menus
@@ -95,9 +95,6 @@ Check for `.claude/apple-design-context.md` before asking questions. Use existin
 
 *Built by [Raintree Technology](https://raintree.technology) · [More developer tools](https://raintree.technology)*
 
-## When to Use
-This skill is applicable to execute the workflow or actions described in the overview.
-
 ## Example
 
 **User request:**
@@ -149,6 +146,122 @@ As with all menus, you need to label Dock menu items succinctly and organize the
 ## [Platform considerations](https://developer.apple.com/design/human-interface-guidelines/dock-menus#Platform-considerations)
 
  _Not supported in iOS, iPadOS, tvOS, visionOS, or watchOS._
+
+## [Resources](https://developer.apple.com/design/human-interface-guidelines/dock-menus#Resources)
+
+#### [Related](https://developer.apple.com/design/human-interface-guidelines/dock-menus#Related)
+
+[Menus](https://developer.apple.com/design/human-interface-guidelines/menus)
+
+[Home Screen quick actions](https://developer.apple.com/design/human-interface-guidelines/home-screen-quick-actions)
+
+#### [Developer documentation](https://developer.apple.com/design/human-interface-guidelines/dock-menus#Developer-documentation)
+
+[`applicationDockMenu(_:)`](https://developer.apple.com/documentation/AppKit/NSApplicationDelegate/applicationDockMenu\(_:\)) — AppKit
+
+## Reference: Edit Menus
+
+|---  
+June 21, 2023| Updated to include guidance for visionOS.  
+September 14, 2022| Added guidance on supporting both edit-menu styles in iPadOS.
+
+## Reference: The Menu Bar
+
+|---|---  
+About _YourAppName_|  Displays the About window for your app, which includes copyright and version information.| Prefer a short name of 16 characters or fewer. Don’t include a version number.  
+Settings…| Opens your [settings](https://developer.apple.com/design/human-interface-guidelines/settings) window, or your app’s page in iPadOS Settings.| Use only for app-level settings. If you also offer document-specific settings, put them in the File menu.  
+Optional app-specific items| Performs custom app-level setting or configuration actions.| List custom app-configuration items after the Settings item and within the same group.  
+Services (macOS only)| Displays a submenu of services from the system and other apps that apply to the current context.|   
+Hide _YourAppName_ (macOS only)| Hides your app and all of its windows, and then activates the most recently used app.| Use the same short app name you supply for the About item.  
+Hide Others (macOS only)| Hides all other open apps and their windows.|   
+Show All (macOS only)| Shows all other open apps and their windows behind your app’s windows.|   
+Quit _YourAppName_|  Quits your app. Pressing Option changes Quit _YourAppName_ to Quit and Keep Windows.| Use the same short app name you supply for the About item.  
+  
+**Display the About menu item first.** Include a separator after the About menu item so that it appears by itself in a group.
+
+## [File menu](https://developer.apple.com/design/human-interface-guidelines/the-menu-bar#File-menu)
+
+The File menu contains commands that help people manage the files or documents an app supports. If your app doesn’t handle any types of files, you can rename or eliminate this menu.
+
+The File menu typically contains the following menu items listed in the following order.
+
+Menu item| Action| Guidance  
+---|---|---  
+New _Item_|  Creates a new document, file, or window.| For _Item_ , use a term that names the type of item your app creates. For example, Calendar uses _Event_ and _Calendar_.  
+Open| Can open the selected item or present an interface in which people select an item to open.| If people need to select an item in a separate interface, an ellipsis follows the command to indicate that more input is required.  
+Open Recent| Displays a submenu that lists recently opened documents and files that people can select, and typically includes a _Clear Menu_ item.| List document and filenames that people recognize in the submenu; don’t display file paths. List the documents in the order people last opened them, with the most recently opened document first.  
+Close| Closes the current window or document. Pressing Option changes Close to Close All. For a tab-based window, Close Tab replaces Close.| In a tab-based window, consider adding a Close Window item to let people close the entire window with one click or tap.  
+Close Tab| Closes the current tab in a tab-based window. Pressing Option changes Close Tab to Close Other Tabs.|   
+Close File| Closes the current file and all its associated windows.| Consider supporting this menu item if your app can open multiple views of the same file.  
+Save| Saves the current document or file.| Automatically save changes periodically as people work so they don’t need to keep choosing File > Save. For a new document, prompt people for a name and location. If you need to let people save a file in multiple formats, prefer a pop-up menu that lets people choose a format in the Save sheet.  
+Save All| Saves all open documents.|   
+Duplicate| Duplicates the current document, leaving both documents open. Pressing Option changes Duplicate to Save As.| Prefer Duplicate to menu items like Save As, Export, Copy To, and Save To because these items don’t clarify the relationship between the original file and the new one.  
+Rename…| Lets people change the name of the current document.|   
+Move To…| Prompts people to choose a new location for the document.|   
+Export As…| Prompts people for a name, output location, and export file format. After exporting the file, the current document remains open; the exported file doesn’t open.| Reserve the Export As item for when you need to let people export content in a format your app doesn’t typically handle.  
+Revert To| When people turn on autosaving, displays a submenu that lists recent document versions and an option to display the version browser. After people choose a version to restore, it replaces the current document.|   
+Page Setup…| Opens a panel for specifying printing parameters like paper size and printing orientation. A document can save the printing parameters that people specify.| Include the Page Setup item if you need to support printing parameters that apply to a specific document. Parameters that are global in nature, like a printer’s name, or that people change frequently, like the number of copies to print, belong in the Print panel.  
+Print…| Opens the standard Print panel, which lets people print to a printer, send a fax, or save as a PDF.|   
+  
+## [Edit menu](https://developer.apple.com/design/human-interface-guidelines/the-menu-bar#Edit-menu)
+
+The Edit menu lets people make changes to content in the current document or text container, and provides commands for interacting with the Clipboard. Because many editing commands apply to any editable content, the Edit menu is useful even in apps that aren’t document-based.
+
+**Determine whether Find menu items belong in the Edit menu.** For example, if your app lets people search for files or other types of objects, Find menu items might be more appropriate in the File menu.
+
+The Edit menu typically contains the following top-level menu items, listed in the following order.
+
+Menu item| Action| Guidance  
+---|---|---  
+Undo| Reverses the effect of the previous user operation.| Clarify the target of the undo. For example, if people just selected a menu item, you can append the item’s title, such as Undo Paste and Match Style. For a text entry operation, you might append the word _Typing_ to give Undo Typing.  
+Redo| Reverses the effect of the previous Undo operation.| Clarify the target of the redo. For example, if people just reversed a menu item selection, you can append the item’s title, such as Redo Paste and Match Style. For a text entry operation, you might append the word _Typing_ to give Redo Typing.  
+Cut| Removes the selected data and stores it on the Clipboard, replacing the previous contents of the Clipboard.|   
+Copy| Duplicates the selected data and stores it on the Clipboard.|   
+Paste| Inserts the contents of the Clipboard at the current insertion point. The Clipboard contents remain unchanged, permitting people to choose Paste multiple times.|   
+Paste and Match Style| Inserts the contents of the Clipboard at the current insertion point, matching the style of the inserted text to the surrounding text.|   
+Delete| Removes the selected data, but doesn’t place it on the Clipboard.| Provide a Delete menu item instead of an Erase or Clear menu item. Choosing Delete is the equivalent of pressing the Delete key, so it’s important for the naming to be consistent.  
+Select All| Highlights all selectable content in the current document or text container.|   
+Find| Displays a submenu containing menu items for performing search operations in the current document or text container. Standard submenus include: Find, Find and Replace, Find Next, Find Previous, Use Selection for Find, and Jump to Selection.|   
+Spelling and Grammar| Displays a submenu containing menu items for checking for and correcting spelling and grammar in the current document or text container. Standard submenus include: Show Spelling and Grammar, Check Document Now, Check Spelling While Typing, Check Grammar With Spelling, and Correct Spelling Automatically.|   
+Substitutions| Displays a submenu containing items that let people toggle automatic substitutions while they type in a document or text container. Standard submenus include: Show Substitutions, Smart Copy/Paste, Smart Quotes, Smart Dashes, Smart Links, Data Detectors, and Text Replacement.|   
+Transformations| Displays a submenu containing items that transform selected text. Standard submenus include: Make Uppercase, Make Lowercase, and Capitalize.|   
+Speech| Displays a submenu containing Start Speaking and Stop Speaking items, which control when the system audibly reads selected text.|   
+Start Dictation| Opens the dictation window and converts spoken words into text that’s added at the current insertion point. The system automatically adds the Start Dictation menu item at the bottom of the Edit menu.|   
+Emoji & Symbols| Displays a Character Viewer, which includes emoji, symbols, and other characters people can insert at the current insertion point. The system automatically adds the Emoji & Symbols menu item at the bottom of the Edit menu.|   
+  
+## [Format menu](https://developer.apple.com/design/human-interface-guidelines/the-menu-bar#Format-menu)
+
+The Format menu lets people adjust text formatting attributes in the current document or text container. You can exclude this menu if your app doesn’t support formatted text editing.
+
+The Format menu typically contains the following top-level menu items, listed in the following order.
+
+Menu item| Action  
+---|---  
+Font| Displays a submenu containing items for adjusting font attributes of the selected text. Standard submenus include: Show Fonts, Bold, Italic, Underline, Bigger, Smaller, Show Colors, Copy Style, and Paste Style.  
+Text| Displays a submenu containing items for adjusting text attributes of the selected text. Standard submenus include: Align Left, Align Center, Justify, Align Right, Writing Direction, Show Ruler, Copy Ruler, and Paste Ruler.  
+  
+## [View menu](https://developer.apple.com/design/human-interface-guidelines/the-menu-bar#View-menu)
+
+The View menu lets people customize the appearance of all an app’s windows, regardless of type.
+
+Important
+
+The View menu doesn’t include items for navigating between or managing specific windows; the [Window menu](https://developer.apple.com/design/human-interface-guidelines/the-menu-bar#Window-menu) provides these commands.
+
+**Provide a View menu even if your app supports only a subset of the standard view functions.** For example, if your app doesn’t include a tab bar, toolbar, or sidebar, but does support full-screen mode, provide a View menu that includes only the Enter/Exit Full Screen menu item.
+
+**Ensure that each show/hide item title reflects the current state of the corresponding view.** For example, when the toolbar is hidden, provide a Show Toolbar menu item; when the toolbar is visible, provide a Hide Toolbar menu item.
+
+The View menu typically contains the following top-level menu items, listed in the following order.
+
+Menu item| Action  
+---|---  
+Show/Hide Tab Bar| Toggles the visibility of the [tab bar](https://developer.apple.com/design/human-interface-guidelines/tab-bars) above the body area in a tab-based window  
+Show All Tabs/Exit Tab Overview| Enters and exits a view (similar to Mission Control) that provides an overview of all open tabs in a tab-based window  
+Show/Hide Toolbar| In a window that includes a [toolbar](https://developer.apple.com/design/human-interface-guidelines/toolbars), toggles the toolbar’s visibility  
+Customize Toolbar| In a window that includes a toolbar, opens a view that lets people customize toolbar items  
+Show/Hide Sidebar| In a window that includes a [sidebar](https://developer.apple.com/design/human-interface-guidelines/sidebars), toggles the sidebar’s visibility  
+Enter/Exit Full Screen| In an app that supports a [full-screen experience](https://developer.apple.com/design/human-interface-guidelines/going-full-screen), opens the window at full-screen size in a new space
 
 (Shortened: the skill continues in its source.)
 

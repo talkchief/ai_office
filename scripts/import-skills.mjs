@@ -57,9 +57,18 @@ const STOCK = [/^When you need specialized assistance with this domain/i, /^The 
   /^The user needs general-purpose assistance without domain expertise/i, /^You need a different domain or tool outside this scope/i,
   /^Use this skill only when the task clearly matches/i, /^Do not treat the output as a substitute for environment-specific validation/i,
   /^Stop and ask for clarification if required inputs, permissions, safety boundaries, or success criteria are missing/i,
-  /^Clarify goals, constraints, and required inputs/i, /^Apply relevant best practices and validate outcomes/i, /^Provide actionable steps and verification/i];
+  /^Clarify goals, constraints, and required inputs/i, /^Apply relevant best practices and validate outcomes/i, /^Provide actionable steps and verification/i,
+  /^Working on .{0,60}(tasks|workflows)\.?$/i, /^Use this skill when working on .{0,80}$/i];
+// The same, as whole lines rather than bullets: the catalogue's stock trigger sentence and its note about where the text came from.
+const STOCK_LINE = [/^This skill is applicable to execute the workflow( or actions)? described in the overview\.?$/i,
+  /^>\s*This file contains the detailed procedure and reference material extracted from `?SKILL\.md`?/i,
+  /^Working on [^\n]{0,60}(tasks|workflows)\.?$/i, /^Use this skill when working on [^\n]{0,80}$/i];
 export function stripStock(body) {
-  const lines = body.replace(/\r\n?/g, '\n').split('\n').filter(l => { const m = /^\s*[-*]\s+(.*)$/.exec(l); return !(m && STOCK.some(re => re.test(m[1].trim()))); }), out = [];
+  const lines = body.replace(/\r\n?/g, '\n').split('\n').filter(l => {
+    const m = /^\s*[-*]\s+(.*)$/.exec(l);
+    if (m && STOCK.some(re => re.test(m[1].trim()))) return false;
+    return !STOCK_LINE.some(re => re.test(l.trim()));
+  }), out = [];
   for (let i = 0; i < lines.length; i++) {
     const h = /^(#{1,6})\s/.exec(lines[i]);
     if (h) { let j = i + 1; while (j < lines.length && !lines[j].trim()) j++; const next = j < lines.length && /^(#{1,6})\s/.exec(lines[j]); if (j >= lines.length || (next && next[1].length <= h[1].length)) { i = j - 1; continue; } }
@@ -74,34 +83,39 @@ const oneLine = (s, max) => String(s || '').replace(/\s+/g, ' ').trim().slice(0,
 // front matter: the curated role line the picker shows under the name, and the words search ranks by.
 // `mission` and `rules` are the persona's own standing instructions, written from its method; without them the Core Mission
 // is the generic one. The office's operating lines (hand over to the lead, stop when a tool is missing, …) are always there.
-export function renderSkillPersona({ name, title, description, role = '', tags = [], emoji = '🛠️', category = '', source = '', catalogue = 'Agentic Awesome Skills', method = '', mission = [], rules = [] }) {
+export function renderSkillPersona({ name, title, description, role = '', tags = [], emoji = '🛠️', category = '', source = '', catalogue = 'Agentic Awesome Skills', method = '', mission = [], rules = [], authored = false }) {
   const optional = (key, value) => (value ? `${key}: ${oneLine(value, 480)}\n` : '');
+  // `authored`: the method was written for the office because the catalogue's own text was not a method. Say so, rather
+  // than calling it "the skill, as written".
+  const kind = authored ? 'method' : 'skill', methodHeading = authored ? 'The method' : 'The skill, as written';
+  const carries = authored ? 'you work by the method below and apply it exactly as it is written' : `you carry one skill, "${title}", and apply it exactly as written`;
+  const experience = authored ? `The ${title} method, written for the office${category ? ', ' + category : ''}` : `The ${title} skill from the ${catalogue} catalogue${category ? ', ' + category : ''}`;
   const bullets = list => list.map(b => `- ${oneLine(b, 200)}`).join('\n'), handOver = 'Hand finished work to the lead in the format the skill prescribes, with every assumption stated', stop = 'Stop and report when the skill needs a tool, a file or an input the office has not given you; never substitute';
-  const missionLines = mission.length ? bullets([...mission, handOver, stop]) : bullets([`Apply the ${title} skill to the assignment, step by step, without skipping a step`, handOver, stop, 'Cite the skill by name in the report so the lead knows which method was applied']);
+  const missionLines = mission.length ? bullets([...mission, handOver, stop]) : bullets([`Apply the ${title} ${kind} to the assignment, step by step, without skipping a step`, handOver, stop, 'Cite the skill by name in the report so the lead knows which method was applied']);
   const ruleLines = rules.length ? bullets(rules) + '\n' : '';
   return `---
 name: ${name}
 description: ${oneLine(description, 480)}
 ${optional('role', role)}${optional('tags', tags.join(', '))}color: slate
 emoji: ${emoji}
-vibe: Applies the ${title} skill exactly as written, step by step, and says which step produced what.
+vibe: Applies the ${title} ${kind} exactly as written, step by step, and says which step produced what.
 source: ${source}
 ---
 
 # ${name}
 
-You are **${name}**: you carry one skill, "${title}", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **${name}**: ${carries}. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: ${role || `${title} specialist${category ? ' (' + category + ')' : ''}`}
 - **Personality**: Methodical; follows the skill's steps in order and names the step behind every result
-- **Memory**: Keeps the skill's checklist and the files it touched for the current task
-- **Experience**: The ${title} skill from the ${catalogue} catalogue${category ? ', ' + category : ''}
+- **Memory**: Keeps the ${kind}'s checklist and the files it touched for the current task
+- **Experience**: ${experience}
 
 ## 🎯 Core Mission
 ${missionLines}
 
-## 📋 The skill, as written
+## 📋 ${methodHeading}
 ${method}
 
 ## 🚨 Critical Rules
@@ -113,7 +127,7 @@ ${ruleLines}- Follow the skill's own rules; where they conflict with the office'
 }
 
 // One persona per skill.
-export function personaFromSkill(markdown, { id, dir = '', division = 'specialized', prefix = '', max = 7000, source = '', catalogue = 'Agentic Awesome Skills' } = {}) {
+export function personaFromSkill(markdown, { id, dir = '', division = 'specialized', prefix = '', max = 20000, source = '', catalogue = 'Agentic Awesome Skills' } = {}) {
   const { meta, body } = readFrontMatter(markdown);
   const skillId = meta.id || meta.name || id, title = titleOf(meta.name && !/^\d/.test(meta.name) ? meta.name : skillId), name = `${prefix}${title}`;
   const description = oneLine(meta.description, 480) || `Applies the ${title} skill.`;
@@ -147,7 +161,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (args.includes('--reindex')) { const r = reindex(); console.log(`agency: ${r.personas} personas in ${r.divisions} divisions → agency/index.json`); process.exit(0); }
   const source = args.find(a => !a.startsWith('--') && (args.indexOf(a) === 0 || !args[args.indexOf(a) - 1].startsWith('--')));
   if (!source || !fs.existsSync(source)) { console.error('usage: node scripts/import-skills.mjs <skills folder> [--division id] [--label "Name"] [--prefix "Name "] [--max 7000] [--skip-risk offensive]'); process.exit(2); }
-  const division = flag('--division', 'specialized'), label = flag('--label', DIVISIONS[division] || titleOf(division)), prefix = flag('--prefix', ''), max = Number(flag('--max', 7000)) || 7000;
+  const division = flag('--division', 'specialized'), label = flag('--label', DIVISIONS[division] || titleOf(division)), prefix = flag('--prefix', ''), max = Number(flag('--max', 20000)) || 20000;
   const skip = new Set(String(flag('--skip-risk', 'offensive')).split(',').map(s => s.trim().toLowerCase()).filter(Boolean)), sourceNote = flag('--source', ''), catalogue = flag('--catalogue', 'Agentic Awesome Skills');
   const out = path.join(AGENCY, 'personas', division); fs.mkdirSync(out, { recursive: true });
   let written = 0, skipped = 0; const seen = new Set();

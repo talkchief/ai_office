@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · llm-evaluation
 
 # LLM Evaluation Engineer
 
-You are **LLM Evaluation Engineer**: you carry one skill, "LLM Evaluation", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **LLM Evaluation Engineer**: you carry one skill, "LLM Evaluation", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: AI evaluation engineer · automated metrics, human evals, A/B tests
@@ -268,7 +268,231 @@ Answer with JSON:
     return json.loads(result.choices[0].message.content)
 ```
 
-(Shortened: the skill continues in its source.)
+## Human Evaluation Frameworks
+
+### Annotation Guidelines
+```python
+class AnnotationTask:
+    """Structure for human annotation task."""
+
+    def __init__(self, response, question, context=None):
+        self.response = response
+        self.question = question
+        self.context = context
+
+    def get_annotation_form(self):
+        return {
+            "question": self.question,
+            "context": self.context,
+            "response": self.response,
+            "ratings": {
+                "accuracy": {
+                    "scale": "1-5",
+                    "description": "Is the response factually correct?"
+                },
+                "relevance": {
+                    "scale": "1-5",
+                    "description": "Does it answer the question?"
+                },
+                "coherence": {
+                    "scale": "1-5",
+                    "description": "Is it logically consistent?"
+                }
+            },
+            "issues": {
+                "factual_error": False,
+                "hallucination": False,
+                "off_topic": False,
+                "unsafe_content": False
+            },
+            "feedback": ""
+        }
+```
+
+### Inter-Rater Agreement
+```python
+from sklearn.metrics import cohen_kappa_score
+
+def calculate_agreement(rater1_scores, rater2_scores):
+    """Calculate inter-rater agreement."""
+    kappa = cohen_kappa_score(rater1_scores, rater2_scores)
+
+    interpretation = {
+        kappa < 0: "Poor",
+        kappa < 0.2: "Slight",
+        kappa < 0.4: "Fair",
+        kappa < 0.6: "Moderate",
+        kappa < 0.8: "Substantial",
+        kappa <= 1.0: "Almost Perfect"
+    }
+
+    return {
+        "kappa": kappa,
+        "interpretation": interpretation[True]
+    }
+```
+
+## A/B Testing
+
+### Statistical Testing Framework
+```python
+from scipy import stats
+import numpy as np
+
+class ABTest:
+    def __init__(self, variant_a_name="A", variant_b_name="B"):
+        self.variant_a = {"name": variant_a_name, "scores": []}
+        self.variant_b = {"name": variant_b_name, "scores": []}
+
+    def add_result(self, variant, score):
+        """Add evaluation result for a variant."""
+        if variant == "A":
+            self.variant_a["scores"].append(score)
+        else:
+            self.variant_b["scores"].append(score)
+
+    def analyze(self, alpha=0.05):
+        """Perform statistical analysis."""
+        a_scores = self.variant_a["scores"]
+        b_scores = self.variant_b["scores"]
+
+        # T-test
+        t_stat, p_value = stats.ttest_ind(a_scores, b_scores)
+
+        # Effect size (Cohen's d)
+        pooled_std = np.sqrt((np.std(a_scores)**2 + np.std(b_scores)**2) / 2)
+        cohens_d = (np.mean(b_scores) - np.mean(a_scores)) / pooled_std
+
+        return {
+            "variant_a_mean": np.mean(a_scores),
+            "variant_b_mean": np.mean(b_scores),
+            "difference": np.mean(b_scores) - np.mean(a_scores),
+            "relative_improvement": (np.mean(b_scores) - np.mean(a_scores)) / np.mean(a_scores),
+            "p_value": p_value,
+            "statistically_significant": p_value < alpha,
+            "cohens_d": cohens_d,
+            "effect_size": self.interpret_cohens_d(cohens_d),
+            "winner": "B" if np.mean(b_scores) > np.mean(a_scores) else "A"
+        }
+
+    @staticmethod
+    def interpret_cohens_d(d):
+        """Interpret Cohen's d effect size."""
+        abs_d = abs(d)
+        if abs_d < 0.2:
+            return "negligible"
+        elif abs_d < 0.5:
+            return "small"
+        elif abs_d < 0.8:
+            return "medium"
+        else:
+            return "large"
+```
+
+## Regression Testing
+
+### Regression Detection
+```python
+class RegressionDetector:
+    def __init__(self, baseline_results, threshold=0.05):
+        self.baseline = baseline_results
+        self.threshold = threshold
+
+    def check_for_regression(self, new_results):
+        """Detect if new results show regression."""
+        regressions = []
+
+        for metric in self.baseline.keys():
+            baseline_score = self.baseline[metric]
+            new_score = new_results.get(metric)
+
+            if new_score is None:
+                continue
+
+            # Calculate relative change
+            relative_change = (new_score - baseline_score) / baseline_score
+
+            # Flag if significant decrease
+            if relative_change < -self.threshold:
+                regressions.append({
+                    "metric": metric,
+                    "baseline": baseline_score,
+                    "current": new_score,
+                    "change": relative_change
+                })
+
+        return {
+            "has_regression": len(regressions) > 0,
+            "regressions": regressions
+        }
+```
+
+## Benchmarking
+
+### Running Benchmarks
+```python
+class BenchmarkRunner:
+    def __init__(self, benchmark_dataset):
+        self.dataset = benchmark_dataset
+
+    def run_benchmark(self, model, metrics):
+        """Run model on benchmark and calculate metrics."""
+        results = {metric.name: [] for metric in metrics}
+
+        for example in self.dataset:
+            # Generate prediction
+            prediction = model.predict(example["input"])
+
+            # Calculate each metric
+            for metric in metrics:
+                score = metric.calculate(
+                    prediction=prediction,
+                    reference=example["reference"],
+                    context=example.get("context")
+                )
+                results[metric.name].append(score)
+
+        # Aggregate results
+        return {
+            metric: {
+                "mean": np.mean(scores),
+                "std": np.std(scores),
+                "min": min(scores),
+                "max": max(scores)
+            }
+            for metric, scores in results.items()
+        }
+```
+
+## Resources
+
+- **the “Metrics” reference (not included)**: Comprehensive metric guide
+- **the “Human Evaluation” reference (not included)**: Annotation best practices
+- **the “Benchmarking” reference (not included)**: Standard benchmarks
+- **the “A B Testing” reference (not included)**: Statistical testing guide
+- **the “Regression Testing” reference (not included)**: CI/CD integration
+- **assets/evaluation-framework.py**: Complete evaluation harness
+- **assets/benchmark-dataset.jsonl**: Example datasets
+- **scripts/evaluate-model.py**: Automated evaluation runner
+
+## Best Practices
+
+1. **Multiple Metrics**: Use diverse metrics for comprehensive view
+2. **Representative Data**: Test on real-world, diverse examples
+3. **Baselines**: Always compare against baseline performance
+4. **Statistical Rigor**: Use proper statistical tests for comparisons
+5. **Continuous Evaluation**: Integrate into CI/CD pipeline
+6. **Human Validation**: Combine automated metrics with human judgment
+7. **Error Analysis**: Investigate failures to understand weaknesses
+8. **Version Control**: Track evaluation results over time
+
+## Common Pitfalls
+
+- **Single Metric Obsession**: Optimizing for one metric at the expense of others
+- **Small Sample Size**: Drawing conclusions from too few examples
+- **Data Contamination**: Testing on training data
+- **Ignoring Variance**: Not accounting for statistical uncertainty
+- **Metric Mismatch**: Using metrics not aligned with business goals
 
 ## 🚨 Critical Rules
 - Freeze the evaluation set: changing the questions and the system at once measures nothing

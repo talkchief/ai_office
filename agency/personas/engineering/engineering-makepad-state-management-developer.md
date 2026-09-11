@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · robius-state-management
 
 # Makepad State Management Developer
 
-You are **Makepad State Management Developer**: you carry one skill, "Robius State Management", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Makepad State Management Developer**: you carry one skill, "Robius State Management", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: Rust app developer · Makepad state, persistence, stores
@@ -208,7 +208,226 @@ impl Widget for RoomsList {
 }
 ```
 
-(Shortened: the skill continues in its source.)
+## Persistence Layer
+
+### File Paths
+
+```rust
+use std::path::{Path, PathBuf};
+
+const LATEST_APP_STATE_FILE_NAME: &str = "latest_app_state.json";
+const WINDOW_GEOM_STATE_FILE_NAME: &str = "window_geom_state.json";
+
+/// Get user-specific persistent state directory
+fn persistent_state_dir(user_id: &UserId) -> PathBuf {
+    app_data_dir()
+        .join("users")
+        .join(user_id.to_string().replace(':', "_"))
+}
+
+/// Get app-wide data directory
+fn app_data_dir() -> &'static Path {
+    // Platform-specific app data location
+    static APP_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
+    APP_DATA_DIR.get_or_init(|| {
+        dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("myapp")
+    })
+}
+```
+
+### Saving State
+
+```rust
+use std::io::Write;
+
+pub fn save_app_state(
+    app_state: AppState,
+    user_id: OwnedUserId,
+) -> anyhow::Result<()> {
+    let file = std::fs::File::create(
+        persistent_state_dir(&user_id).join(LATEST_APP_STATE_FILE_NAME)
+    )?;
+    let mut writer = std::io::BufWriter::new(file);
+    serde_json::to_writer(&mut writer, &app_state)?;
+    writer.flush()?;
+    log!("Successfully saved app state to persistent storage.");
+    Ok(())
+}
+
+/// Save window geometry state (user-agnostic)
+pub fn save_window_state(window_ref: WindowRef, cx: &Cx) -> anyhow::Result<()> {
+    let inner_size = window_ref.get_inner_size(cx);
+    let position = window_ref.get_position(cx);
+    let window_geom = WindowGeomState {
+        inner_size: (inner_size.x, inner_size.y),
+        position: (position.x, position.y),
+        is_fullscreen: window_ref.is_fullscreen(cx),
+    };
+    std::fs::write(
+        app_data_dir().join(WINDOW_GEOM_STATE_FILE_NAME),
+        serde_json::to_string(&window_geom)?,
+    )?;
+    Ok(())
+}
+```
+
+### Loading State
+
+```rust
+/// Load app state with graceful fallback
+pub async fn load_app_state(user_id: &UserId) -> anyhow::Result<AppState> {
+    let state_path = persistent_state_dir(user_id).join(LATEST_APP_STATE_FILE_NAME);
+
+    // Read file
+    let file_bytes = match tokio::fs::read(&state_path).await {
+        Ok(fb) => fb,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            log!("No saved app state found, using default.");
+            return Ok(AppState::default());
+        }
+        Err(e) => return Err(e.into()),
+    };
+
+    // Deserialize with fallback
+    match serde_json::from_slice(&file_bytes) {
+        Ok(app_state) => {
+            log!("Successfully loaded app state.");
+            Ok(app_state)
+        }
+        Err(e) => {
+            error!("Failed to deserialize: {e}. May be incompatible format.");
+
+            // Backup old file
+            let backup_path = state_path.with_extension("json.bak");
+            if let Err(backup_err) = tokio::fs::rename(&state_path, &backup_path).await {
+                error!("Failed to backup old state: {}", backup_err);
+            } else {
+                log!("Old state backed up to: {:?}", backup_path);
+            }
+
+            log!("Using default app state.");
+            Ok(AppState::default())
+        }
+    }
+}
+
+/// Load window geometry (synchronous, on UI thread)
+pub fn load_window_state(window_ref: WindowRef, cx: &mut Cx) -> anyhow::Result<()> {
+    let file = match std::fs::File::open(app_data_dir().join(WINDOW_GEOM_STATE_FILE_NAME)) {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e.into()),
+    };
+
+    let window_geom: WindowGeomState = serde_json::from_reader(file)?;
+    log!("Restoring window geometry: {window_geom:?}");
+
+    window_ref.configure_window(
+        cx,
+        dvec2(window_geom.inner_size.0, window_geom.inner_size.1),
+        dvec2(window_geom.position.0, window_geom.position.1),
+        window_geom.is_fullscreen,
+        "MyApp".to_string(),
+    );
+    Ok(())
+}
+```
+
+### Startup/Shutdown Integration
+
+```rust
+impl MatchEvent for App {
+    fn handle_startup(&mut self, cx: &mut Cx) {
+        // Load window geometry (sync, on UI thread)
+        if let Err(e) = persistence::load_window_state(
+            self.ui.window(ids!(main_window)), cx
+        ) {
+            error!("Failed to load window state: {}", e);
+        }
+
+        // Trigger async app state load
+        let user_id = get_current_user_id();
+        tokio::spawn(async move {
+            match persistence::load_app_state(&user_id).await {
+                Ok(app_state) => {
+                    Cx::post_action(AppStateAction::RestoreFromPersistence(app_state));
+                    SignalToUI::set_ui_signal();
+                }
+                Err(e) => error!("Failed to load app state: {}", e),
+            }
+        });
+    }
+}
+
+impl AppMain for App {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
+        if let Event::Shutdown = event {
+            // Save window state (sync)
+            if let Err(e) = persistence::save_window_state(
+                self.ui.window(ids!(main_window)), cx
+            ) {
+                error!("Failed to save window state: {e}");
+            }
+
+            // Save app state (sync)
+            if let Some(user_id) = current_user_id() {
+                if let Err(e) = persistence::save_app_state(
+                    self.app_state.clone(), user_id
+                ) {
+                    error!("Failed to save app state: {e}");
+                }
+            }
+        }
+        // ...
+    }
+}
+```
+
+## Thread-Local State (UI-Only)
+
+```rust
+use std::{cell::RefCell, rc::Rc, collections::HashMap};
+
+thread_local! {
+    /// UI-thread-only cache
+    static UI_CACHE: Rc<RefCell<HashMap<OwnedRoomId, CachedData>>> =
+        Rc::new(RefCell::new(HashMap::new()));
+}
+
+/// Get cache reference (requires Cx to ensure UI thread)
+pub fn get_ui_cache(_cx: &mut Cx) -> Rc<RefCell<HashMap<OwnedRoomId, CachedData>>> {
+    UI_CACHE.with(Rc::clone)
+}
+
+/// Clear cache (requires Cx)
+pub fn clear_ui_cache(_cx: &mut Cx) {
+    UI_CACHE.with(|cache| cache.borrow_mut().clear());
+}
+```
+
+## Best Practices
+
+1. **Separate persistent vs runtime state**: Use `#[serde(skip)]` for non-persistent fields
+2. **Use Scope::with_data() for tree propagation**: Don't pass state through widget refs
+3. **Graceful deserialization fallback**: Handle format changes between versions
+4. **Backup old state files**: Preserve user data when format changes
+5. **User-specific persistent paths**: Separate state per user account
+6. **Sync window state, async app state**: Window geometry loads sync on UI thread
+7. **Thread-local for UI-only caches**: Use `thread_local!` with Cx parameter guard
+
+## Reference Files
+
+- the “Persistence Patterns” reference (not included) - Additional persistence patterns (Robrix)
+- the “State Structures” reference (not included) - State structure examples (Robrix)
+- the “Moly State Patterns” reference (not included) - Moly-specific patterns
+  - Central Store struct containing all state
+  - Async Store initialization with `load_into_app()`
+  - App state check pattern (early return if not loaded)
+  - Submodule state managers (Search, Downloads, Chats)
+  - Provider syncing status tracking
+  - Store action forwarding to submodules
 
 ## 🚨 Critical Rules
 - Never persist login credentials or session tokens alongside ordinary app state

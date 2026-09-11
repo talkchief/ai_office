@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · frontend-ui-dark-ts
 
 # Dark Dashboard UI Developer
 
-You are **Dark Dashboard UI Developer**: you carry one skill, "Frontend UI Dark TS", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Dark Dashboard UI Developer**: you carry one skill, "Frontend UI Dark TS", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: UI developer · dark React themes, Tailwind CSS, Framer Motion
@@ -47,13 +47,6 @@ A modern dark-themed React UI system using **Tailwind CSS** and **Framer Motion*
 | Success | Status success | `text-status-success` |
 | Warning | Status warning | `text-status-warning` |
 | Error | Status error | `text-status-error` |
-
-## When to Use
-This skill is applicable to execute the workflow or actions described in the overview.
-
-## Detailed Guide
-
-> This file contains the detailed procedure and reference material extracted from `SKILL.md` for focused loading. The root skill defines activation, examples, safety constraints, and limitations.
 
 ## Stack
 
@@ -265,9 +258,358 @@ export default {
         'safe-left': 'env(safe-area-inset-left)',
         'safe-right': 'env(safe-area-inset-right)',
       },
-      // Mobile: min
+      // Mobile: minimum touch target sizes (44px per Apple/Google guidelines)
+      minHeight: {
+        'touch': '44px',
+      },
+      minWidth: {
+        'touch': '44px',
+      },
+    },
+  },
+  plugins: [],
+};
+```
 
-(Shortened: the skill continues in its source.)
+### postcss.config.js
+
+```js
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+```
+
+### src/styles/globals.css
+
+```css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Font faces */
+@font-face {
+  font-family: 'Segoe UI';
+  src: url('../assets/fonts/Segoe UI.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Segoe UI';
+  src: url('../assets/fonts/Segoe UI Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Segoe UI';
+  src: url('../assets/fonts/Segoe UI Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Segoe UI';
+  src: url('../assets/fonts/Segoe UI Bold Italic.ttf') format('truetype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* CSS Custom Properties */
+:root {
+  /* Brand colors */
+  --color-brand: #8251EE;
+  --color-brand-hover: #9366F5;
+  --color-brand-light: #A37EF5;
+  --color-brand-subtle: rgba(130, 81, 238, 0.15);
+
+  /* Neutral backgrounds */
+  --color-bg-1: hsl(240, 6%, 10%);
+  --color-bg-2: hsl(240, 5%, 12%);
+  --color-bg-3: hsl(240, 5%, 14%);
+  --color-bg-4: hsl(240, 4%, 18%);
+  --color-bg-5: hsl(240, 4%, 22%);
+  --color-bg-6: hsl(240, 4%, 26%);
+
+  /* Text colors */
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #A1A1AA;
+  --color-text-muted: #71717A;
+
+  /* Border colors */
+  --color-border-subtle: hsla(0, 0%, 100%, 0.08);
+  --color-border-default: hsla(0, 0%, 100%, 0.12);
+  --color-border-strong: hsla(0, 0%, 100%, 0.20);
+
+  /* Status colors */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #3B82F6;
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+
+  /* Border radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 300ms ease;
+}
+
+/* Base styles */
+html {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-neutral-bg1 text-text-primary font-sans antialiased;
+  min-height: 100vh;
+}
+
+/* Focus styles */
+*:focus-visible {
+  @apply outline-none ring-2 ring-brand ring-offset-2 ring-offset-neutral-bg1;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-neutral-bg2;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-neutral-bg5 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-neutral-bg6;
+}
+
+/* Glass utility classes */
+@layer components {
+  .glass {
+    @apply backdrop-blur-md bg-white/5 border border-white/10;
+  }
+
+  .glass-card {
+    @apply backdrop-blur-md bg-white/5 border border-white/10 rounded-xl;
+  }
+
+  .glass-panel {
+    @apply backdrop-blur-lg bg-black/40 border border-white/5;
+  }
+
+  .glass-overlay {
+    @apply backdrop-blur-sm bg-black/60;
+  }
+
+  .glass-input {
+    @apply backdrop-blur-sm bg-white/5 border border-white/10 focus:border-brand focus:bg-white/10;
+  }
+}
+
+/* Animation utilities */
+@layer utilities {
+  .animate-in {
+    animation: fadeIn 0.3s ease-out, slideUp 0.3s ease-out;
+  }
+}
+```
+
+### src/main.tsx
+
+```tsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App';
+import './styles/globals.css';
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </React.StrictMode>
+);
+```
+
+### src/App.tsx
+
+```tsx
+import { Routes, Route } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
+import { AppShell } from './components/layout/AppShell';
+import { Dashboard } from './pages/Dashboard';
+import { Settings } from './pages/Settings';
+
+export default function App() {
+  return (
+    <AppShell>
+      <AnimatePresence mode="wait">
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      </AnimatePresence>
+    </AppShell>
+  );
+}
+```
+
+## Animation Patterns
+
+### Framer Motion Variants
+
+```tsx
+// Fade in on mount
+export const fadeIn = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 },
+  transition: { duration: 0.2 },
+};
+
+// Slide up on mount
+export const slideUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: 20 },
+  transition: { duration: 0.3, ease: 'easeOut' },
+};
+
+// Scale on hover (for buttons/cards)
+export const scaleOnHover = {
+  whileHover: { scale: 1.02 },
+  whileTap: { scale: 0.98 },
+  transition: { type: 'spring', stiffness: 400, damping: 17 },
+};
+
+// Stagger children
+export const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+export const staggerItem = {
+  hidden: { opacity: 0, y: 10 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.2, ease: 'easeOut' },
+  },
+};
+```
+
+### Page Transition Wrapper
+
+```tsx
+import { motion } from 'framer-motion';
+import { ReactNode } from 'react';
+
+interface PageTransitionProps {
+  children: ReactNode;
+}
+
+export function PageTransition({ children }: PageTransitionProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+```
+
+## Glass Effect Patterns
+
+### Glass Card
+
+```tsx
+<div className="glass-card p-6">
+  <h2 className="text-lg font-semibold text-text-primary">Card Title</h2>
+  <p className="text-text-secondary mt-2">Card content goes here.</p>
+</div>
+```
+
+### Glass Panel (Sidebar)
+
+```tsx
+<aside className="glass-panel w-64 h-screen p-4">
+  <nav className="space-y-2">
+    {/* Navigation items */}
+  </nav>
+</aside>
+```
+
+### Glass Modal Overlay
+
+```tsx
+<motion.div
+  className="fixed inset-0 glass-overlay flex items-center justify-center z-50"
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  exit={{ opacity: 0 }}
+>
+  <motion.div
+    className="glass-card p-6 max-w-md w-full mx-4"
+    initial={{ scale: 0.95, opacity: 0 }}
+    animate={{ scale: 1, opacity: 1 }}
+    exit={{ scale: 0.95, opacity: 0 }}
+  >
+    {/* Modal content */}
+  </motion.div>
+</motion.div>
+```
+
+## Typography
+
+| Element | Classes |
+|---------|---------|
+| Page title | `text-2xl font-semibold text-text-primary` |
+| Section title | `text-lg font-semibold text-text-primary` |
+| Card title | `text-base font-medium text-text-primary` |
+| Body text | `text-sm text-text-secondary` |
+| Caption | `text-xs text-text-muted` |
+| Label | `text-sm font-medium text-text-secondary` |
+
+## Related Files
+
+- Design Tokens — Complete color system, spacing, typography scales
+- Components — Button, Card, Input, Dialog, Tabs, and more
+- Patterns — Page layouts, navigation, lists, forms
 
 ## 🚨 Critical Rules
 - Use the theme's semantic Tailwind classes, never ad-hoc colours

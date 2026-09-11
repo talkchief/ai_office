@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · projection-patterns
 
 # CQRS Read Model Developer
 
-You are **CQRS Read Model Developer**: you carry one skill, "Projection Patterns", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **CQRS Read Model Developer**: you carry one skill, "Projection Patterns", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: event sourcing developer · projections, materialized views
@@ -251,9 +251,286 @@ class OrderSummaryProjection(Projection):
                 SET status = 'shipped',
                     shipped_at = $2,
                     updated_at = NOW()
-                WHERE order_
+                WHERE order_id = $1
+                """,
+                event.data['order_id'],
+                event.data['shipped_at']
+            )
 
-(Shortened: the skill continues in its source.)
+    async def _handle_completed(self, event: Event):
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE order_summaries
+                SET status = 'completed',
+                    completed_at = $2,
+                    updated_at = NOW()
+                WHERE order_id = $1
+                """,
+                event.data['order_id'],
+                event.data['completed_at']
+            )
+
+    async def _handle_cancelled(self, event: Event):
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE order_summaries
+                SET status = 'cancelled',
+                    cancelled_at = $2,
+                    cancellation_reason = $3,
+                    updated_at = NOW()
+                WHERE order_id = $1
+                """,
+                event.data['order_id'],
+                event.data['cancelled_at'],
+                event.data.get('reason')
+            )
+```
+
+### Template 3: Elasticsearch Search Projection
+
+```python
+from elasticsearch import AsyncElasticsearch
+
+class ProductSearchProjection(Projection):
+    """Projects product events to Elasticsearch for full-text search."""
+
+    def __init__(self, es_client: AsyncElasticsearch):
+        self.es = es_client
+        self.index = "products"
+
+    @property
+    def name(self) -> str:
+        return "product_search"
+
+    def handles(self) -> List[str]:
+        return [
+            "ProductCreated",
+            "ProductUpdated",
+            "ProductPriceChanged",
+            "ProductDeleted"
+        ]
+
+    async def apply(self, event: Event) -> None:
+        if event.event_type == "ProductCreated":
+            await self.es.index(
+                index=self.index,
+                id=event.data['product_id'],
+                document={
+                    'name': event.data['name'],
+                    'description': event.data['description'],
+                    'category': event.data['category'],
+                    'price': event.data['price'],
+                    'tags': event.data.get('tags', []),
+                    'created_at': event.data['created_at']
+                }
+            )
+
+        elif event.event_type == "ProductUpdated":
+            await self.es.update(
+                index=self.index,
+                id=event.data['product_id'],
+                doc={
+                    'name': event.data['name'],
+                    'description': event.data['description'],
+                    'category': event.data['category'],
+                    'tags': event.data.get('tags', []),
+                    'updated_at': event.data['updated_at']
+                }
+            )
+
+        elif event.event_type == "ProductPriceChanged":
+            await self.es.update(
+                index=self.index,
+                id=event.data['product_id'],
+                doc={
+                    'price': event.data['new_price'],
+                    'price_updated_at': event.data['changed_at']
+                }
+            )
+
+        elif event.event_type == "ProductDeleted":
+            await self.es.delete(
+                index=self.index,
+                id=event.data['product_id']
+            )
+```
+
+### Template 4: Aggregating Projection
+
+```python
+class DailySalesProjection(Projection):
+    """Aggregates sales data by day for reporting."""
+
+    def __init__(self, db_pool: asyncpg.Pool):
+        self.pool = db_pool
+
+    @property
+    def name(self) -> str:
+        return "daily_sales"
+
+    def handles(self) -> List[str]:
+        return ["OrderCompleted", "OrderRefunded"]
+
+    async def apply(self, event: Event) -> None:
+        if event.event_type == "OrderCompleted":
+            await self._increment_sales(event)
+        elif event.event_type == "OrderRefunded":
+            await self._decrement_sales(event)
+
+    async def _increment_sales(self, event: Event):
+        date = event.data['completed_at'][:10]  # YYYY-MM-DD
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO daily_sales (date, total_orders, total_revenue, total_items)
+                VALUES ($1, 1, $2, $3)
+                ON CONFLICT (date) DO UPDATE SET
+                    total_orders = daily_sales.total_orders + 1,
+                    total_revenue = daily_sales.total_revenue + $2,
+                    total_items = daily_sales.total_items + $3,
+                    updated_at = NOW()
+                """,
+                date,
+                event.data['total_amount'],
+                event.data['item_count']
+            )
+
+    async def _decrement_sales(self, event: Event):
+        date = event.data['original_completed_at'][:10]
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE daily_sales SET
+                    total_orders = total_orders - 1,
+                    total_revenue = total_revenue - $2,
+                    total_refunds = total_refunds + $2,
+                    updated_at = NOW()
+                WHERE date = $1
+                """,
+                date,
+                event.data['refund_amount']
+            )
+```
+
+### Template 5: Multi-Table Projection
+
+```python
+class CustomerActivityProjection(Projection):
+    """Projects customer activity across multiple tables."""
+
+    def __init__(self, db_pool: asyncpg.Pool):
+        self.pool = db_pool
+
+    @property
+    def name(self) -> str:
+        return "customer_activity"
+
+    def handles(self) -> List[str]:
+        return [
+            "CustomerCreated",
+            "OrderCompleted",
+            "ReviewSubmitted",
+            "CustomerTierChanged"
+        ]
+
+    async def apply(self, event: Event) -> None:
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                if event.event_type == "CustomerCreated":
+                    # Insert into customers table
+                    await conn.execute(
+                        """
+                        INSERT INTO customers (customer_id, email, name, tier, created_at)
+                        VALUES ($1, $2, $3, 'bronze', $4)
+                        """,
+                        event.data['customer_id'],
+                        event.data['email'],
+                        event.data['name'],
+                        event.data['created_at']
+                    )
+                    # Initialize activity summary
+                    await conn.execute(
+                        """
+                        INSERT INTO customer_activity_summary
+                        (customer_id, total_orders, total_spent, total_reviews)
+                        VALUES ($1, 0, 0, 0)
+                        """,
+                        event.data['customer_id']
+                    )
+
+                elif event.event_type == "OrderCompleted":
+                    # Update activity summary
+                    await conn.execute(
+                        """
+                        UPDATE customer_activity_summary SET
+                            total_orders = total_orders + 1,
+                            total_spent = total_spent + $2,
+                            last_order_at = $3
+                        WHERE customer_id = $1
+                        """,
+                        event.data['customer_id'],
+                        event.data['total_amount'],
+                        event.data['completed_at']
+                    )
+                    # Insert into order history
+                    await conn.execute(
+                        """
+                        INSERT INTO customer_order_history
+                        (customer_id, order_id, amount, completed_at)
+                        VALUES ($1, $2, $3, $4)
+                        """,
+                        event.data['customer_id'],
+                        event.data['order_id'],
+                        event.data['total_amount'],
+                        event.data['completed_at']
+                    )
+
+                elif event.event_type == "ReviewSubmitted":
+                    await conn.execute(
+                        """
+                        UPDATE customer_activity_summary SET
+                            total_reviews = total_reviews + 1,
+                            last_review_at = $2
+                        WHERE customer_id = $1
+                        """,
+                        event.data['customer_id'],
+                        event.data['submitted_at']
+                    )
+
+                elif event.event_type == "CustomerTierChanged":
+                    await conn.execute(
+                        """
+                        UPDATE customers SET tier = $2, updated_at = NOW()
+                        WHERE customer_id = $1
+                        """,
+                        event.data['customer_id'],
+                        event.data['new_tier']
+                    )
+```
+
+## Best Practices
+
+### Do's
+
+- **Make projections idempotent** - Safe to replay
+- **Use transactions** - For multi-table updates
+- **Store checkpoints** - Resume after failures
+- **Monitor lag** - Alert on projection delays
+- **Plan for rebuilds** - Design for reconstruction
+
+### Don'ts
+
+- **Don't couple projections** - Each is independent
+- **Don't skip error handling** - Log and alert on failures
+- **Don't ignore ordering** - Events must be processed in order
+- **Don't over-normalize** - Denormalize for query patterns
+
+## Resources
+
+- [CQRS Pattern](https://docs.microsoft.com/en-us/azure/architecture/patterns/cqrs)
+- [Projection Building Blocks](https://zimarev.com/blog/event-sourcing/projections/)
 
 ## 🚨 Critical Rules
 - Projections must be idempotent: handling the same event twice leaves the read model unchanged

@@ -58,7 +58,7 @@ export class Agency {
     return { ...persona, label: entry.label };
   }
   // The full method as an office skill (instructions are capped; the cut lands on a heading when it can).
-  skillOf(persona, { max = 10000 } = {}) {
+  skillOf(persona, { max = 24000 } = {}) {
     let instructions = `# ${persona.name}\n\n${persona.body}`;
     if (instructions.length > max) { const cut = instructions.lastIndexOf('\n## ', max); instructions = instructions.slice(0, cut > max / 2 ? cut : max).trimEnd() + '\n\n(Shortened: the full persona is in the Agency catalogue.)'; }
     return { id: ('agency-' + persona.id).slice(0, 48), name: text(persona.name, 100), description: text(persona.description, 500), instructions };

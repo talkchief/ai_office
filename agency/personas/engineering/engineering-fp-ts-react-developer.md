@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · fp-ts-react
 
 # fp-ts React Developer
 
-You are **fp-ts React Developer**: you carry one skill, "FP TS React", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **fp-ts React Developer**: you carry one skill, "FP TS React", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: React developer · fp-ts hooks, state, forms, data fetching
@@ -53,10 +53,6 @@ Practical patterns for React apps. No jargon, just code that works.
 | Prevent re-renders with fp-ts | `useMemo` or `fp-ts-react-stable-hooks` |
 
 ---
-
-## Detailed Guide
-
-> This file contains the detailed procedure and reference material extracted from `SKILL.md` for focused loading. The root skill defines activation, examples, safety constraints, and limitations.
 
 ## Quick Reference
 
@@ -278,7 +274,548 @@ function validateFormWithFieldErrors(form: SignupForm): E.Either<FieldErrors, Va
 
 ---
 
-(Shortened: the skill continues in its source.)
+## 3. Data Fetching with TaskEither
+
+TaskEither = async operation that might fail. Perfect for API calls.
+
+### Basic Fetch Hook
+
+```typescript
+import { useState, useEffect } from 'react'
+import * as TE from 'fp-ts/TaskEither'
+import * as E from 'fp-ts/Either'
+import { pipe } from 'fp-ts/function'
+
+// Wrap fetch in TaskEither
+const fetchJson = <T>(url: string): TE.TaskEither<Error, T> =>
+  TE.tryCatch(
+    async () => {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return res.json()
+    },
+    (err) => err instanceof Error ? err : new Error(String(err))
+  )
+
+// Custom hook
+function useFetch<T>(url: string) {
+  const [data, setData] = useState<T | null>(null)
+  const [error, setError] = useState<Error | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+
+    pipe(
+      fetchJson<T>(url),
+      TE.match(
+        (err) => {
+          setError(err)
+          setLoading(false)
+        },
+        (result) => {
+          setData(result)
+          setLoading(false)
+        }
+      )
+    )()
+  }, [url])
+
+  return { data, error, loading }
+}
+
+// Usage
+function UserList() {
+  const { data, error, loading } = useFetch<User[]>('/api/users')
+
+  if (loading) return <div>Loading...</div>
+  if (error) return <div>Error: {error.message}</div>
+  return (
+    <ul>
+      {data?.map(user => <li key={user.id}>{user.name}</li>)}
+    </ul>
+  )
+}
+```
+
+### Chaining API Calls
+
+```typescript
+// Fetch user, then fetch their posts
+const fetchUserWithPosts = (userId: string) => pipe(
+  fetchJson<User>(`/api/users/${userId}`),
+  TE.flatMap(user => pipe(
+    fetchJson<Post[]>(`/api/users/${userId}/posts`),
+    TE.map(posts => ({ ...user, posts }))
+  ))
+)
+```
+
+### Parallel API Calls
+
+```typescript
+import { sequenceT } from 'fp-ts/Apply'
+
+// Fetch multiple things at once
+const fetchDashboardData = () => pipe(
+  sequenceT(TE.ApplyPar)(
+    fetchJson<User>('/api/user'),
+    fetchJson<Stats>('/api/stats'),
+    fetchJson<Notifications[]>('/api/notifications')
+  ),
+  TE.map(([user, stats, notifications]) => ({
+    user,
+    stats,
+    notifications
+  }))
+)
+```
+
+---
+
+## 4. RemoteData Pattern (The Right Way to Handle Async State)
+
+Stop using `{ data, loading, error }` booleans. Use a proper state machine.
+
+### The Pattern
+
+```typescript
+// RemoteData has exactly 4 states - no impossible combinations
+type RemoteData<E, A> =
+  | { _tag: 'NotAsked' }                    // Haven't started yet
+  | { _tag: 'Loading' }                     // In progress
+  | { _tag: 'Failure'; error: E }           // Failed
+  | { _tag: 'Success'; data: A }            // Got it!
+
+// Constructors
+const notAsked = <E, A>(): RemoteData<E, A> => ({ _tag: 'NotAsked' })
+const loading = <E, A>(): RemoteData<E, A> => ({ _tag: 'Loading' })
+const failure = <E, A>(error: E): RemoteData<E, A> => ({ _tag: 'Failure', error })
+const success = <E, A>(data: A): RemoteData<E, A> => ({ _tag: 'Success', data })
+
+// Pattern match all states
+function fold<E, A, R>(
+  rd: RemoteData<E, A>,
+  onNotAsked: () => R,
+  onLoading: () => R,
+  onFailure: (e: E) => R,
+  onSuccess: (a: A) => R
+): R {
+  switch (rd._tag) {
+    case 'NotAsked': return onNotAsked()
+    case 'Loading': return onLoading()
+    case 'Failure': return onFailure(rd.error)
+    case 'Success': return onSuccess(rd.data)
+  }
+}
+```
+
+### Hook with RemoteData
+
+```typescript
+function useRemoteData<T>(fetchFn: () => Promise<T>) {
+  const [state, setState] = useState<RemoteData<Error, T>>(notAsked())
+
+  const execute = async () => {
+    setState(loading())
+    try {
+      const data = await fetchFn()
+      setState(success(data))
+    } catch (err) {
+      setState(failure(err instanceof Error ? err : new Error(String(err))))
+    }
+  }
+
+  return { state, execute }
+}
+
+// Usage
+function UserProfile({ userId }: { userId: string }) {
+  const { state, execute } = useRemoteData(() =>
+    fetch(`/api/users/${userId}`).then(r => r.json())
+  )
+
+  useEffect(() => { execute() }, [userId])
+
+  return fold(
+    state,
+    () => <button onClick={execute}>Load User</button>,
+    () => <Spinner />,
+    (err) => <ErrorMessage message={err.message} onRetry={execute} />,
+    (user) => <UserCard user={user} />
+  )
+}
+```
+
+### Why RemoteData Beats Booleans
+
+```typescript
+// ❌ BAD: Impossible states are possible
+interface BadState {
+  data: User | null
+  loading: boolean
+  error: Error | null
+}
+// Can have: { data: user, loading: true, error: someError } - what does that mean?!
+
+// ✅ GOOD: Only valid states exist
+type GoodState = RemoteData<Error, User>
+// Can only be: NotAsked | Loading | Failure | Success
+```
+
+---
+
+## 5. Referential Stability (Preventing Re-renders)
+
+fp-ts values like `O.some(1)` create new objects each render. React sees them as "changed".
+
+### The Problem
+
+```typescript
+// ❌ BAD: Creates new Option every render
+function BadComponent() {
+  const [value, setValue] = useState(O.some(1))
+
+  useEffect(() => {
+    // This runs EVERY render because O.some(1) !== O.some(1)
+    console.log('value changed')
+  }, [value])
+}
+```
+
+### Solution 1: useMemo
+
+```typescript
+// ✅ GOOD: Memoize Option creation
+function GoodComponent() {
+  const [rawValue, setRawValue] = useState<number | null>(1)
+
+  const value = useMemo(
+    () => O.fromNullable(rawValue),
+    [rawValue]  // Only recreate when rawValue changes
+  )
+
+  useEffect(() => {
+    // Now this only runs when rawValue actually changes
+    console.log('value changed')
+  }, [rawValue])  // Depend on raw value, not Option
+}
+```
+
+### Solution 2: fp-ts-react-stable-hooks
+
+```bash
+npm install fp-ts-react-stable-hooks
+```
+
+```typescript
+import { useStableO, useStableEffect } from 'fp-ts-react-stable-hooks'
+import * as O from 'fp-ts/Option'
+import * as Eq from 'fp-ts/Eq'
+
+function StableComponent() {
+  // Uses fp-ts equality instead of reference equality
+  const [value, setValue] = useStableO(O.some(1))
+
+  // Effect that understands Option equality
+  useStableEffect(
+    () => { console.log('value changed') },
+    [value],
+    Eq.tuple(O.getEq(Eq.eqNumber))  // Custom equality
+  )
+}
+```
+
+---
+
+## 6. Dependency Injection with Context
+
+Use ReaderTaskEither for testable components with injected dependencies.
+
+### Setup Dependencies
+
+```typescript
+import * as RTE from 'fp-ts/ReaderTaskEither'
+import { pipe } from 'fp-ts/function'
+import { createContext, useContext, ReactNode } from 'react'
+
+// Define what services your app needs
+interface AppDependencies {
+  api: {
+    getUser: (id: string) => Promise<User>
+    updateUser: (id: string, data: Partial<User>) => Promise<User>
+  }
+  analytics: {
+    track: (event: string, data?: object) => void
+  }
+}
+
+// Create context
+const DepsContext = createContext<AppDependencies | null>(null)
+
+// Provider
+function AppProvider({ deps, children }: { deps: AppDependencies; children: ReactNode }) {
+  return <DepsContext.Provider value={deps}>{children}</DepsContext.Provider>
+}
+
+// Hook to use dependencies
+function useDeps(): AppDependencies {
+  const deps = useContext(DepsContext)
+  if (!deps) throw new Error('Missing AppProvider')
+  return deps
+}
+```
+
+### Use in Components
+
+```typescript
+function UserProfile({ userId }: { userId: string }) {
+  const { api, analytics } = useDeps()
+  const [user, setUser] = useState<RemoteData<Error, User>>(notAsked())
+
+  useEffect(() => {
+    setUser(loading())
+    api.getUser(userId)
+      .then(u => {
+        setUser(success(u))
+        analytics.track('user_viewed', { userId })
+      })
+      .catch(e => setUser(failure(e)))
+  }, [userId, api, analytics])
+
+  // render...
+}
+```
+
+### Testing with Mock Dependencies
+
+```typescript
+const mockDeps: AppDependencies = {
+  api: {
+    getUser: jest.fn().mockResolvedValue({ id: '1', name: 'Test User' }),
+    updateUser: jest.fn().mockResolvedValue({ id: '1', name: 'Updated' }),
+  },
+  analytics: {
+    track: jest.fn(),
+  },
+}
+
+test('loads user on mount', async () => {
+  render(
+    <AppProvider deps={mockDeps}>
+      <UserProfile userId="1" />
+    </AppProvider>
+  )
+
+  await screen.findByText('Test User')
+  expect(mockDeps.api.getUser).toHaveBeenCalledWith('1')
+})
+```
+
+---
+
+## 7. React 19 Patterns
+
+### use() for Promises (React 19+)
+
+```typescript
+import { use, Suspense } from 'react'
+
+// Instead of useEffect + useState for data fetching
+function UserProfile({ userPromise }: { userPromise: Promise<User> }) {
+  const user = use(userPromise)  // Suspends until resolved
+  return <div>{user.name}</div>
+}
+
+// Parent provides the promise
+function App() {
+  const userPromise = fetchUser('1')  // Start fetching immediately
+
+  return (
+    <Suspense fallback={<Spinner />}>
+      <UserProfile userPromise={userPromise} />
+    </Suspense>
+  )
+}
+```
+
+### useActionState for Forms (React 19+)
+
+```typescript
+import { useActionState } from 'react'
+import * as E from 'fp-ts/Either'
+
+interface FormState {
+  errors: string[]
+  success: boolean
+}
+
+async function submitForm(
+  prevState: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const data = {
+    email: formData.get('email') as string,
+    password: formData.get('password') as string,
+  }
+
+  // Use Either for validation
+  const result = pipe(
+    validateForm(data),
+    E.match(
+      (errors) => ({ errors, success: false }),
+      async (valid) => {
+        await saveToServer(valid)
+        return { errors: [], success: true }
+      }
+    )
+  )
+
+  return result
+}
+
+function SignupForm() {
+  const [state, formAction, isPending] = useActionState(submitForm, {
+    errors: [],
+    success: false
+  })
+
+  return (
+    <form action={formAction}>
+      <input name="email" type="email" />
+      <input name="password" type="password" />
+
+      {state.errors.map(e => <p key={e} className="error">{e}</p>)}
+
+      <button disabled={isPending}>
+        {isPending ? 'Submitting...' : 'Sign Up'}
+      </button>
+    </form>
+  )
+}
+```
+
+### useOptimistic for Instant Feedback (React 19+)
+
+```typescript
+import { useOptimistic } from 'react'
+
+function TodoList({ todos }: { todos: Todo[] }) {
+  const [optimisticTodos, addOptimisticTodo] = useOptimistic(
+    todos,
+    (state, newTodo: Todo) => [...state, { ...newTodo, pending: true }]
+  )
+
+  const addTodo = async (text: string) => {
+    const newTodo = { id: crypto.randomUUID(), text, done: false }
+
+    // Immediately show in UI
+    addOptimisticTodo(newTodo)
+
+    // Actually save (will reconcile when done)
+    await saveTodo(newTodo)
+  }
+
+  return (
+    <ul>
+      {optimisticTodos.map(todo => (
+        <li key={todo.id} style={{ opacity: todo.pending ? 0.5 : 1 }}>
+          {todo.text}
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+---
+
+## 8. Common Patterns Cheat Sheet
+
+### Render Based on Option
+
+```typescript
+// Pattern 1: match
+pipe(
+  maybeUser,
+  O.match(
+    () => <LoginButton />,
+    (user) => <UserMenu user={user} />
+  )
+)
+
+// Pattern 2: fold (same as match)
+O.fold(
+  () => <LoginButton />,
+  (user) => <UserMenu user={user} />
+)(maybeUser)
+
+// Pattern 3: getOrElse for simple defaults
+const name = pipe(
+  maybeUser,
+  O.map(u => u.name),
+  O.getOrElse(() => 'Guest')
+)
+```
+
+### Render Based on Either
+
+```typescript
+pipe(
+  validationResult,
+  E.match(
+    (errors) => <ErrorList errors={errors} />,
+    (data) => <SuccessMessage data={data} />
+  )
+)
+```
+
+### Safe Array Rendering
+
+```typescript
+import * as A from 'fp-ts/Array'
+
+// Get first item safely
+const firstUser = pipe(
+  users,
+  A.head,
+  O.map(user => <Featured user={user} />),
+  O.getOrElse(() => <NoFeaturedUser />)
+)
+
+// Find specific item
+const adminUser = pipe(
+  users,
+  A.findFirst(u => u.role === 'admin'),
+  O.map(admin => <AdminBadge user={admin} />),
+  O.toNullable  // or O.getOrElse(() => null)
+)
+```
+
+### Conditional Props
+
+```typescript
+// Add props only if value exists
+const modalProps = {
+  isOpen: true,
+  ...pipe(
+    maybeTitle,
+    O.map(title => ({ title })),
+    O.getOrElse(() => ({}))
+  )
+}
+```
+
+---
+
+## Libraries
+
+- **[fp-ts](https://github.com/gcanti/fp-ts)** - Core library
+- **[fp-ts-react-stable-hooks](https://github.com/mblink/fp-ts-react-stable-hooks)** - Stable hooks
+- **[@devexperts/remote-data-ts](https://github.com/devexperts/remote-data-ts)** - RemoteData
+- **[io-ts](https://github.com/gcanti/io-ts)** - Runtime type validation
+- **[zod](https://github.com/colinhacks/zod)** - Schema validation (works great with fp-ts)
 
 ## 🚨 Critical Rules
 - Never represent a missing value as null or undefined where Option states the intent

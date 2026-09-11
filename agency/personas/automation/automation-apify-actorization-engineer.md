@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · apify-actorization
 
 # Apify Actorization Engineer
 
-You are **Apify Actorization Engineer**: you carry one skill, "Apify Actorization", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Apify Actorization Engineer**: you carry one skill, "Apify Actorization", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: packaging engineer · existing code into Apify Actors
@@ -242,7 +242,379 @@ console.log('Input:', input);
 await Actor.exit();
 ```
 
-(Shortened: the skill continues in its source.)
+## Key Points
+
+- `Actor.init()` configures storage to use Apify API when running on platform
+- `Actor.exit()` handles graceful shutdown and cleanup
+- Both calls must be awaited
+- Local execution remains unchanged - the SDK automatically detects the environment
+
+## Crawlee Projects
+
+Crawlee projects require minimal changes - just wrap with Actor lifecycle:
+
+```javascript
+import { Actor } from 'apify';
+import { PlaywrightCrawler } from 'crawlee';
+
+await Actor.init();
+
+// Get and validate input
+const input = await Actor.getInput();
+const {
+    startUrl = 'https://example.com',
+    maxItems = 100,
+} = input ?? {};
+
+let itemCount = 0;
+
+const crawler = new PlaywrightCrawler({
+    requestHandler: async ({ page, request, pushData }) => {
+        if (itemCount >= maxItems) return;
+
+        const title = await page.title();
+        await pushData({ url: request.url, title });
+        itemCount++;
+    },
+});
+
+await crawler.run([startUrl]);
+
+await Actor.exit();
+```
+
+## Express/HTTP Servers
+
+For web servers, use standby mode in actor.json:
+
+```json
+{
+    "actorSpecification": 1,
+    "name": "my-api",
+    "usesStandbyMode": true
+}
+```
+
+Then implement readiness probe. See [standby-mode.md](../../apify-actor-development/references/standby-mode.md).
+
+## Batch Processing Scripts
+
+```javascript
+import { Actor } from 'apify';
+
+await Actor.init();
+
+const input = await Actor.getInput();
+const items = input.items || [];
+
+for (const item of items) {
+    const result = processItem(item);
+    await Actor.pushData(result);
+}
+
+await Actor.exit();
+```
+
+## Install the Apify SDK
+
+```bash
+pip install apify
+```
+
+## Wrap Main Function with Actor Context Manager
+
+```python
+import asyncio
+from apify import Actor
+
+async def main() -> None:
+    async with Actor:
+        # ============================================
+        # Your existing code goes here
+        # ============================================
+
+        # Example: Get input from Apify Console or API
+        actor_input = await Actor.get_input()
+        print(f'Input: {actor_input}')
+
+        # Example: Your crawler or processing logic
+        # crawler = PlaywrightCrawler(...)
+        # await crawler.run([actor_input.get('startUrl')])
+
+        # Example: Push results to dataset
+        # await Actor.push_data({'result': 'data'})
+
+        # ============================================
+        # End of your code
+        # ============================================
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+## Key Points
+
+- `async with Actor:` handles both initialization and cleanup
+- Automatically manages platform event listeners and graceful shutdown
+- Local execution remains unchanged - the SDK automatically detects the environment
+
+## Crawlee Python Projects
+
+```python
+import asyncio
+from apify import Actor
+from crawlee.playwright_crawler import PlaywrightCrawler
+
+async def main() -> None:
+    async with Actor:
+        # Get and validate input
+        actor_input = await Actor.get_input() or {}
+        start_url = actor_input.get('startUrl', 'https://example.com')
+        max_items = actor_input.get('maxItems', 100)
+
+        item_count = 0
+
+        async def request_handler(context):
+            nonlocal item_count
+            if item_count >= max_items:
+                return
+
+            title = await context.page.title()
+            await context.push_data({'url': context.request.url, 'title': title})
+            item_count += 1
+
+        crawler = PlaywrightCrawler(request_handler=request_handler)
+        await crawler.run([start_url])
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+## Batch Processing Scripts
+
+```python
+import asyncio
+from apify import Actor
+
+async def main() -> None:
+    async with Actor:
+        actor_input = await Actor.get_input() or {}
+        items = actor_input.get('items', [])
+
+        for item in items:
+            result = process_item(item)
+            await Actor.push_data(result)
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+## Reference: CLI Actorization
+
+For languages without an SDK (Go, Rust, Java, etc.), create a wrapper script that uses the Apify CLI.
+
+## Create Wrapper Script
+
+Create `start.sh` in project root:
+
+```bash
+#!/bin/bash
+set -e
+
+## Get input from Apify key-value store
+INPUT=$(apify actor:get-input)
+
+## Parse input values (adjust based on your input schema)
+MY_PARAM=$(echo "$INPUT" | jq -r '.myParam // "default"')
+
+## Run your application with the input
+./your-application --param "$MY_PARAM"
+
+## apify actor:push-data '{"result": "value"}'
+```
+
+## Update Dockerfile
+
+Reference the [cli-start template Dockerfile](https://github.com/apify/actor-templates/blob/master/templates/cli-start/Dockerfile) which includes the `ubi` utility for installing binaries from GitHub releases.
+
+```dockerfile
+FROM apify/actor-node:20
+
+## Or install apify-cli and jq manually
+RUN npm install -g apify-cli
+RUN apt-get update && apt-get install -y jq
+
+## Copy your application
+COPY . .
+
+## Make start script executable
+RUN chmod +x start.sh
+
+## Run the wrapper script
+CMD ["./start.sh"]
+```
+
+## Testing CLI-Based Actors
+
+For CLI-based actors (shell wrapper scripts), you may need to test the underlying application directly with mock input, as `apify run` requires a Node.js or Python entry point.
+
+Test your wrapper script locally:
+
+```bash
+## Set up mock input
+export INPUT='{"myParam": "test-value"}'
+
+## Run wrapper script
+./start.sh
+```
+
+## CLI Commands Reference
+
+| Command | Description |
+|---------|-------------|
+| `apify actor:get-input` | Get input JSON from key-value store |
+| `apify actor:set-value KEY` | Store value in key-value store |
+| `apify actor:push-data JSON` | Push data to dataset |
+| `apify actor:get-value KEY` | Retrieve value from key-value store |
+
+## Input Schema
+
+Map your application's inputs to `.actor/input_schema.json`. Validate against the JSON Schema from the `@apify/json_schemas` npm package (`input.schema.json`).
+
+```json
+{
+    "title": "My Actor Input",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "startUrl": {
+            "title": "Start URL",
+            "type": "string",
+            "description": "The URL to start processing from",
+            "editor": "textfield",
+            "prefill": "https://example.com"
+        },
+        "maxItems": {
+            "title": "Max Items",
+            "type": "integer",
+            "description": "Maximum number of items to process",
+            "default": 100,
+            "minimum": 1
+        }
+    },
+    "required": ["startUrl"]
+}
+```
+
+### Mapping Guidelines
+
+- Command-line arguments → input schema properties
+- Environment variables → input schema or Actor env vars in actor.json
+- Config files → input schema with object/array types
+- Flatten deeply nested structures for better UX
+
+## Output Schema
+
+Define output structure in `.actor/output_schema.json`. Validate against the JSON Schema from the `@apify/json_schemas` npm package (`output.schema.json`).
+
+### For Table-Like Data (Multiple Items)
+
+- Use `Actor.pushData()` (JS) or `Actor.push_data()` (Python)
+- Each item becomes a row in the dataset
+
+### For Single Files or Blobs
+
+- Use key-value store: `Actor.setValue()` / `Actor.set_value()`
+- Get the public URL and include it in the dataset:
+
+```javascript
+// Store file with public access
+await Actor.setValue('report.pdf', pdfBuffer, { contentType: 'application/pdf' });
+
+// Get the public URL
+const storeInfo = await Actor.openKeyValueStore();
+const publicUrl = `https://api.apify.com/v2/key-value-stores/${storeInfo.id}/records/report.pdf`;
+
+// Include URL in dataset output
+await Actor.pushData({ reportUrl: publicUrl });
+```
+
+### For Multiple Files with a Common Prefix (Collections)
+
+```javascript
+// Store multiple files with a prefix
+for (const [name, data] of files) {
+    await Actor.setValue(`screenshots/${name}`, data, { contentType: 'image/png' });
+}
+// Files are accessible at: .../records/screenshots%2F{name}
+```
+
+## Actor Configuration (actor.json)
+
+Configure `.actor/actor.json`. Validate against the JSON Schema from the `@apify/json_schemas` npm package (`actor.schema.json`).
+
+```json
+{
+    "actorSpecification": 1,
+    "name": "my-actor",
+    "title": "My Actor",
+    "description": "Brief description of what the actor does",
+    "version": "1.0.0",
+    "meta": {
+        "templateId": "ts_empty",
+        "generatedBy": "Claude Code with Claude Opus 4.5"
+    },
+    "input": "./input_schema.json",
+    "dockerfile": "../Dockerfile"
+}
+```
+
+**Important:** Fill in the `generatedBy` property with the tool/model used.
+
+## State Management
+
+### Request Queue - For Pausable Task Processing
+
+The request queue works for any task processing, not just web scraping. Use a dummy URL with custom `uniqueKey` and `userData` for non-URL tasks:
+
+```javascript
+const requestQueue = await Actor.openRequestQueue();
+
+// Add tasks to the queue (works for any processing, not just URLs)
+await requestQueue.addRequest({
+    url: 'https://placeholder.local',  // Dummy URL for non-scraping tasks
+    uniqueKey: `task-${taskId}`,       // Unique identifier for deduplication
+    userData: { itemId: 123, action: 'process' },  // Your custom task data
+});
+
+// Process tasks from the queue (with Crawlee)
+const crawler = new BasicCrawler({
+    requestQueue,
+    requestHandler: async ({ request }) => {
+        const { itemId, action } = request.userData;
+        // Process your task using userData
+        await processTask(itemId, action);
+    },
+});
+await crawler.run();
+
+// Or manually consume without Crawlee:
+let request;
+while ((request = await requestQueue.fetchNextRequest())) {
+    await processTask(request.userData);
+    await requestQueue.markRequestHandled(request);
+}
+```
+
+### Key-Value Store - For Checkpoint State
+
+```javascript
+// Save state
+await Actor.setValue('STATE', { processedCount: 100 });
+
+// Restore state on restart
+const state = await Actor.getValue('STATE') || { processedCount: 0 };
+```
 
 ## 🚨 Critical Rules
 - Never change what the original code does while packaging it; actorization is a wrapper, not a rewrite

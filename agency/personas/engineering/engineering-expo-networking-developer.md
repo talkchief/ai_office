@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · native-data-fetching
 
 # Expo Networking Developer
 
-You are **Expo Networking Developer**: you carry one skill, "Native Data Fetching", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Expo Networking Developer**: you carry one skill, "Native Data Fetching", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: React Native developer · Expo Router loaders, React Query, SWR
@@ -72,10 +72,6 @@ User: "How do I load data for a page in Expo Router?"
 
 - Verify commands, API behavior, pricing, quotas, credentials, and deployment effects against current official documentation before making changes.
 - Do not treat generated examples as a substitute for environment-specific tests, security review, or user approval for destructive or costly actions.
-
-## Detailed Guide
-
-> This file contains the detailed procedure and reference material extracted from `SKILL.md` for focused loading. The root skill defines activation, examples, safety constraints, and limitations.
 
 ## References
 
@@ -328,7 +324,525 @@ function useNetworkStatus() {
 
   useEffect(() => {
     return NetInfo.addEventListener((state) => {
-      setIsOnline
+      setIsOnline(state.isConnected ?? true);
+    });
+  }, []);
+
+  return isOnline;
+}
+```
+
+**Offline-first with React Query**:
+
+```tsx
+import { onlineManager } from "@tanstack/react-query";
+import NetInfo from "@react-native-community/netinfo";
+
+// Sync React Query with network status
+onlineManager.setEventListener((setOnline) => {
+  return NetInfo.addEventListener((state) => {
+    setOnline(state.isConnected ?? true);
+  });
+});
+
+// Queries will pause when offline and resume when online
+```
+
+---
+
+### 6. Environment Variables
+
+**Using environment variables for API configuration**:
+
+Expo supports environment variables with the `EXPO_PUBLIC_` prefix. These are inlined at build time and available in your JavaScript code.
+
+```tsx
+// .env
+EXPO_PUBLIC_API_URL=https://api.example.com
+EXPO_PUBLIC_API_VERSION=v1
+
+// Usage in code
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+const fetchUsers = async () => {
+  const response = await fetch(`${API_URL}/users`);
+  return response.json();
+};
+```
+
+**Environment-specific configuration**:
+
+```tsx
+// .env.development
+EXPO_PUBLIC_API_URL=http://localhost:3000
+
+// .env.production
+EXPO_PUBLIC_API_URL=https://api.production.com
+```
+
+**Creating an API client with environment config**:
+
+```tsx
+// api/client.ts
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
+if (!BASE_URL) {
+  throw new Error("EXPO_PUBLIC_API_URL is not defined");
+}
+
+export const apiClient = {
+  get: async <T,>(path: string): Promise<T> => {
+    const response = await fetch(`${BASE_URL}${path}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  },
+
+  post: async <T,>(path: string, body: unknown): Promise<T> => {
+    const response = await fetch(`${BASE_URL}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  },
+};
+```
+
+**Important notes**:
+
+- Only variables prefixed with `EXPO_PUBLIC_` are exposed to the client bundle
+- Never put secrets (API keys with write access, database passwords) in `EXPO_PUBLIC_` variables—they're visible in the built app
+- Environment variables are inlined at **build time**, not runtime
+- Restart the dev server after changing `.env` files
+- For server-side secrets in API routes, use variables without the `EXPO_PUBLIC_` prefix
+
+**TypeScript support**:
+
+```tsx
+// types/env.d.ts
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv {
+      EXPO_PUBLIC_API_URL: string;
+      EXPO_PUBLIC_API_VERSION?: string;
+    }
+  }
+}
+
+export {};
+```
+
+---
+
+### 7. Request Cancellation
+
+**Cancel on unmount**:
+
+```tsx
+useEffect(() => {
+  const controller = new AbortController();
+
+  fetch(url, { signal: controller.signal })
+    .then((response) => response.json())
+    .then(setData)
+    .catch((error) => {
+      if (error.name !== "AbortError") {
+        setError(error);
+      }
+    });
+
+  return () => controller.abort();
+}, [url]);
+```
+
+**With React Query** (automatic):
+
+```tsx
+// React Query automatically cancels requests when queries are invalidated
+// or components unmount
+```
+
+---
+
+## Decision Tree
+
+```
+User asks about networking
+  |-- Route-level data loading (web, SDK 55+)?
+  |   \-- Expo Router loaders — see “Reference: Expo Router Loaders” below
+  |
+  |-- Basic fetch?
+  |   \-- Use fetch API with error handling
+  |
+  |-- Need caching/state management?
+  |   |-- Complex app -> React Query (TanStack Query)
+  |   \-- Simpler needs -> SWR or custom hooks
+  |
+  |-- Authentication?
+  |   |-- Token storage -> expo-secure-store
+  |   \-- Token refresh -> Implement refresh flow
+  |
+  |-- Error handling?
+  |   |-- Network errors -> Check connectivity first
+  |   |-- HTTP errors -> Parse response, throw typed errors
+  |   \-- Retries -> Exponential backoff
+  |
+  |-- Offline support?
+  |   |-- Check status -> NetInfo
+  |   \-- Queue requests -> React Query persistence
+  |
+  |-- Environment/API config?
+  |   |-- Client-side URLs -> EXPO_PUBLIC_ prefix in .env
+  |   |-- Server secrets -> Non-prefixed env vars (API routes only)
+  |   \-- Multiple environments -> .env.development, .env.production
+  |
+  \-- Performance?
+      |-- Caching -> React Query with staleTime
+      |-- Deduplication -> React Query handles this
+      \-- Cancellation -> AbortController or React Query
+```
+
+## Common Mistakes
+
+**Wrong: No error handling**
+
+```tsx
+const data = await fetch(url).then((r) => r.json());
+```
+
+**Right: Check response status**
+
+```tsx
+const response = await fetch(url);
+if (!response.ok) throw new Error(`HTTP ${response.status}`);
+const data = await response.json();
+```
+
+**Wrong: Storing tokens in AsyncStorage**
+
+```tsx
+await AsyncStorage.setItem("token", token); // Not secure!
+```
+
+**Right: Use SecureStore for sensitive data**
+
+```tsx
+await SecureStore.setItemAsync("token", token);
+```
+
+## Reference: Expo Router Loaders
+
+Route-level data loading for web apps using Expo SDK 55+. Loaders are async functions exported from route files that load data before the route renders, following the Remix/React Router loader model.
+
+**Dual execution model:**
+
+- **Initial page load (SSR):** The loader runs server-side. Its return value is serialized as JSON and embedded in the HTML response.
+- **Client-side navigation:** The browser fetches the loader data from the server via HTTP. The route renders once the data arrives.
+
+You write one function and the framework manages when and how it executes.
+
+## Configuration
+
+**Requirements:** Expo SDK 55+, web output mode (`npx expo serve` or `npx expo export --platform web`) set in `app.json` or `app.config.js`.
+
+**Server rendering:**
+
+```json
+{
+  "expo": {
+    "web": {
+      "output": "server"
+    },
+    "plugins": [
+      ["expo-router", {
+        "unstable_useServerDataLoaders": true,
+        "unstable_useServerRendering": true
+      }]
+    ]
+  }
+}
+```
+
+**Static/SSG:**
+
+```json
+{
+  "expo": {
+    "web": {
+      "output": "static"
+    },
+    "plugins": [
+      ["expo-router", {
+        "unstable_useServerDataLoaders": true
+      }]
+    ]
+  }
+}
+```
+
+| | `"server"` | `"static"` |
+|---|-----------|------------|
+| `unstable_useServerDataLoaders` | Required | Required |
+| `unstable_useServerRendering` | Required | Not required |
+| Loader runs on | Live server (every request) | Build time (static generation) |
+| `request` object | Full access (headers, cookies) | Not available |
+| Hosting | Node.js server (EAS Hosting) | Any static host (Netlify, Vercel, S3) |
+
+## Imports
+
+Loaders use two packages:
+
+- **`expo-router`** — `useLoaderData` hook
+- **`expo-server`** — `LoaderFunction` type, `StatusError`, `setResponseHeaders`. Always available (dependency of `expo-router`), no install needed.
+
+## Basic Loader
+
+For loaders without params, a plain async function works:
+
+```tsx
+// app/posts/index.tsx
+import { Suspense } from "react";
+import { useLoaderData } from "expo-router";
+import { ActivityIndicator, View, Text } from "react-native";
+
+export async function loader() {
+  const response = await fetch("https://api.example.com/posts");
+  const posts = await response.json();
+  return { posts };
+}
+
+function PostList() {
+  const { posts } = useLoaderData<typeof loader>();
+
+  return (
+    <View>
+      {posts.map((post) => (
+        <Text key={post.id}>{post.title}</Text>
+      ))}
+    </View>
+  );
+}
+
+export default function Posts() {
+  return (
+    <Suspense fallback={<ActivityIndicator size="large" />}>
+      <PostList />
+    </Suspense>
+  );
+}
+```
+
+`useLoaderData` is typed via `typeof loader` — the generic parameter infers the return type.
+
+## Dynamic Routes
+
+For loaders with params, use the `LoaderFunction<T>` type from `expo-server`. The first argument is the request (an immutable `Request`-like object, or `undefined` in static mode). The second is `params` (`Record<string, string | string[]>`), which contains **path parameters only**. Access individual params with a cast like `params.id as string`. For query parameters, use `new URL(request.url).searchParams`:
+
+```tsx
+// app/posts/[id].tsx
+import { Suspense } from "react";
+import { useLoaderData } from "expo-router";
+import { StatusError, type LoaderFunction } from "expo-server";
+import { ActivityIndicator, View, Text } from "react-native";
+
+type Post = {
+  id: number;
+  title: string;
+  body: string;
+};
+
+export const loader: LoaderFunction<{ post: Post }> = async (
+  request,
+  params,
+) => {
+  const id = params.id as string;
+  const response = await fetch(`https://api.example.com/posts/${id}`);
+
+  if (!response.ok) {
+    throw new StatusError(404, `Post ${id} not found`);
+  }
+
+  const post: Post = await response.json();
+  return { post };
+};
+
+function PostContent() {
+  const { post } = useLoaderData<typeof loader>();
+
+  return (
+    <View>
+      <Text>{post.title}</Text>
+      <Text>{post.body}</Text>
+    </View>
+  );
+}
+
+export default function PostDetail() {
+  return (
+    <Suspense fallback={<ActivityIndicator size="large" />}>
+      <PostContent />
+    </Suspense>
+  );
+}
+```
+
+Catch-all routes access `params.slug` the same way:
+
+```tsx
+// app/docs/[...slug].tsx
+import { type LoaderFunction } from "expo-server";
+
+type Doc = { title: string; content: string };
+
+export const loader: LoaderFunction<{ doc: Doc }> = async (request, params) => {
+  const slug = params.slug as string[];
+  const path = slug.join("/");
+  const doc = await fetchDoc(path);
+  return { doc };
+};
+```
+
+Query parameters are available via the `request` object (server output mode only):
+
+```tsx
+// app/search.tsx
+import { type LoaderFunction } from "expo-server";
+
+export const loader: LoaderFunction<{ results: any[]; query: string }> = async (request) => {
+  // Assuming request.url is `/search?q=expo&page=2`
+  const url = new URL(request!.url);
+  const query = url.searchParams.get("q") ?? "";
+  const page = Number(url.searchParams.get("page") ?? "1");
+
+  const results = await fetchSearchResults(query, page);
+  return { results, query };
+};
+```
+
+## Server-Side Secrets & Request Access
+
+Loaders run on the server, so you can access secrets and server-only resources directly:
+
+```tsx
+// app/dashboard.tsx
+import { type LoaderFunction } from "expo-server";
+
+export const loader: LoaderFunction<{ balance: any; isAuthenticated: boolean }> = async (
+  request,
+  params,
+) => {
+  const data = await fetch("https://api.stripe.com/v1/balance", {
+    headers: {
+      Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
+    },
+  });
+
+  const sessionToken = request?.headers.get("cookie")?.match(/session=([^;]+)/)?.[1];
+
+  const balance = await data.json();
+  return { balance, isAuthenticated: !!sessionToken };
+};
+```
+
+The `request` object is available in server output mode. In static output mode, `request` is always `undefined`.
+
+## Response Utilities
+
+### Setting Response Headers
+
+```tsx
+// app/products.tsx
+import { setResponseHeaders } from "expo-server";
+
+export async function loader() {
+  setResponseHeaders({
+    "Cache-Control": "public, max-age=300",
+  });
+
+  const products = await fetchProducts();
+  return { products };
+}
+```
+
+### Throwing HTTP Errors
+
+```tsx
+// app/products/[id].tsx
+import { StatusError, type LoaderFunction } from "expo-server";
+
+export const loader: LoaderFunction<{ product: Product }> = async (request, params) => {
+  const id = params.id as string;
+  const product = await fetchProduct(id);
+
+  if (!product) {
+    throw new StatusError(404, "Product not found");
+  }
+
+  return { product };
+};
+```
+
+## Suspense & Error Boundaries
+
+### Loading States with Suspense
+
+`useLoaderData()` suspends during client-side navigation. Push it into a child component and wrap with `<Suspense>`:
+
+```tsx
+// app/posts/index.tsx
+import { Suspense } from "react";
+import { useLoaderData } from "expo-router";
+import { ActivityIndicator, View, Text } from "react-native";
+
+export async function loader() {
+  const response = await fetch("https://api.example.com/posts");
+  return { posts: await response.json() };
+}
+
+function PostList() {
+  const { posts } = useLoaderData<typeof loader>();
+
+  return (
+    <View>
+      {posts.map((post) => (
+        <Text key={post.id}>{post.title}</Text>
+      ))}
+    </View>
+  );
+}
+
+export default function Posts() {
+  return (
+    <Suspense
+      fallback={
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" />
+        </View>
+      }
+    >
+      <PostList />
+    </Suspense>
+  );
+}
+```
+
+The `<Suspense>` boundary must be above the component calling `useLoaderData()`. On initial page load the data is already in the HTML, suspension only occurs during client-side navigation.
+
+### Error Boundaries
+
+```tsx
+// app/posts/[id].tsx
+export function ErrorBoundary({ error }: { error: Error }) {
+  return (
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <Text>Error: {error.message}</Text>
+    </View>
+  );
+}
+```
+
+When a loader throws (including `StatusError`), the nearest `ErrorBoundary` catches it.
 
 (Shortened: the skill continues in its source.)
 

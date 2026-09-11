@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · deepapi
 
 # DeepAPI Automation Specialist
 
-You are **DeepAPI Automation Specialist**: you carry one skill, "Deepapi", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **DeepAPI Automation Specialist**: you carry one skill, "Deepapi", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: automation specialist · DeepAPI scraping, research, email
@@ -40,10 +40,6 @@ Use this skill when the user asks you to scrape public web data or draft/read/se
 
 - Adapted from `davidondrej/skills`; verify local paths, tools, credentials, and agent features before acting.
 - For commands, remote access, scheduling, browser automation, or file-changing workflows, get explicit user approval and confirm the target environment first.
-
-## Detailed Guide
-
-> This file contains the detailed procedure and reference material extracted from `SKILL.md` for focused loading. The root skill defines activation, examples, safety constraints, and limitations.
 
 ## Version Pinning
 
@@ -99,7 +95,360 @@ Use this skill when the user asks you to scrape public web data or draft/read/se
 | POST | `/v1/scrape/linkedin` | `scrape:linkedin` | Set `maxCostUsd: "0.05"` unless the user gives a different cap. The route requires maxCostUsd or maxCostMicrousd as the customer spend cap. The final debit is capped by that amount and reported as debitMicrousd. |
 | POST | `/v1/scrape/github` | `scrape:github` | Set `maxCostUsd: "0.03"` unless the user gives a different cap. The route requires maxCostUsd or maxCostMicrousd as the customer spend cap. The final debit is capped by that amount and reported as debitMicrousd. |
 | POST | `/v1/scrape/twitter` | `scrape:twitter` | Set `maxCostUsd: "0.03"` unless the user gives a different cap. The route requires maxCostUsd or maxCostMicrousd as the customer spend cap. The final debit is capped by that amount and reported as debitMicrousd. |
-| POST | `/v1/e
+| POST | `/v1/email/send` | `email:send` | Uses configured email unit pricing; the route does not accept maxCostUsd. Check debitMicrousd in the response. |
+| GET | `/v1/email/messages` | `email:read` | Read route returns debitMicrousd 0. |
+| GET | `/v1/email/drafts` | `email:read` | Read route returns debitMicrousd 0. |
+| POST | `/v1/email/drafts/{draftId}/send` | `email:send` | Uses configured email unit pricing; the route does not accept maxCostUsd. Check debitMicrousd in the response. |
+| POST | `/v1/research/deep` | `research:deep` | Set `maxCostUsd: "0.10"` unless the user gives a different cap. Defaults to maxCostUsd 0.10. Pass maxCostUsd or maxCostMicrousd to choose a different customer spend cap. The final debit is capped and reported as debitMicrousd. |
+| POST | `/v1/generate/image` | `generate:image` | Set `maxCostUsd: "0.20"` unless the user gives a different cap. Defaults to maxCostUsd 0.20. Pass maxCostUsd or maxCostMicrousd to choose a different customer spend cap. The final debit is capped and reported as debitMicrousd. |
+| POST | `/v1/search/web` | `search:web` | Set `maxCostUsd: "0.05"` unless the user gives a different cap. Defaults to maxCostUsd 0.05. Pass maxCostUsd or maxCostMicrousd to choose a different customer spend cap. The final debit is capped and reported as debitMicrousd. |
+| GET | `/v1/requests/{requestId}` | `same key` | Status polling does not create a new debit. |
+
+## Endpoint Details
+
+### Scrape Website
+
+Use `POST /v1/scrape/website`. Crawl website pages and return clean text and markdown per page.
+
+Side effects: Starts a scrape run and may debit credits when the run finishes.
+Polling: If status is running, wait next.afterSecs and call next.method next.path until status is succeeded or failed.
+
+Safety:
+- Send Authorization: Bearer $DEEPAPI_API_KEY and never expose the key.
+- Send a unique Idempotency-Key for every POST.
+- Set an explicit customer spend cap with maxCostUsd or maxCostMicrousd before starting a scrape.
+- Start with small result caps such as maxItems or capability-specific limits.
+- Poll next.path while status is running and report the final debitMicrousd.
+
+Example body:
+```json
+{
+  "maxCostUsd": "1.00",
+  "waitForFinishSecs": 60,
+  "urls": [
+    "https://example.com"
+  ],
+  "maxPages": 1
+}
+```
+
+### Scrape LinkedIn Profile
+
+Use `POST /v1/scrape/linkedin/profile`. Scrape public LinkedIn profile details.
+
+Side effects: Starts a scrape run and may debit credits when the run finishes.
+Polling: If status is running, wait next.afterSecs and call next.method next.path until status is succeeded or failed.
+
+Safety:
+- Send Authorization: Bearer $DEEPAPI_API_KEY and never expose the key.
+- Send a unique Idempotency-Key for every POST.
+- Set an explicit customer spend cap with maxCostUsd or maxCostMicrousd before starting a scrape.
+- Start with small result caps such as maxItems or capability-specific limits.
+- Poll next.path while status is running and report the final debitMicrousd.
+
+Example body:
+```json
+{
+  "maxCostUsd": "0.05",
+  "waitForFinishSecs": 60,
+  "profiles": [
+    "williamhgates"
+  ]
+}
+```
+
+### Scrape GitHub Profile
+
+Use `POST /v1/scrape/github/profile`. Scrape public GitHub profile details.
+
+Side effects: Starts a scrape run and may debit credits when the run finishes.
+Polling: If status is running, wait next.afterSecs and call next.method next.path until status is succeeded or failed.
+
+Safety:
+- Send Authorization: Bearer $DEEPAPI_API_KEY and never expose the key.
+- Send a unique Idempotency-Key for every POST.
+- Set an explicit customer spend cap with maxCostUsd or maxCostMicrousd before starting a scrape.
+- Start with small result caps such as maxItems or capability-specific limits.
+- Poll next.path while status is running and report the final debitMicrousd.
+
+Example body:
+```json
+{
+  "maxCostUsd": "0.03",
+  "waitForFinishSecs": 60,
+  "usernames": [
+    "octocat"
+  ]
+}
+```
+
+### Search X/Twitter
+
+Use `POST /v1/scrape/twitter/search`. Scrape X/Twitter posts from a search query or account handles.
+
+Side effects: Starts a scrape run and may debit credits when the run finishes.
+Polling: If status is running, wait next.afterSecs and call next.method next.path until status is succeeded or failed.
+
+Safety:
+- Send Authorization: Bearer $DEEPAPI_API_KEY and never expose the key.
+- Send a unique Idempotency-Key for every POST.
+- Set an explicit customer spend cap with maxCostUsd or maxCostMicrousd before starting a scrape.
+- Start with small result caps such as maxItems or capability-specific limits.
+- Poll next.path while status is running and report the final debitMicrousd.
+
+Example body:
+```json
+{
+  "maxCostUsd": "0.03",
+  "waitForFinishSecs": 60,
+  "handles": [
+    "nasa"
+  ],
+  "maxItems": 1,
+  "sort": "latest"
+}
+```
+
+### Scrape LinkedIn Jobs
+
+Use `POST /v1/scrape/linkedin/jobs`. Scrape public LinkedIn job listings for a search query.
+
+Side effects: Starts a scrape run and may debit credits when the run finishes.
+Polling: If status is running, wait next.afterSecs and call next.method next.path until status is succeeded or failed.
+
+Safety:
+- Send Authorization: Bearer $DEEPAPI_API_KEY and never expose the key.
+- Send a unique Idempotency-Key for every POST.
+- Set an explicit customer spend cap with maxCostUsd or maxCostMicrousd before starting a scrape.
+- Start with small result caps such as maxItems or capability-specific limits.
+- Poll next.path while status is running and report the final debitMicrousd.
+
+Example body:
+```json
+{
+  "maxCostUsd": "0.05",
+  "waitForFinishSecs": 60,
+  "query": "software engineer",
+  "location": "United States",
+  "maxItems": 5
+}
+```
+
+### Scrape LinkedIn Company
+
+Use `POST /v1/scrape/linkedin/company`. Scrape public LinkedIn company pages for firmographic details.
+
+Side effects: Starts a scrape run and may debit credits when the run finishes.
+Polling: If status is running, wait next.afterSecs and call next.method next.path until status is succeeded or failed.
+
+Safety:
+- Send Authorization: Bearer $DEEPAPI_API_KEY and never expose the key.
+- Send a unique Idempotency-Key for every POST.
+- Set an explicit customer spend cap with maxCostUsd or maxCostMicrousd before starting a scrape.
+- Start with small result caps such as maxItems or capability-specific limits.
+- Poll next.path while status is running and report the final debitMicrousd.
+
+Example body:
+```json
+{
+  "maxCostUsd": "0.05",
+  "waitForFinishSecs": 60,
+  "companies": [
+    "microsoft"
+  ]
+}
+```
+
+### Search LinkedIn People
+
+Use `POST /v1/scrape/linkedin/people`. Search public LinkedIn profiles by role, location, company, or school. Requires maxCostUsd of at least 0.50.
+
+Side effects: Starts a scrape run and may debit credits when the run finishes.
+Polling: If status is running, wait next.afterSecs and call next.method next.path until status is succeeded or failed.
+
+Safety:
+- Send Authorization: Bearer $DEEPAPI_API_KEY and never expose the key.
+- Send a unique Idempotency-Key for every POST.
+- Set an explicit customer spend cap with maxCostUsd or maxCostMicrousd before starting a scrape.
+- Start with small result caps such as maxItems or capability-specific limits.
+- Poll next.path while status is running and report the final debitMicrousd.
+
+Example body:
+```json
+{
+  "maxCostUsd": "0.50",
+  "waitForFinishSecs": 60,
+  "titles": [
+    "Founder"
+  ],
+  "locations": [
+    "San Francisco"
+  ],
+  "maxItems": 5
+}
+```
+
+### Scrape LinkedIn Posts
+
+Use `POST /v1/scrape/linkedin/posts`. Scrape recent public posts from LinkedIn profiles or company pages.
+
+Side effects: Starts a scrape run and may debit credits when the run finishes.
+Polling: If status is running, wait next.afterSecs and call next.method next.path until status is succeeded or failed.
+
+Safety:
+- Send Authorization: Bearer $DEEPAPI_API_KEY and never expose the key.
+- Send a unique Idempotency-Key for every POST.
+- Set an explicit customer spend cap with maxCostUsd or maxCostMicrousd before starting a scrape.
+- Start with small result caps such as maxItems or capability-specific limits.
+- Poll next.path while status is running and report the final debitMicrousd.
+
+Example body:
+```json
+{
+  "maxCostUsd": "0.05",
+  "waitForFinishSecs": 60,
+  "profiles": [
+    "williamhgates"
+  ],
+  "maxItems": 3
+}
+```
+
+### Scrape X/Twitter User
+
+Use `POST /v1/scrape/twitter/user`. Scrape public X/Twitter account profiles, with optional follower and following lists.
+
+Side effects: Starts a scrape run and may debit credits when the run finishes.
+Polling: If status is running, wait next.afterSecs and call next.method next.path until status is succeeded or failed.
+
+Safety:
+- Send Authorization: Bearer $DEEPAPI_API_KEY and never expose the key.
+- Send a unique Idempotency-Key for every POST.
+- Set an explicit customer spend cap with maxCostUsd or maxCostMicrousd before starting a scrape.
+- Start with small result caps such as maxItems or capability-specific limits.
+- Poll next.path while status is running and report the final debitMicrousd.
+
+Example body:
+```json
+{
+  "maxCostUsd": "0.05",
+  "waitForFinishSecs": 60,
+  "handles": [
+    "nasa"
+  ]
+}
+```
+
+### Scrape X/Twitter Replies
+
+Use `POST /v1/scrape/twitter/replies`. Scrape the public reply thread of an X/Twitter post. Requires maxCostUsd of at least 0.20.
+
+Side effects: Starts a scrape run and may debit credits when the run finishes.
+Polling: If status is running, wait next.afterSecs and call next.method next.path until status is succeeded or failed.
+
+Safety:
+- Send Authorization: Bearer $DEEPAPI_API_KEY and never expose the key.
+- Send a unique Idempotency-Key for every POST.
+- Set an explicit customer spend cap with maxCostUsd or maxCostMicrousd before starting a scrape.
+- Start with small result caps such as maxItems or capability-specific limits.
+- Poll next.path while status is running and report the final debitMicrousd.
+
+Example body:
+```json
+{
+  "maxCostUsd": "0.20",
+  "waitForFinishSecs": 60,
+  "url": "https://x.com/NASA/status/1234567890123456789",
+  "maxItems": 5
+}
+```
+
+### Scrape YouTube Transcript
+
+Use `POST /v1/scrape/youtube/transcript`. Scrape the transcript of a YouTube video as plain text plus timed segments. Videos without captions return an empty result.
+
+Side effects: Starts a scrape run and may debit credits when the run finishes.
+Polling: If status is running, wait next.afterSecs and call next.method next.path until status is succeeded or failed.
+
+Safety:
+- Send Authorization: Bearer $DEEPAPI_API_KEY and never expose the key.
+- Send a unique Idempotency-Key for every POST.
+- Set an explicit customer spend cap with maxCostUsd or maxCostMicrousd before starting a scrape.
+- Start with small result caps such as maxItems or capability-specific limits.
+- Poll next.path while status is running and report the final debitMicrousd.
+
+Example body:
+```json
+{
+  "maxCostUsd": "0.05",
+  "waitForFinishSecs": 60,
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+}
+```
+
+### Scrape YouTube Channel
+
+Use `POST /v1/scrape/youtube/channel`. Scrape a YouTube channel's stats and recent videos. Each video item includes subscriber and channel totals.
+
+Side effects: Starts a scrape run and may debit credits when the run finishes.
+Polling: If status is running, wait next.afterSecs and call next.method next.path until status is succeeded or failed.
+
+Safety:
+- Send Authorization: Bearer $DEEPAPI_API_KEY and never expose the key.
+- Send a unique Idempotency-Key for every POST.
+- Set an explicit customer spend cap with maxCostUsd or maxCostMicrousd before starting a scrape.
+- Start with small result caps such as maxItems or capability-specific limits.
+- Poll next.path while status is running and report the final debitMicrousd.
+
+Example body:
+```json
+{
+  "maxCostUsd": "0.30",
+  "waitForFinishSecs": 60,
+  "channels": [
+    "mkbhd"
+  ],
+  "maxItems": 3
+}
+```
+
+### Search YouTube
+
+Use `POST /v1/scrape/youtube/search`. Search YouTube videos by keyword and return video metadata.
+
+Side effects: Starts a scrape run and may debit credits when the run finishes.
+Polling: If status is running, wait next.afterSecs and call next.method next.path until status is succeeded or failed.
+
+Safety:
+- Send Authorization: Bearer $DEEPAPI_API_KEY and never expose the key.
+- Send a unique Idempotency-Key for every POST.
+- Set an explicit customer spend cap with maxCostUsd or maxCostMicrousd before starting a scrape.
+- Start with small result caps such as maxItems or capability-specific limits.
+- Poll next.path while status is running and report the final debitMicrousd.
+
+Example body:
+```json
+{
+  "maxCostUsd": "0.10",
+  "waitForFinishSecs": 60,
+  "query": "ai agents",
+  "sort": "views",
+  "maxItems": 3
+}
+```
+
+### Scrape LinkedIn
+
+Use `POST /v1/scrape/linkedin`. Backward-compatible alias for LinkedIn profile scraping.
+
+Side effects: Starts a scrape run and may debit credits when the run finishes.
+Polling: If status is running, wait next.afterSecs and call next.method next.path until status is succeeded or failed.
+
+Safety:
+- Send Authorization: Bearer $DEEPAPI_API_KEY and never expose the key.
+- Send a unique Idempotency-Key for every POST.
+- Set an explicit customer spend cap with maxCostUsd or maxCostMicrousd before starting a scrape.
+- Start with small result caps such as maxItems or capability-spe
 
 (Shortened: the skill continues in its source.)
 

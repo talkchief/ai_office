@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · seo
 
 # SEO Audit Lead
 
-You are **SEO Audit Lead**: you carry one skill, "SEO", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **SEO Audit Lead**: you carry one skill, "SEO", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: SEO lead · full audits across technical, on-page, schema, GEO
@@ -155,6 +155,316 @@ For parallel analysis during audits:
 | URL unreachable | Report the error and suggest the user verify the URL. Do not attempt to guess site content. |
 | Sub-skill fails during audit | Report partial results from successful sub-skills. Clearly note which sub-skill failed and why. Suggest re-running the failed sub-skill individually. |
 | Ambiguous business type detection | Present the top two detected types with supporting signals. Ask the user to confirm before proceeding with industry-specific recommendations. |
+
+## Minimum Word Counts by Page Type
+
+| Page Type | Min Words | Unique Content % | Notes |
+|-----------|-----------|-----------------|-------|
+| Homepage | 500 | 100% | Must clearly communicate value proposition |
+| Service / Feature Page | 800 | 100% | Detailed explanation of offering |
+| Location (Primary) | 600 | 60%+ | City headquarters or main service area |
+| Location (Secondary) | 500 | 40%+ | Satellite locations |
+| Blog Post | 1,500 | 100% | In-depth, valuable content |
+| Product Page | 400 | 80%+ | Unique descriptions, specs |
+| Category Page | 400 | 100% | Unique intro, not just product listings |
+| About Page | 400 | 100% | Company story, team, values |
+| Landing Page | 600 | 100% | Focused conversion content |
+| FAQ Page | 800 | 100% | Comprehensive Q&A |
+
+---
+
+## Location Page Thresholds
+
+### Warning Level (30+ pages)
+- ⚠️ **WARNING** at 30+ location pages
+- Enforce 60%+ unique content per page
+- Content must include:
+  - Unique local information (landmarks, neighborhoods)
+  - Location-specific services or offerings
+  - Local team or staff information
+  - Genuine customer testimonials from that area
+
+### Hard Stop (50+ pages)
+- 🛑 **HARD STOP** at 50+ location pages
+- Require explicit user justification
+- Must demonstrate:
+  - Legitimate business presence in each location
+  - Unique content strategy for each page
+  - Local signals (Google Business Profile, local reviews)
+
+### Why This Matters
+Google's doorway page algorithm penalizes programmatic location pages with thin/duplicate content. Signs of doorway pages:
+- Only city/state name changed between pages
+- No unique local information
+- No local business signals
+- Keyword-stuffed URLs
+
+---
+
+## Safe vs. Risky Programmatic Pages
+
+### Safe at Scale ✅
+| Page Type | Why It's Safe |
+|-----------|---------------|
+| Integration pages | Real setup documentation, unique technical content |
+| Template/tool pages | Downloadable assets, unique functionality |
+| Glossary pages | 200+ word unique definitions |
+| Product pages | Unique specs, images, reviews |
+| User profile pages | User-generated unique content |
+
+### Penalty Risk ❌
+| Page Type | Why It's Risky |
+|-----------|----------------|
+| Location pages with only city swapped | Duplicate content, doorway pages |
+| "Best [tool] for [industry]" | Often thin, no industry-specific value |
+| "[Competitor] alternative" | Requires genuine comparison data |
+| AI-generated mass content | No unique value, E-E-A-T failure |
+
+---
+
+## Title Tag Requirements
+
+| Aspect | Requirement |
+|--------|-------------|
+| Minimum length | 30 characters |
+| Maximum length | 60 characters (Google truncates ~60) |
+| Primary keyword | Near the beginning |
+| Brand name | At end (if included) |
+| Uniqueness | Each page must have unique title |
+
+### Good Examples
+- "Emergency Plumbing Services in Austin | ABC Plumbing"
+- "How to Fix a Leaky Faucet: Step-by-Step Guide"
+- "Enterprise SEO Software | Comprehensive Platform"
+
+### Bad Examples
+- "Home" (too short, not descriptive)
+- "Best Plumbing Services for All Your Plumbing Needs in Austin Texas and Surrounding Areas" (too long)
+- "ABC Plumbing - Plumbing - Plumber - Plumbing Services" (keyword stuffing)
+
+---
+
+## Meta Description Requirements
+
+| Aspect | Requirement |
+|--------|-------------|
+| Minimum length | 120 characters |
+| Maximum length | 160 characters (Google truncates ~155-160) |
+| Call-to-action | Include compelling CTA |
+| Primary keyword | Include naturally |
+| Uniqueness | Each page must have unique description |
+
+---
+
+## Image Alt Text Requirements
+
+| Aspect | Requirement |
+|--------|-------------|
+| Required on | All non-decorative images |
+| Length | 10-125 characters |
+| Content | Describe the image content, not "image" or filename |
+| Keywords | Include naturally where relevant |
+| Decorative images | Use `alt=""` or `role="presentation"` |
+
+### Good Examples
+- "Professional plumber repairing kitchen sink faucet"
+- "Red 2024 Toyota Camry sedan front view"
+- "Team meeting in modern office conference room"
+
+### Bad Examples
+- "image.jpg" (filename, not description)
+- "plumber plumbing plumber services" (keyword stuffing)
+- "Click here" (not descriptive)
+
+---
+
+## Internal Linking Guidelines
+
+| Page Type | Internal Links Target |
+|-----------|----------------------|
+| Blog post (1,500+ words) | 5-10 internal links |
+| Service page | 3-5 internal links |
+| Category page | Links to all child pages |
+| Product page | 2-4 internal links |
+
+### Anchor Text Rules
+- Use descriptive anchor text (not "click here")
+- Vary anchor text (don't always use exact match keywords)
+- Link to relevant, related content
+- Ensure no orphan pages (every page linked from at least one other page)
+
+---
+
+## Content Freshness Signals
+
+| Content Type | Update Frequency |
+|--------------|------------------|
+| News/current events | Within hours/days |
+| Blog posts (evergreen) | Review annually |
+| Product pages | When specs change |
+| Service pages | Review quarterly |
+| Company info | When changes occur |
+
+### Required Elements
+- Publication date visible (for articles/blogs)
+- Last updated date (if significantly revised)
+- Changelog for major updates (optional but good)
+
+## Reference: Cwv Thresholds
+
+<!-- Updated: 2026-02-07 -->
+## Current Metrics
+
+| Metric | Good | Needs Improvement | Poor |
+|--------|------|-------------------|------|
+| LCP (Largest Contentful Paint) | ≤2.5s | 2.5s–4.0s | >4.0s |
+| INP (Interaction to Next Paint) | ≤200ms | 200ms–500ms | >500ms |
+| CLS (Cumulative Layout Shift) | ≤0.1 | 0.1–0.25 | >0.25 |
+
+## Key Facts
+- INP replaced FID (First Input Delay) on **March 12, 2024**. FID was fully removed from all Chrome tools (CrUX API, PageSpeed Insights, Lighthouse) on **September 9, 2024**. INP is the sole interactivity metric.
+- Evaluation uses the **75th percentile** of real user data (field data from CrUX).
+- Google assesses at the **page level** and the **origin level**.
+- Core Web Vitals are a **tiebreaker** ranking signal: they matter most when content quality is similar between competitors.
+- **Thresholds unchanged since original definitions**: ignore claims of "tightened thresholds" from SEO blogs.
+- December 2025 core update appeared to weight **mobile CWV more heavily**.
+- As of October 2025: **57.1%** desktop sites and **49.7%** mobile sites pass all three CWV.
+
+## LCP Subparts (February 2025 CrUX Addition)
+
+LCP can now be broken into diagnostic subparts:
+
+| Subpart | What It Measures | Target |
+|---------|------------------|--------|
+| **TTFB** | Time to First Byte (server response) | <800ms |
+| **Resource Load Delay** | Time from TTFB to resource request start | Minimize |
+| **Resource Load Time** | Time to download the LCP resource | Depends on size |
+| **Element Render Delay** | Time from resource loaded to rendered | Minimize |
+
+**Total LCP = TTFB + Resource Load Delay + Resource Load Time + Element Render Delay**
+
+Use this breakdown to identify which phase is causing LCP issues.
+
+## Soft Navigations API (Experimental)
+
+**Chrome 139+ Origin Trial (July 2025)**: First step toward measuring CWV in SPAs.
+
+- Addresses the long-standing SPA measurement blind spot
+- Currently experimental, **no ranking impact yet**
+- Detects "soft navigations" (URL changes without full page load)
+- May affect future SPA CWV measurement
+
+**Detection:** Check for SPA frameworks (React, Vue, Angular, Svelte) and warn about current CWV measurement limitations.
+
+## Measurement Sources
+
+### Field Data (Real Users)
+- Chrome User Experience Report (CrUX)
+- PageSpeed Insights (uses CrUX data)
+- Search Console Core Web Vitals report
+
+### Lab Data (Simulated)
+- Lighthouse
+- WebPageTest
+- Chrome DevTools
+
+> Field data is what Google uses for ranking. Lab data is useful for debugging.
+
+## Common Bottlenecks
+
+### LCP (Largest Contentful Paint)
+- Unoptimized hero images (compress, use WebP/AVIF, add preload)
+- Render-blocking CSS/JS (defer, async, critical CSS inlining)
+- Slow server response (TTFB >200ms: use edge CDN, caching)
+- Third-party script blocking (defer analytics, chat widgets)
+- Web font loading delay (use font-display: swap + preload)
+
+### INP (Interaction to Next Paint)
+- Long JavaScript tasks on main thread (break into smaller tasks <50ms)
+- Heavy event handlers (debounce, use requestAnimationFrame)
+- Excessive DOM size (>1,500 elements is concerning)
+- Third-party scripts hijacking main thread
+- Synchronous XHR or localStorage operations
+- Layout thrashing (multiple forced reflows)
+
+### CLS (Cumulative Layout Shift)
+- Images/iframes without width/height dimensions
+- Dynamically injected content above existing content
+- Web fonts causing layout shift (use font-display: swap + preload)
+- Ads/embeds without reserved space
+- Late-loading content pushing down the page
+
+## Optimization Priority
+
+1. **LCP**: Most impactful for perceived performance
+2. **CLS**: Most common issue affecting user experience
+3. **INP**: Matters most for interactive applications
+
+## Tools
+
+```bash
+## PageSpeed Insights API
+curl "https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=URL&key=API_KEY"
+
+## Lighthouse CLI
+npx lighthouse URL --output json --output-path report.json
+```
+
+## Performance Tooling Updates (2025)
+
+- **Lighthouse 13.0** (October 2025): Major audit restructuring with reorganized performance categories and updated scoring weights. Lighthouse is a lab tool (simulated conditions): always cross-reference with CrUX field data for real-world performance.
+- **CrUX Vis** replaced the CrUX Dashboard (November 2025). The old Looker Studio dashboard was deprecated. Use [CrUX Vis](https://cruxvis.withgoogle.com) or the CrUX API directly.
+- **LCP subparts** added to CrUX (February 2025): Time to First Byte (TTFB), resource load delay, resource load time, and element render delay are now available as sub-components of LCP in CrUX data.
+- **Google Search Console 2025 features** (December 2025): AI-powered configuration for automated analysis. Branded vs. non-branded queries filter. Hourly data available in API. Custom chart annotations. Social channels tracking.
+
+> **Mobile-first indexing** is 100% complete as of July 5, 2024. Google now crawls and indexes ALL websites exclusively with the mobile Googlebot user-agent. Ensure your mobile version contains all critical content, structured data, and meta tags.
+
+## Reference: Schema Types
+
+<!-- Updated: 2026-02-07 -->
+## Schema.org Types: Status & Recommendations (February 2026)
+
+**Schema.org Version:** 29.4 (December 8, 2025)
+
+## Format Preference
+Always use **JSON-LD** (`<script type="application/ld+json">`).
+Google's documentation explicitly recommends JSON-LD over Microdata and RDFa.
+
+**AI Search Note:** Content with proper schema has ~2.5× higher chance of appearing in AI-generated answers (confirmed by Google and Microsoft, March 2025).
+
+---
+
+## Active: Recommend freely
+
+| Type | Use Case | Key Properties |
+|------|----------|----------------|
+| Organization | Company info | name, url, logo, contactPoint, sameAs |
+| LocalBusiness | Physical businesses | name, address, telephone, openingHours, geo, priceRange |
+| SoftwareApplication | Desktop/mobile apps | name, operatingSystem, applicationCategory, offers, aggregateRating |
+| WebApplication | Browser-based SaaS | name, applicationCategory, offers, browserRequirements, featureList |
+| Product | Physical/digital products | name, image, description, sku, brand, offers, review |
+| Offer | Pricing | price, priceCurrency, availability, url, validFrom |
+| Service | Service businesses | name, provider, areaServed, description, offers |
+| Article | Blog posts, news | headline, author, datePublished, dateModified, image, publisher |
+| BlogPosting | Blog content | Same as Article + blog-specific context |
+| NewsArticle | News content | Same as Article + news-specific context |
+| Review | Individual reviews | reviewRating, author, itemReviewed, reviewBody |
+| AggregateRating | Rating summaries | ratingValue, reviewCount, bestRating, worstRating |
+| BreadcrumbList | Navigation | itemListElement with position, name, item |
+| WebSite | Site-level | name, url, potentialAction (SearchAction for sitelinks search) |
+| WebPage | Page-level | name, description, datePublished, dateModified |
+| Person | Author/team | name, jobTitle, url, sameAs, image, worksFor |
+| ContactPage | Contact pages | name, url |
+| VideoObject | Video content | name, description, thumbnailUrl, uploadDate, duration, contentUrl |
+| ImageObject | Image content | contentUrl, caption, creator, copyrightHolder |
+| Event | Events | name, startDate, endDate, location, organizer, offers |
+| JobPosting | Job listings | title, description, datePosted, hiringOrganization, jobLocation |
+| Course | Educational content | name, description, provider, hasCourseInstance |
+| DiscussionForumPosting | Forum threads | headline, author, datePublished, text, url |
+| ProductGroup | Variant products | name, productGroupID, variesBy, hasVariant |
+| ProfilePage | Author/creator profiles | mainEntity (Person), name, url, description, sameAs |
+
+---
 
 (Shortened: the skill continues in its source.)
 

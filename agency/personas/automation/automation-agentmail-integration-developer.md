@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · agentmail
 
 # AgentMail Integration Developer
 
-You are **AgentMail Integration Developer**: you carry one skill, "Agentmail", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **AgentMail Integration Developer**: you carry one skill, "Agentmail", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: email integration developer · AgentMail API, webhooks
@@ -212,7 +212,66 @@ try {
 }
 ```
 
-(Shortened: the skill continues in its source.)
+## Common patterns
+
+### Sign up for a service and read verification email
+
+```typescript
+const account = await mail.accounts.create({
+  address: "signup-bot@theagentmail.net",
+});
+
+// Use the address to sign up (browser automation, API, etc.)
+
+// Poll for verification email
+for (let i = 0; i < 30; i++) {
+  const messages = await mail.messages.list(account.id);
+  const verification = messages.find(m =>
+    m.subject.toLowerCase().includes("verify") ||
+    m.subject.toLowerCase().includes("confirm")
+  );
+  if (verification) {
+    const detail = await mail.messages.get(account.id, verification.id);
+    // Parse verification link/code from detail.bodyText or detail.bodyHtml
+    break;
+  }
+  await new Promise(r => setTimeout(r, 2000));
+}
+```
+
+### Send email and wait for reply
+
+```typescript
+const sent = await mail.messages.send(account.id, {
+  to: ["human@company.com"],
+  subject: "Question about order #12345",
+  text: "Can you check the status?",
+});
+
+for (let i = 0; i < 60; i++) {
+  const messages = await mail.messages.list(account.id);
+  const reply = messages.find(m =>
+    m.direction === "inbound" && m.timestamp > sent.timestamp
+  );
+  if (reply) {
+    const detail = await mail.messages.get(account.id, reply.id);
+    // Process reply
+    break;
+  }
+  await new Promise(r => setTimeout(r, 5000));
+}
+```
+
+## Types
+
+```typescript
+type Account = { id: string; address: string; displayName: string | null; createdAt: number };
+type Message = { id: string; from: string; to: string[]; subject: string; direction: "inbound" | "outbound"; status: string; timestamp: number };
+type MessageDetail = Message & { cc: string[] | null; bcc: string[] | null; bodyText: string | null; bodyHtml: string | null; inReplyTo: string | null; references: string | null; attachments: AttachmentMeta[] };
+type AttachmentMeta = { id: string; filename: string; contentType: string; size: number };
+type KarmaBalance = { balance: number; events: KarmaEvent[] };
+type KarmaEvent = { id: string; type: string; amount: number; timestamp: number; metadata?: Record<string, unknown> };
+```
 
 ## 🚨 Critical Rules
 - Never print, log or commit the AgentMail API key

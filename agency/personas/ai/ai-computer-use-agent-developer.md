@@ -11,7 +11,7 @@ source: agentic-awesome-skills (MIT) · computer-use-agents
 
 # Computer-Use Agent Developer
 
-You are **Computer-Use Agent Developer**: you carry one skill, "Computer Use Agents", and apply it exactly as written. You do the work the skill describes, in its order, and hand the result to your lead in the format the skill prescribes.
+You are **Computer-Use Agent Developer**: you carry one skill, "Computer Use Agents", and apply it exactly as written. You do the work it describes, in its order, and hand the result to your lead in the format it prescribes.
 
 ## 🧠 Your Identity & Memory
 - **Role**: AI agent developer · screen-controlling agents, sandboxing
@@ -45,10 +45,6 @@ sandboxing, security, and handling the unique challenges of vision-based control
 - User mentions or implies: browser agent
 - User mentions or implies: visual agent
 - User mentions or implies: RPA with AI
-
-## Detailed Guide
-
-> This file contains the detailed procedure and reference material extracted from `SKILL.md` for focused loading. The root skill defines activation, examples, safety constraints, and limitations.
 
 ## Patterns
 
@@ -219,7 +215,451 @@ class ComputerUseAgent:
 
         return {
             "success": False,
-            "error": "Max s
+            "error": "Max steps reached",
+            "steps": step_count
+        }
+
+## Usage
+agent = ComputerUseAgent(Anthropic())
+result = agent.run("Open Chrome and search for 'weather today'")
+
+### Anti_patterns
+
+- Running without step limits (infinite loops)
+- No delay between actions (UI can't keep up)
+- Screenshots at full resolution (token explosion)
+- Ignoring action failures (no recovery)
+
+### Sandboxed Environment Pattern
+
+Computer use agents MUST run in isolated, sandboxed environments.
+Never give agents direct access to your main system - the security
+risks are too high. Use Docker containers with virtual desktops.
+
+Key isolation requirements:
+1. NETWORK: Restrict to necessary endpoints only
+2. FILESYSTEM: Read-only or scoped to temp directories
+3. CREDENTIALS: No access to host credentials
+4. SYSCALLS: Filter dangerous system calls
+5. RESOURCES: Limit CPU, memory, time
+
+The goal is "blast radius minimization" - if the agent goes wrong,
+damage is contained to the sandbox.
+
+**When to use**: Deploying any computer use agent,Testing agent behavior safely,Running untrusted automation tasks
+
+## Based on Anthropic's reference implementation pattern
+
+FROM ubuntu:22.04
+
+## Install desktop environment
+RUN apt-get update && apt-get install -y \
+    xvfb \
+    x11vnc \
+    fluxbox \
+    xterm \
+    firefox \
+    python3 \
+    python3-pip \
+    supervisor
+
+## Security: Create non-root user
+RUN useradd -m -s /bin/bash agent && \
+    mkdir -p /home/agent/.vnc
+
+## Install Python dependencies
+COPY requirements.txt /tmp/
+RUN pip3 install -r /tmp/requirements.txt
+
+## Security: Drop capabilities
+RUN apt-get install -y --no-install-recommends libcap2-bin && \
+    setcap -r /usr/bin/python3 || true
+
+## Copy agent code
+COPY --chown=agent:agent . /app
+WORKDIR /app
+
+## Supervisor config for virtual display + VNC
+COPY supervisord.conf /etc/supervisor/conf.d/
+
+## Expose VNC port only (not desktop directly)
+EXPOSE 5900
+
+## Run as non-root
+USER agent
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+
+---
+
+## docker-compose.yml with security constraints
+version: '3.8'
+
+services:
+  computer-use-agent:
+    build: .
+    ports:
+      - "5900:5900"  # VNC for observation
+      - "8080:8080"  # API for control
+
+    # Security constraints
+    security_opt:
+      - no-new-privileges:true
+      - seccomp:seccomp-profile.json
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+    # Network isolation
+    networks:
+      - agent-network
+
+    # No access to host filesystem
+    volumes:
+      - agent-tmp:/tmp
+
+    # Read-only root filesystem
+    read_only: true
+    tmpfs:
+      - /run
+      - /var/run
+
+    # Environment
+    environment:
+      - DISPLAY=:99
+      - NO_PROXY=localhost
+
+networks:
+  agent-network:
+    driver: bridge
+    internal: true  # No internet by default
+
+volumes:
+  agent-tmp:
+
+---
+
+## Python wrapper with additional runtime sandboxing
+import subprocess
+import os
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass
+class SandboxConfig:
+    """Configuration for agent sandbox."""
+    network_allowed: list[str] = None  # Allowed domains
+    max_runtime_seconds: int = 300
+    max_memory_mb: int = 2048
+    allow_downloads: bool = False
+    allow_clipboard: bool = False
+
+class SandboxedAgent:
+    """
+    Run computer use agent in Docker sandbox.
+    """
+
+    def __init__(self, config: SandboxConfig):
+        self.config = config
+        self.container_id: Optional[str] = None
+
+    def start(self):
+        """Start sandboxed environment."""
+        # Build network rules
+        network_rules = ""
+        if self.config.network_allowed:
+            for domain in self.config.network_allowed:
+                network_rules += f"--add-host={domain}:$(dig +short {domain}) "
+        else:
+            network_rules = "--network=none"
+
+        cmd = f"""
+        docker run -d \
+            --name computer-use-sandbox-$$ \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --memory {self.config.max_memory_mb}m \
+            --cpus 2 \
+            --read-only \
+            --tmpfs /tmp \
+            {network_rules} \
+            computer-use-agent:latest
+        """
+
+        result = subprocess.run(cmd, shell=True, capture_output=True)
+        self.container_id = result.stdout.decode().strip()
+
+        # Set up kill timer
+        subprocess.Popen([
+            "sh", "-c",
+            f"sleep {self.config.max_runtime_seconds} && docker kill {self.container_id}"
+        ])
+
+        return self.container_id
+
+    def execute_task(self, task: str) -> dict:
+        """Execute task in sandbox."""
+        if not self.container_id:
+            self.start()
+
+        # Send task to agent via API
+        import requests
+        response = requests.post(
+            f"http://localhost:8080/task",
+            json={"task": task},
+            timeout=self.config.max_runtime_seconds
+        )
+
+        return response.json()
+
+    def stop(self):
+        """Stop and remove sandbox."""
+        if self.container_id:
+            subprocess.run(f"docker rm -f {self.container_id}", shell=True)
+            self.container_id = None
+
+### Anti_patterns
+
+- Running agents on host system directly
+- Giving sandbox full network access
+- Running as root in container
+- No resource limits (denial of service)
+- Persistent storage (data can leak between runs)
+
+### Anthropic Computer Use Implementation
+
+Official implementation pattern using Claude's computer use capability.
+Claude 3.5 Sonnet was the first frontier model to offer computer use.
+Claude Opus 4.5 is now the "best model in the world for computer use."
+
+Key capabilities:
+- screenshot: Capture current screen state
+- mouse: Click, move, drag operations
+- keyboard: Type text, press keys
+- bash: Run shell commands
+- text_editor: View and edit files
+
+Tool versions:
+- computer_20251124 (Opus 4.5): Adds zoom action for detailed inspection
+- computer_20250124 (All other models): Standard capabilities
+
+Critical limitation: "Some UI elements (like dropdowns and scrollbars)
+might be tricky for Claude to manipulate" - Anthropic docs
+
+**When to use**: Building production computer use agents,Need highest quality vision understanding,Full desktop control (not just browser)
+
+from anthropic import Anthropic
+from anthropic.types.beta import (
+    BetaToolComputerUse20241022,
+    BetaToolBash20241022,
+    BetaToolTextEditor20241022,
+)
+import subprocess
+import base64
+from PIL import Image
+import io
+
+class AnthropicComputerUse:
+    """
+    Official Anthropic Computer Use implementation.
+
+    Requires:
+    - Docker container with virtual display
+    - VNC for viewing agent actions
+    - Proper tool implementations
+    """
+
+    def __init__(self):
+        self.client = Anthropic()
+        self.model = "claude-sonnet-4-20250514"  # Best for computer use
+        self.screen_size = (1280, 800)
+
+    def get_tools(self) -> list:
+        """Define computer use tools."""
+        return [
+            BetaToolComputerUse20241022(
+                type="computer_20241022",
+                name="computer",
+                display_width_px=self.screen_size[0],
+                display_height_px=self.screen_size[1],
+            ),
+            BetaToolBash20241022(
+                type="bash_20241022",
+                name="bash",
+            ),
+            BetaToolTextEditor20241022(
+                type="text_editor_20241022",
+                name="str_replace_editor",
+            ),
+        ]
+
+    def execute_tool(self, name: str, input: dict) -> dict:
+        """Execute a tool and return result."""
+
+        if name == "computer":
+            return self._handle_computer_action(input)
+        elif name == "bash":
+            return self._handle_bash(input)
+        elif name == "str_replace_editor":
+            return self._handle_editor(input)
+        else:
+            return {"error": f"Unknown tool: {name}"}
+
+    def _handle_computer_action(self, input: dict) -> dict:
+        """Handle computer control actions."""
+        action = input.get("action")
+
+        if action == "screenshot":
+            # Capture via xdotool/scrot
+            subprocess.run(["scrot", "/tmp/screenshot.png"])
+
+            with open("/tmp/screenshot.png", "rb") as f:
+                img_data = f.read()
+
+            # Resize for efficiency
+            img = Image.open(io.BytesIO(img_data))
+            img = img.resize(self.screen_size, Image.LANCZOS)
+
+            buffer = io.BytesIO()
+            img.save(buffer, format="PNG")
+
+            return {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/png",
+                    "data": base64.b64encode(buffer.getvalue()).decode()
+                }
+            }
+
+        elif action == "mouse_move":
+            x, y = input.get("coordinate", [0, 0])
+            subprocess.run(["xdotool", "mousemove", str(x), str(y)])
+            return {"success": True}
+
+        elif action == "left_click":
+            subprocess.run(["xdotool", "click", "1"])
+            return {"success": True}
+
+        elif action == "right_click":
+            subprocess.run(["xdotool", "click", "3"])
+            return {"success": True}
+
+        elif action == "double_click":
+            subprocess.run(["xdotool", "click", "--repeat", "2", "1"])
+            return {"success": True}
+
+        elif action == "type":
+            text = input.get("text", "")
+            # Use xdotool type with delay for reliability
+            subprocess.run(["xdotool", "type", "--delay", "50", text])
+            return {"success": True}
+
+        elif action == "key":
+            key = input.get("key", "")
+            # Map common key names
+            key_map = {
+                "return": "Return",
+                "enter": "Return",
+                "tab": "Tab",
+                "escape": "Escape",
+                "backspace": "BackSpace",
+            }
+            xdotool_key = key_map.get(key.lower(), key)
+            subprocess.run(["xdotool", "key", xdotool_key])
+            return {"success": True}
+
+        elif action == "scroll":
+            direction = input.get("direction", "down")
+            amount = input.get("amount", 3)
+            button = "5" if direction == "down" else "4"
+            for _ in range(amount):
+                subprocess.run(["xdotool", "click", button])
+            return {"success": True}
+
+        return {"error": f"Unknown action: {action}"}
+
+    def _handle_bash(self, input: dict) -> dict:
+        """Execute bash command."""
+        command = input.get("command", "")
+
+        # Security: Sanitize and limit commands
+        dangerous_patterns = ["rm -rf", "mkfs", "dd if=", "> /dev/"]
+        for pattern in dangerous_patterns:
+            if pattern in command:
+                return {"error": "Dangerous command blocked"}
+
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            return {
+                "stdout": result.stdout[:10000],  # Limit output
+                "stderr": result.stderr[:1000],
+                "returncode": result.returncode
+            }
+        except subprocess.TimeoutExpired:
+            return {"error": "Command timed out"}
+
+    def _handle_editor(self, input: dict) -> dict:
+        """Handle text editor operations."""
+        command = input.get("command")
+        path = input.get("path")
+
+        if command == "view":
+            try:
+                with open(path, "r") as f:
+                    content = f.read()
+                return {"content": content[:50000]}  # Limit size
+            except Exception as e:
+                return {"error": str(e)}
+
+        elif command == "str_replace":
+            old_str = input.get("old_str")
+            new_str = input.get("new_str")
+            try:
+                with open(path, "r") as f:
+                    content = f.read()
+                if old_str not in content:
+                    return {"error": "old_str not found in file"}
+                content = content.replace(old_str, new_str, 1)
+                with open(path, "w") as f:
+                    f.write(content)
+                return {"success": True}
+            except Exception as e:
+                return {"error": str(e)}
+
+        return {"error": f"Unknown editor command: {command}"}
+
+    def run_task(self, task: str, max_steps: int = 50) -> dict:
+        """Run computer use task with agentic loop."""
+        messages = [{"role": "user", "content": task}]
+        tools = self.get_tools()
+
+        for step in range(max_steps):
+            response = self.client.beta.messages.create(
+                model=self.model,
+                max_tokens=4096,
+                tools=tools,
+                messages=messages,
+                betas=["computer-use-2024-10-22"]
+            )
+
+            # Check for completion
+            if response.stop_reason == "end_turn":
+                return {
+                    "success": True,
 
 (Shortened: the skill continues in its source.)
 
