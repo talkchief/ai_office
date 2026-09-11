@@ -191,10 +191,10 @@ body.dark{--mg-rail:#121316;--mg-card:#1E1F23;--mg-line2:rgba(236,234,226,.32);-
 #settingsPage.mg details.mg-fold>.mg-fold-body{padding:16px}
 
 /* the save bar: the one place that always tells the truth about what is saved */
-#settingsPage.mg .mg-savebar{position:sticky;bottom:12px;z-index:5;display:flex;align-items:center;gap:14px;margin-top:22px;padding:10px 12px 10px 16px;border:1px solid var(--mg-line2);border-radius:12px;background:color-mix(in srgb,var(--mg-card) 92%,transparent);backdrop-filter:blur(8px);box-shadow:var(--mg-shadow)}
+#settingsPage.mg .mg-savebar{position:sticky;bottom:12px;z-index:5;display:flex;align-items:center;gap:14px;margin-top:22px;padding:10px 12px 10px 16px;border:1px solid var(--mg-line2);border-radius:12px;background:var(--mg-card);box-shadow:var(--mg-shadow)}
 #settingsPage.mg .mg-savebar .mg-savemsg{font:12.5px/1.4 var(--ui);color:var(--ink)}
 #settingsPage.mg .mg-savebar .mg-savemsg small{display:block;color:var(--grey);font-size:11.5px}
-#settingsPage.mg .mg-savebar[data-state=idle]{border-color:var(--hairline);box-shadow:none;background:transparent;backdrop-filter:none}
+#settingsPage.mg .mg-savebar[data-state=idle]{border-color:var(--hairline);box-shadow:0 -8px 24px -12px rgba(22,21,20,.18);background:var(--mg-card)}
 #settingsPage.mg .mg-savebar[data-state=idle] [data-mark]{display:none}
 #settingsPage.mg .mg-savebar[data-state=dirty]{border-color:color-mix(in srgb,var(--mg-warn) 50%,transparent)}
 #settingsPage.mg .mg-savebar[data-state=failed]{border-color:color-mix(in srgb,var(--mg-fail) 55%,transparent)}
