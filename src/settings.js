@@ -181,7 +181,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       if (!draft.teams.some(t => t.id === team)) team = draft.teams[0].id;
       setMeta(mark('ok', 'Saved')); refreshMeta('teams', mark('ok', 'Saved'));
       renderTeam();
-      if (resume?.hire) $('spaceHireAgency')?.click();
+      if (resume?.hire) $('spaceAddAgent')?.click();
     } catch (error) { feedback(error.message, true); }
   }
   const toolChoices = (selected, prefix) => tools.filter(t => t.type !== 'candidate').map(t => check(`<input type="checkbox" class="mg-switch" data-${prefix}="${esc(t.id)}" ${selected.includes(t.id) ? 'checked' : ''}>`, esc(t.name), esc(t.origin || t.type))).join('');
@@ -235,7 +235,13 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       <form id="spaceTeamForm" data-dirty novalidate>
       <section data-settings-page="overview">${unsaved ? banner('info', '<b>This team does not exist yet.</b> Name it, write its charter or draft it with AI, then press Create team. People, rules, tools and tests open once it exists.') : ''}<div class="mg-card"><div class="mg-card-head"><h3>Charter</h3><span class="mg-count">read before every assignment</span><button type="button" class="mg-assist" data-assist="team" style="margin-left:auto">✦ Draft with AI</button></div><div class="mg-grid">${field('Team name', `<input name="name" value="${esc(t.name)}" required>`)}${field('Accountable lead', `<select name="lead">${agents.map(a => `<option value="${a.id}" ${a.id === t.lead ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>`, 'Reviews every result against the criteria before it is filed in the Brain.')}</div>
       <div style="margin-top:14px">${field('Purpose', `<textarea name="purpose" rows="2" required placeholder="What does this team own, and what does success look like?">${esc(t.purpose)}</textarea>`, 'What this team owns and what a good result looks like. Read before every assignment.')}${field('Working instructions', `<textarea name="instructions" rows="6" required placeholder="Process, tone, source requirements and boundaries for this team.">${esc(t.instructions)}</textarea>`, 'Process, tone, sources and boundaries. Steps with a template belong in a skill instead.')}</div></div></section>
-      <section data-settings-page="people"><div id="spaceAgencyPicker" hidden></div>${agents.map(person).join('')}<div class="mg-toolbar" style="margin-top:14px"><button type="button" class="mg-btn" id="spaceAddAgent" ${agents.length >= 7 ? 'disabled' : ''}>+ Add a person</button><button type="button" class="mg-btn" id="spaceHireAgency" ${unsaved ? 'disabled title="Create the team first"' : agents.length >= 7 ? 'disabled' : ''}>Hire from the Agency</button><span class="mg-muted">${agents.length >= 7 ? 'This team is full: a lead and six specialists.' : `Room for ${7 - agents.length} more.`}</span></div></section>
+      <section data-settings-page="people"><div id="spaceAgencyPicker" hidden></div>${agents.map(person).join('')}<div class="mg-toolbar" style="margin-top:14px"><button type="button" class="mg-btn mg-btn-primary" id="spaceAddAgent" ${agents.length >= 7 ? 'disabled' : ''}>+ Add agent</button><span class="mg-muted">${agents.length >= 7 ? 'This team is full: a lead and six specialists.' : `Room for ${7 - agents.length} more on this team.`}</span></div>
+      <div class="mg-modal" id="spaceAddAgentModal" hidden role="dialog" aria-modal="true" aria-label="Add an agent"><div class="mg-modal-box">
+        <div class="mg-modal-head"><h3>Add an agent to ${esc(t.name)}</h3><button type="button" class="mg-modal-x" data-add-close aria-label="Close">✕</button></div>
+        <div class="mg-choices">
+          <button type="button" class="mg-choice" data-add="agency" ${unsaved ? 'disabled' : ''}><b>Hire from the Agency</b><span>Pick a ready-made specialist from 2,000+ personas. They arrive with a role, a job description, standing instructions and their method as a skill.</span>${unsaved ? '<em>Create the team first.</em>' : '<em>Recommended</em>'}</button>
+          <button type="button" class="mg-choice" data-add="blank"><b>Create from scratch</b><span>A blank seat you write yourself: the name, the role, what they do and how you want them to work. AI can draft the job for you.</span></button>
+        </div></div></div></section>
       <section data-settings-page="rules"><div class="mg-card"><h3>Whole team</h3><p>Your own words, kept as you wrote them. Every task for this team starts from them.</p>${ruleList(t.rules, 'remove-team-rule')}<div class="mg-toolbar" style="margin:14px 0 0"><div class="mg-search" style="flex:1">${SEARCH_ICON}<input id="spaceNewTeamRule" maxlength="300" placeholder="Add a rule, e.g. Always quote prices in USD"></div><button type="button" class="mg-btn" id="spaceAddTeamRule">Add rule</button></div></div>
         ${agents.filter(a => a.rules?.length).map(a => `<div class="mg-card"><h3>${esc(a.name)}</h3><p>Rules for this person only.</p>${ruleList(a.rules || [], 'remove-agent-rule-' + a.id)}</div>`).join('')}</section>
       <section data-settings-page="quality"><div class="mg-card"><h3>What the lead checks</h3><p>Guardrails are hard stops; criteria are the bar.</p><div class="mg-grid">${field('Guardrails — one per line', `<textarea name="guardrails" rows="4" placeholder="Boundaries the lead must check before approving work.">${esc(t.guardrails.join('\n'))}</textarea>`)}${field('Lead’s review criteria — one per line', `<textarea name="criteria" rows="4">${esc(t.criteria.join('\n'))}</textarea>`)}</div>
@@ -274,7 +280,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     $('spaceAddCheck').onclick = () => { collectTeam(); if (t.checks.length >= 20) return feedback('A team supports up to 20 checks.', true); t.checks.push({ type: 'contains', label: 'New acceptance check', value: '' }); dirty = true; renderTeam(); $('spaceCheckEditors').lastElementChild.open = true; };
     content.querySelectorAll('[data-remove-check]').forEach(b => b.onclick = () => { collectTeam(); t.checks.splice(Number(b.dataset.removeCheck), 1); rerender(); });
     content.querySelectorAll('[data-check-type]').forEach(select => select.onchange = () => { const input = select.closest('[data-check-editor]').querySelector('[data-check-value]'); input.type = select.value.includes('length') ? 'number' : 'text'; });
-    if ($('spaceHireAgency')) $('spaceHireAgency').onclick = async () => {
+    async function hireFromAgency() {
       collectTeam();
       if (!config.teams.some(x => x.id === t.id)) { // not saved yet: the Agency can only hire into a team the office knows
         if (!t.name.trim() || t.name === 'New team' || !t.purpose.trim() || !t.instructions.trim()) { teamSection = 'overview'; renderTeam(); toast('Name the team and write its charter first', { kind: 'warn', detail: 'Or press Draft with AI. Hiring saves the team for you.' }); content.querySelector(t.purpose.trim() ? '[name=instructions]' : '[name=purpose]')?.focus(); return; }
@@ -282,7 +288,8 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         return;
       }
       agencyPicker($('spaceAgencyPicker'), { mode: 'hire', dept: t.id, full: agents.length >= 7, onDone: async () => { dirty = false; await showTeams(); teamSection = 'people'; renderTeam(); } });
-    };
+      $('spaceAgencyPicker').scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
     content.querySelectorAll('[data-assist]').forEach(b => b.onclick = async () => {
       collectTeam(); const form = $('spaceTeamForm'); b.disabled = true; const was = b.textContent; b.innerHTML = '<span class="mg-spin"></span>Drafting…';
       try {
@@ -300,7 +307,19 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       } catch (error) { feedback(error.message, true); }
       finally { b.disabled = false; b.textContent = was; }
     });
-    $('spaceAddAgent').onclick = () => { collectTeam(); if (agents.length >= 7) return feedback('A team is a lead and up to six specialists.', true); const id = 'agent-' + crypto.randomUUID().slice(0, 8); draft.agents.push({ id, department: t.id, name: 'New person', role: 'Specialist', does: '', brief: '', model: '', effort: '', tools: [], skills: [], rules: [], inheritTools: true }); dirty = true; renderTeam(); content.querySelector(`[data-agent-editor="${id}"]`).open = true; };
+    const addModal = $('spaceAddAgentModal'), closeAdd = () => { addModal.hidden = true; $('spaceAddAgent')?.focus(); };
+    $('spaceAddAgent').onclick = () => { collectTeam(); if (agents.length >= 7) return feedback('A team is a lead and up to six specialists.', true); addModal.hidden = false; addModal.querySelector('.mg-choice:not(:disabled)').focus(); };
+    addModal.addEventListener('click', event => {
+      if (event.target === addModal || event.target.closest('[data-add-close]')) return closeAdd();
+      const choice = event.target.closest('[data-add]'); if (!choice) return;
+      closeAdd();
+      if (choice.dataset.add === 'agency') return hireFromAgency();
+      const id = 'agent-' + crypto.randomUUID().slice(0, 8);
+      draft.agents.push({ id, department: t.id, name: 'New agent', role: 'Specialist', does: '', brief: '', model: '', effort: '', tools: [], skills: [], rules: [], inheritTools: true });
+      dirty = true; renderTeam();
+      const box = content.querySelector(`[data-agent-editor="${id}"]`); box.open = true; box.scrollIntoView({ block: 'center', behavior: 'smooth' }); box.querySelector('[data-field="name"]').select();
+    });
+    addModal.addEventListener('keydown', event => { if (event.key === 'Escape') { event.stopPropagation(); closeAdd(); } });
     content.querySelectorAll('[data-remove-agent]').forEach(b => b.onclick = () => {
       collectTeam(); if (agents.length <= 2) return feedback('Keep a lead and at least one specialist.', true);
       draft.agents = draft.agents.filter(a => a.id !== b.dataset.removeAgent);

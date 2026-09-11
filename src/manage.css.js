@@ -232,6 +232,24 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #settingsPage.mg .mg-person .mg-fold-body h4{margin:18px 0 8px;font:500 10.5px var(--mg-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--grey)}
 #settingsPage.mg .mg-rules td:first-child{width:60%}
 
+/* a small modal: one question, two ways to answer it */
+#settingsPage.mg .mg-modal{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:20px;background:color-mix(in srgb,var(--ink) 38%,transparent);backdrop-filter:blur(2px);animation:mgFade .15s ease-out}
+#settingsPage.mg .mg-modal[hidden]{display:none}
+@keyframes mgFade{from{opacity:0}to{opacity:1}}
+#settingsPage.mg .mg-modal-box{width:min(620px,100%);background:var(--mg-card);border:1px solid var(--hairline);border-radius:14px;box-shadow:var(--mg-shadow);overflow:hidden}
+#settingsPage.mg .mg-modal-head{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--hairline);background:var(--mg-rail)}
+#settingsPage.mg .mg-modal-head h3{margin:0;font:400 22px var(--serif)}
+#settingsPage.mg .mg-modal-x{margin-left:auto;border:0;background:transparent;color:var(--grey);font-size:15px;line-height:1;padding:4px 6px;cursor:pointer;height:auto}
+#settingsPage.mg .mg-modal-x:hover{color:var(--ink)}
+#settingsPage.mg .mg-choices{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:18px 20px 20px}
+#settingsPage.mg .mg-choice{display:flex;flex-direction:column;align-items:flex-start;gap:6px;height:auto;padding:16px;border:1px solid var(--mg-line2);border-radius:12px;background:transparent;text-align:left;cursor:pointer;color:var(--ink);white-space:normal}
+#settingsPage.mg .mg-choice:hover:not(:disabled){border-color:var(--ink);background:var(--mg-hover)}
+#settingsPage.mg .mg-choice:disabled{opacity:.55;cursor:default}
+#settingsPage.mg .mg-choice b{font:600 14px var(--ui)}
+#settingsPage.mg .mg-choice span{font:12px/1.5 var(--ui);color:var(--grey)}
+#settingsPage.mg .mg-choice em{margin-top:2px;font:500 10.5px var(--mg-mono);letter-spacing:.08em;text-transform:uppercase;font-style:normal;color:var(--mg-gold)}
+@media (max-width:620px){#settingsPage.mg .mg-choices{grid-template-columns:1fr}}
+
 /* routines: a timetable */
 #settingsPage.mg .mg-timetable{display:grid;grid-template-columns:52px repeat(7,1fr);border:1px solid var(--hairline);border-radius:10px;overflow:hidden;background:var(--mg-card);margin-bottom:18px}
 #settingsPage.mg .mg-timetable .hd{padding:8px 6px;font:500 10.5px var(--mg-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--grey);border-bottom:1px solid var(--hairline);border-right:1px solid var(--hairline);background:var(--mg-rail);text-align:center}
