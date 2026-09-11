@@ -59,6 +59,7 @@ export async function officeSummary(api, { force = false } = {}) {
         models: { line: `${keyed.length} of ${providers.length} provider${providers.length === 1 ? '' : 's'} keyed · ${health.ready ? 'ready' : 'not ready'}`, dot: health.ready ? (rejected.length ? 'fail' : 'ok') : 'warn' },
         tools: { line: tools ? `${own.length} connector${own.length === 1 ? '' : 's'}${failed.length ? ' · ' + failed.length + ' failed' : signedOut.length ? ' · ' + signedOut.length + ' signed out' : ''}` : '', dot: failed.length ? 'fail' : signedOut.length ? 'warn' : own.length ? 'ok' : '' },
         vault: { line: vault ? `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}${noSecret.length ? ' · ' + noSecret.length + ' without a secret' : ''}` : '', dot: entries.length ? (noSecret.length ? 'warn' : 'ok') : '' },
+        profile: { line: health.name || '' },
         office: { line: `${health.settings?.maxConcurrentJobs ?? '—'} tasks at once · digest ${health.settings?.digestTime || '—'}` },
         audit: { line: audit?.[0] ? `#${audit[0].seq} · ${ago(audit[0].at)}` : '', count: audit?.[0]?.seq },
       },

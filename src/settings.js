@@ -16,6 +16,7 @@ const lines = value => String(value || '').split('\n').map(s => s.trim()).filter
 const duration = ms => ms == null ? '—' : ms < 60000 ? Math.round(ms / 1000) + 's' : ms < 3600000 ? Math.round(ms / 60000) + ' min' : (ms / 3600000).toFixed(1) + ' h';
 const initials = name => String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 const SECTIONS = [
+  ['profile', 'Profile', 'Administration', 'The company the office works for: its name, and the purpose every planner reads before work.', 'settings'],
   ['office', 'Office settings', 'Administration', 'How the whole office runs. Choices for one team live under Teams & people.', 'settings'],
   ['teams', 'Teams & people', 'People', 'Who is on each team, what they do, and the standing instructions they start every task from. A team is a lead and up to six specialists.', 'office'],
   ['models', 'Models & keys', 'Services', 'Save a provider key, activate the models the office may use, and pick who runs on what. Keys stay on the server and are never shown again.', 'providers'],
@@ -30,7 +31,7 @@ const SECTIONS = [
   ['audit', 'Audit log', 'Administration', 'Every change made through the office, by you or by an agent, with what it was before. Nothing here can be edited.', ''],
 ];
 const RESUME = 'ao.settings.resume';
-const RAIL = [['People', ['teams', 'projects', 'routines']], ['Knowledge', ['brain', 'skills', 'artifacts', 'reports']], ['Services', ['models', 'tools', 'vault']], ['Administration', ['office', 'audit']]];
+const RAIL = [['People', ['teams', 'projects', 'routines']], ['Knowledge', ['brain', 'skills', 'artifacts', 'reports']], ['Services', ['models', 'tools', 'vault']], ['Administration', ['profile', 'office', 'audit']]];
 const readFile = file => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(',')[1]); r.onerror = reject; r.readAsDataURL(file); });
 const SEARCH_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
 
@@ -90,7 +91,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   });
   page.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Escape' && !event.target.closest('input,textarea,select')) close(); });
   $('settingsBack').onclick = event => { event.preventDefault(); close(); };
-  const RENDER = { office: showOffice, teams: showTeams, models: showModels, tools: showTools, vault: showVault, skills: showSkills, projects: showProjects, artifacts: showArtifacts, routines: showRoutines, reports: showReports, brain: showBrain, audit: showAudit };
+  const RENDER = { profile: showProfile, office: showOffice, teams: showTeams, models: showModels, tools: showTools, vault: showVault, skills: showSkills, projects: showProjects, artifacts: showArtifacts, routines: showRoutines, reports: showReports, brain: showBrain, audit: showAudit };
 
   function route() {
     const match = location.hash.match(/^#\/settings(?:\/([\w-]+))?/);
@@ -122,6 +123,29 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   const search = (id, placeholder, value = '', type = 'search') => `<div class="mg-search">${SEARCH_ICON}<input id="${id}" type="${type}" placeholder="${esc(placeholder)}" value="${esc(value)}" aria-label="${esc(placeholder)}"></div>`;
   const empty = (title, text) => `<div class="mg-card" style="text-align:center;padding:36px 22px"><h3>${title}</h3><p style="margin:0">${text}</p></div>`;
   const banner = (kind, html, actions = '') => `<div class="mg-banner mg-banner-${kind}"><span class="mg-glyph">${{ fail: '✕', warn: '!', ok: '✓', info: 'i' }[kind]}</span><div>${html}</div>${actions ? `<div class="mg-actions">${actions}</div>` : ''}</div>`;
+
+  /* ---------- Profile: the company's name and purpose ---------- */
+  const PURPOSE_ID = 'Knowledge/office-purpose.md';
+  async function showProfile() {
+    try {
+      const [s, health, note] = await Promise.all([api('/settings'), api('/health'), api('/knowledge/note?id=' + encodeURIComponent(PURPOSE_ID)).catch(() => null)]);
+      const purpose = note ? note.content.replace(/^#\s+.*(?:\r?\n)?/, '').trim() : '';
+      content.innerHTML = `<form id="setProfile" data-dirty novalidate><div class="mg-card"><div class="mg-card-head"><h3>The company</h3><span class="mg-count">shown across the office and told to every agent</span></div>
+        <div class="mg-grid">${field('Office name', `<input name="officeName" value="${esc(s.officeName || health.name || '')}" maxlength="80" placeholder="${esc(health.name || 'Your company')}" required>`, 'The company the teams work for. Agents introduce the office by this name.')}</div></div>
+        <div class="mg-card"><div class="mg-card-head"><h3>Office purpose</h3><span class="mg-count">read by every planner before work</span></div>
+        ${field('The business, who you serve, what the teams should achieve, and the constraints', `<textarea name="purpose" rows="12" placeholder="What the company does, for whom, what good work looks like, and what must never happen.">${esc(purpose)}</textarea>`, 'Kept in the Brain as Knowledge/office-purpose.md. Markdown is fine.')}
+        ${saveBar({ hint: 'New work uses the new name and purpose at once.', label: 'Save profile' })}</div></form>`;
+      setMeta(purpose ? mark('ok', 'Purpose written') : mark('warn', 'No purpose yet'), note?.updatedAt ? `purpose updated ${esc(when(note.updatedAt))}` : ''); refreshMeta('profile', purpose ? mark('ok', 'Purpose written') : mark('warn', 'No purpose yet'));
+      $('setProfile').onsubmit = async event => {
+        event.preventDefault(); const form = event.target, name = form.elements.officeName.value.trim(), text = form.elements.purpose.value.trim();
+        if (!name) { setBar(barOf(form), 'failed', 'Not saved: the office needs a name'); feedback('Give the office a name.', true); form.elements.officeName.focus(); return; }
+        try {
+          await runSave(barOf(form), async () => { await api('/settings', 'PUT', { officeName: name }); if (text || note) await api('/knowledge', 'POST', { id: PURPOSE_ID, title: 'Office purpose', content: '# Office purpose\n\n' + text, updatedAt: note?.updatedAt }); }, { ok: 'Profile saved', sub: 'The office answers to its new name from now on.' });
+          await syncBrain?.(); await showProfile();
+        } catch {}
+      };
+    } catch (error) { feedback(error.message, true); }
+  }
 
   /* ---------- Office ---------- */
   async function showOffice() {
@@ -191,6 +215,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     const modelName = id => providers.models.find(m => m.id === id)?.label || id;
     const models = (selected, inherit = 'Use the role default') => `<option value="">${inherit}</option>` + providers.models.filter(m => m.enabled !== false).map(m => `<option value="${esc(m.id)}" ${m.id === selected ? 'selected' : ''}>${esc(m.label || m.id)}</option>`).join('');
     const openAgents = [...content.querySelectorAll('[data-agent-editor][open]')].map(el => el.dataset.agentEditor);
+    const unsaved = !config.teams.some(x => x.id === t.id); if (unsaved) teamSection = 'overview';
     const lead = agents.find(a => a.id === t.lead), ruleCount = t.rules.length + agents.reduce((n, a) => n + (a.rules?.length || 0), 0);
     const teamTools = tools.filter(x => x.type !== 'candidate' && t.tools.includes(x.id)).length;
     const person = a => { const own = a.inheritTools === false ? a.tools.length : teamTools + a.tools.filter(id => !t.tools.includes(id)).length; return `<details class="mg-fold mg-person" data-agent-editor="${a.id}" ${openAgents.includes(a.id) ? 'open' : ''}><summary><span class="mg-avatar ${a.id === t.lead ? 'lead' : ''}">${esc(initials(a.name))}</span><span class="mg-who"><b>${esc(a.name)}</b><span>${esc(a.role || '')}${a.id === t.lead ? ' · leads the team' : ''}</span></span><span class="mg-facts"><span class="mg-chip">${esc(a.model ? modelName(a.model) : 'team model')}</span><span class="mg-chip">${own} tool${own === 1 ? '' : 's'}</span><span class="mg-chip">${a.skills?.length || 0} skill${a.skills?.length === 1 ? '' : 's'}</span></span><span class="mg-open">Edit</span><span class="mg-does ${a.does ? '' : 'mg-missing'}">${esc(a.does || 'No job description yet. Open to write one, or draft it with AI.')}</span></summary>
@@ -205,10 +230,10 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         <div class="mg-toolbar" style="margin:12px 0 0"><span class="mg-muted">Changes apply when the team is saved.</span><span class="mg-spacer"></span><button class="mg-btn mg-btn-sm mg-btn-danger" type="button" data-remove-agent="${a.id}">Remove person</button></div>
       </div></details>`; };
     content.innerHTML = `<div class="mg-team-strip" role="tablist">${draft.teams.map(x => { const n = draft.agents.filter(a => a.department === x.id); return `<button type="button" class="mg-team-tab" role="tab" data-team="${x.id}" aria-selected="${x.id === t.id}"><b>${esc(x.name)}</b><small>${n.length} people · ${esc(n.find(a => a.id === x.lead)?.name || 'no lead')}</small></button>`; }).join('')}<button type="button" class="mg-team-tab mg-add" id="spaceAddTeam">+ Add team</button></div>
-      <div class="mg-team-head"><h2>${esc(t.name)}</h2><span class="mg-lead">Led by <b>${esc(lead?.name || 'nobody yet')}</b> · ${t.maxParallelRuns} at once · ${t.maxReworkRounds} rework rounds · ${t.completionApproval ? mark('warn', 'Asks your OK to close') : mark('off', 'Closes on the lead’s approval')}</span><div class="mg-actions"><button type="button" class="mg-btn mg-btn-sm" id="spaceHireAgency">Hire from the Agency</button><button type="button" class="mg-btn mg-btn-sm mg-btn-danger" id="spaceRemoveTeam">Remove team</button></div></div>
-      <nav class="mg-subnav" role="tablist" aria-label="Team pages">${[['overview', 'Charter', ''], ['people', 'People', agents.length], ['rules', 'Standing rules', ruleCount], ['access', 'Tools & skills', teamTools + t.skills.length], ['quality', 'Review', t.checks.length || ''], ['execution', 'Models & pace', ''], ['tests', 'Tests', t.tests.length || '']].map(([id, text, n]) => `<button type="button" class="mg-tab" data-settings-section="${id}" aria-pressed="${teamSection === id}">${text}${n !== '' ? `<span class="mg-n">${n}</span>` : ''}</button>`).join('')}</nav>
+      <div class="mg-team-head"><h2>${esc(t.name)}</h2><span class="mg-lead">Led by <b>${esc(lead?.name || 'nobody yet')}</b> · ${t.maxParallelRuns} at once · ${t.maxReworkRounds} rework rounds · ${t.completionApproval ? mark('warn', 'Asks your OK to close') : mark('off', 'Closes on the lead’s approval')}</span><div class="mg-actions"><button type="button" class="mg-btn mg-btn-sm" id="spaceHireAgency" ${unsaved ? 'disabled title="Create the team first"' : ''}>Hire from the Agency</button><button type="button" class="mg-btn mg-btn-sm mg-btn-danger" id="spaceRemoveTeam">${unsaved ? 'Discard' : 'Remove team'}</button></div></div>
+      <nav class="mg-subnav" role="tablist" aria-label="Team pages">${[['overview', 'Charter', ''], ['people', 'People', agents.length], ['rules', 'Standing rules', ruleCount], ['access', 'Tools & skills', teamTools + t.skills.length], ['quality', 'Review', t.checks.length || ''], ['execution', 'Models & pace', ''], ['tests', 'Tests', t.tests.length || '']].map(([id, text, n]) => `<button type="button" class="mg-tab" data-settings-section="${id}" aria-pressed="${teamSection === id}" ${unsaved && id !== 'overview' ? 'disabled title="Create the team first"' : ''}>${text}${n !== '' ? `<span class="mg-n">${n}</span>` : ''}</button>`).join('')}</nav>
       <form id="spaceTeamForm" data-dirty novalidate>
-      <section data-settings-page="overview"><div class="mg-card"><div class="mg-card-head"><h3>Charter</h3><span class="mg-count">read before every assignment</span><button type="button" class="mg-assist" data-assist="team" style="margin-left:auto">✦ Draft with AI</button></div><div class="mg-grid">${field('Team name', `<input name="name" value="${esc(t.name)}" required>`)}${field('Accountable lead', `<select name="lead">${agents.map(a => `<option value="${a.id}" ${a.id === t.lead ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>`, 'Reviews every result against the criteria before it is filed in the Brain.')}</div>
+      <section data-settings-page="overview">${unsaved ? banner('info', '<b>This team does not exist yet.</b> Name it, write its charter or draft it with AI, then press Create team. People, rules, tools and tests open once it exists.') : ''}<div class="mg-card"><div class="mg-card-head"><h3>Charter</h3><span class="mg-count">read before every assignment</span><button type="button" class="mg-assist" data-assist="team" style="margin-left:auto">✦ Draft with AI</button></div><div class="mg-grid">${field('Team name', `<input name="name" value="${esc(t.name)}" required>`)}${field('Accountable lead', `<select name="lead">${agents.map(a => `<option value="${a.id}" ${a.id === t.lead ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>`, 'Reviews every result against the criteria before it is filed in the Brain.')}</div>
       <div style="margin-top:14px">${field('Purpose', `<textarea name="purpose" rows="2" required placeholder="What does this team own, and what does success look like?">${esc(t.purpose)}</textarea>`, 'What this team owns and what a good result looks like. Read before every assignment.')}${field('Working instructions', `<textarea name="instructions" rows="6" required placeholder="Process, tone, source requirements and boundaries for this team.">${esc(t.instructions)}</textarea>`, 'Process, tone, sources and boundaries. Steps with a template belong in a skill instead.')}</div></div></section>
       <section data-settings-page="people"><div id="spaceAgencyPicker" hidden></div>${agents.map(person).join('')}<div class="mg-toolbar" style="margin-top:14px"><button type="button" class="mg-btn" id="spaceAddAgent">+ Add a person</button><span class="mg-muted">${agents.length >= 7 ? 'This team is full: a lead and six specialists.' : `Room for ${7 - agents.length} more.`}</span></div></section>
       <section data-settings-page="rules"><div class="mg-card"><h3>Whole team</h3><p>Your own words, kept as you wrote them. Every task for this team starts from them.</p>${ruleList(t.rules, 'remove-team-rule')}<div class="mg-toolbar" style="margin:14px 0 0"><div class="mg-search" style="flex:1">${SEARCH_ICON}<input id="spaceNewTeamRule" maxlength="300" placeholder="Add a rule, e.g. Always quote prices in USD"></div><button type="button" class="mg-btn" id="spaceAddTeamRule">Add rule</button></div></div>
@@ -224,7 +249,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       <section data-settings-page="tests"><div class="mg-card"><h3>Team tests</h3><p>Run the whole plan, work and review process against known inputs. Tests run without external tools.</p>
       <div id="spaceTestEditors">${t.tests.map(test => `<details class="mg-fold" data-test-editor="${esc(test.id)}"><summary>${esc(test.name || 'New test')}<small>${test.requiredText.length} required phrase${test.requiredText.length === 1 ? '' : 's'}</small><span class="mg-open">Edit</span></summary><div class="mg-fold-body">${field('Name', `<input data-test-name value="${esc(test.name)}" required>`)}${field('Task and supplied facts', `<textarea data-test-prompt rows="3" required>${esc(test.prompt)}</textarea>`)}${field('Required text — one per line', `<textarea data-test-required rows="2">${esc(test.requiredText.join('\n'))}</textarea>`)}<div class="mg-toolbar" style="margin:0"><button type="button" class="mg-btn mg-btn-sm" data-run-test="${esc(test.id)}">Run saved test</button><button type="button" class="mg-btn mg-btn-sm mg-btn-danger" data-remove-test="${esc(test.id)}">Remove test</button></div></div></details>`).join('') || '<p class="mg-intro">No tests yet.</p>'}</div>
       <div class="mg-toolbar" style="margin:0"><button type="button" class="mg-btn" id="spaceAddTest">+ Add test</button><button type="button" class="mg-btn" id="spaceRunTests" ${t.tests.length ? '' : 'disabled'}>Run all saved tests</button></div></div></section>
-      ${saveBar({ hint: 'New tasks keep using the last saved version until you save.' })}</form>`;
+      ${saveBar({ hint: unsaved ? 'The office adds a pod for the new team when you create it.' : 'New tasks keep using the last saved version until you save.', label: unsaved ? 'Create team' : 'Save changes' })}</form>`;
     const rerender = () => { collectTeam(); dirty = true; renderTeam(); };
     content.querySelectorAll('[data-settings-page]').forEach(el => el.hidden = el.dataset.settingsPage !== teamSection);
     content.querySelectorAll('[data-settings-section]').forEach(b => b.onclick = () => { collectTeam(); teamSection = b.dataset.settingsSection; renderTeam(); });
@@ -237,6 +262,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     };
     $('spaceRemoveTeam').onclick = () => {
       collectTeam(); if (draft.teams.length <= 1) return feedback('Keep at least one team.', true);
+      if (!config.teams.some(x => x.id === t.id)) { draft.teams = draft.teams.filter(x => x.id !== t.id); draft.agents = draft.agents.filter(a => a.department !== t.id); team = draft.teams[0].id; dirty = draft.teams.length !== config.teams.length; renderTeam(); toast('New team discarded', { kind: 'info' }); return; }
       if (!confirm(`Remove ${t.name} and its people when you save? Past tasks and the Brain are kept. Unfinished work must be finished or cancelled first.`)) return;
       draft.teams = draft.teams.filter(x => x.id !== t.id); draft.agents = draft.agents.filter(a => a.department !== t.id); team = draft.teams[0].id; dirty = true; renderTeam(); toast('Removal staged', { kind: 'warn', detail: 'Save to apply it.' });
     };

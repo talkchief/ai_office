@@ -136,6 +136,9 @@ async function routinesChat(a, text) {
   return { reply: `Done: “${made.routine.title}” runs ${made.routine.desc}. Next run ${untilText(made.routine.nextAt)}.${made.routine.needsOk ? ' The result waits for your approval before it is filed.' : ''}`, routine: made.routine };
 }
 
+// The company's name: what the owner typed under Manage → Profile, else the config file.
+const officeName = () => settings.get().officeName || cfg.name;
+
 /* ---------- chat ---------- */
 const PM = { id: 'pm', name: 'Program Manager', role: 'Program Manager', does: 'Plans work across the teams, delegates to the department leads and closes tasks once the leads approve.', department: null, lead: true };
 async function chatModel(agent, team) { const spec = models.resolve({ agent, team, role: 'chat' }); return models.instance({ model: spec.model, effort: spec.effort, streaming: false, maxTokens: 2000 }); }
@@ -182,7 +185,7 @@ async function chat({ agent: agentId, text, taskId, kind, refs = [], remember = 
   const model = await chatModel(a, team);
   const hits = index.search(message, { k: settings.get().knowledgeSeedNotes || 6 }), memory = { notes: hits.map(h => h.path), text: hits.map(h => `--- ${h.path}${h.heading ? ' › ' + h.heading : ''} ---\n${h.snippet}`).join('\n\n') };
   const recent = engine.list().filter(j => isPm ? !['cancelled'].includes(j.state) : (j.runs || []).some(r => r.agent === a.id) || j.agent === a.id).slice(0, isPm ? 10 : 6).map(j => `- [${j.state}] ${j.title}`).join('\n');
-  const system = (isPm ? pmChatPrompt({ office: o, name: cfg.name, recentTasks: recent }) : chatPrompt({ office: o, team, agent: { ...a, lead: isLead }, name: cfg.name, recentTasks: recent })) + `\n\nBrain notes that may help (cite their paths):\n${memory.text || '—'}`;
+  const system = (isPm ? pmChatPrompt({ office: o, name: officeName(), recentTasks: recent }) : chatPrompt({ office: o, team, agent: { ...a, lead: isLead }, name: officeName(), recentTasks: recent })) + `\n\nBrain notes that may help (cite their paths):\n${memory.text || '—'}`;
   const history = engine.threads.list(thread).slice(-12).map(m => m.role === 'ceo' ? new HumanMessage(m.text) : new AIMessage(m.text));
   const answer = await model.invoke([new SystemMessage(system), ...history], { signal: AbortSignal.timeout(120000) });
   const reply = flat(answer.content).trim() || 'I do not have an answer to that yet.';
@@ -200,7 +203,7 @@ async function assist({ kind, name = '', hint = '', role = '', teamName = '', te
     ? `Draft, for a person named "${s(name)}" with the role "${s(role)}" on the team "${s(teamName)}" (team purpose: ${s(teamPurpose) || 'not written yet'}): a job description of 2 or 3 sentences in the present tense saying what this person does and does not do, and standing instructions of 4 to 7 short lines (sources to use, tone, boundaries, when to stop and ask the lead). Reply as JSON only: {"does": "...", "brief": "..."}.`
     : `Draft the charter for a new team named "${s(name)}"${hint ? ` (the owner says: ${s(hint)})` : ''}: a purpose of 1 or 2 sentences saying what the team owns and what success looks like, and working instructions of 5 to 8 short lines (process, sources, tone, boundaries, and that anything outside its field is handed to the Program Manager). Do not repeat what the other teams own. Reply as JSON only: {"purpose": "...", "instructions": "..."}.`;
   const model = await chatModel(PM, null);
-  const answer = await model.invoke([new SystemMessage(`You help the owner of ${cfg.name} set up teams of AI agents. Write plainly and specifically for this company, addressing the team or the person as "you". No markdown, no headings, no bullets: plain lines separated by newlines inside the JSON strings.\n\nThe company:\n${officePurpose || '(no office purpose written yet)'}\n\nExisting teams:\n${teams || '—'}`), new HumanMessage(ask)], { signal: AbortSignal.timeout(90000) });
+  const answer = await model.invoke([new SystemMessage(`You help the owner of ${officeName()} set up teams of AI agents. Write plainly and specifically for this company, addressing the team or the person as "you". No markdown, no headings, no bullets: plain lines separated by newlines inside the JSON strings.\n\nThe company:\n${officePurpose || '(no office purpose written yet)'}\n\nExisting teams:\n${teams || '—'}`), new HumanMessage(ask)], { signal: AbortSignal.timeout(90000) });
   const raw = flat(answer.content).trim(), m = raw.match(/\{[\s\S]*\}/);
   let out; try { out = JSON.parse(m ? m[0] : raw); } catch { throw httpError('The model did not return a usable draft. Try again.', 502); }
   return kind === 'person' ? { does: s(out.does), brief: String(out.brief || '').trim().slice(0, 6000) } : { purpose: s(out.purpose), instructions: String(out.instructions || '').trim().slice(0, 12000) };
@@ -223,7 +226,7 @@ function syncProject(id) {
 }
 bus.on(event => { if (event.type === 'task.updated' && event.data?.projectId) syncProject(event.data.projectId); });
 for (const p of projects.list()) syncProject(p.id);
-registerApi(router, { projects, syncProject, office, engine, models, settings, toolStore, hub, knowledge, index, bus, audit, vault, routines: routineApi, chat, assist, version, name: cfg.name, graph: () => graph, discover: () => mcp.discover({ timeout: 15000 }), agency: new Agency() });
+registerApi(router, { projects, syncProject, office, engine, models, settings, toolStore, hub, knowledge, index, bus, audit, vault, routines: routineApi, chat, assist, version, get name() { return officeName(); }, graph: () => graph, discover: () => mcp.discover({ timeout: 15000 }), agency: new Agency() });
 const oauthPage = (title, text) => `<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font:15px system-ui;padding:40px;max-width:520px"><h1 style="font-size:20px">${title}</h1><p>${text}</p><p><a href="/">Back to the office</a></p><script>setTimeout(()=>{if(window.opener){window.opener.postMessage('connector-signed-in','*');window.close();}},1200)</script>`;
 
 const server = http.createServer(async (req, res) => {

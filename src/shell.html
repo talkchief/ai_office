@@ -1582,9 +1582,9 @@ body.dark #inboxDrawer, body.dark #inboxDrawer header, body.dark #settingsPage {
 .space-options summary { display: flex; align-items: center; gap: 10px; list-style: none; cursor: pointer; }
 .space-options summary::-webkit-details-marker { display: none; }
 .space-options .opt-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 99px; border: 1px solid #B9A775; background: rgba(185,167,117,.14); color: #6E5A1C; font: 600 10.5px var(--ui); letter-spacing: .06em; transition: background .2s var(--ease); }
-.space-options .opt-pill i { font-style: normal; font-size: 12px; line-height: 1; transition: transform .2s var(--ease); }
+.space-options .opt-pill svg { flex: none; transition: transform .2s var(--ease); }
 .space-options summary:hover .opt-pill { background: rgba(185,167,117,.28); }
-.space-options[open] .opt-pill i { transform: rotate(180deg); }
+.space-options[open] .opt-pill svg { transform: rotate(180deg); }
 .space-options .opt-hint { font: 500 9.5px var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .space-options[open] .opt-hint { display: none; }
 body.dark .space-options .opt-pill { color: #E4C97A; border-color: rgba(205,187,134,.6); background: rgba(205,187,134,.12); }
