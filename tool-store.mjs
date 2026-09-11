@@ -11,9 +11,10 @@ const NAME = /^[a-zA-Z][a-zA-Z0-9_-]{0,47}$/;
 const sameText = (a, b) => typeof a === 'string' && typeof b === 'string' && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 export class ToolStore {
-  constructor({ dataDir, office, discover = mcp.discover, summary = () => mcp.summary(), statusFor = () => 'unchecked', authFn = null }) {
+  // `allowStdio` false refuses local-command connectors (a hosted office never runs a process for a tenant).
+  constructor({ dataDir, office, discover = mcp.discover, summary = () => mcp.summary(), statusFor = () => 'unchecked', authFn = null, allowStdio = true }) {
     this.file = path.join(dataDir, 'tools.json');
-    Object.assign(this, { office, discover, summary, statusFor, authFn });
+    Object.assign(this, { office, discover, summary, statusFor, authFn, allowStdio });
     this.items = fs.existsSync(this.file) ? JSON.parse(fs.readFileSync(this.file, 'utf8')) : [];
     this.pendingUrls = new Map(); this.onChange = () => {};
   }
@@ -44,6 +45,7 @@ export class ToolStore {
       const token = input.clearToken ? '' : input.token || previous?.config.headers?.Authorization?.replace(/^Bearer /, '') || '';
       if (token) { if (typeof token !== 'string' || /[\r\n]/.test(token) || token.length > 8192) invalid('Invalid bearer token.'); config.headers = { Authorization: 'Bearer ' + token }; }
     } else if (input.type === 'stdio') {
+      if (!this.allowStdio) invalid('This office only connects to MCP servers by URL; local commands are not available here.');
       if (!input.command || typeof input.command !== 'string' || input.command.length > 1000 || /[\r\n]/.test(input.command)) invalid('Enter the executable for this MCP server.');
       if (!Array.isArray(input.args) || input.args.length > 50 || input.args.some(a => typeof a !== 'string' || a.length > 2000)) invalid('Arguments must be a list of strings.');
       const env = { ...(previous?.config.env || {}), ...(input.env || {}) };
@@ -68,6 +70,7 @@ export class ToolStore {
     if (this.byId(id)) invalid('That connector is already in the office.', 409);
     const parts = found.target.trim().split(/\s+/);
     const config = /^https?:\/\//.test(found.target) ? { type: 'http', url: new URL(found.target).href } : { type: 'stdio', command: parts[0], args: parts.slice(1), env: {} };
+    if (config.type === 'stdio' && !this.allowStdio) invalid('This office only connects to MCP servers by URL; local commands are not available here.');
     if (!NAME.test(id)) invalid('That server name cannot be imported; add it by hand instead.');
     this.items.push({ name: id, config }); this.changed(); return this.list();
   }
