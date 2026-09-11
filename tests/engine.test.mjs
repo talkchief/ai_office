@@ -34,7 +34,7 @@ function sendHub(sent) {
   const sendEmail = tool(async ({ to, body }) => { sent.push({ to, body }); return `sent to ${to}`; }, { name: 'send_email', description: 'Send an email', schema: z.object({ to: z.string(), body: z.string() }) });
   return { tools: [sendEmail], calls: [], async ensure() {}, toolsFor(args) { this.calls.push(args); return args.evaluation || args.readOnly ? { tools: [], interruptOn: {} } : { tools: [sendEmail], interruptOn: { send_email: { allowedDecisions: ['approve', 'edit', 'reject'] } } }; } };
 }
-function fixture({ dir = temp(), pm, lead, specialist, settings = {}, hub = null, configure, keep = false, knowledgeIndex = null, brain = null } = {}) {
+function fixture({ dir = temp(), pm, lead, specialist, settings = {}, hub = null, configure, keep = false, knowledgeIndex = null, brain = null, engineOptions = {} } = {}) {
   const office = new OfficeStore({ dataDir: dir, initialAgents: loadRoster().agents });
   if (configure) { const config = office.get(); configure(config); office.update(config); }
   const team = office.team('marketing'), workers = office.agents().filter(a => a.department === 'marketing' && a.id !== team.lead).map(a => a.id);
@@ -42,7 +42,7 @@ function fixture({ dir = temp(), pm, lead, specialist, settings = {}, hub = null
   const meter = { active: 0, peak: 0, start() { this.active++; this.peak = Math.max(this.peak, this.active); }, end() { this.active--; } };
   const models = { resolve: ({ role }) => ({ model: role === 'specialist' ? 'specialist' : role === 'pm' ? 'pm' : 'lead', effort: '' }), instance: async ({ model }) => new ScriptedModel(model, scripts[model], { meter }) };
   const completed = [];
-  const engine = new OfficeEngine({ dataDir: dir, office, models, toolHub: hub, knowledgeDir: path.join(dir, 'knowledge'), knowledgeIndex, brain, settings: () => settings, onComplete: async job => { completed.push(job.id); } });
+  const engine = new OfficeEngine({ dataDir: dir, office, models, toolHub: hub, knowledgeDir: path.join(dir, 'knowledge'), knowledgeIndex, brain, settings: () => settings, onComplete: async job => { completed.push(job.id); }, ...engineOptions });
   return { dir, office, engine, workers, worker: workers[0], meter, completed, close: async () => { await engine.close(); if (!keep) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } };
 }
 async function until(engine, id, states, ms = 20000) {
@@ -64,6 +64,21 @@ test('the PM delegates to the lead, the lead to a specialist, and a recorded rev
     for (const s of ['planning', 'working', 'awaiting_lead_review', 'reviewing', 'saving', 'done']) assert.ok(states.includes(s), `${s} missing from ${states.join(',')}`);
     assert.equal(f.engine.notifications.list().filter(n => n.kind === 'done').length, 1);
     assert.equal(done.messages[0].text, 'Write a launch report.');
+  } finally { await f.close(); }
+});
+
+test('a rate-limited provider blocks the task quietly, the office retries it by itself, and the count starts again after a review', async () => {
+  let failures = 0;
+  const f = fixture({ specialist: () => { if (failures < 1) { failures++; throw Object.assign(new Error('google/x is temporarily rate-limited upstream. Please retry shortly'), { status: 429 }); } return { text: 'Verified result and evidence.' }; }, engineOptions: { providerRetryDelays: [20, 20, 20, 20] } });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done']);
+    const retries = done.events.filter(e => e.type === 'provider_retry');
+    assert.equal(retries.length, 1); assert.match(retries[0].message, /attempt 1 of 4/);
+    assert.equal(done.review.approved, true);
+    assert.equal(f.engine.get(id).autoRetries, 0, 'a recorded review starts the count again');
+    assert.equal(f.engine.providerHealth().lastHour, 1); assert.equal(f.engine.providerHealth().waits.lastHour, 0);
+    f.engine.noteProviderWait({ status: 429, attempt: 1, delay: 2000, url: 'https://openrouter.ai/api/v1/chat/completions' });
+    assert.deepEqual([f.engine.providerHealth().waits.lastHour, f.engine.providerHealth().waits.last.host], [1, 'openrouter.ai']);
   } finally { await f.close(); }
 });
 

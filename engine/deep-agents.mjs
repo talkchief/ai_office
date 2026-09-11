@@ -73,7 +73,7 @@ export function isProviderError(error) {
 }
 
 export class OfficeEngine {
-  constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent, pmSkillsDir = null, toolLabels = () => ({}), memoryFactory = null, projectFor = () => null, brain = null, vault = null, connectors = {} }) {
+  constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent, pmSkillsDir = null, toolLabels = () => ({}), memoryFactory = null, projectFor = () => null, brain = null, vault = null, connectors = {}, providerRetryDelays = [30000, 90000, 180000, 300000] }) {
     fs.mkdirSync(dataDir, { recursive: true });
     this.workspaces = path.join(dataDir, 'workspaces'); this.knowledgeDir = knowledgeDir || path.join(dataDir, 'knowledge');
     this.saver = SqliteSaver.fromConnString(path.join(dataDir, 'workflows.sqlite')); this.db = this.saver.db;
@@ -84,6 +84,9 @@ export class OfficeEngine {
     this.memory = memoryFactory ? memoryFactory(this.db) : null;
     this.notifications = new Notifications({ db: this.db, bus }); this.threads = new Threads({ db: this.db, bus });
     this.running = new Map(); this.waiting = []; this.faults = []; this.brain = brain; this.vault = vault; this.followUps = new Map(); this.gates = new Map(); this.closed = false; this.providerTrouble = [];
+    // Pauses before the automatic retries after a provider failure, and the waits the model calls themselves sat through.
+    this.providerRetryDelays = providerRetryDelays; this.providerWaits = [];
+    if (models) models.onWait = info => this.noteProviderWait(info);
     // The database and SSH connectors behind the Vault's entries; tests inject fakes, the office uses the real ones.
     this.connectors = { pool: connectors.pool || new DatabasePool(), ssh: connectors.ssh || new SshRunner() };
   }
@@ -117,7 +120,14 @@ export class OfficeEngine {
   // What the board shows when the model provider is failing: failures in the last hour and day, and the last reason.
   providerHealth(now = Date.now()) {
     const hour = this.providerTrouble.filter(t => now - t.at < 3600000), day = this.providerTrouble.filter(t => now - t.at < 86400000);
-    return { lastHour: hour.length, lastDay: day.length, last: day.at(-1) || null };
+    const waits = this.providerWaits.filter(t => now - t.at < 3600000);
+    return { lastHour: hour.length, lastDay: day.length, last: day.at(-1) || null, waits: { lastHour: waits.length, last: waits.at(-1) || null } };
+  }
+  // A model call sat out a rate limit or an overload and was sent again: counted for the health page, one line in the log.
+  noteProviderWait({ status, attempt, delay, url } = {}) {
+    let host = ''; try { host = new URL(url).host; } catch {}
+    this.providerWaits.push({ at: Date.now(), status, attempt, delay, host }); if (this.providerWaits.length > 200) this.providerWaits.splice(0, 100);
+    console.log(`  provider: ${status} from ${host || 'the provider'}; waiting ${Math.round(delay / 1000)} s before sending the call again (wait ${attempt})`);
   }
   activeAgents() {
     const office = this.office.get();
@@ -245,12 +255,14 @@ export class OfficeEngine {
         if (this.closed || !job || TERMINAL.has(job.state)) return this.detail(id);
         const reason = stalled ? `The task made no progress for ${minutes} minutes and was stopped. Retry to continue from where it stopped, or raise the no-progress limit in Settings.` : clean(error?.message) || 'The task stopped unexpectedly.';
         if (!stalled && (isTransientProviderError(error) || isProviderError(error))) { this.providerTrouble.push({ at: Date.now(), reason: reason.slice(0, 160), task: job.title }); if (this.providerTrouble.length > 200) this.providerTrouble.splice(0, 100); }
-        if (!stalled && isTransientProviderError(error) && (job.autoRetries || 0) < 2) {
-          // Twice, quietly, with a longer pause the second time: the CEO hears about it only if the third attempt fails too.
-          const attempt = (job.autoRetries || 0) + 1, delay = attempt === 1 ? 30000 : 90000;
+        if (!stalled && isTransientProviderError(error) && (job.autoRetries || 0) < this.providerRetryDelays.length) {
+          // Quietly, with a longer pause each time (half a minute, then 1½, 3 and 5 minutes): the CEO hears about it only when the
+          // provider is still failing after that. The count starts again once a review is recorded, so a long project survives
+          // several separate rate-limit episodes.
+          const attempt = (job.autoRetries || 0) + 1, delay = this.providerRetryDelays[attempt - 1];
           this.update(id, j => { j.autoRetries = attempt; }, { touch: false });
           this.block(id, reason, { provider: true, quiet: true });
-          this.event(id, 'provider_retry', null, `The model provider failed (${reason.slice(0, 120)}). Retrying automatically in ${delay / 1000} seconds (attempt ${attempt} of 2).`);
+          this.event(id, 'provider_retry', null, `The model provider failed (${reason.slice(0, 120)}). Retrying automatically in ${Math.round(delay / 1000)} seconds (attempt ${attempt} of ${this.providerRetryDelays.length}).`);
           setTimeout(() => { try { if (this.get(id)?.state === 'blocked') this.retry(id, undefined, { automatic: true }); } catch {} }, delay).unref?.();
         } else this.block(id, reason, { provider: !stalled && isProviderError(error) });
       } finally {
@@ -739,6 +751,8 @@ export class OfficeEngine {
       const review = { at: Date.now(), agent: current.lead, dept: team.id, approved: ok, summary: clean(summary).slice(0, 5000), criteria, checks, missing: covered.missing, file };
       this.update(id, j => { j.reviews.push(review); j.review = review; (j.reviewsByDept ||= {})[team.id] = review; (j.reworkRounds ||= {})[team.id] = rounds; if (ok) (j.deliverables ||= {})[team.id] = text.slice(0, 120000); if (text) j.result = text.slice(0, 120000); });
       this.event(id, 'review_recorded', current.lead, review.summary || (ok ? 'Approved.' : 'Changes required.'), { approved: ok, checks });
+      // Progress: a provider failure after this point starts a fresh series of automatic retries.
+      if (this.get(id)?.autoRetries) this.update(id, j => { j.autoRetries = 0; }, { touch: false });
       if (this.get(id).state !== 'cancelled') this.setState(id, 'working');
       if (ok) return 'Review recorded as APPROVED. Report back to the Program Manager with a short summary.';
       const reasons = [approved !== true ? 'you did not approve it' : '', covered.missing.length ? `criteria without passing evidence: ${covered.missing.join(', ')}` : '', !text ? (fileProblem ? 'deliverable file problem: ' + fileProblem : 'no final deliverable was included: give deliverablePath (the handed-over file under /work/), or the text when it is a few lines') : '', ...checks.filter(c => !c.passed).map(c => `automated check failed: ${c.label}`), placeholders.length ? `the deliverable still holds placeholders (${placeholders.slice(0, 3).join(', ')}): a combined document must carry every part in full; use assemble_files` : ''].filter(Boolean);

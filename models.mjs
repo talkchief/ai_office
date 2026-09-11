@@ -44,21 +44,42 @@ export const CALL_TIMEOUT_MS = 5 * 60 * 1000;
 // connection) is tried again on a fresh connection, up to three times, when the body can be sent again.
 const RETRY_NETWORK = /fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|socket hang up|certificate|TLS|EPIPE/i;
 const canResend = body => body == null || typeof body === 'string' || body instanceof Uint8Array || body instanceof ArrayBuffer || (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams);
-export async function fetchWithRetries(fetchImpl, url, init, { attempts = 3, pause = 400 } = {}) {
-  let last;
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try { return await fetchImpl(url, init); }
-    catch (error) {
-      last = error; const text = String(error?.cause?.message || error?.message || '');
-      if (attempt === attempts || !RETRY_NETWORK.test(text) || !canResend(init?.body) || init?.signal?.aborted) throw error;
-      await new Promise(r => setTimeout(r, pause * attempt));
-    }
-  }
-  throw last;
+// A provider that answers 429 (rate limited) or 5xx (overloaded, down) is asked again after a pause when the body can be sent
+// again: Retry-After when the provider gives one (up to a minute), else a growing pause, for about three minutes in all; then
+// the last answer is handed back and the task-level retry takes over. This sits below the SDKs on purpose: LangChain treats a
+// 429 without Retry-After as final and switches the OpenAI SDK's own retries off, so without it a rate-limited call fails at once.
+const RETRY_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504, 529]);
+const RESEND_PAUSES = [2000, 5000, 10000, 20000, 40000, 60000, 60000];
+export const RESEND_TOTAL_MS = 200000;
+export function retryAfterMs(res) {
+  const h = res.headers?.get?.('retry-after'); if (!h) return null;
+  const s = Number(h); if (Number.isFinite(s)) return Math.max(0, s * 1000);
+  const at = Date.parse(h); return Number.isFinite(at) ? Math.max(0, at - Date.now()) : null;
 }
-export function silenceGuard(fetchImpl, ms = CALL_TIMEOUT_MS) {
+const sleep = (ms, signal) => new Promise(resolve => { const done = () => { clearTimeout(t); signal?.removeEventListener?.('abort', done); resolve(); }; const t = setTimeout(done, ms); signal?.addEventListener?.('abort', done, { once: true }); });
+export async function fetchWithRetries(fetchImpl, url, init, { attempts = 3, pause = 400, resend = true, total = RESEND_TOTAL_MS, pauses = RESEND_PAUSES, onWait } = {}) {
+  let netFails = 0, waits = 0, waited = 0;
+  for (;;) {
+    let res;
+    try { res = await fetchImpl(url, init); }
+    catch (error) {
+      netFails++; const text = String(error?.cause?.message || error?.message || '');
+      if (netFails >= attempts || !RETRY_NETWORK.test(text) || !canResend(init?.body) || init?.signal?.aborted) throw error;
+      await sleep(pause * netFails, init?.signal); continue;
+    }
+    if (!resend || !RETRY_STATUS.has(res.status) || !canResend(init?.body) || init?.signal?.aborted) return res;
+    const delay = Math.min(retryAfterMs(res) ?? pauses[Math.min(waits, pauses.length - 1)], 60000);
+    if (waited + delay > total) return res;
+    try { await res.body?.cancel?.(); } catch {}
+    waits++; waited += delay;
+    try { onWait?.({ status: res.status, attempt: waits, delay, url: String(url) }); } catch {}
+    await sleep(delay, init?.signal);
+    if (init?.signal?.aborted) throw init.signal.reason || new Error('The call was stopped while waiting for the provider.');
+  }
+}
+export function silenceGuard(fetchImpl, ms = CALL_TIMEOUT_MS, { onWait } = {}) {
   return async (url, init) => {
-    const res = await fetchWithRetries(fetchImpl, url, init);
+    const res = await fetchWithRetries(fetchImpl, url, init, { onWait });
     if (!res.ok || !res.body) return res;
     const reader = res.body.getReader();
     let timer = null;
@@ -78,6 +99,8 @@ export function silenceGuard(fetchImpl, ms = CALL_TIMEOUT_MS) {
 export class ModelRegistry {
   constructor({ dataDir, env = process.env, factory = defaultFactory, fetchImpl = globalThis.fetch }) {
     this.file = path.join(dataDir, 'providers.json'); this.env = env; this.factory = factory; this.fetch = fetchImpl; this.modelCache = new Map();
+    // Told each time a call waits for a rate-limited or overloaded provider (the engine counts these for the health page).
+    this.onWait = null;
     fs.mkdirSync(dataDir, { recursive: true });
     this.value = this.validate(fs.existsSync(this.file) ? JSON.parse(fs.readFileSync(this.file, 'utf8')) : structuredClone(DEFAULT_REGISTRY), null);
   }
@@ -150,7 +173,7 @@ export class ModelRegistry {
     const provider = this.provider(model.provider); if (!this.usable(provider)) fail(`Add a key for ${provider?.label || model.provider} in Settings → Models.`, 409);
     const { key } = this.keyFor(provider);
     if (provider.type === 'anthropic') {
-      const options = { model: model.id, apiKey: key, maxTokens: maxTokens || 64000, streaming, clientOptions: { timeout: CALL_TIMEOUT_MS, fetch: silenceGuard(this.fetch), ...(provider.baseURL ? { baseURL: provider.baseURL } : {}) } };
+      const options = { model: model.id, apiKey: key, maxTokens: maxTokens || 64000, streaming, clientOptions: { timeout: CALL_TIMEOUT_MS, fetch: silenceGuard(this.fetch, CALL_TIMEOUT_MS, { onWait: info => this.onWait?.(info) }), ...(provider.baseURL ? { baseURL: provider.baseURL } : {}) } };
       if (model.supports.effort) { options.thinking = { type: 'adaptive' }; if (effort) options.outputConfig = { effort }; }
       // Refusal fallbacks are opt-out per provider; they only apply to models that support them.
       if (provider.refusalFallback && REFUSAL_FALLBACK_MODELS.has(model.id)) { options.betas = ['server-side-fallback-2026-07-01']; options.invocationKwargs = { fallbacks: 'default' }; }
@@ -158,7 +181,7 @@ export class ModelRegistry {
     }
     const reasoningEffort = effort ? (['xhigh', 'max'].includes(effort) ? 'high' : effort) : '';
     const options = { model: model.id, apiKey: key || 'not-needed', streaming, streamUsage: true, timeout: CALL_TIMEOUT_MS, ...(maxTokens ? { maxTokens } : {}),
-      configuration: { fetch: silenceGuard(this.fetch), ...(provider.baseURL ? { baseURL: provider.baseURL } : {}), ...(Object.keys(provider.headers || {}).length ? { defaultHeaders: provider.headers } : {}) } };
+      configuration: { fetch: silenceGuard(this.fetch, CALL_TIMEOUT_MS, { onWait: info => this.onWait?.(info) }), ...(provider.baseURL ? { baseURL: provider.baseURL } : {}), ...(Object.keys(provider.headers || {}).length ? { defaultHeaders: provider.headers } : {}) } };
     if (reasoningEffort && (provider.type === 'openai' || model.supports.reasoning)) options.reasoning = { effort: reasoningEffort };
     return { type: 'openai', options };
   }
@@ -185,7 +208,7 @@ export class ModelRegistry {
     // while the next connection is fine, so the list is asked for up to four times, on fresh connections, before giving up with the reason.
     let res, last;
     for (let attempt = 0; attempt < 4 && !res; attempt++) {
-      try { res = await fetchWithRetries(this.fetch, base + '/models' + (attempt ? '?office=' + Date.now() : ''), { headers, signal: AbortSignal.timeout(15000) }, { attempts: 1 }); }
+      try { res = await fetchWithRetries(this.fetch, base + '/models' + (attempt ? '?office=' + Date.now() : ''), { headers, signal: AbortSignal.timeout(15000) }, { attempts: 1, resend: false }); }
       catch (error) { last = error; }
     }
     if (!res) fail(`Could not fetch ${provider.label}’s model list (${last?.cause?.message || last?.message || 'no answer'}). Type the model id instead; it is used as typed.`, 502);
