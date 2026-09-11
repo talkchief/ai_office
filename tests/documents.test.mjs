@@ -1,5 +1,5 @@
 import test from 'node:test';
-import { assembleFiles } from '../engine/documents.mjs';
+import { assembleFiles, browserStats, closeBrowser } from '../engine/documents.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -103,4 +103,16 @@ test('assemble_files combines the parts in order, in full, each under its own nu
   assert.throws(() => assembleFiles(dir, { output: '/work/pack.md', title: 'x', parts: [{ path: '/work/missing.md' }] }), /no file at \/work\/missing\.md/);
   assert.throws(() => assembleFiles(dir, { output: '/work/pack.pdf', title: 'x', parts: [{ path: '/work/launch-pack/01-marketing.md' }] }), /must be Markdown/);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('the browser stays warm between exports: two PDFs, one launch; closeBrowser lets it go', async () => {
+  if (!(await pdfEngineAvailable())) { await closeBrowser(); return; }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'talkchief-warm-'));
+  const { renderPdf } = await import('../engine/documents.mjs');
+  const before = browserStats().launches;
+  await renderPdf({ markdown: '# One\n\nHello.', title: 'One', out: path.join(dir, 'one.pdf') });
+  await renderPdf({ markdown: '# Two\n\nHello again.', title: 'Two', out: path.join(dir, 'two.pdf') });
+  assert.equal(browserStats().launches - before, 0, 'the availability check launched the browser once and both exports reused it'); assert.equal(browserStats().open, true);
+  await closeBrowser(); assert.equal(browserStats().open, false);
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 });

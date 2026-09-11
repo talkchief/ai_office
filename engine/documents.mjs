@@ -76,32 +76,46 @@ export function markdownToHtml(markdown, { title = '', date = new Date() } = {})
 }
 
 /* ---------- PDF ---------- */
-// The browser on this machine: Chrome or Edge through playwright-core, or the path in AO_CHROME. Checked once, rechecked after failures.
+// The browser on this machine: Chrome or Edge through playwright-core, or the path in AO_CHROME. Checked once, rechecked after
+// failures. One browser stays open between exports and is closed after ninety seconds idle: launching it is the slow part
+// (10 to 15 seconds), printing a page is under a second.
 let browserState = { checkedAt: 0, ok: null, launch: null };
+let shared = null, idleTimer = null, launches = 0;
+const BROWSER_IDLE_MS = 90000;
+const keep = b => { shared = b; launches++; b.on?.('disconnected', () => { if (shared === b) shared = null; }); touch(); };
+const touch = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => { const b = shared; shared = null; b?.close().catch(() => {}); }, BROWSER_IDLE_MS); idleTimer.unref?.(); };
 async function browserLaunch() {
   if (browserState.ok === false && Date.now() - browserState.checkedAt < 5 * 60000) return null;
   if (browserState.ok && browserState.launch) return browserState.launch;
   let chromium; try { ({ chromium } = require('playwright-core')); } catch { browserState = { checkedAt: Date.now(), ok: false }; return null; }
   const attempts = [process.env.AO_CHROME ? { executablePath: process.env.AO_CHROME } : null, { channel: 'chrome' }, { channel: 'msedge' }, { channel: 'chromium' }].filter(Boolean);
   for (const options of attempts) {
-    try { const b = await chromium.launch({ ...options, headless: true }); await b.close(); browserState = { checkedAt: Date.now(), ok: true, launch: () => chromium.launch({ ...options, headless: true }) }; return browserState.launch; }
+    try { const b = await chromium.launch({ ...options, headless: true }); browserState = { checkedAt: Date.now(), ok: true, launch: () => chromium.launch({ ...options, headless: true }) }; keep(b); return browserState.launch; }
     catch { /* try the next one */ }
   }
   browserState = { checkedAt: Date.now(), ok: false }; return null;
 }
+async function warmBrowser() {
+  const launch = await browserLaunch(); if (!launch) return null;
+  if (shared && shared.isConnected?.() !== false) { touch(); return shared; }
+  keep(await launch()); return shared;
+}
 export async function pdfEngineAvailable() { return !!(await browserLaunch()); }
+export async function closeBrowser() { clearTimeout(idleTimer); const b = shared; shared = null; await b?.close().catch(() => {}); }
+export const browserStats = () => ({ launches, open: !!shared });
 
 async function renderPdfWithBrowser({ html, title, out }) {
-  const launch = await browserLaunch(); if (!launch) return null;
-  const browser = await launch();
+  const browser = await warmBrowser(); if (!browser) return null;
+  let page = null;
   try {
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'load' });
     await page.pdf({ path: out, format: 'A4', printBackground: true, preferCSSPageSize: true, displayHeaderFooter: true, headerTemplate: '<span></span>',
       footerTemplate: `<div style="font-family:Arial,sans-serif;font-size:7.5pt;color:#8A867E;width:100%;padding:0 18mm;display:flex;justify-content:space-between"><span>${esc(title || '')}</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>`,
       margin: { top: '22mm', bottom: '20mm', left: '18mm', right: '18mm' } });
     return { engine: 'browser' };
-  } finally { await browser.close().catch(() => {}); }
+  } catch (error) { if (browser.isConnected?.() === false && shared === browser) shared = null; throw error; }
+  finally { await page?.close().catch(() => {}); touch(); }
 }
 
 // The fallback renderer: pdfkit, one flow, no explicit coordinates, so the page never runs away.

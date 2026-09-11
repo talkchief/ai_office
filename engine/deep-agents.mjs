@@ -14,7 +14,7 @@ import { z } from 'zod';
 import { officeBackend, FILE_PERMISSIONS, PM_FILE_PERMISSIONS, SKILL_SOURCES } from './backend.mjs';
 import { ROOT } from '../config.mjs';
 import { programManagerPrompt, leadPrompt, specialistPrompt, quickLeadPrompt, leadName } from './prompts.mjs';
-import { exportPdfTool, exportPptxTool, assembleFilesTool, listWorkspaceFiles, workspaceFile, mimeOf } from './documents.mjs';
+import { exportPdfTool, exportPptxTool, assembleFilesTool, listWorkspaceFiles, workspaceFile, mimeOf, closeBrowser } from './documents.mjs';
 import { fetchWithRetries } from '../models.mjs';
 import { DatabasePool, validateQuery, markdownTable, schemaText } from '../connectors/database.mjs';
 import { SshRunner, validateCommand } from '../connectors/ssh.mjs';
@@ -1207,5 +1207,5 @@ export class OfficeEngine {
     }
     this.pump();
   }
-  async close() { this.closed = true; for (const entry of this.running.values()) entry.controller.abort(new Error('The server is stopping.')); await Promise.allSettled([...this.running.values()].map(e => e.promise)); try { await this.connectors?.pool?.close?.(); } catch {} this.db.close(); }
+  async close() { this.closed = true; for (const entry of this.running.values()) entry.controller.abort(new Error('The server is stopping.')); await Promise.allSettled([...this.running.values()].map(e => e.promise)); try { await this.connectors?.pool?.close?.(); } catch {} try { await closeBrowser(); } catch {} this.db.close(); }
 }
