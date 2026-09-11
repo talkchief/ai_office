@@ -18,12 +18,14 @@ export const SUBJECT_TAG = /\[AO-([a-z0-9]{8})\]/i;
 export const cleanSubject = s => String(s || '').replace(/^\s*((re|fwd?|aw|wg)\s*:\s*)+/i, '').replace(SUBJECT_TAG, '').replace(/\s+/g, ' ').trim().slice(0, 100) || 'Email task';
 const NOTICE_KINDS = new Set(['question', 'escalated', 'ceo_decision', 'ceo_approval']);
 
-export function createIntake({ accounts, registry, mailer = null, domain = '', publicOrigin = () => '', log = console.log }) {
+// `mail` is { mailer, domain } read at call time, so a change in the Platform panel applies at once.
+export function createIntake({ accounts, registry, mail = { mailer: null, domain: '' }, publicOrigin = () => '', log = console.log }) {
+  const mailer = () => mail.mailer, domain = () => mail.domain || '';
   const limiter = new RateLimiter({ max: 30, windowMs: 3600000 });
   const watched = new WeakSet();
   const link = id => `${publicOrigin()}/#task=${id}`;
   const viewerOf = (tenantId, userId) => { const m = accounts.membership(userId, tenantId); return m && { id: m.id, email: m.email, name: m.name, role: m.role, tenantId, groups: accounts.groupsOf(userId, tenantId) }; };
-  const aliasFor = (tenant, userId, jobId = null) => { const h = accounts.mailHandleFor(userId, tenant.id); return h && domain ? `${tenant.slug}.${h.handle}.${h.suffix}${jobId ? '+' + tagOf(jobId) : ''}@${domain}` : null; };
+  const aliasFor = (tenant, userId, jobId = null) => { const h = accounts.mailHandleFor(userId, tenant.id); return h && domain() ? `${tenant.slug}.${h.handle}.${h.suffix}${jobId ? '+' + tagOf(jobId) : ''}@${domain()}` : null; };
   const drop = (m, reason, detail = {}) => { accounts.mailLog({ level: 'warn', summary: `Dropped mail: ${reason}`, detail: { from: m.from?.address, to: m.recipients, subject: String(m.subject || '').slice(0, 120), ...detail } }); log(`  mail: dropped (${reason}) from ${m.from?.address || '?'}`); return { outcome: 'dropped', reason }; };
 
   // The task an incoming message belongs to: the +tag of the alias, then the mail thread, then the [AO-…] tag in the subject.
@@ -35,9 +37,9 @@ export function createIntake({ accounts, registry, mailer = null, domain = '', p
   }
   // A mail back on the thread of a task (or of a question): threaded, with the alias as Reply-To so a reply lands on the same task.
   async function sendOnThread(instance, tenant, viewer, jobId, { to, subject, text, inReplyTo = null, references = [], attachments = [] }) {
-    if (!mailer?.enabled) return null;
+    if (!mailer()?.enabled) return null;
     const known = jobId ? accounts.threadMessageIds(jobId) : [];
-    const result = await mailer.send({ to, subject, text: `${text}\n\n— ${instance.name}${jobId ? `\nReply to this email to add a note to the task.` : ''}`, replyTo: aliasFor(tenant, viewer.id, jobId), inReplyTo: inReplyTo || known.at(-1) || null, references: [...known, ...references], attachments, tag: jobId ? tagOf(jobId) : '' });
+    const result = await mailer().send({ to, subject, text: `${text}\n\n— ${instance.name}${jobId ? `\nReply to this email to add a note to the task.` : ''}`, replyTo: aliasFor(tenant, viewer.id, jobId), inReplyTo: inReplyTo || known.at(-1) || null, references: [...known, ...references], attachments, tag: jobId ? tagOf(jobId) : '' });
     accounts.recordMailMessage({ tenantId: tenant.id, jobId, direction: 'out', messageId: result.messageId, providerId: result.id });
     return result;
   }
@@ -45,7 +47,7 @@ export function createIntake({ accounts, registry, mailer = null, domain = '', p
 
   /** One inbound message, end to end. Returns { outcome, jobId?, reason? }; never throws for a bad message, only for a broken office. */
   async function handle(m) {
-    const hit = (m.recipients || []).map(r => ({ r, a: accounts.resolveAlias(String(r).split('@')[0]) })).find(x => x.a && (!domain || String(x.r).toLowerCase().endsWith('@' + domain.toLowerCase())));
+    const hit = (m.recipients || []).map(r => ({ r, a: accounts.resolveAlias(String(r).split('@')[0]) })).find(x => x.a && (!domain() || String(x.r).toLowerCase().endsWith('@' + domain().toLowerCase())));
     if (!hit) return drop(m, 'unknown alias');
     const { tenantId, userId, tag } = hit.a, tenant = accounts.tenant(tenantId);
     if (!tenant || tenant.suspendedAt) return drop(m, 'office suspended');
@@ -127,7 +129,7 @@ export function createIntake({ accounts, registry, mailer = null, domain = '', p
   }
   /** Listens on a loaded office for finished results and questions to mail back. Safe to call more than once per instance. */
   function watch(instance) {
-    if (!instance?.tenant || watched.has(instance) || !mailer?.enabled) return;
+    if (!instance?.tenant || watched.has(instance)) return;
     watched.add(instance);
     instance.bus.on(event => {
       (async () => {

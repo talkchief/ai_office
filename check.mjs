@@ -192,7 +192,7 @@ await step('tests: the full suite passes', async () => {
 {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ao-hosted-'));
   const port = 4900 + Math.floor(Math.random() * 300), base = `http://127.0.0.1:${port}`;
-  const env = { ...process.env, PORT: String(port), HOST: '127.0.0.1', AO_MODE: 'hosted', AO_TENANTS_DIR: path.join(tmp, 'tenants'), AO_ACCOUNTS: path.join(tmp, 'accounts.sqlite'), AO_PLATFORM_DIR: path.join(tmp, 'platform'), AO_PLATFORM_ADMINS: 'admin@check.test', AO_PUBLIC_ORIGIN: base, AO_MAIL_DRY_RUN: '1', AO_MAIL_DOMAIN: 'check.test', AO_MAIL_PROVIDER: 'postmark', AO_MAIL_WEBHOOK_SECRET: 'check-secret', AO_MAIL_OUTBOX: path.join(tmp, 'mail-outbox.json') };
+  const env = { ...process.env, PORT: String(port), HOST: '127.0.0.1', AO_MODE: 'hosted', AO_TENANTS_DIR: path.join(tmp, 'tenants'), AO_ACCOUNTS: path.join(tmp, 'accounts.sqlite'), AO_PLATFORM_DIR: path.join(tmp, 'platform'), AO_PLATFORM_ADMINS: 'admin@check.test', AO_PUBLIC_ORIGIN: base, AO_MAIL_OUTBOX: path.join(tmp, 'mail-outbox.json') };
   delete env.AO_DATA; delete env.AO_BRAIN;
   const srv = spawn(NODE, ['serve.mjs'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = ''; srv.stdout.on('data', d => { log += d; }); srv.stderr.on('data', d => { log += d; });
@@ -265,7 +265,14 @@ await step('tests: the full suite passes', async () => {
       const h = await call('/api/health'); if (h.json.limits.maxTeams !== 2) throw new Error('health limits: ' + JSON.stringify(h.json.limits));
       const tenants = await call('/api/admin/tenants', 'GET', undefined, 'admin'); if (!tenants.json.tenants.some(t => t.slug === 'check-co' && t.users === 2)) throw new Error('tenants: ' + JSON.stringify(tenants.json).slice(0, 200));
       const prov = await call('/api/admin/providers', 'GET', undefined, 'admin'); if (!prov.ok || !Array.isArray(prov.json.providers)) throw new Error('admin providers: ' + prov.status);
-      return `${saved.json.error} · ${tenants.json.tenants.length} offices listed`;
+      // The mail set-up is platform configuration too: saved in the panel, never in the environment; secrets never come back.
+      const mailCfg = await call('/api/admin/config', 'PUT', { mail: { provider: 'postmark', domain: 'check.test', webhookSecret: 'check-secret', apiKey: 'not-a-real-key', dryRun: true }, publicOrigin: base }, 'admin'); if (!mailCfg.ok) throw new Error('mail config: ' + JSON.stringify(mailCfg.json));
+      if (mailCfg.json.mail.apiKey !== undefined || mailCfg.json.mail.webhookSecret !== undefined || !mailCfg.json.mail.hasApiKey || !mailCfg.json.mail.hasWebhookSecret || mailCfg.json.mail.domain !== 'check.test') throw new Error('mail config shape: ' + JSON.stringify(mailCfg.json.mail));
+      if (JSON.stringify(mailCfg.json).includes('not-a-real-key') || JSON.stringify(mailCfg.json).includes('check-secret')) throw new Error('a secret came back from the panel');
+      if (!mailCfg.json.webhooks?.postmark?.endsWith('/api/mail/inbound/postmark')) throw new Error('webhook address: ' + JSON.stringify(mailCfg.json.webhooks));
+      const badMail = await call('/api/admin/config', 'PUT', { mail: { provider: 'pigeon' } }, 'admin'); if (badMail.status !== 400) throw new Error('an unknown mail provider was accepted');
+      const testMail = await call('/api/admin/mail/test', 'POST', {}, 'admin'); if (!testMail.ok || !testMail.json.dryRun) throw new Error('test mail: ' + JSON.stringify(testMail.json));
+      return `${saved.json.error} · ${tenants.json.tenants.length} offices listed · mail set up in the panel, secrets masked`;
     });
     await step('hosted: mail — a verified sender’s message becomes a task with its file; a repeat is one task; a stranger is dropped and audited', async () => {
       const profile = await call('/api/mail/profile'); if (!profile.ok || !profile.json.address) throw new Error('profile: ' + JSON.stringify(profile.json));

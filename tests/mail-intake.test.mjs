@@ -42,7 +42,7 @@ test('mail becomes work: a verified sender gets a task with its file and a threa
   const accounts = new Accounts({ file: path.join(root, 'accounts.sqlite') }), platform = new PlatformStore({ dir: path.join(root, 'platform'), env: {} });
   const registry = new TenantRegistry({ accounts, platform, dir: path.join(root, 'tenants'), log: () => {} });
   const mailer = new Mailer({ provider: 'postmark', domain: 'check.test', dryRun: true, outbox });
-  const intake = createIntake({ accounts, registry, mailer, domain: 'check.test', publicOrigin: () => 'https://office.test', log: () => {} });
+  const intake = createIntake({ accounts, registry, mail: { mailer, domain: 'check.test' }, publicOrigin: () => 'https://office.test', log: () => {} });
   registry.onLoad = intake.watch;
   try {
     const owner = accounts.createUser({ email: 'dana@acme.test', name: 'Dana Q', password: 'a long enough password' });

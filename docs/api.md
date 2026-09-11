@@ -103,7 +103,8 @@ Members and admins only see what the rules allow: `GET /tasks`, `/artifacts`, `/
 
 | Route | Does |
 |---|---|
-| `GET/PUT /admin/config` | `{ limits { maxTeams (1–50), maxMembersPerTeam (2–20) }, registration (open \| invite), adminEmails }`. Limits apply to every office's next change. |
+| `GET/PUT /admin/config` | `{ limits { maxTeams (1–50), maxMembersPerTeam (2–20) }, registration (open \| invite), adminEmails, publicOrigin, tenants { idleMinutes (1–1440), maxLoaded (1–500) }, mail { provider (postmark \| mailgun), domain, from, region (us \| eu), dryRun, apiKey?, clearApiKey?, webhookSecret?, clearWebhookSecret? } }`. Secrets are write-only: the response carries `mail.hasApiKey`, `mail.hasWebhookSecret`, `mail.enabled`, the `webhooks` addresses to paste into the provider and a `secretSuggestion`. Limits apply to every office's next change; mail applies at once. |
+| `POST /admin/mail/test` | A test message to the administrator's own address with the saved mail set-up → `{ ok, to, dryRun, outbox }`. |
 | `GET/PUT /admin/providers`, `POST /admin/providers/:id/test`, `GET /admin/providers/:id/models` | The one model registry every office inherits; same bodies as `/providers`. |
 | `GET /admin/tenants`, `POST /admin/tenants/:id/suspend \| resume` | Every office: owner, people, teams, open tasks, tokens, loaded or put away, suspended. |
 | `GET /admin/users?q=`, `PUT /admin/users/:id` | People across offices; `{ platformAdmin }`. |

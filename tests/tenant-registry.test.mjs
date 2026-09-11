@@ -13,8 +13,8 @@ const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'talkchief-registry-'))
 test('a tenant is provisioned with the shipped seats, served lazily, put away only when idle, and woken by a due routine', async () => {
   const root = temp(); let clock = Date.now();
   const accounts = new Accounts({ file: path.join(root, 'accounts.sqlite'), now: () => clock });
-  const platform = new PlatformStore({ dir: path.join(root, 'platform'), env: {} });
-  const registry = new TenantRegistry({ accounts, platform, dir: path.join(root, 'tenants'), version: 'test', log: () => {}, idleMs: 60000, now: () => clock });
+  const platform = new PlatformStore({ dir: path.join(root, 'platform'), env: {} }); platform.update({ tenants: { idleMinutes: 1 } }); // the panel's number governs eviction
+  const registry = new TenantRegistry({ accounts, platform, dir: path.join(root, 'tenants'), version: 'test', log: () => {}, now: () => clock });
   try {
     const owner = accounts.createUser({ email: 'o@acme.test', name: 'Owner', password: 'a long enough password' });
     const tenant = accounts.createTenant({ name: 'Acme', ownerId: owner.id });

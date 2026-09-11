@@ -16,6 +16,9 @@ export class TenantRegistry {
     this.instances = new Map(); this.loading = new Map(); this.timer = null; this.lastScan = 0;
     fs.mkdirSync(dir, { recursive: true });
   }
+  // The platform panel's numbers when there is one, else the constructor's.
+  idleLimitMs() { const m = this.platform?.get?.()?.tenants?.idleMinutes; return m ? m * 60000 : this.idleMs; }
+  loadedLimit() { return this.platform?.get?.()?.tenants?.maxLoaded || this.maxLoaded; }
   dirs(id) { const root = path.join(this.dir, id); return { root, data: path.join(root, 'data'), brain: path.join(root, 'brain') }; }
   loaded() { return [...this.instances.keys()]; }
   peek(id) { return this.instances.get(id)?.instance || null; }
@@ -42,7 +45,7 @@ export class TenantRegistry {
   }
   async load(id) {
     const tenant = this.accounts.tenant(id); if (!tenant) fail('No such office.', 404);
-    if (this.instances.size >= this.maxLoaded) await this.evictIdle({ force: true });
+    if (this.instances.size >= this.loadedLimit()) await this.evictIdle({ force: true });
     const d = this.dirs(id); fs.mkdirSync(d.data, { recursive: true }); fs.mkdirSync(d.brain, { recursive: true });
     const instance = await this.createInstance({ dataDir: d.data, brainDir: d.brain, cfg: { ...this.cfg, name: tenant.name }, name: tenant.name, version: this.version, models: this.platform.models, agency: this.agency, discovery: false, allowStdio: false, limits: this.platform.limits(), tenant: this.tenantContext(tenant), log: line => this.log(`  [${tenant.slug}]${line}`) });
     await instance.boot();
@@ -61,7 +64,7 @@ export class TenantRegistry {
   }
   async evict(id) { const entry = this.instances.get(id); if (!entry) return false; this.instances.delete(id); await entry.instance.close(); this.log(`  office put away: ${id}`); return true; }
   async evictIdle({ force = false } = {}) {
-    const t = this.now(), candidates = [...this.instances.entries()].filter(([, e]) => this.idle(e) && (force || t - e.lastUsed >= this.idleMs)).sort((a, b) => a[1].lastUsed - b[1].lastUsed);
+    const t = this.now(), candidates = [...this.instances.entries()].filter(([, e]) => this.idle(e) && (force || t - e.lastUsed >= this.idleLimitMs())).sort((a, b) => a[1].lastUsed - b[1].lastUsed);
     const out = [];
     for (const [id] of force ? candidates.slice(0, 1) : candidates) { await this.evict(id); out.push(id); }
     return out;

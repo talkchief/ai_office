@@ -52,9 +52,8 @@ export class Mailer {
   }
 }
 
-/** The mailer the server runs with, from the environment; null when mail is not configured at all. */
-export function mailerFromEnv(env = process.env, { outbox = null } = {}) {
-  const provider = String(env.AO_MAIL_PROVIDER || 'postmark').toLowerCase(), dryRun = env.AO_MAIL_DRY_RUN === '1';
-  if (!dryRun && !env.AO_MAIL_API_KEY) return null;
-  return new Mailer({ provider, apiKey: env.AO_MAIL_API_KEY || '', domain: env.AO_MAIL_DOMAIN || '', from: env.AO_MAIL_FROM || '', dryRun, outbox: dryRun ? outbox || 'mail-outbox.json' : null, region: env.AO_MAIL_REGION || 'us' });
+/** The mailer for the platform's mail configuration (platform.json → mail); null when neither a key nor a dry run is set. */
+export function mailerFor(mail = {}, { outbox = null, fetchImpl } = {}) {
+  if (!mail.dryRun && !mail.apiKey) return null;
+  return new Mailer({ provider: mail.provider || 'postmark', apiKey: mail.apiKey || '', domain: mail.domain || '', from: mail.from || '', dryRun: !!mail.dryRun, outbox: mail.dryRun ? outbox || 'mail-outbox.json' : null, region: mail.region || 'us', ...(fetchImpl ? { fetchImpl } : {}) });
 }

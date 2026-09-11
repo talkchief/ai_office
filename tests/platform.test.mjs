@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { PlatformStore, validatePlatform } from '../platform.mjs';
+import { PlatformStore, validatePlatform, seedFromEnv } from '../platform.mjs';
 import { OfficeStore } from '../office-store.mjs';
 import { loadRoster } from '../roster.mjs';
 
@@ -22,7 +22,34 @@ test('platform limits are bounded and refused with a sentence; admin emails and 
     platform.update({ limits: { maxTeams: 2 }, registration: 'invite', adminEmails: ['a@b.test', 'not-an-email'] });
     const again = new PlatformStore({ dir, env: {} });
     assert.deepEqual(again.limits(), { maxTeams: 2, maxMembersPerTeam: 7 }); assert.equal(again.registrationOpen(), false); assert.deepEqual(again.get().adminEmails, ['a@b.test']);
+    assert.deepEqual(again.get().tenants, { idleMinutes: 30, maxLoaded: 50 }); assert.equal(again.get().mail.provider, 'postmark'); assert.equal(again.summary().mail.enabled, false);
     assert.ok(fs.existsSync(path.join(dir, 'providers.json')) || again.models.value.providers.length >= 1, 'the platform has the one model registry');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the mail set-up lives in the platform file: secrets are write-only and masked, the environment only seeds the first file', () => {
+  const dir = temp();
+  try {
+    const env = { AO_MAIL_PROVIDER: 'mailgun', AO_MAIL_API_KEY: 'key-from-env', AO_MAIL_DOMAIN: 'Mail.Example.com', AO_MAIL_WEBHOOK_SECRET: 'hook-from-env', AO_PUBLIC_ORIGIN: 'https://office.example.com/some/path', AO_TENANT_IDLE_MINUTES: '5', AO_REGISTRATION: 'invite' };
+    assert.equal(seedFromEnv(env).mail.apiKey, 'key-from-env');
+    const platform = new PlatformStore({ dir, env });
+    const c = platform.get();
+    assert.equal(c.mail.provider, 'mailgun'); assert.equal(c.mail.apiKey, 'key-from-env'); assert.equal(c.mail.domain, 'mail.example.com'); assert.equal(c.publicOrigin, 'https://office.example.com'); assert.equal(c.tenants.idleMinutes, 5); assert.equal(c.registration, 'invite');
+    const seen = platform.summary(); assert.equal(seen.mail.apiKey, undefined); assert.equal(seen.mail.webhookSecret, undefined); assert.equal(seen.mail.hasApiKey, true); assert.equal(seen.mail.hasWebhookSecret, true); assert.equal(seen.mail.enabled, true);
+    assert.ok(!JSON.stringify(seen).includes('key-from-env'), 'no secret in the summary');
+    // The panel is the truth from now on: a blank key keeps the stored one, clearApiKey removes it, the environment no longer matters.
+    let changes = 0; platform.onChange(() => changes++);
+    platform.update({ mail: { provider: 'postmark', apiKey: '', domain: 'mail.acme.test' } });
+    assert.equal(platform.get().mail.apiKey, 'key-from-env'); assert.equal(platform.get().mail.provider, 'postmark'); assert.equal(changes, 1);
+    platform.update({ mail: { clearApiKey: true, dryRun: true } }); assert.equal(platform.get().mail.apiKey, ''); assert.equal(platform.summary().mail.enabled, true, 'dry run counts as on');
+    assert.throws(() => platform.update({ mail: { provider: 'pigeon' } }), /postmark or mailgun/);
+    assert.throws(() => platform.update({ mail: { domain: 'not a domain' } }), /host name/);
+    assert.throws(() => platform.update({ mail: { from: 'nobody' } }), /valid email/);
+    assert.throws(() => platform.update({ publicOrigin: 'office.example.com' }), /full URL/);
+    assert.throws(() => platform.update({ tenants: { idleMinutes: 0 } }), /1 to 1440/);
+    const reopened = new PlatformStore({ dir, env: { ...env, AO_MAIL_API_KEY: 'a-newer-env-key', AO_MAIL_DOMAIN: 'other.example.com' } });
+    assert.equal(reopened.get().mail.apiKey, '', 'an existing file is not overwritten by the environment'); assert.equal(reopened.get().mail.domain, 'mail.acme.test');
+    assert.equal((fs.statSync(path.join(dir, 'platform.json')).mode & 0o777) <= 0o666, true);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 

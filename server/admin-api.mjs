@@ -4,15 +4,23 @@ import { readJsonBody as body } from '../http-body.mjs';
 import { httpError } from './routes.mjs';
 import { registerProviderRoutes } from './providers-api.mjs';
 
-export function registerAdminApi(router, { accounts, platform, registry }) {
+export function registerAdminApi(router, { accounts, platform, registry, mail = { mailer: null }, publicOrigin = () => '' }) {
   const log = (user, summary) => { try { accounts.adminLog(user?.email || 'platform', summary); } catch {} };
-  router.on('GET', '/api/admin/config', () => ({ ...platform.get(), admins: accounts.platformAdmins().map(u => u.email) }));
+  // The configuration without its secrets, plus what the administrator needs to copy into the mail provider.
+  const configOut = () => { const c = platform.summary(); return { ...c, admins: accounts.platformAdmins().map(u => u.email), webhooks: { postmark: `${publicOrigin()}/api/mail/inbound/postmark`, mailgun: `${publicOrigin()}/api/mail/inbound/mailgun` }, secretSuggestion: platform.newWebhookSecret() }; };
+  router.on('GET', '/api/admin/config', () => configOut());
   router.on('PUT', '/api/admin/config', async ({ req, user }) => {
-    const before = platform.get(), next = platform.update(await body(req));
-    log(user, `Platform config: limits ${next.limits.maxTeams} teams × ${next.limits.maxMembersPerTeam} agents, registration ${next.registration}, ${next.adminEmails.length} admin emails`);
+    const before = platform.summary(), next = platform.update(await body(req, 256 * 1024));
+    log(user, `Platform config: limits ${next.limits.maxTeams} teams × ${next.limits.maxMembersPerTeam} agents, registration ${next.registration}, ${next.adminEmails.length} admin emails, mail ${next.mail.provider}${next.mail.domain ? ' @' + next.mail.domain : ''}${next.mail.hasApiKey ? ' (key set)' : ''}${next.mail.dryRun ? ' dry run' : ''}`);
     // Limits apply to the next change in every loaded office; the number itself is read from the office store.
     for (const id of registry.loaded()) { const instance = registry.peek(id); if (instance) { instance.office.limits = { ...instance.office.limits, ...next.limits }; instance.bus.publish('office.updated', { area: 'limits', limits: next.limits }); } }
-    return { ...next, before };
+    return { ...configOut(), before };
+  });
+  // A test message to the administrator's own address, with the mail set-up as saved.
+  router.on('POST', '/api/admin/mail/test', async ({ user }) => {
+    if (!mail.mailer?.enabled) throw httpError('Mail is not configured yet: save a provider key (or switch on the dry run) first.', 503);
+    const r = await mail.mailer.send({ to: user.email, subject: 'Mail from your Agents Office platform works', text: `This message was sent with the platform's mail settings (${mail.mailer.provider}${mail.mailer.domain ? ', ' + mail.mailer.domain : ''}). Inbound mail arrives through the webhook shown in the Platform panel.`, tag: 'platform-test' });
+    log(user, 'Sent a platform test mail'); return { ok: true, to: user.email, dryRun: !!r.dryRun, outbox: mail.mailer.outbox || null };
   });
   registerProviderRoutes(router, platform.models, '/api/admin/providers', {
     record: entry => log(null, entry.summary),

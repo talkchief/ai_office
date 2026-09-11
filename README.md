@@ -103,9 +103,14 @@ Sharing a project shares every task in it. A private task's record, thread, prog
 result is still filed in the office's shared Brain, which every agent reads.
 
 The **models are the platform's**: a company never sees providers, keys or models; it inherits what the platform administrator
-activates under the Platform panel (Manage → Platform, or `/api/admin/*`), together with the limits (maximum AI teams per office,
-maximum agents per team) and whether registration is open or invitation-only. Platform administrators are the emails in
-`AO_PLATFORM_ADMINS` (and anyone flagged in the panel).
+activates under the Platform panel (Manage → Platform, or `/api/admin/*`). The panel is also where every other platform-wide
+setting lives: the limits (maximum AI teams per office, maximum agents per team), whether registration is open or
+invitation-only, the public address, how long an idle office stays loaded, and the **mail set-up** (provider, API key, mail
+domain, From address, webhook secret, dry run). It is kept in `platform.json` (mode 0600; secrets are write-only and never
+shown again). Platform administrators are the emails in `AO_PLATFORM_ADMINS` (and anyone flagged in the panel).
+
+The environment names where things are and seeds the first `platform.json`; after that first start the panel is the truth and
+the seeding variables are ignored.
 
 | Variable | Meaning |
 |---|---|
@@ -114,12 +119,9 @@ maximum agents per team) and whether registration is open or invitation-only. Pl
 | `AO_ACCOUNTS` | The accounts database (users, offices, memberships, groups, sessions, invites, mail identities; default `data/accounts.sqlite`) |
 | `AO_PLATFORM_DIR` | `platform.json` (limits, registration, admin emails) and the platform's `providers.json` (default `data/platform/`) |
 | `AO_PLATFORM_ADMINS` | Comma-separated emails that may open the Platform panel |
-| `AO_REGISTRATION` | `open` (default) or `invite` |
-| `AO_TENANT_IDLE_MINUTES`, `AO_TENANTS_MAX_LOADED` | An idle office is put away after this long (default 30) and at most this many stay loaded (default 50); a due routine wakes an office up |
-| `AO_PUBLIC_ORIGIN` | The address links in mail point to (`https://office.example.com`) |
-| `AO_MAIL_PROVIDER`, `AO_MAIL_API_KEY`, `AO_MAIL_DOMAIN`, `AO_MAIL_FROM`, `AO_MAIL_REGION` | Outbound mail: `postmark` or `mailgun`, its key, the mail domain, the From address (default `office@<domain>`), `eu` for Mailgun's EU region |
-| `AO_MAIL_WEBHOOK_SECRET` | The secret the inbound webhook must present (Basic auth `postmark:<secret>` in the webhook URL, the `X-AO-Webhook-Token` header, or Mailgun's webhook signing key) |
-| `AO_MAIL_DRY_RUN`, `AO_MAIL_OUTBOX` | `1` writes every outbound message to the outbox file instead of sending (the check loop uses it) |
+| `AO_REGISTRATION`, `AO_PUBLIC_ORIGIN`, `AO_TENANT_IDLE_MINUTES`, `AO_TENANTS_MAX_LOADED` | Seed only: registration mode, the public address links point to, minutes before an idle office is put away, offices loaded at once. Change them in Platform → Settings afterwards |
+| `AO_MAIL_PROVIDER`, `AO_MAIL_API_KEY`, `AO_MAIL_DOMAIN`, `AO_MAIL_FROM`, `AO_MAIL_REGION`, `AO_MAIL_WEBHOOK_SECRET`, `AO_MAIL_DRY_RUN` | Seed only: the mail set-up. Change it in Platform → Mail afterwards, where the panel also shows the webhook address to paste into the provider and sends a test message |
+| `AO_MAIL_OUTBOX` | Where a dry run writes its messages (default `<platform dir>/mail-outbox.json`) |
 | `AO_BRAIN_TEMPLATE` | A folder copied into every new office's Brain |
 
 **Email intake.** Every member has an address of the form `<office>.<person>.<suffix>@<mail domain>` (Manage → Profile → Email
@@ -132,7 +134,8 @@ has; approvals stay in the app. Replying to a receipt adds a note to that task; 
 Mail from anyone else is dropped and logged, never bounced. Set up at the provider: point the domain's MX at the provider
 (Postmark: `inbound.postmarkapp.com`; Mailgun: `mxa.mailgun.org` and `mxb.mailgun.org`), add its DKIM and Return-Path records,
 and set the inbound webhook to `https://postmark:<secret>@<host>/api/mail/inbound/postmark` (Postmark) or a route that posts
-to `https://<host>/api/mail/inbound/mailgun` (Mailgun, signed with the webhook signing key you set as `AO_MAIL_WEBHOOK_SECRET`).
+to `https://<host>/api/mail/inbound/mailgun` (Mailgun, signed with the webhook signing key you save as the webhook secret in
+Platform → Mail; the panel shows both addresses ready to copy).
 The webhook answers `202` and processes the message in the background; a repeated delivery is acknowledged and ignored.
 
 **Moving a self-hosted office in.** Register the office in hosted mode, stop both servers, then
