@@ -727,7 +727,14 @@ export class OfficeEngine {
       // The lead reviews; a specialist does the work. No review until someone on the team has handed work over this round.
       const specialists = new Set(this.office.agents().filter(a => a.department === team.id && a.id !== current.lead).map(a => a.id));
       const leadRuns = job.runs.filter(r => r.agent === current.lead), since = leadRuns.length ? Math.max(...leadRuns.map(r => r.startedAt || 0)) : 0;
-      if (specialists.size && !job.runs.some(r => specialists.has(r.agent) && (r.startedAt || 0) >= since && ['done', 'working'].includes(r.state) || specialists.has(r.agent) && (r.finishedAt || 0) >= since && r.state === 'done')) {
+      const handedOver = job.runs.some(r => specialists.has(r.agent) && (r.startedAt || 0) >= since && ['done', 'working'].includes(r.state) || specialists.has(r.agent) && (r.finishedAt || 0) >= since && r.state === 'done');
+      // After a restart or a provider failure the lead comes back in a new run while the file its specialist handed over in the
+      // interrupted round is already in the workspace: that file may be reviewed, when the lead names it, without sending the
+      // specialist once more.
+      const broken = leadRuns.filter(r => ['interrupted', 'failed'].includes(r.state)).map(r => r.startedAt || 0), lastBroken = broken.length ? Math.max(...broken) : -1;
+      const deliveredBefore = !handedOver && lastBroken >= 0 && !!clean(deliverablePath) && job.runs.some(r => specialists.has(r.agent) && r.state === 'done' && (r.startedAt || 0) >= lastBroken && (r.finishedAt || 0) <= since);
+      if (deliveredBefore) this.event(id, 'review_resumed', current.lead, `Reviewing ${clean(deliverablePath)}, handed over before the interruption.`);
+      if (specialists.size && !handedOver && !deliveredBefore) {
         this.event(id, 'review_refused', current.lead, 'No specialist has handed work over in this round.');
         return `Refused: nobody on your team has handed work over in this round. Delegate the work to a specialist with the task tool (subagent_type is the specialist id: ${[...specialists].join(', ')}), then review what they return.`;
       }

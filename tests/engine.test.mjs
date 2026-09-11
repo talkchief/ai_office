@@ -122,6 +122,29 @@ test('an outbound tool pauses for the CEO, survives a restart, and runs once aft
   } finally { if (second) await second.close(); else { await first.engine.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } }
 });
 
+test('after a restart the lead reviews the file its specialist handed over before the interruption, without sending the specialist again', async () => {
+  const dir = temp(); let release; const hold = new Promise(r => { release = r; });
+  const specialist = ({ last }) => last.type === 'human' ? { calls: [call('write_file', { file_path: '/work/report.md', content: 'Verified result and evidence for every criterion.' })] } : { text: 'Handed over /work/report.md with the verified result.' };
+  // In the first office the lead delegates, then hangs after the hand-over: the restart interrupts it there.
+  const leadFirst = workers => ({ last }) => last.type === 'human' ? { calls: [call('task', { subagent_type: workers[0], description: 'Write the report to /work/report.md' })] } : { text: 'Reviewing.', wait: hold };
+  // In the second office the resumed lead reviews the file straight away.
+  const leadSecond = () => ({ last, system }) => last.type === 'human' ? { calls: [call('record_review', { approved: true, summary: 'Checked every criterion.', criteria: criteria(system).map(id => ({ id, passed: true, evidence: 'Present in the file.' })), deliverablePath: '/work/report.md' })] } : { text: /APPROVED/.test(last.text) ? 'Review approved: the report is ready.' : 'Review not approved: ' + last.text };
+  const first = fixture({ dir, lead: leadFirst, specialist, keep: true }); let second;
+  try {
+    const id = start(first);
+    const end = Date.now() + 20000; while (Date.now() < end && !first.engine.get(id).runs.some(r => r.role === 'specialist' && r.state === 'done')) await new Promise(r => setTimeout(r, 10));
+    assert.ok(first.engine.get(id).runs.some(r => r.role === 'specialist' && r.state === 'done'), 'the specialist handed over before the restart');
+    await first.engine.close(); release();
+    second = fixture({ dir, lead: leadSecond, specialist });
+    second.engine.recover(); assert.equal(second.engine.get(id).state, 'blocked'); assert.match(second.engine.get(id).error || '', /restarted/);
+    second.engine.retry(id);
+    const done = await until(second.engine, id, ['done']);
+    assert.equal(done.runs.filter(r => r.role === 'specialist').length, 1, 'the specialist was not sent again');
+    assert.equal(done.events.filter(e => e.type === 'review_refused').length, 0); assert.equal(done.events.filter(e => e.type === 'review_resumed').length, 1);
+    assert.equal(done.review.approved, true); assert.equal(done.review.file, 'report.md');
+  } finally { if (second) await second.close(); else { await first.engine.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } }
+});
+
 test('a rejected action never runs; an edited one must match the tool and runs as edited; a second decision is a no-op', async () => {
   const specialist = ({ last }) => last.type === 'human' ? { calls: [call('send_email', { to: 'client@example.com', body: 'Hello' })] } : { text: 'Email handled: ' + last.text };
   const sentA = [], a = fixture({ hub: sendHub(sentA), specialist });
