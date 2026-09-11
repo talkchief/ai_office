@@ -97,7 +97,11 @@ the CEO is asked, and how long a run may take.
 
 Anything that sends, posts, pays, deletes or changes data outside the office pauses for the CEO. The
 CEO approves, edits or rejects the exact action; approval runs it once. Team tests never receive such
-tools. This is a single-owner application: the office access code is the only login.
+tools. In the default single mode the office access code is the only login; `AO_MODE=hosted` adds accounts
+(email and password), one office per company, roles (owner, admin, member), private tasks shared with
+people and groups, platform-owned models and limits, and email intake (see the README's hosted section).
+For hosted mode the reverse proxy must let the mail provider's webhook through with a larger body:
+`location /api/mail/inbound/ { client_max_body_size 40m; proxy_pass …; }` (the nginx site has it).
 
 Authenticated configuration requests accept up to 16 MiB for the office, 4 MiB for connector
 definitions and 512 KiB for knowledge notes. Ordinary requests are limited to 64 KiB.

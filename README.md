@@ -92,6 +92,53 @@ Keys, passwords and SSH credentials live in the **Vault** (Manage → Vault), a 
 - **Provider trouble.** A model call that produces nothing for five minutes fails and is retried; a rate limit, a 5xx or an overload is waited out and the call sent again (Retry-After honoured, about three minutes at most), a dropped connection is retried on a fresh one, and a call that still fails blocks the task quietly while the office retries it by itself four times with growing pauses before you are asked. A provider that keeps failing is a provider to change under Settings → Models & keys.
 - **Runaway work.** A run that makes no progress for the no-progress limit (Settings → Office, default 20 minutes) stops with a Retry. There is no cap on tokens: a big task is allowed to be big. An agent that repeats the same tool call with the same arguments is refused from the fifth time and told to finish with what it has or report what is missing, so a lead cannot sit listing an empty workspace while another team works. Deliverables are handed over as files under /work/ and read once by the lead, not re-typed.
 
+## Hosted mode: many companies, one process
+
+`AO_MODE=hosted` turns the office into a multi-tenant product. A company registers its office online (email and password); the
+person who registers becomes the office's **owner** and invites colleagues as **admins** or **members** (an invitation is a link
+that works once for seven days). Each office has its own teams, connectors, Vault and Brain; **tasks and projects are private
+by default** (the owner, the office admins and whoever they are shared with see them), can be made public to the whole office,
+or shared with named members or **member groups** (groups of people, defined under Manage → Users & groups; not AI teams).
+Sharing a project shares every task in it. A private task's record, thread, progress and files stay private; its approved
+result is still filed in the office's shared Brain, which every agent reads.
+
+The **models are the platform's**: a company never sees providers, keys or models; it inherits what the platform administrator
+activates under the Platform panel (Manage → Platform, or `/api/admin/*`), together with the limits (maximum AI teams per office,
+maximum agents per team) and whether registration is open or invitation-only. Platform administrators are the emails in
+`AO_PLATFORM_ADMINS` (and anyone flagged in the panel).
+
+| Variable | Meaning |
+|---|---|
+| `AO_MODE` | `single` (default: one office, the access code) or `hosted` |
+| `AO_TENANTS_DIR` | Where each company's `data/` and `brain/` live (default `tenants/`, one folder per tenant id) |
+| `AO_ACCOUNTS` | The accounts database (users, offices, memberships, groups, sessions, invites, mail identities; default `data/accounts.sqlite`) |
+| `AO_PLATFORM_DIR` | `platform.json` (limits, registration, admin emails) and the platform's `providers.json` (default `data/platform/`) |
+| `AO_PLATFORM_ADMINS` | Comma-separated emails that may open the Platform panel |
+| `AO_REGISTRATION` | `open` (default) or `invite` |
+| `AO_TENANT_IDLE_MINUTES`, `AO_TENANTS_MAX_LOADED` | An idle office is put away after this long (default 30) and at most this many stay loaded (default 50); a due routine wakes an office up |
+| `AO_PUBLIC_ORIGIN` | The address links in mail point to (`https://office.example.com`) |
+| `AO_MAIL_PROVIDER`, `AO_MAIL_API_KEY`, `AO_MAIL_DOMAIN`, `AO_MAIL_FROM`, `AO_MAIL_REGION` | Outbound mail: `postmark` or `mailgun`, its key, the mail domain, the From address (default `office@<domain>`), `eu` for Mailgun's EU region |
+| `AO_MAIL_WEBHOOK_SECRET` | The secret the inbound webhook must present (Basic auth `postmark:<secret>` in the webhook URL, the `X-AO-Webhook-Token` header, or Mailgun's webhook signing key) |
+| `AO_MAIL_DRY_RUN`, `AO_MAIL_OUTBOX` | `1` writes every outbound message to the outbox file instead of sending (the check loop uses it) |
+| `AO_BRAIN_TEMPLATE` | A folder copied into every new office's Brain |
+
+**Email intake.** Every member has an address of the form `<office>.<person>.<suffix>@<mail domain>` (Manage → Profile → Email
+intake, with a Copy button). Mail to it from the member's own account email, or from an address they verified with a six-digit
+code, becomes a task for the Program Manager: the subject is the title, the body the brief, attachments (PDF, Word, Excel,
+PowerPoint, CSV, text, Markdown, JSON, PNG, JPEG; 25 MB each) land under the task's `/work/inbox/` and readable ones are also
+filed in the Brain under `Inbox/<person>/`. A plain question is answered by the Program Manager on the same thread instead. The
+office writes back a receipt, the finished result (with the newest PDF or the result as Markdown) and any question the team
+has; approvals stay in the app. Replying to a receipt adds a note to that task; a question in the reply is answered from it.
+Mail from anyone else is dropped and logged, never bounced. Set up at the provider: point the domain's MX at the provider
+(Postmark: `inbound.postmarkapp.com`; Mailgun: `mxa.mailgun.org` and `mxb.mailgun.org`), add its DKIM and Return-Path records,
+and set the inbound webhook to `https://postmark:<secret>@<host>/api/mail/inbound/postmark` (Postmark) or a route that posts
+to `https://<host>/api/mail/inbound/mailgun` (Mailgun, signed with the webhook signing key you set as `AO_MAIL_WEBHOOK_SECRET`).
+The webhook answers `202` and processes the message in the background; a repeated delivery is acknowledged and ignored.
+
+**Moving a self-hosted office in.** Register the office in hosted mode, stop both servers, then
+`node scripts/tenant-import.mjs --tenant <tenantId> --data ./data --brain ./brain`. On the next start every task, project and
+routine without an owner belongs to the office's owner.
+
 ## The build loop
 
 ```bash
@@ -106,7 +153,9 @@ CHECK_LIVE=1 npm run check   # … plus one real task through your model provide
 |---|---|
 | `src/` | The page: `main.js` chrome, rail, chat and hotkeys; `office.js` the task panel, task view and chat context; `settings.js` the settings page; `inbox.js` the inbox; `sse.js` live updates; `rightnow.js` the "Right now" rows and hand-off chains; `brain.js` the Brain view; `mcp.js` connector docks |
 | `src/scene/` | The 3D office on React Three Fiber: `index.jsx` mounts it; `office.jsx` the building and rooms; `person.js` the figures; `sim.js` their life and the walk-and-talk hand-overs; `nav.js` walking; `screens.js` wall screens; `overlays.js` pills and speech bubbles; `rig.js` the camera |
-| `serve.mjs` · `server/` | The server and its API ([docs/api.md](docs/api.md)) |
+| `serve.mjs` · `office-instance.mjs` · `server/` | The server (both modes), one office as an instance, and the API ([docs/api.md](docs/api.md)); `server/visibility.mjs` decides who sees a task |
+| `accounts.mjs` · `platform.mjs` · `tenant-registry.mjs` | Hosted mode: users, offices, groups, sessions and invitations; the platform's models and limits; one office per tenant, loaded on demand |
+| `mail/` · `channels/` | Email intake: the providers' inbound webhooks (Postmark, Mailgun), outbound mail, the intake that turns mail into tasks; the shapes a later channel (WhatsApp) implements |
 | `engine/` | The Program Manager → leads → specialists harness on Deep Agents: prompts, tools, approvals, reviews, live progress |
 | `agency/` · `agency.mjs` | The Agency catalogue (personas, MIT), the Program Manager's skills, and the importer |
 | `models.mjs` | Providers, models and who runs on what |
@@ -115,7 +164,8 @@ CHECK_LIVE=1 npm run check   # … plus one real task through your model provide
 | `knowledge.mjs` · `knowledge-index.mjs` · `documents.mjs` | The Brain, its search index, document text extraction |
 | `office-store.mjs` · `settings.mjs` · `tool-store.mjs` · `audit.mjs` | Teams and people, office settings, connectors, the audit log |
 | `vault.mjs` · `connectors/` | The Vault; the database (`database.mjs`) and SSH (`ssh.mjs`) connectors behind it |
-| `data/` | Everything the office stores (ignored by git): `office.json`, `providers.json`, `settings.json`, `tools.json`, `workflows.sqlite`, `knowledge/` |
+| `data/` | Everything the office stores (ignored by git): `office.json`, `providers.json`, `settings.json`, `tools.json`, `workflows.sqlite`, `knowledge/`; in hosted mode also `accounts.sqlite` and `platform/` |
+| `tenants/` | Hosted mode (ignored by git): `<tenantId>/data/` and `<tenantId>/brain/` per company |
 | `deploy/` | Running it as a service ([deploy/README.md](deploy/README.md)) |
 
 ## Privacy

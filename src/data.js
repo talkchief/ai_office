@@ -101,7 +101,7 @@ export const AGENTS = boot?.agents ? boot.agents.map(a => {
   const index = members.findIndex(x => x.id === a.id), cols = members.length > 8 ? 3 : 2;
   return { ...original, ...a, dept: a.department, grid: a.lead ? [(cols - 1) / 2, 0] : [(index - 1) % cols, 1 + Math.floor((index - 1) / cols)] };
 }) : DEFAULT_AGENTS;
-if (boot) for (const key of DEPT_KEYS) {
+if (boot?.teams) for (const key of DEPT_KEYS) {
   const count = AGENTS.filter(a => a.dept === key).length, cols = count > 8 ? 3 : 2;
   LAYOUT[key].w = Math.max(20, cols * 8.6 + 4);
   LAYOUT[key].d = Math.max(26, (1 + Math.ceil((count - 1) / cols)) * 6.4 + 7);

@@ -86,10 +86,11 @@ export const officeReady = new Promise(resolve => {
     message(secure ? (tab === 'register' ? 'A company registers its office here.' : tab === 'accept' ? '' : 'Enter your email and password.') : 'Open this office over HTTPS to sign in.');
   };
   dialog.querySelectorAll('[data-auth-tab]').forEach(b => b.onclick = () => show(b.dataset.authTab));
-  if (button) { button.textContent = USER ? 'Sign out' : 'Sign in'; button.classList.toggle('connected', !!USER); button.addEventListener('click', async () => { if (USER) { try { await api('logout', {}); } catch {} location.reload(); } else if (!dialog.open) { dialog.showModal(); show('login'); } }); }
+  // The top-bar button is the person: their name opens the Profile (account, email intake); signed out, it opens the sign-in.
+  if (button) { button.textContent = USER ? USER.name : 'Sign in'; button.classList.toggle('connected', !!USER); button.addEventListener('click', () => { if (USER) window.dispatchEvent(new CustomEvent('office:open', { detail: 'profile' })); else if (!dialog.open) { dialog.showModal(); show('login'); } }); }
   const submit = (form, fn) => $(form).addEventListener('submit', async event => {
     event.preventDefault(); const b = event.target.querySelector('button[type=submit]'); b.disabled = true;
-    try { await fn(); location.replace(location.pathname + location.search); location.reload(); } catch (error) { message(error.message, true); b.disabled = false; }
+    try { await fn(); history.replaceState(null, '', location.pathname + location.search); location.reload(); } catch (error) { message(error.message, true); b.disabled = false; }
   });
   submit('authLogin', () => api('login', { email: $('loginEmail').value.trim(), password: $('loginPassword').value }));
   submit('authRegister', () => api('register', { officeName: $('regOffice').value.trim(), name: $('regName').value.trim(), email: $('regEmail').value.trim(), password: $('regPassword').value }));
@@ -105,8 +106,11 @@ export const officeReady = new Promise(resolve => {
           show('accept');
           $('acceptWho').textContent = `${inv.email} is invited to ${inv.office} as ${inv.role}.${inv.existing ? ' You already have an account: sign in with your password to join.' : ''}`;
           $('accName').hidden = $('accNameLabel').hidden = !!inv.existing; $('accPasswordLabel').textContent = inv.existing ? 'Your password' : 'Choose a password';
-          if (!status.locked) message('Accepting joins this office with your current account.');
-        } catch (error) { show('login'); message(error.message, true); }
+        } catch (error) {
+          // A used or expired link while signed in (the reload after accepting): carry on into the office.
+          if (!status.locked) { history.replaceState(null, '', location.pathname + location.search); if (dialog.open) dialog.close(); release(); return; }
+          show('login'); message(error.message, true);
+        }
       } else show('login');
     } catch (error) { if (!dialog.open) dialog.showModal(); show('login'); message(error.message, true); }
   })();

@@ -1,14 +1,16 @@
 # Office API and live events
 
-The contract between the server and any interface (the current page, or the React Three Fiber rebuild). All routes are under `/api`, JSON in and out. Mutating requests must come from the page's own origin. Errors are `{ "error": "A plain sentence." }` with status 400 (bad input), 404, 409 (not allowed in the current state, or no model key yet) or 401 (office locked).
+The contract between the server and any interface (the current page, or the React Three Fiber rebuild). All routes are under `/api`, JSON in and out. Mutating requests must come from the page's own origin. Errors are `{ "error": "A plain sentence." }` with status 400 (bad input), 404, 409 (not allowed in the current state, or no model key yet), 401 (office locked, or not signed in) or 403 (in hosted mode: a task or project that belongs to someone else — `This task belongs to someone else in the office.` — or a route for owners and admins only).
 
 ## Tasks
 
 | Route | Does |
 |---|---|
 | `GET /tasks` | All tasks, list shape (below). |
-| `POST /tasks` | Create. `{ dept, text, depts?, assignee?, dueAt?, priority? (0–2), backlog?, completionApproval? }`. `dept: "auto", depts: "auto"` lets the Program Manager choose the teams. `depts: [a, b]` involves several teams. Empty `text` → 400. No model key → 409 unless `backlog`. |
+| `POST /tasks` | Create. `{ dept, text, depts?, assignee?, dueAt?, priority? (0–2), backlog?, completionApproval?, visibility? ("private" \| "public"), sharedWith?: { users: [id], groups: [id] } }`. `dept: "auto", depts: "auto"` lets the Program Manager choose the teams. `depts: [a, b]` involves several teams. Empty `text` → 400. No model key → 409 unless `backlog`. |
 | `GET /tasks/:id` | Detail shape (below). |
+| `POST /tasks/:id/share` | Hosted: `{ visibility, sharedWith: { users, groups } }` → the task in list shape. The task's owner or an office owner/admin only; ids must name members and groups of the office. Everyone receives `task.removed { id }`, then those who may see it `task.updated`. |
+| `POST /tasks/:id/attach` | `{ name, data (base64), type? }` → `{ attachments }`. Files land under `/work/inbox/`; 409 once the task has started. When the task belongs to a project, readable text is also filed in the project's Brain folder. |
 | `POST /tasks/:id/queue` | Edit a queued idea: `{ text?, priority?, state: "queued" \| "backlog" }`. |
 | `POST /tasks/:id/cancel` | Stop and close. Nothing is filed. |
 | `POST /tasks/:id/seen` | Mark the result or blocker as seen by the CEO. |
@@ -21,7 +23,7 @@ The contract between the server and any interface (the current page, or the Reac
 
 **States:** `backlog`, `queued`, `planning`, `working`, `awaiting_lead_review`, `reviewing`, `executing`, `awaiting_ceo` (a decision or approval waits for the CEO), `escalated` (the team needs direction), `blocked`, `saving`, `done`, `cancelled`. Needs the CEO: `awaiting_ceo`, `escalated`, `blocked`. A result is new until `seenAt >= doneAt`.
 
-**List shape:** the task record without large fields, plus `teamName`, `resultPreview`, `versions`, `pendingActions [{ name, agent, requestedAt }]`, `runs` (without output), `subtasks [{ id, title, agent, state }]`, `completedSteps`. Useful fields: `id, title, text, dept, depts, autoRoute, agent, assignee, dueAt, priority, state, stateSince, progressLine, createdAt, updatedAt, doneAt, seenAt, calls, tokens, error, kind` (`task` or `evaluation`).
+**List shape:** the task record without large fields, plus `teamName`, `resultPreview`, `versions`, `pendingActions [{ name, agent, requestedAt }]`, `runs` (without output), `subtasks [{ id, title, agent, state }]`, `completedSteps`. Useful fields: `id, title, text, dept, depts, autoRoute, agent, assignee, dueAt, priority, state, stateSince, progressLine, createdAt, updatedAt, doneAt, seenAt, calls, tokens, error, kind` (`task` or `evaluation`), and in hosted mode `ownerId`, `visibility`, `sharedWith { users, groups }`, `origin { channel: web \| chat \| routine \| email, from?, messageId?, subject?, routineId? }`, `attachments [{ name, bytes, type, at }]`.
 
 **Detail shape:** the full record plus `team { id, name, lead, criteria, guardrails }`, `agents`, `runs [{ id, agent, role, title, state, output, sources, tools, model, startedAt, finishedAt, error }]`, `reviews [{ agent, approved, summary, criteria [{ id, passed, evidence }], checks, at }]`, `resultVersions [{ n, at, result, summary, correction? }]`, `result`, `messages`, `decisions`, `pendingActions [{ name, args, agent }]`, `todos`, `sources`, `liveCalls { [agent]: { preview, state } }`, `events`, `tokensByModel`.
 
@@ -49,6 +51,7 @@ A server-sent event stream. Reconnect with `?lastEventId=` (or the browser's own
 |---|---|
 | `task.updated` | A task in list shape. |
 | `task.state` | `{ id, from, to }` |
+| `task.removed` | `{ id }` — the task's audience changed (hosted); drop it, and take it back if a `task.updated` follows. |
 | `task.event` | `{ id, type, agent, message, role, approved, … }` for hand-overs worth animating (a run starting or finishing, a review, a decision). |
 | `task.live` | `{ id, agent, preview }` — a specialist's draft as it is written, throttled. |
 | `notification.new` | An inbox item. |
@@ -65,7 +68,7 @@ A server-sent event stream. Reconnect with `?lastEventId=` (or the browser's own
 |---|---|
 | `GET/PUT /office` | Teams, people, skills, standing rules. Send the whole object back. Removing a team with unfinished work → 409. |
 | `GET /agents` | `{ agents }` |
-| `GET/PUT /providers` | Providers (never keys: `hasKey`, `keySource`), models, `roleDefaults`, `roleEfforts`. Send `apiKey` to set a key, `clearKey` to remove one. |
+| `GET/PUT /providers` | Providers (never keys: `hasKey`, `keySource`), models, `roleDefaults`, `roleEfforts`. Send `apiKey` to set a key, `clearKey` to remove one. In hosted mode these routes do not exist (404): the platform's live at `/admin/providers`. |
 | `POST /providers/:id/test`, `GET /providers/:id/models` | Test a key; list the provider's models. |
 | `GET/PUT /settings` | `maxConcurrentJobs` (1–8), `runTimeoutMinutes` (1–480), `escalateAfterHours` (0.25–72), `digestTime` (HH:MM), `knowledgeSeedNotes` (0–20), `outboundTools`, `readOnlyTools`, `publicOrigin`. |
 | `GET /tools`, `POST /tools`, `DELETE /tools/:id` | Connectors. Items have `type` (`builtin`, `http`, `sse`, `stdio`, `candidate`), `auth` (`signed-in`, `not-signed-in`, `none`), `assignedTeams`. |
@@ -75,6 +78,45 @@ A server-sent event stream. Reconnect with `?lastEventId=` (or the browser's own
 | `GET/POST /routines`, `POST /routines/:id`, `DELETE /routines/:id`, `POST /routines/:id/run \| pause \| resume` | Routines for any team. `POST /routines { dept, agent, text, needsOk }`; incomplete input → 400 with `needsTime`, `needsDay` or `noSchedule`. |
 | `GET /reports?days=`, `GET /kpis?days=` | Team report; KPIs: `throughput { done, perDay, series }`, `cycle { p50, p90 }`, `leadReviewMs`, `ceoLatencyMs`, `reworkRate`, `blockedAgeMs`, `overdue`, `needsYou`, `agents`, `tokensByModel`, `teams`. |
 | `GET /audit?limit=&area=` | `[{ seq, at, actor, area, summary, diff }]` |
+
+## Accounts, roles and sharing (hosted mode)
+
+`AO_MODE=hosted`. Sign-in is a session cookie (`ao_session`, HttpOnly, Lax, seven days). Roles inside an office: `owner` (everything, cannot be removed), `admin` (everything but ownership and inviting admins), `member` (own tasks, shared and public ones, the Brain, Teams read-only). Platform administrators additionally get `/admin/*`.
+
+| Route | Does |
+|---|---|
+| `GET /auth/status` | `{ mode, locked, user, secure, registrationOpen, providersReady }` (single mode: `{ mode: "single", locked, secure, accessRequired, providersReady }`). |
+| `POST /auth/register` | `{ email, password (≥ 10), name, officeName }` → `201 { user, tenant }` and the cookie; 409 taken; 403 invitation-only. Over HTTPS or locally; rate-limited per address. |
+| `POST /auth/login`, `POST /auth/logout` | `{ email, password, tenantId? }` → `{ user, tenant }` and the cookie (401 for a wrong pair, 403 when not a member of any office) / clears the cookie. |
+| `GET /auth/invite/:token`, `POST /auth/accept` | What an invitation is for; `{ token, name?, password }` joins the office (an existing account signs in with its own password). 410 expired or used. |
+| `GET /auth/me` | `{ user { id, email, name, role, platformAdmin }, tenant, groups, mail { address }, prefs, tenants }`. |
+| `POST /auth/switch`, `POST /auth/password`, `PUT /auth/prefs` | `{ tenantId }`; `{ current, next }`; `{ name?, notifyByEmail?: none \| mine \| all }`. |
+| `POST /auth/invite`, `DELETE /auth/invite/:hash` | Owner or admin (only the owner invites admins): `{ email, role }` → `201 { email, role, expiresAt, link, sent }`; revoke. |
+| `GET /users`, `PUT /users/:id`, `DELETE /users/:id` | Members `{ id, name, email, role, lastLoginAt }` and (owner/admin) open invitations; `{ role }` (owner only; the owner → 409); remove (an admin removes members only). |
+| `GET/POST /groups`, `PUT/DELETE /groups/:id`, `PUT /groups/:id/members` | Member groups (people, not AI teams): `{ name, users? }`, `{ name }`, `{ users: [id] }`. Owner or admin. |
+| `GET/PUT /projects/:id` | Projects carry `ownerId`, `visibility`, `sharedWith`; the project's owner or an office admin changes them. Sharing a project shares its tasks. |
+| `GET /health` | Adds `mode`, `limits { maxTeams, maxMembersPerTeam }` and `platform { managedModels }`. |
+
+Members and admins only see what the rules allow: `GET /tasks`, `/artifacts`, `/reports`, `/kpis`, `/usage`, `/projects` and the event stream are filtered; `GET /tasks/:id` and every `/tasks/:id/*` answer 403 for someone else's private task. Inbox items reach the person they are addressed to and the owner/admin. `PUT /settings`, `PUT /office`, `/tools*`, `/vault*`, the Agency's hire and skill routes, Brain re-indexing and note deletion, team tests and `GET /audit` need owner or admin.
+
+### Platform panel (platform administrators)
+
+| Route | Does |
+|---|---|
+| `GET/PUT /admin/config` | `{ limits { maxTeams (1–50), maxMembersPerTeam (2–20) }, registration (open \| invite), adminEmails }`. Limits apply to every office's next change. |
+| `GET/PUT /admin/providers`, `POST /admin/providers/:id/test`, `GET /admin/providers/:id/models` | The one model registry every office inherits; same bodies as `/providers`. |
+| `GET /admin/tenants`, `POST /admin/tenants/:id/suspend \| resume` | Every office: owner, people, teams, open tasks, tokens, loaded or put away, suspended. |
+| `GET /admin/users?q=`, `PUT /admin/users/:id` | People across offices; `{ platformAdmin }`. |
+| `GET /admin/log` | What platform administrators did. |
+
+### Email intake
+
+| Route | Does |
+|---|---|
+| `POST /mail/inbound/:provider` | The provider's webhook (`postmark`, `mailgun`). No cookie, no same-origin check; the shared secret (Basic `postmark:<secret>`, `X-AO-Webhook-Token`) or Mailgun's signature is the proof. `202 { ok }` and the message is handled in the background; `200 { duplicate: true }` for a repeated delivery; 401, 400, 413 (over 40 MB), 503 (mail not configured). |
+| `GET /mail/profile` | `{ enabled, domain, address, senders [{ id, address, verifiedAt, pending }], prefs }`. |
+| `POST /mail/senders`, `POST /mail/senders/:id/verify`, `DELETE /mail/senders/:id` | `{ address }` mails a six-digit code (five per hour); `{ code }`; remove. |
+| `POST /mail/alias/rotate`, `POST /mail/test` | A new random part in the alias; a test message to the account email. |
 
 ## The Brain
 

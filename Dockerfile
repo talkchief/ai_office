@@ -7,6 +7,8 @@
 #     -e ANTHROPIC_API_KEY=... ai-office
 #
 # Provider keys can also be added later in Settings → Models & keys; they are kept in /app/data.
+# Hosted mode: add -e AO_MODE=hosted -e AO_PLATFORM_ADMINS=you@example.com and mount /app/tenants as well;
+# the platform's models and keys live under /app/data/platform, the accounts database in /app/data.
 FROM node:22-bookworm-slim
 
 # Chromium prints the PDFs (documents.mjs finds it through AO_CHROME); the fonts keep the output readable.
@@ -20,9 +22,9 @@ RUN npm ci
 COPY . .
 RUN npm run build && npm prune --omit=dev
 
-RUN mkdir -p /app/data /app/brain && chown -R node:node /app
+RUN mkdir -p /app/data /app/brain /app/tenants && chown -R node:node /app
 USER node
-VOLUME ["/app/data", "/app/brain"]
+VOLUME ["/app/data", "/app/brain", "/app/tenants"]
 EXPOSE 4520
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD node -e "fetch('http://127.0.0.1:4520/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 CMD ["node", "serve.mjs"]

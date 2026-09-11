@@ -144,16 +144,18 @@ export function initOfficeWork(ctx) {
   panel.querySelector('form').onsubmit = async event => {
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
-      const files = [...($('spaceFiles').files || [])], refs = [];
-      for (const file of files) {
-        if (file.size > 25 * 1024 * 1024) throw new Error(`${file.name} is larger than 25 MB.`);
-        $('spaceHint').textContent = `Adding ${file.name} to the Brain…`;
-        const data = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(',')[1]); r.onerror = reject; r.readAsDataURL(file); });
-        refs.push((await api('/knowledge/upload', 'POST', { folder: 'Projects', name: file.name, data })).id);
-      }
+      // Documents go with the task: it is created as an idea, the files land under its /work/inbox/ (and, for a project task, their text in the project's Brain folder), then it is queued.
+      const files = [...($('spaceFiles').files || [])], wantBacklog = !!event.submitter.dataset.backlog;
+      for (const file of files) if (file.size > 25 * 1024 * 1024) throw new Error(`${file.name} is larger than 25 MB.`);
       const assignee = $('spaceAssignee').value || undefined, forTeam = assignee ? Object.values(R).find(r => r.a.id === assignee)?.a.dept : null;
       const auto = selectedTeam === 'auto' && !forTeam, team = forTeam || selectedTeam, involve = [...$('spaceInvolve').querySelectorAll('input:checked')].map(el => el.value), due = $('spaceDue').value;
-      const job = await api('/tasks', 'POST', { dept: auto ? 'auto' : team, ...(auto ? { depts: 'auto' } : involve.length ? { depts: [team, ...involve] } : {}), text: $('spaceBrief').value + (refs.length ? `\n\nReference documents in the Brain: ${refs.join(', ')}` : ''), assignee, dueAt: due ? new Date(due).getTime() : undefined, priority: Number($('spacePriority').value), backlog: !!event.submitter.dataset.backlog, projectId: $('spaceProject').value || undefined, ...audienceInput() });
+      let job = await api('/tasks', 'POST', { dept: auto ? 'auto' : team, ...(auto ? { depts: 'auto' } : involve.length ? { depts: [team, ...involve] } : {}), text: $('spaceBrief').value, assignee, dueAt: due ? new Date(due).getTime() : undefined, priority: Number($('spacePriority').value), backlog: wantBacklog || files.length > 0, projectId: $('spaceProject').value || undefined, ...audienceInput() });
+      for (const file of files) {
+        $('spaceHint').textContent = `Adding ${file.name} to the task…`;
+        const data = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(',')[1]); r.onerror = reject; r.readAsDataURL(file); });
+        await api(`/tasks/${job.id}/attach`, 'POST', { name: file.name, data, type: file.type });
+      }
+      if (files.length && !wantBacklog) job = await api(`/tasks/${job.id}/queue`, 'POST', { state: 'queued' });
       $('spaceDue').value = ''; $('spaceFiles').value = ''; $('spacePriority').value = '1'; $('spaceOptions').open = false; if (HOSTED) { $('spaceVisibility').value = 'private'; $('spaceShareWrap').hidden = false; for (const o of $('spaceShare').options) o.selected = false; } selectedTeam = 'auto'; $('spaceDept').innerHTML = `<i style="background:${teamChip('auto').chip}"></i><span>${esc(teamChip('auto').name)}</span><span class="space-chevron">⌄</span>`; fillOptions();
       $('spaceBrief').value = ''; $('spaceHint').textContent = job.state === 'backlog' ? 'Idea saved. Start it when you are ready.' : 'Task received. The lead will create the plan; open the task from the list on the right to follow it.';
       await refresh();
