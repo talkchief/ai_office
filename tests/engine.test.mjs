@@ -891,3 +891,14 @@ test('the Program Manager can assemble approved files into one document itself, 
     assert.equal(done.state, 'done');
   } finally { await f.close(); }
 });
+
+test('a binary export is never read back into the conversation: read_file on the PDF is refused with the Markdown named, and the work goes on', async () => {
+  let n = 0;
+  const specialist = ({ last }) => { n++; if (n === 1) return { calls: [call('write_file', { file_path: '/work/brief.md', content: 'Verified result and evidence.' })] }; if (n === 2) return { calls: [call('read_file', { file_path: '/work/brief.pdf' })] }; return { text: last.type === 'tool' && /Refused: \/work\/brief\.pdf is a binary file/.test(last.text) ? 'Handed over /work/brief.md with the verified result.' : 'Unexpected: ' + last.text }; };
+  const f = fixture({ specialist });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done']);
+    assert.equal(done.events.filter(e => e.type === 'binary_read_refused' && e.agent === f.worker).length, 1);
+    assert.match(done.runs.find(r => r.role === 'specialist').output, /Handed over \/work\/brief\.md/); assert.equal(done.review.approved, true);
+  } finally { await f.close(); }
+});

@@ -86,10 +86,11 @@ class PromoteError extends Error {}
 const TRIAGE_MS = 6000, QUICK_SILENCE_MS = 45000, QUICK_READS = 8, QUICK_CALLS = 14;
 const QUICK_FINISH = new Set(['write_file', 'edit_file', 'export_pdf', 'export_pptx', 'assemble_files', 'record_review', 'needs_the_team', 'report_progress']);
 const QUICK_READ_TOOLS = new Set(['vault_list', 'api_get', 'db_list', 'db_schema', 'db_query', 'ssh_list']);
+const BINARY_FILE = /\.(pdf|pptx|docx|xlsx|png|jpe?g|gif|webp|bmp|zip)$/i;
 const TRIAGE_PROMPT = `You size a task for a company office. Answer with one JSON object and nothing else: {"lane":"quick"|"standard","team":"<team id>","effort":"low"|"medium"|"high","why":"<one short sentence>"}.
 quick: one person can finish it in minutes with what the company Brain already holds or what the brief itself says: a lookup, a short answer, a summary, a format conversion (a PDF or a deck from an existing note), a short draft (an email, a note, a checklist) from existing material.
 standard: research with no source at hand, work for several people or teams, numbers that must be computed or verified, anything that needs a specialist's skill, anything the CEO will send out that needs a second pair of eyes, anything you are unsure about.
-team: the team whose purpose fits best, one of the ids given. effort: low for lookups, formatting and drafts from existing material; medium for standard deliverables; high for numbers, analysis and decisions.`;
+team: the team whose purpose fits best, one of the ids given. effort: low for lookups, formatting, summaries and drafts from existing material (copying existing figures exactly is low); medium for standard deliverables; high when numbers must be computed or verified, for analysis and decisions.`;
 const oneLine = (value, max) => clean(value).replace(/\s+/g, ' ').slice(0, max);
 const textOf = content => typeof content === 'string' ? content : Array.isArray(content) ? content.map(p => typeof p === 'string' ? p : p?.text || '').join('') : '';
 const parseJsonReply = text => { const m = /\{[\s\S]*\}/.exec(String(text || '')); if (!m) return null; try { return JSON.parse(m[0]); } catch { return null; } };
@@ -480,17 +481,17 @@ export class OfficeEngine {
         const { model, provider, spec } = await make('specialist', agent, team);
         const set = this.toolHub ? this.toolHub.toolsFor({ agent, team, provider, evaluation }) : { tools: [], interruptOn: {} };
         subagents.push({ name: agent.id, description: `${agent.name}, ${agent.role}. ${agent.does || ''}`.slice(0, 600), systemPrompt: specialistPrompt({ office, team, agent, leadAgent: lead, toolLabels }),
-          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id), ...this.vaultTools(job.id, team, agent.id), ...this.connectorTools(job.id, team, agent.id)], interruptOn: { ...set.interruptOn, ...VAULT_APPROVALS }, middleware: [this.stepGuard(job.id, agent.id, 'specialist'), this.effortSwitch(job.id, agent.id, spec), this.pace(job.id, team, agent.id, signal), this.loopGuard(job.id, agent.id), this.specialistReadGuard(job.id, agent.id)] });
+          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id), ...this.vaultTools(job.id, team, agent.id), ...this.connectorTools(job.id, team, agent.id)], interruptOn: { ...set.interruptOn, ...VAULT_APPROVALS }, middleware: [this.stepGuard(job.id, agent.id, 'specialist'), this.binaryReadGuard(job.id, agent.id), this.effortSwitch(job.id, agent.id, spec), this.pace(job.id, team, agent.id, signal), this.loopGuard(job.id, agent.id), this.specialistReadGuard(job.id, agent.id)] });
       }
       const { model, provider, spec } = await make('lead', lead, team);
       const spotChecks = this.toolHub ? this.toolHub.toolsFor({ agent: lead, team, provider, evaluation, readOnly: true }).tools : [];
       const graph = this.agentFactory({ name: leadName(team.id), model, systemPrompt: leadPrompt({ office, team, lead, specialists, reworkRounds: reworkRounds(team), toolLabels }),
-        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), this.brainTool(job.id, lead.id), ...this.vaultTools(job.id, team, lead.id), ...this.connectorTools(job.id, team, lead.id), ...spotChecks], interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...VAULT_APPROVALS }, subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [this.stepGuard(job.id, lead.id, 'lead'), this.effortSwitch(job.id, lead.id, spec), this.effortTag(job.id, lead.id), todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
+        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), this.brainTool(job.id, lead.id), ...this.vaultTools(job.id, team, lead.id), ...this.connectorTools(job.id, team, lead.id), ...spotChecks], interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...VAULT_APPROVALS }, subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [this.stepGuard(job.id, lead.id, 'lead'), this.binaryReadGuard(job.id, lead.id), this.effortSwitch(job.id, lead.id, spec), this.effortTag(job.id, lead.id), todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
       leads.push({ name: leadName(team.id), description: `${team.name} team, led by ${lead.name}.${team.purpose ? ' ' + team.purpose : ''}`.slice(0, 600), runnable: graph });
     }
     const { model } = await make('pm', null, null);
     const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams, toolLabels }),
-      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm'), this.brainTool(job.id, 'pm'), ...this.exportTools(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.effortTag(job.id, 'pm'), this.subagentGuard(job.id, 'pm', leads.map(l => l.name), 'lead'), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm'), this.pmReadGuard(job.id)],
+      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm'), this.brainTool(job.id, 'pm'), ...this.exportTools(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.binaryReadGuard(job.id, 'pm'), this.effortTag(job.id, 'pm'), this.subagentGuard(job.id, 'pm', leads.map(l => l.name), 'lead'), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm'), this.pmReadGuard(job.id)],
       checkpointer: this.saver, interruptOn: { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...(job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {}) } });
     return { pm, models };
   }
@@ -768,6 +769,18 @@ export class OfficeEngine {
       return new ToolMessage({ tool_call_id: call.id, name: 'task', content: 'Refused: plan first. Call write_todos with one item per work package (team, deliverable, what you need back), then delegate with task.' });
     } });
   }
+  // A binary file (a PDF or a deck the office exported, an image) is never read back into a conversation: the Deep Agents
+  // file system would hand it to the model as a file part, which some endpoints reject outright (Google: 400) and none needs.
+  // The agent is pointed at the Markdown source instead; the CEO downloads the export from the task page.
+  binaryReadGuard(jobId, agentId) {
+    return createMiddleware({ name: `binary_read_guard_${agentId.replace(/[^a-zA-Z0-9_]/g, '_')}`, wrapToolCall: async (request, handler) => {
+      const call = request.toolCall, target = String(call?.args?.file_path || call?.args?.path || '');
+      if (!['read_file', 'edit_file'].includes(call?.name) || !BINARY_FILE.test(target)) return handler(request);
+      this.event(jobId, 'binary_read_refused', agentId, `${call.name} refused on ${target}: exports are not read back.`);
+      const source = target.replace(BINARY_FILE, '.md');
+      return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `Refused: ${target} is a binary file and is not read into the conversation. It was made from ${source}: read or edit that Markdown instead, export again if it changed, and name the Markdown in your hand-over; the CEO downloads the export from the task page.` });
+    } });
+  }
   /* ---------- the thinking level per assignment ---------- */
   // A delegator writes "Effort: low" (or medium, high) as the first line of a task description. The office takes it off the
   // brief, keeps it for the run record (the tracker asks with takeEffort), and the delegate runs at that effort.
@@ -841,7 +854,7 @@ export class OfficeEngine {
       ...this.vaultTools(job.id, team, lead.id).filter(t => QUICK_READ_TOOLS.has(t.name)), ...this.connectorTools(job.id, team, lead.id).filter(t => QUICK_READ_TOOLS.has(t.name)), ...spotChecks];
     const backend = officeBackend({ workspaceDir: path.join(this.workspaces, job.id), knowledgeDir: this.knowledgeDir, memoryRoutes: this.memory?.routesFor({ role: 'lead', teamId: team.id }) || {} });
     const graph = createAgent({ name: leadName(team.id), model, systemPrompt: quickLeadPrompt({ office, team, lead, toolLabels }), tools, checkpointer: this.saver,
-      middleware: [createFilesystemMiddleware({ backend, permissions: FILE_PERMISSIONS, tools: ['ls', 'read_file', 'write_file', 'edit_file', 'glob', 'grep'] }), this.quickBudget(job.id, lead.id, onPromote), this.loopGuard(job.id, lead.id), this.pace(job.id, team, lead.id, signal)] });
+      middleware: [createFilesystemMiddleware({ backend, permissions: FILE_PERMISSIONS, tools: ['ls', 'read_file', 'write_file', 'edit_file', 'glob', 'grep'] }), this.binaryReadGuard(job.id, lead.id), this.quickBudget(job.id, lead.id, onPromote), this.loopGuard(job.id, lead.id), this.pace(job.id, team, lead.id, signal)] });
     return { graph, models: { [lead.id]: spec.model }, effort };
   }
   // The quick lane: the lead alone, its own review, the office files the result. Past the budget, or when the lead asks for the
