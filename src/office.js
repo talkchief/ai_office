@@ -1,6 +1,6 @@
 import { DEPTS, DEPT_KEYS } from './data.js';
 import { officeReady } from './auth.js';
-import { HOSTED, USER, isOfficeAdmin, isPlatformAdmin, MANAGED_MODELS, canOpenArea } from './session.js';
+import { HOSTED, USER, PLATFORM_ONLY, isOfficeAdmin, isPlatformAdmin, MANAGED_MODELS, canOpenArea } from './session.js';
 import { initSettings } from './settings.js';
 import { unseenResult } from './activity.js';
 import { initInbox } from './inbox.js';
@@ -621,7 +621,8 @@ export function initOfficeWork(ctx) {
     else if (type === 'resync' || type === 'office.updated') { if (type === 'office.updated' && data?.area === 'office') { rosterChanged = true; reloadForRoster(); } refresh(); }
   };
   const poll = () => setTimeout(async () => { await refresh(); poll(); }, liveStatus === 'live' ? 15000 : 2000);
-  officeReady.then(async()=>{connectLive({ onEvent, onStatus: status => { const was = liveStatus; liveStatus = status; if (status === 'live' && was !== 'live') refresh(); } });poll();try{const health=await api('/health');onLive?.(health);await syncBrain();await refresh();const wanted=new URLSearchParams(location.hash.slice(1)).get('task');if(wanted)showTask(wanted).catch(()=>{});const usage=await api('/usage');onUsage?.(usage);}catch(error){$('spaceHint').textContent=error.message;}});
+  // A platform session has no office: straight to the Platform page, nothing else is asked of the server.
+  officeReady.then(async()=>{if(PLATFORM_ONLY){settings.open('admin');return;}connectLive({ onEvent, onStatus: status => { const was = liveStatus; liveStatus = status; if (status === 'live' && was !== 'live') refresh(); } });poll();try{const health=await api('/health');onLive?.(health);await syncBrain();await refresh();const wanted=new URLSearchParams(location.hash.slice(1)).get('task');if(wanted)showTask(wanted).catch(()=>{});const usage=await api('/usage');onUsage?.(usage);}catch(error){$('spaceHint').textContent=error.message;}});
   const noop=()=>{};
   return { chatContext, chatInput, chatPickerKey, chatSent, loadHistory, openInbox: () => inbox.open(), needsYouCount: () => inbox.counts.needsYou, settings, get tasks(){return jobs.flatMap(j=>[...j.subtasks.filter(s=>s.agent).map(s=>({...s,agent:s.agent,state:s.state==='working'?'doing':s.state})),...(['planning','reviewing'].includes(j.state)?[{agent:j.agent,state:'doing'}]:[]),...(j.state==='working'?(j.runs||[]).filter(r=>r.role==='lead'&&r.state==='working'&&r.agent&&!(j.runs||[]).some(x=>x.role==='specialist'&&x.state==='working'&&x.dept===r.dept)).map(r=>({agent:r.agent,state:'doing'})):[])]);},
     projectActivity:()=>projectUI.activity(),openProjects:()=>projectUI.open(),agentActivity:id=>activityByAgent.get(id),job:id=>jobs.find(j=>j.id===id),jobs:()=>jobs,tick:noop,panelWidth:()=>panel.offsetWidth,onFocusChange:key=>{ /* the composer keeps the Program Manager until the owner picks a team */ },rowHTML,

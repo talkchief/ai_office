@@ -87,7 +87,7 @@ A server-sent event stream. Reconnect with `?lastEventId=` (or the browser's own
 |---|---|
 | `GET /auth/status` | `{ mode, locked, user, secure, registrationOpen, providersReady }` (single mode: `{ mode: "single", locked, secure, accessRequired, providersReady }`). |
 | `POST /auth/register` | `{ email, password (≥ 8), name, officeName }` → `201 { user, tenant }` and the cookie; 409 taken; 403 invitation-only. Over HTTPS or locally; rate-limited per address. |
-| `POST /auth/login`, `POST /auth/logout` | `{ email, password, tenantId? }` → `{ user, tenant }` and the cookie (401 for a wrong pair, 403 when not a member of any office) / clears the cookie. |
+| `POST /auth/login`, `POST /auth/logout` | `{ email, password, tenantId? }` → `{ user, tenant }` and the cookie (401 for a wrong pair, 403 when not a member of any office) / clears the cookie. The platform administrator (an account without an office) gets `{ user, platform: true }` and a platform session that reaches `/admin/*`, `/auth/me` and `/auth/logout` only. |
 | `GET /auth/invite/:token`, `POST /auth/accept` | What an invitation is for; `{ token, name?, password }` joins the office (an existing account signs in with its own password). 410 expired or used. |
 | `GET /auth/me` | `{ user { id, email, name, role, platformAdmin }, tenant, groups, mail { address }, prefs, tenants }`. |
 | `POST /auth/switch`, `POST /auth/password`, `PUT /auth/prefs` | `{ tenantId }`; `{ current, next }`; `{ name?, notifyByEmail?: none \| mine \| all }`. |

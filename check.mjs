@@ -111,7 +111,8 @@ await step('tests: the full suite passes', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ao-check-')), data = path.join(tmp, 'data'), brain = path.join(tmp, 'brain');
   fs.mkdirSync(data); fs.cpSync(path.join(ROOT, 'brain'), brain, { recursive: true });
   const port = 4600 + Math.floor(Math.random() * 300);
-  const env = { ...process.env, PORT: String(port), HOST: '127.0.0.1', AO_DATA: data, AO_BRAIN: brain };
+  // The smoke runs the single office whatever this machine's office.config.local.json says.
+  const env = { ...process.env, PORT: String(port), HOST: '127.0.0.1', AO_DATA: data, AO_BRAIN: brain, AO_MODE: 'single' };
   const srv = spawn(NODE, ['serve.mjs'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = ''; srv.stdout.on('data', d => { log += d; }); srv.stderr.on('data', d => { log += d; });
   const base = `http://127.0.0.1:${port}`;
@@ -192,7 +193,7 @@ await step('tests: the full suite passes', async () => {
 {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ao-hosted-'));
   const port = 4900 + Math.floor(Math.random() * 300), base = `http://127.0.0.1:${port}`;
-  const env = { ...process.env, PORT: String(port), HOST: '127.0.0.1', AO_MODE: 'hosted', AO_TENANTS_DIR: path.join(tmp, 'tenants'), AO_ACCOUNTS: path.join(tmp, 'accounts.sqlite'), AO_PLATFORM_DIR: path.join(tmp, 'platform'), AO_PLATFORM_ADMINS: 'admin@check.test', AO_PUBLIC_ORIGIN: base, AO_MAIL_OUTBOX: path.join(tmp, 'mail-outbox.json') };
+  const env = { ...process.env, PORT: String(port), HOST: '127.0.0.1', AO_MODE: 'hosted', AO_TENANTS_DIR: path.join(tmp, 'tenants'), AO_ACCOUNTS: path.join(tmp, 'accounts.sqlite'), AO_PLATFORM_DIR: path.join(tmp, 'platform'), AO_PLATFORM_ADMINS: 'admin@check.test', AO_PLATFORM_ADMIN_EMAIL: 'admin@check.test', AO_PLATFORM_ADMIN_PASSWORD: 'admin-password-1', AO_PUBLIC_ORIGIN: base, AO_MAIL_OUTBOX: path.join(tmp, 'mail-outbox.json') };
   delete env.AO_DATA; delete env.AO_BRAIN;
   const srv = spawn(NODE, ['serve.mjs'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = ''; srv.stdout.on('data', d => { log += d; }); srv.stderr.on('data', d => { log += d; });
@@ -258,12 +259,15 @@ await step('tests: the full suite passes', async () => {
       return 'settings 403 · providers 404 · tools 403 · admin panel 403';
     });
     await step('hosted: the platform admin lowers the team limit and the owner’s change is refused with that number', async () => {
-      const r = await call('/api/auth/register', 'POST', { email: 'admin@check.test', password: 'admin-password-1', name: 'Admin', officeName: 'Platform Co' }, 'admin'); if (r.status !== 201 || !r.json.user.platformAdmin) throw new Error('admin register: ' + JSON.stringify(r.json));
+      const r = await call('/api/auth/login', 'POST', { email: 'admin@check.test', password: 'admin-password-1' }, 'admin'); if (!r.ok || !r.json.platform || !r.json.user.platformAdmin) throw new Error('platform sign-in: ' + JSON.stringify(r.json));
+      const me = await call('/api/auth/me', 'GET', undefined, 'admin'); if (!me.json.platform || me.json.tenant !== null) throw new Error('platform me: ' + JSON.stringify(me.json));
+      const noOffice = await call('/api/tasks', 'GET', undefined, 'admin'); if (noOffice.status !== 403) throw new Error('the platform account reached an office: ' + noOffice.status);
       const cfgNow = await call('/api/admin/config', 'PUT', { limits: { maxTeams: 2 } }, 'admin'); if (!cfgNow.ok || cfgNow.json.limits.maxTeams !== 2) throw new Error('config: ' + JSON.stringify(cfgNow.json));
       const bad = await call('/api/admin/config', 'PUT', { limits: { maxTeams: 99 } }, 'admin'); if (bad.status !== 400) throw new Error('an out-of-range limit was accepted');
       const office = await call('/api/office'); const saved = await call('/api/office', 'PUT', office.json); if (saved.status !== 400 || !/1–2 teams/.test(saved.json?.error || '')) throw new Error('team limit: ' + saved.status + ' ' + JSON.stringify(saved.json));
       const h = await call('/api/health'); if (h.json.limits.maxTeams !== 2) throw new Error('health limits: ' + JSON.stringify(h.json.limits));
       const tenants = await call('/api/admin/tenants', 'GET', undefined, 'admin'); if (!tenants.json.tenants.some(t => t.slug === 'check-co' && t.users === 2)) throw new Error('tenants: ' + JSON.stringify(tenants.json).slice(0, 200));
+      const ownerMe = await call('/api/auth/me'); if (ownerMe.json.user.platformAdmin) throw new Error('an office owner is shown as platform admin');
       const prov = await call('/api/admin/providers', 'GET', undefined, 'admin'); if (!prov.ok || !Array.isArray(prov.json.providers)) throw new Error('admin providers: ' + prov.status);
       // The mail set-up is platform configuration too: saved in the panel, never in the environment; secrets never come back.
       const mailCfg = await call('/api/admin/config', 'PUT', { mail: { provider: 'postmark', domain: 'check.test', webhookSecret: 'check-secret', apiKey: 'not-a-real-key', dryRun: true }, publicOrigin: base }, 'admin'); if (!mailCfg.ok) throw new Error('mail config: ' + JSON.stringify(mailCfg.json));

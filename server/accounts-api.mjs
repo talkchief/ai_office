@@ -3,10 +3,11 @@
 import { readJsonBody as body } from '../http-body.mjs';
 import { httpError } from './routes.mjs';
 import { sessionCookie, clearCookie } from '../auth.mjs';
+import { PLATFORM_SESSION } from '../accounts.mjs';
 import { requireRole } from './visibility.mjs';
 import { RateLimiter } from './ratelimit.mjs';
 
-const publicUser = (u, platform) => u && { id: u.id, email: u.email, name: u.name, role: u.role, platformAdmin: platform.isAdmin(u), tenantId: u.tenantId };
+const publicUser = (u, platform) => u && { id: u.id, email: u.email, name: u.name, role: u.role, platform: !!u.platform, platformAdmin: !!u.platform, tenantId: u.tenantId };
 const text = (value, max = 200) => String(value ?? '').trim().slice(0, max);
 
 /** The routes that run before the gate: register, login, accept an invitation, logout. serve.mjs guards them (HTTPS or local, rate limit). */
@@ -27,6 +28,8 @@ export function registerAuthRoutes(router, { accounts, platform, registry, log =
     const input = await body(req), user = accounts.verifyLogin(input.email, input.password);
     if (!user) throw httpError('That email and password do not match.', 401);
     const tenants = accounts.tenantsOf(user.id).filter(t => !t.suspendedAt);
+    // The platform administrator signs in to the platform itself, not to an office.
+    if (user.platformAdmin && !tenants.length) { const s = accounts.createSession(user.id, PLATFORM_SESSION, { ua }); res.setHeader('Set-Cookie', sessionCookie(s.id, { secure })); return { user: publicUser({ ...user, platform: true, role: 'platform', tenantId: null }, platform), platform: true }; }
     const wanted = input.tenantId ? tenants.find(t => t.id === input.tenantId) : tenants[0];
     if (!wanted) throw httpError(tenants.length ? 'You are not a member of that office.' : 'You are not a member of any office yet. Create one, or ask for an invitation.', 403);
     return signIn(res, user, wanted, { secure, ua });
@@ -50,6 +53,7 @@ export function registerAccountsApi(router, { accounts, platform, publicOrigin =
   const memberOut = m => ({ id: m.id, name: m.name, email: m.email, role: m.role, lastLoginAt: m.lastLoginAt, joinedAt: m.joinedAt });
   const mailAddress = user => { const h = accounts.mailHandleFor(user.id, user.tenantId), t = accounts.tenant(user.tenantId); return h && mailDomain() ? `${t.slug}.${h.handle}.${h.suffix}@${mailDomain()}` : null; };
   router.on('GET', '/api/auth/me', ({ user }) => {
+    if (user.platform) return { user: publicUser(user, platform), platform: true, tenant: null, groups: [], mail: { address: null }, prefs: user.prefs || {}, tenants: [] };
     const tenant = accounts.tenant(user.tenantId);
     return { user: publicUser(user, platform), tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name }, groups: accounts.groups(user.tenantId).filter(g => g.users.includes(user.id)).map(g => ({ id: g.id, name: g.name })), mail: { address: mailAddress(user) }, prefs: user.prefs || {}, tenants: accounts.tenantsOf(user.id).map(t => ({ id: t.id, slug: t.slug, name: t.name, role: t.role })) };
   });
