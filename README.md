@@ -4,7 +4,7 @@
 
 A 3D office run like a company, with you as the CEO. You give work to the **Program Manager**, who hands it to the right **department leads**; leads plan it, hand assignments to their **specialists**, review what comes back against the team's criteria, and only approved work is filed in the **Brain**, the company's shared knowledge. Anything that would send, post, pay or change something outside the office waits for your approval.
 
-Quick work (a lookup, a summary, a PDF from a note the Brain already holds) is done by the team's lead alone in seconds; everything else goes through the Program Manager and the team, at a thinking level the delegator chooses per assignment. It runs on API keys from any provider: Anthropic, OpenAI, Google Gemini, OpenRouter (GLM, Kimi and many others) or any OpenAI-compatible endpoint, with a model per role, per team and per person. The agents are built on LangChain Deep Agents.
+A project starts from a brief: say what to build or achieve, attach the documents, and the Program Manager names it, writes the charter, picks the teams, sets the milestones and starts the first tasks. Quick work (a lookup, a summary, a PDF from a note the Brain already holds) is done by the team's lead alone in seconds; everything else goes through the Program Manager and the team, at a thinking level the delegator chooses per assignment. It runs on API keys from any provider: Anthropic, OpenAI, Google Gemini, OpenRouter (GLM, Kimi and many others) or any OpenAI-compatible endpoint, with a model per role, per team and per person. The agents are built on LangChain Deep Agents.
 
 **Beta.** It works end to end. Expect rough edges.
 

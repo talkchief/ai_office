@@ -576,9 +576,36 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       content.innerHTML = `<div class="mg-toolbar"><span class="mg-count">${list.length} open · ${archived.length} archived</span><span class="mg-spacer"></span><button id="spaceNewProject" type="button" class="mg-btn mg-btn-primary">+ New project</button></div>
         ${list.length ? `<div class="mg-ledger-wrap"><table class="mg-ledger"><thead><tr><th>Project</th><th>State</th><th>Milestones</th><th>Next</th><th>Tasks</th><th>Teams</th><th>Target</th></tr></thead><tbody>${list.map(p => { const done = p.milestones.filter(m => m.done).length, total = p.milestones.length; return `<tr class="mg-row" data-project="${esc(p.id)}" tabindex="0"><td><span class="mg-name">${esc(p.name)}</span><span class="mg-sub" style="font-family:var(--ui);font-size:12px">${esc(p.description.slice(0, 140))}</span></td><td>${projectMark(p)}</td><td class="k">${total ? `${done} / ${total}` : '—'}</td><td>${p.next ? `${esc(p.next.title)}${p.next.dueAt ? `<span class="mg-sub">${esc(dateShort(p.next.dueAt))}</span>` : ''}` : '<span class="mg-muted">—</span>'}</td><td class="k">${p.done ? `${p.done} done${p.open ? ' · ' : ''}` : ''}${p.open || !p.done ? `${p.open} open` : ''}</td><td><div class="mg-chips">${p.teams.map(t => `<span class="mg-chip mg-chip-ink">${esc(data.teams.find(x => x.id === t)?.name || t)}</span>`).join('') || '<span class="mg-muted">—</span>'}</div></td><td class="k">${p.dueAt ? esc(dateShort(p.dueAt)) : '—'}</td></tr>`; }).join('')}</tbody></table></div>` : empty('No projects yet.', 'Define the first one: what it is for, who owns it, the milestones, and the files the teams should start from.')}
         ${archived.length ? `<details class="mg-fold"><summary>${archived.length} archived</summary><div class="mg-fold-body">${archived.map(p => `<button type="button" class="space-text-action" data-project="${esc(p.id)}">${esc(p.name)}</button>`).join(' ')}</div></details>` : ''}`;
-      $('spaceNewProject').onclick = () => editProject(null, data.teams);
+      $('spaceNewProject').onclick = () => briefProject(data.teams);
       content.querySelectorAll('[data-project]').forEach(b => { b.onclick = () => editProject(b.dataset.project, data.teams); b.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); b.click(); } }; });
     } catch (error) { feedback(error.message, true); }
+  }
+  // A project from a brief: the CEO says what to build or achieve and attaches documents; the Program Manager plans the rest.
+  function briefProject(teams) {
+    projectOpen = null; setMeta(mark('off', 'Not planned yet'));
+    content.innerHTML = `<div class="mg-toolbar"><button type="button" class="mg-btn mg-btn-sm" id="spaceBackProjects">← All projects</button></div>
+      <form id="spaceProjectBrief" data-dirty novalidate><div class="mg-card"><div class="mg-card-head"><h3>New project</h3><span class="mg-count">the Program Manager plans it</span></div>
+        <p>Say what you want to build or achieve, for whom, by when, and what must or must not happen. The Program Manager names the project, writes the charter, picks the teams, sets the milestones with dates and starts the first tasks. Change any of it afterwards.</p>
+        ${field('The brief', '<textarea name="text" rows="9" required placeholder="What we are building or achieving, for whom, by when; what done looks like; what must and must not happen; where the material is."></textarea>')}
+        ${field('Documents', '<input type="file" name="files" multiple accept=".pdf,.docx,.txt,.md,.csv">', 'Up to 10 files, 25 MB each. They are filed in the project’s Brain folder and given to every task.')}
+        <div class="mg-toolbar" style="margin-top:16px"><button type="submit" class="mg-btn mg-btn-primary" id="spacePlanProject">Let the Program Manager plan it</button><button type="button" class="mg-btn" id="spaceManualProject">Fill the form yourself</button><span class="mg-muted" id="spacePlanHint"></span></div></div></form>`;
+    $('spaceBackProjects').onclick = () => showProjects();
+    $('spaceManualProject').onclick = () => editProject(null, teams);
+    $('spaceProjectBrief').onsubmit = async event => {
+      event.preventDefault();
+      const form = event.target, text = form.elements.text.value.trim(), picked = [...(form.elements.files.files || [])];
+      if (text.length < 10) return feedback('Say what the project should build or achieve.', true);
+      if (picked.length > 10) return feedback('Attach up to 10 files.', true);
+      if (picked.some(f => f.size > 25 * 1024 * 1024)) return feedback('A file is larger than 25 MB.', true);
+      const button = $('spacePlanProject'); button.disabled = true; button.textContent = 'Planning…'; $('spacePlanHint').textContent = 'The Program Manager is reading the brief and the documents; this takes up to a minute.';
+      try {
+        const files = []; for (const file of picked) files.push({ name: file.name, data: await readFile(file) });
+        const out = await api('/projects/plan', 'POST', { text, files });
+        dirty = false; dropSummary();
+        toast(`Project planned: “${out.project.name}”`, { kind: 'ok', detail: `${out.milestones} milestone${out.milestones === 1 ? '' : 's'}, ${out.tasks.length} task${out.tasks.length === 1 ? '' : 's'}; the first milestone’s work has started.` });
+        await editProject(out.project.id, teams);
+      } catch (error) { button.disabled = false; button.textContent = 'Let the Program Manager plan it'; $('spacePlanHint').textContent = ''; feedback(error.message, true); }
+    };
   }
   async function editProject(id, teams) {
     try {

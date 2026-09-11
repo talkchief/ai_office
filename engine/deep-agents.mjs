@@ -170,7 +170,7 @@ export class OfficeEngine {
     return new Set(this.list().filter(j => !TERMINAL.has(j.state) && j.state !== 'backlog').flatMap(j => [...(j.runs || []).filter(r => ['working', 'paused'].includes(r.state)).map(r => r.agent), ...(j.autoRoute ? involved(j) : j.depts || [j.dept]).map(d => office.teams.find(t => t.id === d)?.lead)]).filter(Boolean));
   }
   /* ---------- creating and scheduling ---------- */
-  create({ dept, depts, text, title, model, effort, kind = 'task', testId, suiteId, routine = null, backlog = false, priority = 1, assignee = null, dueAt = null, autoStart = true, completionApproval, requireHumanApproval, projectId = null, ownerId = null, visibility = 'private', sharedWith = null, origin = null, lane = null }) {
+  create({ dept, depts, text, title, model, effort, kind = 'task', testId, suiteId, routine = null, backlog = false, priority = 1, assignee = null, dueAt = null, autoStart = true, completionApproval, requireHumanApproval, projectId = null, ownerId = null, visibility = 'private', sharedWith = null, origin = null, lane = null, milestoneId = null }) {
     const office = this.office.get();
     const audience = this.audience({ visibility, sharedWith });
     const autoRoute = depts === 'auto' || dept === 'auto';
@@ -186,7 +186,7 @@ export class OfficeEngine {
     if (kind === 'evaluation' && !testcase) throw httpError('Choose a saved team test.');
     const skillIds = new Set(teams.flatMap(t => [...(t.skills || []), ...office.agents.filter(a => a.department === t.id).flatMap(a => a.skills || [])]));
     const now = Date.now();
-    const job = { schemaVersion: 2, id: randomUUID(), kind, dept: team.id, depts: all, autoRoute, title: clean(title || text).slice(0, 100), text: clean(text), assignee: assignee || null, dueAt: due, projectId: project ? project.id : null, projectName: project ? project.name : null, milestoneId: project?.next?.id || null, milestoneTitle: project?.next?.title || null,
+    const job = { schemaVersion: 2, id: randomUUID(), kind, dept: team.id, depts: all, autoRoute, title: clean(title || text).slice(0, 100), text: clean(text), assignee: assignee || null, dueAt: due, projectId: project ? project.id : null, projectName: project ? project.name : null, milestoneId: (milestoneId && project?.milestones?.find(m => m.id === milestoneId)?.id) || project?.next?.id || null, milestoneTitle: (milestoneId && project?.milestones?.find(m => m.id === milestoneId)?.title) || project?.next?.title || null,
       priority: [0, 1, 2].includes(priority) ? priority : 1, routine, suiteId: suiteId || null, testId: testcase?.id || null, testName: testcase?.name || null, agent: autoRoute ? 'pm' : team.lead,
       model: clean(model) || null, effort: clean(effort) || null, lane: ['quick', 'standard'].includes(lane) ? lane : null, lanePinned: ['quick', 'standard'].includes(lane), state: backlog ? 'backlog' : 'queued', stateSince: now, createdAt: now, updatedAt: now,
       officeRevision: office.revision, skills: office.skills.filter(s => skillIds.has(s.id)),

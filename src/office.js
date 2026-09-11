@@ -18,7 +18,7 @@ const labels = { backlog: 'Backlog', queued: 'Queued', planning: 'Planning', wor
 const when = value => value ? new Date(value).toLocaleString() : '—';
 const lines = value => String(value || '').split('\n').map(s => s.trim()).filter(Boolean);
 async function api(path, method = 'GET', body) {
-  const response = await fetch('/api' + path, { method, signal: AbortSignal.timeout((path.startsWith('/tools')||path.startsWith('/projects/documents')) ? 45000 : 15000), ...(body !== undefined ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) });
+  const response = await fetch('/api' + path, { method, signal: AbortSignal.timeout(path.startsWith('/projects/plan') ? 180000 : (path.startsWith('/tools')||path.startsWith('/projects/documents')) ? 45000 : 15000), ...(body !== undefined ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) });
   const value = await response.json();
   if (!response.ok) throw new Error(value.error || 'Request failed.');
   return value;

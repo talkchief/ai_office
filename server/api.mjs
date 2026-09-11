@@ -10,6 +10,8 @@ import { httpError } from './routes.mjs';
 import { officeReport, kpis } from '../reporting.mjs';
 import { collectArtifacts, filterArtifacts, ARTIFACT_KINDS } from './artifacts.mjs';
 import { extractDocument } from '../documents.mjs';
+import { planProject, applyPlan, loadPlanningSkills, loadCatalogueMethods } from '../project-planner.mjs';
+import { ROOT } from '../config.mjs';
 import { registerProviderRoutes } from './providers-api.mjs';
 import { canSeeJob, canSeeProject, canShare, visibleJobs, requireRole, isAdmin, notificationVisible, sseFilter, INVISIBLE } from './visibility.mjs';
 
@@ -177,6 +179,22 @@ export function registerApi(router, ctx) {
   const projectOut = (p, user) => { const tasks = mine(user).filter(j => j.projectId === p.id); return { ...p, folder: projects.folder(p), page: projects.pageId(p), next: projects.nextMilestone(p), tasks: tasks.length, open: tasks.filter(j => !['done', 'cancelled'].includes(j.state)).length }; };
   router.on('GET', '/api/projects', ({ user }) => ({ projects: projects.list().filter(p => canSeeProject(user, p)).map(p => projectOut(p, user)), teams: office.get().teams.map(t => ({ id: t.id, name: t.name })) }));
   router.on('POST', '/api/projects', async ({ req, user }) => { const input = await body(req, 256 * 1024); const p = projects.create({ ...input, ...audience(user, input) }, { ownerId: user?.id || null }); record({ area: 'projects', summary: `Created project “${p.name}”` }); ctx.syncProject?.(p.id); bus.publish('office.updated', { area: 'projects' }); return projectOut(p, user); });
+  // A project from a brief: the Program Manager plans it (name, purpose, charter, teams, dates, milestones, the first tasks); the
+  // documents go to its Brain folder; the first milestone's tasks start now, later ones wait for their milestone.
+  router.on('POST', '/api/projects/plan', async ({ req, user }) => {
+    ready();
+    const input = await body(req, 36 * 1024 * 1024), brief = String(input.text || '').trim();
+    if (brief.length < 10) throw httpError('Say what the project should build or achieve, in a sentence or two at least.', 400);
+    const documents = []; for (const f of (Array.isArray(input.files) ? input.files : []).slice(0, 10)) documents.push(await extractDocument({ name: f.name, data: f.data }));
+    const skills = loadPlanningSkills({ dirs: [engine.pmSkillsDir || path.join(ROOT, 'agency', 'pm-skills'), path.join(engine.knowledgeDir, 'Agents Office', 'pm-skills')] });
+    const catalogue = loadCatalogueMethods({ agency: ctx.agency, brief });
+    const plan = await planProject({ brief, documents: documents.map(d => ({ name: d.name, content: d.content })), skills, catalogue, office: office.get(), models });
+    const { project: p, tasks } = applyPlan({ plan, projects, engine, ownerId: user?.id || null, audience: audience(user, input) });
+    for (const doc of documents) { try { await knowledge.upload({ folder: projects.folder(p), name: doc.name, content: doc.content }); } catch (error) { console.warn('project document:', error.message); } }
+    record({ area: 'projects', summary: `The Program Manager planned project “${p.name}”: ${p.milestones.length} milestone${p.milestones.length === 1 ? '' : 's'}, ${tasks.length} task${tasks.length === 1 ? '' : 's'}; methods read: ${[...skills.map(s => s.name), ...catalogue.map(s => s.name)].join(', ') || 'none'}` });
+    ctx.syncProject?.(p.id); bus.publish('office.updated', { area: 'projects' });
+    return { project: projectOut(p, user), tasks: tasks.map(t => ({ id: t.id, title: t.title, state: t.state, milestoneId: t.milestoneId })), milestones: p.milestones.length, methods: { builtIn: skills.map(s => s.name), catalogue: catalogue.map(s => s.name) } };
+  });
   router.on('GET', '/api/projects/:id', ({ params, user }) => { const p = project(params.id, user); const o = office.get(); return { project: projectOut(p, user), tasks: mine(user).filter(j => j.projectId === p.id).map(j => listShape(j, o)), files: knowledge.list().filter(n => n.id.startsWith(projects.folder(p) + '/') && n.id !== projects.pageId(p)) }; });
   router.on('PUT', '/api/projects/:id', async ({ req, params, user }) => {
     const before = project(params.id, user); projectEditor(before, user); const input = await body(req, 256 * 1024);

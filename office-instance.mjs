@@ -21,6 +21,7 @@ import { chatPrompt, pmChatPrompt } from './engine/prompts.mjs';
 import { runMigrations } from './migrations.mjs';
 import { OfficeMemory } from './office-memory.mjs';
 import { ProjectStore } from './projects.mjs';
+import { startNextMilestone } from './project-planner.mjs';
 import { KnowledgeIndex } from './knowledge-index.mjs';
 import { Agency } from './agency.mjs';
 import { AuditLog } from './audit.mjs';
@@ -69,7 +70,7 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
       // Filed through the store so the Brain graph and the search index both see the result.
       await knowledge.writeNote(`Agents Office/task-${job.id}.md`, `# ${job.title}\n\nTask: ${job.id} · Teams: ${job.depts.map(d => o.teams.find(t => t.id === d)?.name || d).join(', ')} · Version ${version?.n || 1} · Filed: ${new Date().toISOString()}\n\nCEO request: ${job.text}\n\n${job.result}\n\n---\nApproved by ${lead}. ${job.review?.summary || ''}\n`);
       // A project task marks its milestones achieved and the project page is rewritten.
-      if (job.projectId) { try { const marked = projects.recordCompletion({ ...job, state: 'done', doneAt: job.doneAt || Date.now() }); if (marked.length) { engine.event(job.id, 'milestones_achieved', null, `Milestone${marked.length === 1 ? '' : 's'} achieved: ${marked.map(m => m.title).join(', ')}.`); audit.record({ area: 'projects', summary: `${job.projectName || job.projectId}: milestone${marked.length === 1 ? '' : 's'} achieved by “${job.title}”: ${marked.map(m => m.title).join(', ')}` }); } syncProject(job.projectId); } catch (error) { console.warn('project milestones:', error.message); } }
+      if (job.projectId) { try { const marked = projects.recordCompletion({ ...job, state: 'done', doneAt: job.doneAt || Date.now() }); if (marked.length) { engine.event(job.id, 'milestones_achieved', null, `Milestone${marked.length === 1 ? '' : 's'} achieved: ${marked.map(m => m.title).join(', ')}.`); audit.record({ area: 'projects', summary: `${job.projectName || job.projectId}: milestone${marked.length === 1 ? '' : 's'} achieved by “${job.title}”: ${marked.map(m => m.title).join(', ')}` }); const started = startNextMilestone({ project: projects.get(job.projectId), projects, engine }); if (started.length) engine.event(job.id, 'milestone_started', null, `The next milestone's ${started.length} task${started.length === 1 ? '' : 's'} queued.`); } syncProject(job.projectId); } catch (error) { console.warn('project milestones:', error.message); } }
     } });
 
   const audit = new AuditLog({ db: engine.db, bus });
