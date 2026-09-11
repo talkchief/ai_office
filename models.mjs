@@ -6,7 +6,9 @@ import path from 'node:path';
 export const PROVIDER_TYPES = ['anthropic', 'openai', 'openai-compatible'];
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 export const ROLES = ['pm', 'lead', 'specialist', 'review', 'chat', 'office'];
-const ENV_KEYS = { anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY', openrouter: 'OPENROUTER_API_KEY' };
+const ENV_KEYS = { anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY', openrouter: 'OPENROUTER_API_KEY', google: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'] };
+// Google's OpenAI-compatible endpoint for Gemini: the office's OpenAI-style client speaks to it as it is.
+export const GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
 // Older office files name models by family.
 export const LEGACY_MODELS = { sonnet: 'claude-sonnet-5', opus: 'claude-opus-5', fable: 'claude-fable-5-1' };
 const REFUSAL_FALLBACK_MODELS = new Set(['claude-fable-5-1', 'claude-opus-5']);
@@ -16,6 +18,7 @@ export const DEFAULT_REGISTRY = {
   providers: [
     { id: 'anthropic', type: 'anthropic', label: 'Anthropic', enabled: true, refusalFallback: true },
     { id: 'openai', type: 'openai', label: 'OpenAI', enabled: true },
+    { id: 'google', type: 'openai-compatible', label: 'Google Gemini', baseURL: GOOGLE_BASE_URL, enabled: true },
     { id: 'openrouter', type: 'openai-compatible', label: 'OpenRouter', baseURL: 'https://openrouter.ai/api/v1', enabled: true, headers: { 'X-Title': 'Cloud AI Office' } },
   ],
   // No model is built in: the owner adds a key, then activates models from the provider's own list.
@@ -143,6 +146,9 @@ export class ModelRegistry {
     this.onWait = null;
     fs.mkdirSync(dataDir, { recursive: true });
     this.value = this.validate(fs.existsSync(this.file) ? JSON.parse(fs.readFileSync(this.file, 'utf8')) : structuredClone(DEFAULT_REGISTRY), null);
+    // A built-in provider added in a later version joins an office that already has a providers file (it can be disabled, it is never removed).
+    const missing = DEFAULT_REGISTRY.providers.filter(d => !this.value.providers.some(p => p.id === d.id));
+    if (missing.length) { this.value = this.validate({ ...this.value, providers: [...this.value.providers, ...missing.map(d => structuredClone(d))] }, this.value); if (fs.existsSync(this.file)) this.persist(); }
   }
   persist() { const tmp = this.file + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(this.value, null, 2), { mode: 0o600 }); fs.renameSync(tmp, this.file); }
   validate(input, previous) {
@@ -179,8 +185,8 @@ export class ModelRegistry {
   }
   keyFor(provider) {
     if (provider.apiKey) return { key: provider.apiKey, source: 'file' };
-    const envName = ENV_KEYS[provider.id] || ENV_KEYS[provider.type];
-    return this.env[envName] ? { key: this.env[envName], source: 'env' } : { key: '', source: '' };
+    const envName = [].concat(ENV_KEYS[provider.id] || ENV_KEYS[provider.type] || []).find(name => this.env[name]);
+    return envName ? { key: this.env[envName], source: 'env' } : { key: '', source: '' };
   }
   provider(id) { return this.value.providers.find(p => p.id === id); }
   model(id) { return this.value.models.find(m => m.id === normModel(id)); }
@@ -254,7 +260,9 @@ export class ModelRegistry {
     if (!res) fail(`Could not fetch ${provider.label}’s model list (${last?.cause?.message || last?.message || 'no answer'}). Type the model id instead; it is used as typed.`, 502);
     if (!res.ok) fail(`${provider.label} returned ${res.status} when listing models.`, 502);
     const body = await res.json();
-    const list = (body.data || []).map(m => ({ id: m.id, label: m.display_name || m.name || m.id, supports: { effort: provider.type === 'anthropic' && /claude-(opus|sonnet|fable)-(4\.[6-9]|[5-9])/.test(m.id), reasoning: provider.type !== 'anthropic' && (Array.isArray(m.supported_parameters) ? m.supported_parameters.includes('reasoning') : /o[1-9]|gpt-5|reasoning|thinking|glm-[5-9]|kimi-k[3-9]|deepseek-r/i.test(m.id)) } })).sort((a, b) => a.id.localeCompare(b.id)).slice(0, 2000);
+    const google = /generativelanguage\.googleapis\.com/.test(provider.baseURL || '');
+    // Google's endpoint lists every model as "models/<id>", chat and otherwise: the prefix goes and only the chat models stay.
+    const list = (body.data || []).map(m => { const id = google ? String(m.id || '').replace(/^models\//, '') : m.id; return { id, label: m.display_name || m.name || id, supports: { effort: provider.type === 'anthropic' && /claude-(opus|sonnet|fable)-(4\.[6-9]|[5-9])/.test(id), reasoning: provider.type !== 'anthropic' && (Array.isArray(m.supported_parameters) ? m.supported_parameters.includes('reasoning') : /o[1-9]|gpt-5|reasoning|thinking|glm-[5-9]|kimi-k[3-9]|deepseek-r|gemini-(2\.5|[3-9])/i.test(id)) } }; }).filter(m => m.id && (!google || (/^(gemini|gemma)/.test(m.id) && !/embedding|imagen|veo|tts|audio|image|live|robotics|aqa|learnlm|computer-use/i.test(m.id)))).sort((a, b) => a.id.localeCompare(b.id)).slice(0, 2000);
     this.modelCache.set(id, { at: Date.now(), list }); return list;
   }
 }

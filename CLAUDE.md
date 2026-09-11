@@ -1,6 +1,6 @@
 # Agents Office — for Claude Code
 
-You are in the Agents Office repo. The office is a company the owner runs as CEO. Every task goes to the **Program Manager**, who hands it to one or more **department leads**; leads hand assignments to their **specialists**, review the result against the team's criteria, and only approved work is filed in the Brain. It runs on API keys from any provider (Anthropic, OpenAI, OpenRouter, any OpenAI-compatible endpoint), with a model per role, team and person.
+You are in the Agents Office repo. The office is a company the owner runs as CEO. Every task goes to the **Program Manager**, who hands it to one or more **department leads**; leads hand assignments to their **specialists**, review the result against the team's criteria, and only approved work is filed in the Brain. It runs on API keys from any provider (Anthropic, OpenAI, Google Gemini, OpenRouter, any OpenAI-compatible endpoint), with a model per role, team and person.
 
 The owner most often asks you to change **who is on a team and what they do**, to teach **how a kind of work is done** (a skill), to put something **on the timetable** (a routine), or to change **which connectors a team may use**. Do those through the office's settings or its API, as described below. Do not change `src/`, `engine/`, `server/` or the build for those requests.
 
@@ -19,7 +19,7 @@ All in the data folder (`data/`, or `AO_DATA`). The server owns these files; do 
 
 No model is built in: the owner saves a provider key, the office fetches that provider's model list (`GET /api/providers/:id/models`), and the owner activates the models the office may use and picks the office default and any per-role models. A lead whose assignment needs another team's expertise calls `hand_to_program_manager`; the Program Manager must delegate that part to the other lead before the task can close, and the other lead's review is then required.
 
-Every change through the API is validated (a bad edit is refused with a sentence, nothing is applied) and recorded in the audit log. **Never print, copy or commit provider keys or connector tokens.** Keys can also come from the environment: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`.
+Every change through the API is validated (a bad edit is refused with a sentence, nothing is applied) and recorded in the audit log. **Never print, copy or commit provider keys or connector tokens.** Keys can also come from the environment: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` (or `GOOGLE_API_KEY`), `OPENROUTER_API_KEY`. Google Gemini is the built-in provider `google`: Google's OpenAI-compatible endpoint, model ids such as `gemini-2.5-flash` (the list drops the `models/` prefix and the non-chat models), its own rate budget rather than OpenRouter's shared one.
 
 ## Changing teams and people
 
