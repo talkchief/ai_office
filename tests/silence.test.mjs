@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { silenceGuard, fetchWithRetries, retryAfterMs, CALL_TIMEOUT_MS, RESEND_TOTAL_MS } from '../models.mjs';
+import { silenceGuard, fetchWithRetries, retryAfterMs, CALL_TIMEOUT_MS, RESEND_TOTAL_MS, PEEK_MS } from '../models.mjs';
 import { ChatOpenAI } from '@langchain/openai';
 import { isTransientProviderError } from '../engine/deep-agents.mjs';
 
@@ -100,4 +100,44 @@ test('through the real client a headerless 429 fails at once without the guard a
   const guarded = new ChatOpenAI({ model: 'x', apiKey: 'k', configuration: { baseURL: 'https://provider.example/v1', fetch: silenceGuard(provider(), 60000, { onWait: w => waits.push(w) }) } });
   const reply = await guarded.invoke('hi');
   assert.equal(reply.content, 'ok'); assert.equal(waits.length, 1); assert.equal(waits[0].status, 429);
+});
+
+const sse = (...events) => events.map(e => e.startsWith(':') ? e + '\n\n' : 'data: ' + e + '\n\n').join('');
+const streamResponse = (text, pieces = 1) => { const enc = new TextEncoder(), step = Math.ceil(text.length / pieces); let i = 0; return new Response(new ReadableStream({ pull(c) { if (i >= text.length) return c.close(); c.enqueue(enc.encode(text.slice(i, i + step))); i += step; } }), { status: 200, headers: { 'content-type': 'text/event-stream' } }); };
+const CHUNK = '{"id":"c1","object":"chat.completion.chunk","created":1,"model":"x","choices":[{"index":0,"delta":{"role":"assistant","content":"ok"},"finish_reason":null}]}';
+const LAST = '{"id":"c1","object":"chat.completion.chunk","created":1,"model":"x","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}';
+const UPSTREAM = '{"error":{"code":429,"message":"google/x is temporarily rate-limited upstream. Please retry shortly"}}';
+
+test('a stream whose first event is an upstream error is sent again; a healthy stream and a late error pass through untouched', async () => {
+  assert.equal(PEEK_MS, 30000);
+  let calls = 0; const waits = [];
+  const provider = async () => { calls++; return calls === 1 ? streamResponse(sse(': OPENROUTER PROCESSING', UPSTREAM, '[DONE]')) : streamResponse(sse(': OPENROUTER PROCESSING', CHUNK, LAST, '[DONE]'), 3); };
+  const res = await fetchWithRetries(provider, 'https://openrouter.ai/api/v1/chat/completions', { method: 'POST', body: '{"stream":true}' }, { pauses: [1], onWait: w => waits.push(w) });
+  assert.equal(calls, 2); assert.deepEqual(waits.map(w => [w.status, w.attempt]), [[429, 1]]);
+  assert.equal(await readAll(res), sse(': OPENROUTER PROCESSING', CHUNK, LAST, '[DONE]'), 'the healthy answer arrives whole, comment line included');
+  calls = 0;
+  const healthy = await fetchWithRetries(async () => { calls++; return streamResponse(sse(CHUNK, LAST, '[DONE]'), 5); }, 'https://provider.example/v1/x', { method: 'POST', body: '{}' }, { pauses: [1] });
+  assert.equal(await readAll(healthy), sse(CHUNK, LAST, '[DONE]')); assert.equal(calls, 1);
+  calls = 0;
+  const late = await fetchWithRetries(async () => { calls++; return streamResponse(sse(CHUNK, UPSTREAM, '[DONE]')); }, 'https://provider.example/v1/x', { method: 'POST', body: '{}' }, { pauses: [1] });
+  assert.equal(await readAll(late), sse(CHUNK, UPSTREAM, '[DONE]')); assert.equal(calls, 1, 'an error after real content is not retried here; the task-level retry handles it');
+  calls = 0;
+  const final = await fetchWithRetries(async () => { calls++; return streamResponse(sse('{"error":{"code":401,"message":"Invalid API key"}}')); }, 'https://provider.example/v1/x', { method: 'POST', body: '{}' }, { pauses: [1] });
+  assert.match(await readAll(final), /Invalid API key/); assert.equal(calls, 1, 'an error that will not go away is handed on');
+  calls = 0;
+  const json = await fetchWithRetries(async () => { calls++; return new Response(calls === 1 ? UPSTREAM : '{"ok":true}', { status: 200, headers: { 'content-type': 'application/json' } }); }, 'https://provider.example/v1/x', { method: 'POST', body: '{}' }, { pauses: [1] });
+  assert.equal(await json.text(), '{"ok":true}'); assert.equal(calls, 2, 'a JSON answer that carries an upstream error is sent again too');
+  calls = 0;
+  const slow = await fetchWithRetries(async () => { calls++; return new Response(new ReadableStream({ pull() { return new Promise(() => {}); } }), { status: 200, headers: { 'content-type': 'text/event-stream' } }); }, 'https://provider.example/v1/x', { method: 'POST', body: '{}' }, { peekMs: 30 });
+  assert.equal(slow.status, 200); assert.equal(calls, 1, 'a stream that has not started within the peek window is handed on as it is');
+});
+
+test('through the real streaming client an error-first stream fails without the guard and streams the answer with it', async () => {
+  const provider = () => { let calls = 0; return async () => { calls++; return calls === 1 ? streamResponse(sse(UPSTREAM, '[DONE]')) : streamResponse(sse(CHUNK, LAST, '[DONE]'), 2); }; };
+  const bare = new ChatOpenAI({ model: 'x', apiKey: 'k', streaming: true, configuration: { baseURL: 'https://provider.example/v1', fetch: provider() } });
+  await assert.rejects(async () => { for await (const _ of await bare.stream('hi')) {} }, /rate-limited/, 'the SDK raises the error from the stream, with no status to retry on');
+  const waits = [];
+  const guarded = new ChatOpenAI({ model: 'x', apiKey: 'k', streaming: true, configuration: { baseURL: 'https://provider.example/v1', fetch: silenceGuard(provider(), 60000, { onWait: w => waits.push(w) }) } });
+  let text = ''; for await (const chunk of await guarded.stream('hi')) text += chunk.content;
+  assert.equal(text, 'ok'); assert.deepEqual(waits.map(w => w.status), [429]);
 });

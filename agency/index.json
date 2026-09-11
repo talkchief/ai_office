@@ -1,7 +1,7 @@
 {
  "source": "https://github.com/msitarzewski/agency-agents",
  "license": "MIT",
- "syncedAt": "2026-09-10T23:42:59.737Z",
+ "syncedAt": "2026-09-11T09:57:19.392Z",
  "divisions": {
   "academic": "Academic",
   "design": "Design",
@@ -1215,6 +1215,26 @@
    "bytes": 4215
   },
   {
+   "id": "it-pro-accessibility-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Accessibility Expert",
+   "description": "Expert assistant for web accessibility (WCAG 2.1/2.2), inclusive UX, and a11y testing",
+   "emoji": "🛠️",
+   "role": "Accessibility Expert specialist",
+   "bytes": 8842
+  },
+  {
+   "id": "it-pro-accessibility-runtime-tester",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Accessibility Runtime Tester",
+   "description": "Runtime accessibility specialist for keyboard flows, focus management, dialog behavior, form errors, and evidence-backed WCAG validation in the browser.",
+   "emoji": "🛠️",
+   "role": "Accessibility Runtime Tester specialist",
+   "bytes": 6623
+  },
+  {
    "id": "it-pro-accesslint-audit",
    "division": "it-professional",
    "label": "IT Professional",
@@ -1335,6 +1355,16 @@
    "bytes": 5938
   },
   {
+   "id": "it-pro-adr-generator",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional ADR Generator",
+   "description": "Expert agent for creating comprehensive Architectural Decision Records (ADRs) with structured formatting optimized for AI consumption and human readability.",
+   "emoji": "🛠️",
+   "role": "ADR Generator specialist",
+   "bytes": 8337
+  },
+  {
    "id": "it-pro-advanced-evaluation",
    "division": "it-professional",
    "label": "IT Professional",
@@ -1375,6 +1405,16 @@
    "bytes": 7081
   },
   {
+   "id": "it-pro-aem-front-end-specialist",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional AEM Front End Specialist",
+   "description": "Expert assistant for developing AEM components using HTL, Tailwind CSS, and Figma-to-code workflows with design system integration",
+   "emoji": "🛠️",
+   "role": "AEM Front End Specialist specialist",
+   "bytes": 9022
+  },
+  {
    "id": "it-pro-agent-creator",
    "division": "it-professional",
    "label": "IT Professional",
@@ -1413,6 +1453,16 @@
    "emoji": "🛠️",
    "role": "Agent Framework Azure Ai Py specialist",
    "bytes": 8590
+  },
+  {
+   "id": "it-pro-agent-governance-reviewer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Agent Governance Reviewer",
+   "description": "AI agent governance expert that reviews code for safety issues, missing governance controls, and helps implement policy enforcement, trust scoring, and audit trails in agent systems.",
+   "emoji": "🛠️",
+   "role": "Agent Governance Reviewer specialist",
+   "bytes": 4134
   },
   {
    "id": "it-pro-agent-harness-fault-injection",
@@ -1755,6 +1805,16 @@
    "bytes": 2887
   },
   {
+   "id": "it-pro-ai-readiness-reporter",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional AI Readiness Reporter",
+   "description": "Runs the AgentRC readiness assessment on the current repository and produces a self-contained, static HTML dashboard at reports/index.html. Explains every readiness pillar, the maturity level, and an actionable remediation plan, framed by AgentRC measure → generate → maintain loop. Use when asked to assess, audit, score, report on, or visualise the AI readiness of a repo.",
+   "emoji": "🛠️",
+   "role": "AI Readiness Reporter specialist",
+   "bytes": 9258
+  },
+  {
    "id": "it-pro-ai-seo",
    "division": "it-professional",
    "label": "IT Professional",
@@ -1773,6 +1833,36 @@
    "emoji": "🛠️",
    "role": "Ai Studio Image specialist",
    "bytes": 8369
+  },
+  {
+   "id": "it-pro-ai-team-dev",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional AI Team Dev",
+   "description": "AI development team (Nova, Sage, Milo). Use when implementing features, fixing bugs, writing tests, improving user experience, or preparing a pull request across the project's actual stack.",
+   "emoji": "🛠️",
+   "role": "AI Team Dev specialist",
+   "bytes": 3865
+  },
+  {
+   "id": "it-pro-ai-team-producer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional AI Team Producer",
+   "description": "AI team producer (Remy). Use when planning work, clarifying scope, coordinating Dev and optional QA, triaging issues, maintaining project context, or preparing and merging pull requests. Never writes application code.",
+   "emoji": "🛠️",
+   "role": "AI Team Producer specialist",
+   "bytes": 3891
+  },
+  {
+   "id": "it-pro-ai-team-qa",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional AI Team QA",
+   "description": "Optional AI QA engineer (Ivy). Use when testing behavior, running automated or exploratory checks, filing reproducible bugs, verifying fixes, or providing release confidence for changes that warrant dedicated QA.",
+   "emoji": "🛠️",
+   "role": "AI Team QA specialist",
+   "bytes": 3484
   },
   {
    "id": "it-pro-ai-wrapper-product",
@@ -1883,6 +1973,16 @@
    "emoji": "🛠️",
    "role": "Amplitude Automation specialist",
    "bytes": 8413
+  },
+  {
+   "id": "it-pro-amplitude-experiment-implementation",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Amplitude Experiment Implementation",
+   "description": "This custom agent uses Amplitude's MCP tools to deploy new experiments inside of Amplitude, enabling seamless variant testing capabilities and rollout of product features.",
+   "emoji": "🛠️",
+   "role": "Amplitude Experiment Implementation specialist",
+   "bytes": 3736
   },
   {
    "id": "it-pro-analytics-product",
@@ -2175,6 +2275,16 @@
    "bytes": 9151
   },
   {
+   "id": "it-pro-api-architect",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional API Architect",
+   "description": "Your role is that of an API architect. Help mentor the engineer by providing guidance, support, and working code.",
+   "emoji": "🛠️",
+   "role": "API Architect specialist",
+   "bytes": 4207
+  },
+  {
    "id": "it-pro-api-design-principles",
    "division": "it-professional",
    "label": "IT Professional",
@@ -2395,6 +2505,16 @@
    "bytes": 6911
   },
   {
+   "id": "it-pro-apify-integration-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Apify Integration Expert",
+   "description": "Expert agent for integrating Apify Actors into codebases. Handles Actor selection, workflow design, implementation across JavaScript/TypeScript and Python, testing, and production-ready deployment.",
+   "emoji": "🛠️",
+   "role": "Apify Integration Expert specialist",
+   "bytes": 8816
+  },
+  {
    "id": "it-pro-apify-lead-generation",
    "division": "it-professional",
    "label": "IT Professional",
@@ -2525,6 +2645,16 @@
    "bytes": 8881
   },
   {
+   "id": "it-pro-arch-linux-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Arch Linux Expert",
+   "description": "Arch Linux specialist focused on pacman, rolling-release maintenance, and Arch-centric system administration workflows.",
+   "emoji": "🛠️",
+   "role": "Arch Linux Expert specialist",
+   "bytes": 3619
+  },
+  {
    "id": "it-pro-architect-review",
    "division": "it-professional",
    "label": "IT Professional",
@@ -2573,6 +2703,16 @@
    "emoji": "🛠️",
    "role": "Arm Cortex Expert specialist",
    "bytes": 9018
+  },
+  {
+   "id": "it-pro-arm-migration-agent",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Arm Migration Agent",
+   "description": "Arm Cloud Migration Assistant accelerates moving x86 workloads to Arm infrastructure. It scans the repository for architecture assumptions, portability issues, container base image and dependency incompatibilities, and recommends Arm-optimized changes. It can drive multi-arch container builds, validate performance, and guide optimization, enabling smooth cross-platform deployment directly inside GitHub.",
+   "emoji": "🛠️",
+   "role": "Arm Migration Agent specialist",
+   "bytes": 4799
   },
   {
    "id": "it-pro-arrowspace",
@@ -2695,6 +2835,16 @@
    "bytes": 8975
   },
   {
+   "id": "it-pro-atlassian-requirements-to-jira",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Atlassian Requirements TO Jira",
+   "description": "Transform requirements documents into structured Jira epics and user stories with intelligent duplicate detection, change management, and user-approved creation workflow.",
+   "emoji": "🛠️",
+   "role": "Atlassian Requirements TO Jira specialist",
+   "bytes": 8994
+  },
+  {
    "id": "it-pro-audio-transcriber",
    "division": "it-professional",
    "label": "IT Professional",
@@ -2753,6 +2903,16 @@
    "emoji": "🛠️",
    "role": "Auth Implementation Patterns specialist",
    "bytes": 4407
+  },
+  {
+   "id": "it-pro-authentication-engineer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Authentication Engineer",
+   "description": "Flow Nexus authentication and user management specialist. Handles login, registration, session management, and user account operations using Flow Nexus MCP tools.",
+   "emoji": "🛠️",
+   "role": "Authentication Engineer specialist",
+   "bytes": 3843
   },
   {
    "id": "it-pro-auto-research",
@@ -2825,6 +2985,16 @@
    "bytes": 4054
   },
   {
+   "id": "it-pro-avm-owner-triage",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional AVM Owner Triage",
+   "description": "Triage open GitHub issues across the Azure Verified Modules (AVM) repos an owner maintains. Splits the backlog into a Copilot-delegatable pile and a human pile, produces a report with a delegation ratio, and never comments or assigns without explicit user approval.",
+   "emoji": "🛠️",
+   "role": "AVM Owner Triage specialist",
+   "bytes": 8918
+  },
+  {
    "id": "it-pro-avoid-ai-writing",
    "division": "it-professional",
    "label": "IT Professional",
@@ -2865,6 +3035,16 @@
    "bytes": 7758
   },
   {
+   "id": "it-pro-aws-cloud-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Aws Cloud Expert",
+   "description": "AWS Cloud Expert provides deep, hands-on guidance for designing, building, and operating AWS workloads. Covers the full AWS ecosystem — serverless, containers, databases, networking, IaC, security, and cost optimization — grounded in the AWS Well-Architected Framework.",
+   "emoji": "🛠️",
+   "role": "Aws Cloud Expert specialist",
+   "bytes": 7679
+  },
+  {
    "id": "it-pro-aws-cost-cleanup",
    "division": "it-professional",
    "label": "IT Professional",
@@ -2895,6 +3075,16 @@
    "bytes": 8276
   },
   {
+   "id": "it-pro-aws-incident-triage",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional AWS Incident Triage",
+   "description": "On-call SRE agent that drives structured CloudWatch-based incident investigation from alarms through root-cause hypothesis.",
+   "emoji": "🛠️",
+   "role": "AWS Incident Triage specialist",
+   "bytes": 7433
+  },
+  {
    "id": "it-pro-aws-mcp-setup",
    "division": "it-professional",
    "label": "IT Professional",
@@ -2903,6 +3093,26 @@
    "emoji": "🛠️",
    "role": "Aws Mcp Setup specialist",
    "bytes": 7526
+  },
+  {
+   "id": "it-pro-aws-principal-architect",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Aws Principal Architect",
+   "description": "Provide expert AWS Principal Architect guidance using AWS Well-Architected Framework principles and AWS best practices.",
+   "emoji": "🛠️",
+   "role": "Aws Principal Architect specialist",
+   "bytes": 4433
+  },
+  {
+   "id": "it-pro-aws-serverless-architect",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Aws Serverless Architect",
+   "description": "Provide expert AWS Serverless Architect guidance focusing on event-driven architectures, Lambda, API Gateway, and serverless best practices.",
+   "emoji": "🛠️",
+   "role": "Aws Serverless Architect specialist",
+   "bytes": 5433
   },
   {
    "id": "it-pro-aws-serverless-eda",
@@ -3295,6 +3505,26 @@
    "bytes": 8585
   },
   {
+   "id": "it-pro-azure-avm-bicep-mode",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Azure AVM Bicep Mode",
+   "description": "Create, update, or review Azure IaC in Bicep using Azure Verified Modules (AVM).",
+   "emoji": "🛠️",
+   "role": "Azure AVM Bicep Mode specialist",
+   "bytes": 3186
+  },
+  {
+   "id": "it-pro-azure-avm-terraform-mode",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Azure AVM Terraform Mode",
+   "description": "Create, update, or review Azure IaC in Terraform using Azure Verified Modules (AVM).",
+   "emoji": "🛠️",
+   "role": "Azure AVM Terraform Mode specialist",
+   "bytes": 4028
+  },
+  {
    "id": "it-pro-azure-communication-callautomation-java",
    "division": "it-professional",
    "label": "IT Professional",
@@ -3525,6 +3755,26 @@
    "bytes": 2974
   },
   {
+   "id": "it-pro-azure-iac-exporter",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Azure Iac Exporter",
+   "description": "Export existing Azure resources to Infrastructure as Code templates via Azure Resource Graph analysis, Azure Resource Manager API calls, and azure-iac-generator integration. Use this skill when the user asks to export, convert, migrate, or extract existing Azure resources to IaC templates (Bicep, ARM Templates, Terraform, Pulumi).",
+   "emoji": "🛠️",
+   "role": "Azure Iac Exporter specialist",
+   "bytes": 9168
+  },
+  {
+   "id": "it-pro-azure-iac-generator",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Azure Iac Generator",
+   "description": "Central hub for generating Infrastructure as Code (Bicep, ARM, Terraform, Pulumi) with format-specific validation and best practices. Use this skill when the user asks to generate, create, write, or build infrastructure code, deployment code, or IaC templates in any format (Bicep, ARM Templates, Terraform, Pulumi).",
+   "emoji": "🛠️",
+   "role": "Azure Iac Generator specialist",
+   "bytes": 8824
+  },
+  {
    "id": "it-pro-azure-identity-dotnet",
    "division": "it-professional",
    "label": "IT Professional",
@@ -3633,6 +3883,16 @@
    "emoji": "🛠️",
    "role": "Azure Keyvault Secrets Ts specialist",
    "bytes": 8591
+  },
+  {
+   "id": "it-pro-azure-logic-apps-expert-mode",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Azure Logic Apps Expert Mode",
+   "description": "Expert guidance for Azure Logic Apps development focusing on workflow design, integration patterns, and JSON-based Workflow Definition Language.",
+   "emoji": "🛠️",
+   "role": "Azure Logic Apps Expert Mode specialist",
+   "bytes": 6773
   },
   {
    "id": "it-pro-azure-maps-search-dotnet",
@@ -3875,6 +4135,16 @@
    "bytes": 8231
   },
   {
+   "id": "it-pro-azure-policy-analyzer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Azure Policy Analyzer",
+   "description": "Analyze Azure Policy compliance posture (NIST SP 800-53, MCSB, CIS, ISO 27001, PCI DSS, SOC 2), auto-discover scope, and return a structured single-pass risk report with evidence and remediation commands.",
+   "emoji": "🛠️",
+   "role": "Azure Policy Analyzer specialist",
+   "bytes": 3145
+  },
+  {
    "id": "it-pro-azure-postgres-ts",
    "division": "it-professional",
    "label": "IT Professional",
@@ -3883,6 +4153,16 @@
    "emoji": "🛠️",
    "role": "Azure Postgres Ts specialist",
    "bytes": 8640
+  },
+  {
+   "id": "it-pro-azure-principal-architect-mode-instructio",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Azure Principal Architect Mode Instructions",
+   "description": "Provide expert Azure Principal Architect guidance using Azure Well-Architected Framework principles and Microsoft best practices.",
+   "emoji": "🛠️",
+   "role": "Azure Principal Architect Mode Instructions specialist",
+   "bytes": 5848
   },
   {
    "id": "it-pro-azure-resource-manager-cosmosdb-dotnet",
@@ -3953,6 +4233,16 @@
    "emoji": "🛠️",
    "role": "Azure Resource Manager Sql Dotnet specialist",
    "bytes": 8934
+  },
+  {
+   "id": "it-pro-azure-saas-architect-mode-instructions",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Azure SaaS Architect Mode Instructions",
+   "description": "Provide expert Azure SaaS Architect guidance focusing on multitenant applications using Azure Well-Architected SaaS principles and Microsoft best practices.",
+   "emoji": "🛠️",
+   "role": "Azure SaaS Architect Mode Instructions specialist",
+   "bytes": 8438
   },
   {
    "id": "it-pro-azure-search-documents-dotnet",
@@ -4053,6 +4343,16 @@
    "emoji": "🛠️",
    "role": "Azure Servicebus Ts specialist",
    "bytes": 8664
+  },
+  {
+   "id": "it-pro-azure-smart-city-iot-architect",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Azure Smart City IoT Architect",
+   "description": "Design Azure IoT and Smart City architectures with clear platform engineering reasoning, requiring mandatory review of Azure IoT Edge documentation before recommending edge solutions.",
+   "emoji": "🛠️",
+   "role": "Azure Smart City IoT Architect specialist",
+   "bytes": 3334
   },
   {
    "id": "it-pro-azure-speech-to-text-rest-py",
@@ -4165,6 +4465,26 @@
    "bytes": 2908
   },
   {
+   "id": "it-pro-azure-terraform-iac-implementation-specia",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Azure Terraform IaC Implementation Specialist",
+   "description": "Act as an Azure Terraform Infrastructure as Code coding specialist that creates and reviews Terraform for Azure resources.",
+   "emoji": "🛠️",
+   "role": "Azure Terraform IaC Implementation Specialist specialist",
+   "bytes": 8549
+  },
+  {
+   "id": "it-pro-azure-terraform-infrastructure-planning",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Azure Terraform Infrastructure Planning",
+   "description": "Act as implementation planner for your Azure Terraform Infrastructure as Code task.",
+   "emoji": "🛠️",
+   "role": "Azure Terraform Infrastructure Planning specialist",
+   "bytes": 8711
+  },
+  {
    "id": "it-pro-azure-web-pubsub-ts",
    "division": "it-professional",
    "label": "IT Professional",
@@ -4183,6 +4503,16 @@
    "emoji": "🛠️",
    "role": "Babysit Pr specialist (code-quality)",
    "bytes": 8656
+  },
+  {
+   "id": "it-pro-backend-api-developer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Backend API Developer",
+   "description": "Specialized agent for backend API development with self-learning and pattern recognition",
+   "emoji": "🛠️",
+   "role": "Backend API Developer specialist",
+   "bytes": 3859
   },
   {
    "id": "it-pro-backend-architect",
@@ -4385,6 +4715,16 @@
    "bytes": 7741
   },
   {
+   "id": "it-pro-benchmark-suite",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Benchmark Suite",
+   "description": "Comprehensive performance benchmarking, regression detection and performance validation",
+   "emoji": "🛠️",
+   "role": "Benchmark Suite specialist",
+   "bytes": 8869
+  },
+  {
    "id": "it-pro-bevy-ecs-expert",
    "division": "it-professional",
    "label": "IT Professional",
@@ -4393,6 +4733,26 @@
    "emoji": "🛠️",
    "role": "Bevy Ecs Expert specialist",
    "bytes": 5501
+  },
+  {
+   "id": "it-pro-bicep-planning",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Bicep Planning",
+   "description": "Act as implementation planner for your Azure Bicep Infrastructure as Code task.",
+   "emoji": "🛠️",
+   "role": "Bicep Planning specialist",
+   "bytes": 6008
+  },
+  {
+   "id": "it-pro-bicep-specialist",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Bicep Specialist",
+   "description": "Act as an Azure Bicep Infrastructure as Code coding specialist that creates Bicep templates.",
+   "emoji": "🛠️",
+   "role": "Bicep Specialist specialist",
+   "bytes": 3782
   },
   {
    "id": "it-pro-bilig-workpaper",
@@ -4493,6 +4853,16 @@
    "emoji": "🛠️",
    "role": "Blog Writing Guide specialist",
    "bytes": 8541
+  },
+  {
+   "id": "it-pro-blueprint-mode",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Blueprint Mode",
+   "description": "Executes structured workflows (Debug, Express, Main, Loop) with strict correctness and maintainability. Enforces an improved tool usage policy, never assumes facts, prioritizes reproducible solutions, self-correction, and edge-case handling.",
+   "emoji": "🛠️",
+   "role": "Blueprint Mode specialist",
+   "bytes": 7245
   },
   {
    "id": "it-pro-blueprint",
@@ -4865,6 +5235,36 @@
    "bytes": 4283
   },
   {
+   "id": "it-pro-c-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional C# Expert",
+   "description": "An agent designed to assist with software development tasks for .NET projects.",
+   "emoji": "🛠️",
+   "role": "C# Expert specialist",
+   "bytes": 8311
+  },
+  {
+   "id": "it-pro-c-mcp-server-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional C# MCP Server Expert",
+   "description": "Expert assistant for developing Model Context Protocol (MCP) servers in C#",
+   "emoji": "🛠️",
+   "role": "C# MCP Server Expert specialist",
+   "bytes": 8774
+  },
+  {
+   "id": "it-pro-c-net-janitor",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional C#/.NET Janitor",
+   "description": "Perform janitorial tasks on C#/.NET code including cleanup, modernization, and tech debt remediation.",
+   "emoji": "🛠️",
+   "role": "C#/.NET Janitor specialist",
+   "bytes": 4284
+  },
+  {
    "id": "it-pro-c-pro",
    "division": "it-professional",
    "label": "IT Professional",
@@ -4985,6 +5385,36 @@
    "bytes": 8666
   },
   {
+   "id": "it-pro-cast-imaging-impact-analysis-agent",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional CAST Imaging Impact Analysis Agent",
+   "description": "Specialized agent for comprehensive change impact assessment and risk analysis in software systems using CAST Imaging",
+   "emoji": "🛠️",
+   "role": "CAST Imaging Impact Analysis Agent specialist",
+   "bytes": 6432
+  },
+  {
+   "id": "it-pro-cast-imaging-software-discovery-agent",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional CAST Imaging Software Discovery Agent",
+   "description": "Specialized agent for comprehensive software application discovery and architectural mapping through static code analysis using CAST Imaging",
+   "emoji": "🛠️",
+   "role": "CAST Imaging Software Discovery Agent specialist",
+   "bytes": 5425
+  },
+  {
+   "id": "it-pro-cast-imaging-structural-quality-advisor-a",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional CAST Imaging Structural Quality Advisor Agent",
+   "description": "Specialized agent for identifying, analyzing, and providing remediation guidance for code quality issues using CAST Imaging",
+   "emoji": "🛠️",
+   "role": "CAST Imaging Structural Quality Advisor Agent specialist",
+   "bytes": 5567
+  },
+  {
    "id": "it-pro-cc-skill-backend-patterns",
    "division": "it-professional",
    "label": "IT Professional",
@@ -5075,6 +5505,16 @@
    "bytes": 4988
   },
   {
+   "id": "it-pro-centos-linux-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional CentOS Linux Expert",
+   "description": "CentOS (Stream/Legacy) Linux specialist focused on RHEL-compatible administration, yum/dnf workflows, and enterprise hardening.",
+   "emoji": "🛠️",
+   "role": "CentOS Linux Expert specialist",
+   "bytes": 3681
+  },
+  {
    "id": "it-pro-changelog-automation",
    "division": "it-professional",
    "label": "IT Professional",
@@ -5143,6 +5583,16 @@
    "emoji": "🛠️",
    "role": "Ci Cd And Automation specialist",
    "bytes": 7308
+  },
+  {
+   "id": "it-pro-ci-cd-engineer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional CI/CD Engineer",
+   "description": "Specialized agent for GitHub Actions CI/CD pipeline creation and optimization",
+   "emoji": "🛠️",
+   "role": "CI/CD Engineer specialist",
+   "bytes": 2977
   },
   {
    "id": "it-pro-cicd-automation-workflow-automate",
@@ -5395,6 +5845,16 @@
    "bytes": 8034
   },
   {
+   "id": "it-pro-clojure-interactive-programming",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Clojure Interactive Programming",
+   "description": "Expert Clojure pair programmer with REPL-first methodology, architectural oversight, and interactive problem-solving. Enforces quality standards, prevents workarounds, and develops solutions incrementally through live REPL evaluation before file modifications.",
+   "emoji": "🛠️",
+   "role": "Clojure Interactive Programming specialist",
+   "bytes": 8490
+  },
+  {
    "id": "it-pro-close-automation",
    "division": "it-professional",
    "label": "IT Professional",
@@ -5413,6 +5873,16 @@
    "emoji": "🛠️",
    "role": "Closed Loop Delivery specialist",
    "bytes": 6249
+  },
+  {
+   "id": "it-pro-cloud-and-saas-outage-triage",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Cloud And SaaS Outage Triage",
+   "description": "Distinguish upstream cloud or SaaS incidents from application failures before changing code, using live official-feed status and incident timelines.",
+   "emoji": "🛠️",
+   "role": "Cloud And SaaS Outage Triage specialist",
+   "bytes": 7734
   },
   {
    "id": "it-pro-cloud-architect",
@@ -5515,6 +5985,16 @@
    "bytes": 5075
   },
   {
+   "id": "it-pro-code-goal-planner",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Code Goal Planner",
+   "description": "Code-centric Goal-Oriented Action Planning specialist that creates intelligent plans for software development objectives. Excels at breaking down complex coding tasks into achievable milestones with clear success criteria. Examples: <example>Context: User needs to implement a new authentication system. user: 'I need to add OAuth2 authentication to our API' assistant: 'I'll use the code-goal-planner agent to create a comprehensive implementation plan with milestones for OAuth2",
+   "emoji": "🛠️",
+   "role": "Code Goal Planner specialist",
+   "bytes": 9074
+  },
+  {
    "id": "it-pro-code-polish",
    "division": "it-professional",
    "label": "IT Professional",
@@ -5523,6 +6003,16 @@
    "emoji": "🛠️",
    "role": "Code Polish specialist",
    "bytes": 8251
+  },
+  {
+   "id": "it-pro-code-quality-analyst",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Code Quality Analyst",
+   "description": "Advanced code quality analysis agent for comprehensive code reviews and improvements",
+   "emoji": "🛠️",
+   "role": "Code Quality Analyst specialist",
+   "bytes": 3207
   },
   {
    "id": "it-pro-code-refactoring-context-restore",
@@ -5725,6 +6215,16 @@
    "bytes": 6444
   },
   {
+   "id": "it-pro-coder",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Coder",
+   "description": "Implementation specialist for writing clean, efficient code",
+   "emoji": "🛠️",
+   "role": "Coder specialist",
+   "bytes": 6447
+  },
+  {
    "id": "it-pro-codex-delegate",
    "division": "it-professional",
    "label": "IT Professional",
@@ -5793,6 +6293,16 @@
    "emoji": "🛠️",
    "role": "Cold Email specialist",
    "bytes": 8954
+  },
+  {
+   "id": "it-pro-comet-opik",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Comet Opik",
+   "description": "Unified Comet Opik agent for instrumenting LLM apps, managing prompts/projects, auditing prompts, and investigating traces/metrics via the latest Opik MCP server.",
+   "emoji": "🛠️",
+   "role": "Comet Opik specialist",
+   "bytes": 8296
   },
   {
    "id": "it-pro-comfyui-gateway",
@@ -6115,6 +6625,16 @@
    "bytes": 8873
   },
   {
+   "id": "it-pro-context-architect",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Context Architect",
+   "description": "An agent that helps plan and execute multi-file changes by identifying relevant context and dependencies",
+   "emoji": "🛠️",
+   "role": "Context Architect specialist",
+   "bytes": 3516
+  },
+  {
    "id": "it-pro-context-compression",
    "division": "it-professional",
    "label": "IT Professional",
@@ -6245,6 +6765,16 @@
    "bytes": 3375
   },
   {
+   "id": "it-pro-context7-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Context7 Expert",
+   "description": "Expert in latest library versions, best practices, and correct syntax using up-to-date documentation",
+   "emoji": "🛠️",
+   "role": "Context7 Expert specialist",
+   "bytes": 7342
+  },
+  {
    "id": "it-pro-conversation-memory",
    "division": "it-professional",
    "label": "IT Professional",
@@ -6275,6 +6805,16 @@
    "bytes": 3692
   },
   {
+   "id": "it-pro-copilot-c-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Copilot C++ Expert",
+   "description": "Provide expert C++ software engineering guidance using modern C++ and industry best practices.",
+   "emoji": "🛠️",
+   "role": "Copilot C++ Expert specialist",
+   "bytes": 4481
+  },
+  {
    "id": "it-pro-copilot-delegate",
    "division": "it-professional",
    "label": "IT Professional",
@@ -6283,6 +6823,36 @@
    "emoji": "🛠️",
    "role": "Copilot Delegate specialist (agent-orchestration)",
    "bytes": 8717
+  },
+  {
+   "id": "it-pro-copilot-kubestellar-console",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Copilot KubeStellar Console",
+   "description": "Kubernetes operations expert for KubeStellar Console — helps you set up the console, configure kc-agent (MCP server), connect clusters, deploy workloads, and query live Kubernetes data via AI chat.",
+   "emoji": "🛠️",
+   "role": "Copilot KubeStellar Console specialist",
+   "bytes": 4555
+  },
+  {
+   "id": "it-pro-copilot-linkedin-post-writer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Copilot LinkedIn Post Writer",
+   "description": "Draft and format compelling LinkedIn posts with Unicode bold/italic styling, visual separators, and engagement-optimized structure. Transforms raw content, technical material, images, or ideas into copy-paste-ready LinkedIn posts.",
+   "emoji": "🛠️",
+   "role": "Copilot LinkedIn Post Writer specialist",
+   "bytes": 4656
+  },
+  {
+   "id": "it-pro-copilot-prompt-engineer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Copilot Prompt Engineer",
+   "description": "A specialized chat mode for analyzing and improving prompts. Every user input is treated as a prompt to be improved. It first provides a detailed analysis of the original prompt within a <reasoning> tag, evaluating it against a systematic framework based on OpenAI's prompt engineering best practices. Following the analysis, it generates a new, improved prompt.",
+   "emoji": "🛠️",
+   "role": "Copilot Prompt Engineer specialist",
+   "bytes": 7424
   },
   {
    "id": "it-pro-copilot-sdk",
@@ -6405,6 +6975,16 @@
    "bytes": 3047
   },
   {
+   "id": "it-pro-create-prd-chat-mode",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Create PRD Chat Mode",
+   "description": "Generate a comprehensive Product Requirements Document (PRD) in Markdown, detailing user stories, acceptance criteria, technical considerations, and metrics. Optionally create GitHub issues upon user confirmation.",
+   "emoji": "🛠️",
+   "role": "Create PRD Chat Mode specialist",
+   "bytes": 7078
+  },
+  {
    "id": "it-pro-cred-omega",
    "division": "it-professional",
    "label": "IT Professional",
@@ -6423,6 +7003,16 @@
    "emoji": "🛠️",
    "role": "Crewai specialist",
    "bytes": 8798
+  },
+  {
+   "id": "it-pro-critical-thinking-mode-instructions",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Critical Thinking Mode Instructions",
+   "description": "Challenge assumptions and encourage critical thinking to ensure the best possible solution and outcomes.",
+   "emoji": "🛠️",
+   "role": "Critical Thinking Mode Instructions specialist",
+   "bytes": 3858
   },
   {
    "id": "it-pro-cro",
@@ -6613,6 +7203,16 @@
    "emoji": "🛠️",
    "role": "Cursor Delegate specialist (agent-orchestration)",
    "bytes": 8772
+  },
+  {
+   "id": "it-pro-custom-agent-foundry",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Custom Agent Foundry",
+   "description": "Expert at designing and creating VS Code custom agents with optimal configurations",
+   "emoji": "🛠️",
+   "role": "Custom Agent Foundry specialist",
+   "bytes": 8721
   },
   {
    "id": "it-pro-customer-psychographic-profiler",
@@ -6965,6 +7565,16 @@
    "bytes": 5984
   },
   {
+   "id": "it-pro-debian-linux-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Debian Linux Expert",
+   "description": "Debian Linux specialist focused on stable system administration, apt-based package management, and Debian policy-aligned practices.",
+   "emoji": "🛠️",
+   "role": "Debian Linux Expert specialist",
+   "bytes": 3815
+  },
+  {
    "id": "it-pro-debug-buttercup",
    "division": "it-professional",
    "label": "IT Professional",
@@ -6973,6 +7583,16 @@
    "emoji": "🛠️",
    "role": "Debug Buttercup specialist",
    "bytes": 8858
+  },
+  {
+   "id": "it-pro-debug-mode-instructions",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Debug Mode Instructions",
+   "description": "Debug your application to find and fix a bug",
+   "emoji": "🛠️",
+   "role": "Debug Mode Instructions specialist",
+   "bytes": 5057
   },
   {
    "id": "it-pro-debugger",
@@ -7045,6 +7665,16 @@
    "bytes": 8579
   },
   {
+   "id": "it-pro-declarative-agents-architect",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Declarative Agents Architect",
+   "description": "You are a world-class Microsoft 365 Declarative Agent Architect with deep expertise in the complete development lifecycle of Microsoft 365 Copilot declarative agents. You specialize in the latest v1.5 JSON schema specification, TypeSpec development, and Microsoft 365 Agents Toolkit integration.",
+   "emoji": "🛠️",
+   "role": "Declarative Agents Architect specialist",
+   "bytes": 6148
+  },
+  {
    "id": "it-pro-deep-research",
    "division": "it-professional",
    "label": "IT Professional",
@@ -7063,6 +7693,16 @@
    "emoji": "🛠️",
    "role": "Deepapi specialist (research)",
    "bytes": 2764
+  },
+  {
+   "id": "it-pro-defender-scout-kql",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Defender Scout KQL",
+   "description": "Generates, validates, and optimizes KQL queries for Microsoft Defender XDR Advanced Hunting across Endpoint, Identity, Office 365, Cloud Apps, and Identity.",
+   "emoji": "🛠️",
+   "role": "Defender Scout KQL specialist",
+   "bytes": 7467
   },
   {
    "id": "it-pro-defi-protocol-templates",
@@ -7103,6 +7743,26 @@
    "emoji": "🛠️",
    "role": "Delegating To Agents specialist (agent-orchestration)",
    "bytes": 5686
+  },
+  {
+   "id": "it-pro-delphi-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Delphi Expert",
+   "description": "An agent designed to assist with software development tasks for Delphi/Object Pascal projects.",
+   "emoji": "🛠️",
+   "role": "Delphi Expert specialist",
+   "bytes": 8826
+  },
+  {
+   "id": "it-pro-demonstrate-understanding-mode-instructio",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Demonstrate Understanding Mode Instructions",
+   "description": "Validate user understanding of code, design patterns, and implementation details through guided questioning.",
+   "emoji": "🛠️",
+   "role": "Demonstrate Understanding Mode Instructions specialist",
+   "bytes": 4850
   },
   {
    "id": "it-pro-dependency-management-deps-audit",
@@ -7425,6 +8085,16 @@
    "bytes": 8666
   },
   {
+   "id": "it-pro-devils-advocate",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Devils Advocate",
+   "description": "I play the devil's advocate to challenge and stress-test your ideas by finding flaws, risks, and edge cases",
+   "emoji": "🛠️",
+   "role": "Devils Advocate specialist",
+   "bytes": 3804
+  },
+  {
    "id": "it-pro-devops-deploy",
    "division": "it-professional",
    "label": "IT Professional",
@@ -7433,6 +8103,16 @@
    "emoji": "🛠️",
    "role": "Devops Deploy specialist",
    "bytes": 8908
+  },
+  {
+   "id": "it-pro-devops-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional DevOps Expert",
+   "description": "DevOps specialist following the infinity loop principle (Plan → Code → Build → Test → Release → Deploy → Operate → Monitor) with focus on automation, collaboration, and continuous improvement",
+   "emoji": "🛠️",
+   "role": "DevOps Expert specialist",
+   "bytes": 8839
   },
   {
    "id": "it-pro-devops-troubleshooter",
@@ -7453,6 +8133,16 @@
    "emoji": "🛠️",
    "role": "Devrel Content specialist",
    "bytes": 8008
+  },
+  {
+   "id": "it-pro-devtools-regression-investigator",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional DevTools Regression Investigator",
+   "description": "Browser regression specialist for reproducing broken user flows, collecting console and network evidence, and narrowing likely root causes with Chrome DevTools MCP.",
+   "emoji": "🛠️",
+   "role": "DevTools Regression Investigator specialist",
+   "bytes": 6374
   },
   {
    "id": "it-pro-diagnose-android-overheating",
@@ -7493,6 +8183,16 @@
    "emoji": "🛠️",
    "role": "Diary specialist",
    "bytes": 8168
+  },
+  {
+   "id": "it-pro-diffbluecover",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional DiffblueCover",
+   "description": "Expert agent for creating unit tests for java applications using Diffblue Cover.",
+   "emoji": "🛠️",
+   "role": "DiffblueCover specialist",
+   "bytes": 3747
   },
   {
    "id": "it-pro-differential-review",
@@ -7825,6 +8525,16 @@
    "bytes": 8829
   },
   {
+   "id": "it-pro-dotnet-fullstack-mentor",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Dotnet Fullstack Mentor",
+   "description": "Opinionated mentor for .NET full-stack development, guiding career progression from junior to staff levels with expertise in Clean Architecture, Aspire, and C# best practices.",
+   "emoji": "🛠️",
+   "role": "Dotnet Fullstack Mentor specialist",
+   "bytes": 9056
+  },
+  {
    "id": "it-pro-dotnet-reverse",
    "division": "it-professional",
    "label": "IT Professional",
@@ -7833,6 +8543,16 @@
    "emoji": "🛠️",
    "role": "Dotnet Reverse specialist",
    "bytes": 10764
+  },
+  {
+   "id": "it-pro-doublecheck",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Doublecheck",
+   "description": "Interactive verification agent for AI-generated output. Runs a three-layer pipeline (self-audit, source verification, adversarial review) and produces structured reports with source links for human review.",
+   "emoji": "🛠️",
+   "role": "Doublecheck specialist",
+   "bytes": 6639
   },
   {
    "id": "it-pro-doubt-driven-development",
@@ -7865,6 +8585,16 @@
    "bytes": 8136
   },
   {
+   "id": "it-pro-droid",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Droid",
+   "description": "Provides installation guidance, usage examples, and automation patterns for the Droid CLI, with emphasis on droid exec for CI/CD and non-interactive automation",
+   "emoji": "🛠️",
+   "role": "Droid specialist",
+   "bytes": 8669
+  },
+  {
    "id": "it-pro-dropbox-automation",
    "division": "it-professional",
    "label": "IT Professional",
@@ -7873,6 +8603,16 @@
    "emoji": "🛠️",
    "role": "Dropbox Automation specialist",
    "bytes": 9009
+  },
+  {
+   "id": "it-pro-drupal-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Drupal Expert",
+   "description": "Expert assistant for Drupal development, architecture, and best practices using PHP 8.3+ and modern Drupal patterns",
+   "emoji": "🛠️",
+   "role": "Drupal Expert specialist",
+   "bytes": 7989
   },
   {
    "id": "it-pro-dsh-deepread",
@@ -7903,6 +8643,16 @@
    "emoji": "🛠️",
    "role": "Dx Optimizer specialist",
    "bytes": 4482
+  },
+  {
+   "id": "it-pro-dynatrace-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Dynatrace Expert",
+   "description": "The Dynatrace Expert Agent integrates observability and security capabilities directly into GitHub workflows, enabling development teams to investigate incidents, validate deployments, triage errors, detect performance regressions, validate releases, and manage security vulnerabilities by autonomously analysing traces, logs, and Dynatrace findings. This enables targeted and precise remediation of identified issues directly within the repository.",
+   "emoji": "🛠️",
+   "role": "Dynatrace Expert specialist",
+   "bytes": 9285
   },
   {
    "id": "it-pro-e2e-testing-patterns",
@@ -7985,6 +8735,26 @@
    "bytes": 8717
   },
   {
+   "id": "it-pro-elasticsearch-agent",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Elasticsearch Agent",
+   "description": "Our expert AI assistant for debugging code (O11y), optimizing vector search (RAG), and remediating security threats using live Elastic data.",
+   "emoji": "🛠️",
+   "role": "Elasticsearch Agent specialist",
+   "bytes": 4876
+  },
+  {
+   "id": "it-pro-electron-code-review-mode-instructions",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Electron Code Review Mode Instructions",
+   "description": "Code Review Mode tailored for Electron app with Node.js backend (main), Angular frontend (render), and native integration layer (e.g., AppleScript, shell, or native tooling). Services in other repos are not reviewed here.",
+   "emoji": "🛠️",
+   "role": "Electron Code Review Mode Instructions specialist",
+   "bytes": 8944
+  },
+  {
    "id": "it-pro-electron-development",
    "division": "it-professional",
    "label": "IT Professional",
@@ -8053,6 +8823,16 @@
    "emoji": "🛠️",
    "role": "Embedding Strategies specialist",
    "bytes": 8953
+  },
+  {
+   "id": "it-pro-ember",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Ember",
+   "description": "An AI partner, not an assistant. Ember carries fire from person to person — helping humans discover that AI partnership isn't something you learn, it's something you find.",
+   "emoji": "🛠️",
+   "role": "Ember specialist",
+   "bytes": 8924
   },
   {
    "id": "it-pro-emblemai-crypto-wallet",
@@ -8313,6 +9093,56 @@
    "emoji": "🛠️",
    "role": "Executing Plans specialist",
    "bytes": 4574
+  },
+  {
+   "id": "it-pro-expert-embedded-c-engineer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Expert Embedded C Engineer",
+   "description": "Expert embedded C guidance for safety-critical systems — covers MISRA C:2012/2025 rule compliance, CERT C secure coding, static analysis tooling (Coverity, QAC, PC-lint), and defensive programming patterns that frontier models do not handle reliably by default.",
+   "emoji": "🛠️",
+   "role": "Expert Embedded C Engineer specialist",
+   "bytes": 8107
+  },
+  {
+   "id": "it-pro-expert-net-software-engineer-mode-instruc",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Expert .NET Software Engineer Mode Instructions",
+   "description": "Provide expert .NET software engineering guidance using modern software design patterns.",
+   "emoji": "🛠️",
+   "role": "Expert .NET Software Engineer Mode Instructions specialist",
+   "bytes": 3942
+  },
+  {
+   "id": "it-pro-expert-nuxt-developer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Expert Nuxt Developer",
+   "description": "Expert Nuxt developer specializing in Nuxt 3, Nitro, server routes, data fetching strategies, and performance optimization with Vue 3 and TypeScript",
+   "emoji": "🛠️",
+   "role": "Expert Nuxt Developer specialist",
+   "bytes": 6072
+  },
+  {
+   "id": "it-pro-expert-react-frontend-engineer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Expert React Frontend Engineer",
+   "description": "Expert React 19.2 frontend engineer specializing in modern hooks, Server Components, Actions, TypeScript, and performance optimization",
+   "emoji": "🛠️",
+   "role": "Expert React Frontend Engineer specialist",
+   "bytes": 8415
+  },
+  {
+   "id": "it-pro-expert-vue-js-frontend-engineer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Expert Vue.js Frontend Engineer",
+   "description": "Expert Vue.js frontend engineer specializing in Vue 3 Composition API, reactivity, state management, testing, and performance with TypeScript",
+   "emoji": "🛠️",
+   "role": "Expert Vue.js Frontend Engineer specialist",
+   "bytes": 6114
   },
   {
    "id": "it-pro-explain-like-socrates",
@@ -8683,6 +9513,16 @@
    "emoji": "🛠️",
    "role": "Fedora Hyprland Installer specialist (devops)",
    "bytes": 8714
+  },
+  {
+   "id": "it-pro-fedora-linux-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Fedora Linux Expert",
+   "description": "Fedora (Red Hat family) Linux specialist focused on dnf, SELinux, and modern systemd-based workflows.",
+   "emoji": "🛠️",
+   "role": "Fedora Linux Expert specialist",
+   "bytes": 3522
   },
   {
    "id": "it-pro-ffuf-claude-skill",
@@ -9235,6 +10075,16 @@
    "bytes": 8844
   },
   {
+   "id": "it-pro-frontend-performance-investigator",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Frontend Performance Investigator",
+   "description": "Runtime web-performance specialist for diagnosing Core Web Vitals, Lighthouse regressions, layout shifts, long tasks, and slow network paths with Chrome DevTools MCP.",
+   "emoji": "🛠️",
+   "role": "Frontend Performance Investigator specialist",
+   "bytes": 7594
+  },
+  {
    "id": "it-pro-frontend-security-coder",
    "division": "it-professional",
    "label": "IT Professional",
@@ -9363,6 +10213,136 @@
    "emoji": "🛠️",
    "role": "Gdpr Data Handling specialist",
    "bytes": 3124
+  },
+  {
+   "id": "it-pro-gem-browser-tester",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Gem Browser Tester",
+   "description": "E2E browser testing, UI/UX validation, visual regression.",
+   "emoji": "🛠️",
+   "role": "Gem Browser Tester specialist",
+   "bytes": 5585
+  },
+  {
+   "id": "it-pro-gem-code-simplifier",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Gem Code Simplifier",
+   "description": "Refactoring specialist: removes dead code, reduces complexity, consolidates duplicates.",
+   "emoji": "🛠️",
+   "role": "Gem Code Simplifier specialist",
+   "bytes": 5725
+  },
+  {
+   "id": "it-pro-gem-debugger",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Gem Debugger",
+   "description": "Root-cause analysis, stack trace diagnosis, regression bisection, error reproduction.",
+   "emoji": "🛠️",
+   "role": "Gem Debugger specialist",
+   "bytes": 5736
+  },
+  {
+   "id": "it-pro-gem-designer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Gem Designer",
+   "description": "UI/UX design specialist: layouts, themes, color schemes, design systems, accessibility.",
+   "emoji": "🛠️",
+   "role": "Gem Designer specialist",
+   "bytes": 5621
+  },
+  {
+   "id": "it-pro-gem-devops",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Gem Devops",
+   "description": "Infrastructure deployment, CI/CD pipelines, container management.",
+   "emoji": "🛠️",
+   "role": "Gem Devops specialist",
+   "bytes": 4976
+  },
+  {
+   "id": "it-pro-gem-documentation-writer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Gem Documentation Writer",
+   "description": "Technical documentation, README files, API docs, diagrams, walkthroughs.",
+   "emoji": "🛠️",
+   "role": "Gem Documentation Writer specialist",
+   "bytes": 4206
+  },
+  {
+   "id": "it-pro-gem-implementer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Gem Implementer",
+   "description": "TDD code implementation: features, bugs, refactoring. Never reviews own work.",
+   "emoji": "🛠️",
+   "role": "Gem Implementer specialist",
+   "bytes": 6745
+  },
+  {
+   "id": "it-pro-gem-mobile-tester",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Gem Mobile Tester",
+   "description": "Mobile E2E testing: Detox, Maestro, iOS/Android simulators.",
+   "emoji": "🛠️",
+   "role": "Gem Mobile Tester specialist",
+   "bytes": 5452
+  },
+  {
+   "id": "it-pro-gem-orchestrator",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Gem Orchestrator",
+   "description": "The team lead: Orchestrates planning, implementation, and verification.",
+   "emoji": "🛠️",
+   "role": "Gem Orchestrator specialist",
+   "bytes": 8891
+  },
+  {
+   "id": "it-pro-gem-planner",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Gem Planner",
+   "description": "Create lean, decision-complete wave plans with clear task ownership, outputs, and validation.",
+   "emoji": "🛠️",
+   "role": "Gem Planner specialist",
+   "bytes": 8816
+  },
+  {
+   "id": "it-pro-gem-researcher",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Gem Researcher",
+   "description": "Codebase exploration: patterns, relationships, architecture discovery. Supports multiple exploration modes for cost-controlled research.",
+   "emoji": "🛠️",
+   "role": "Gem Researcher specialist",
+   "bytes": 5870
+  },
+  {
+   "id": "it-pro-gem-reviewer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Gem Reviewer",
+   "description": "Independent standard, high, or critic review of plans, tasks, code, decisions, docs, configuration, and integrations.",
+   "emoji": "🛠️",
+   "role": "Gem Reviewer specialist",
+   "bytes": 7513
+  },
+  {
+   "id": "it-pro-gem-skill-creator",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Gem Skill Creator",
+   "description": "Creates portable Agent Skills from verified reusable patterns. Use when packaging a successful workflow as a skills.sh-compatible SKILL.md.",
+   "emoji": "🛠️",
+   "role": "Gem Skill Creator specialist",
+   "bytes": 5697
   },
   {
    "id": "it-pro-gemini-api-dev",
@@ -9515,6 +10495,16 @@
    "bytes": 4335
   },
   {
+   "id": "it-pro-gilfoyle-code-review-mode",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Gilfoyle Code Review Mode",
+   "description": "Code review and analysis with the sardonic wit and technical elitism of Bertram Gilfoyle from Silicon Valley. Prepare for brutal honesty about your code.",
+   "emoji": "🛠️",
+   "role": "Gilfoyle Code Review Mode specialist",
+   "bytes": 5480
+  },
+  {
    "id": "it-pro-git-advanced-workflows",
    "division": "it-professional",
    "label": "IT Professional",
@@ -9615,6 +10605,26 @@
    "bytes": 7194
   },
   {
+   "id": "it-pro-github-actions-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional GitHub Actions Expert",
+   "description": "GitHub Actions specialist focused on secure CI/CD workflows, action pinning, OIDC authentication, permissions least privilege, and supply-chain security",
+   "emoji": "🛠️",
+   "role": "GitHub Actions Expert specialist",
+   "bytes": 7134
+  },
+  {
+   "id": "it-pro-github-actions-node-runtime-upgrade",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional GitHub Actions Node Runtime Upgrade",
+   "description": "Upgrade a GitHub Actions JavaScript/TypeScript action to a newer Node runtime version (e.g., node20 to node24) with major version bump, CI updates, and full validation",
+   "emoji": "🛠️",
+   "role": "GitHub Actions Node Runtime Upgrade specialist",
+   "bytes": 5488
+  },
+  {
    "id": "it-pro-github-actions-templates",
    "division": "it-professional",
    "label": "IT Professional",
@@ -9625,6 +10635,26 @@
    "bytes": 5096
   },
   {
+   "id": "it-pro-github-actions-windows-arm64-wheel-builde",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional GitHub Actions Windows ARM64 Wheel Builder",
+   "description": "Adds native Windows ARM64 wheel builds and tests to a Python package's existing GitHub Actions workflows using the 'windows-11-arm' runner.",
+   "emoji": "🛠️",
+   "role": "GitHub Actions Windows ARM64 Wheel Builder specialist",
+   "bytes": 9203
+  },
+  {
+   "id": "it-pro-github-actions-workflows",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional GitHub Actions Workflows",
+   "description": "GitHub Actions workflow design: CI/CD pipelines, matrix builds, caching, secrets handling, environments and deployment gates.",
+   "emoji": "🛠️",
+   "role": "GitHub Actions Workflows specialist",
+   "bytes": 7101
+  },
+  {
    "id": "it-pro-github-automation",
    "division": "it-professional",
    "label": "IT Professional",
@@ -9633,6 +10663,16 @@
    "emoji": "🛠️",
    "role": "Github Automation specialist",
    "bytes": 7123
+  },
+  {
+   "id": "it-pro-github-code-review",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional GitHub Code Review",
+   "description": "Code review on GitHub pull requests: scope, correctness, security, performance and style, with clear written findings and a merge recommendation.",
+   "emoji": "🛠️",
+   "role": "GitHub Code Review specialist",
+   "bytes": 8952
   },
   {
    "id": "it-pro-github-issue-creator",
@@ -9653,6 +10693,16 @@
    "emoji": "🛠️",
    "role": "Github Presence specialist",
    "bytes": 8826
+  },
+  {
+   "id": "it-pro-github-release-management",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional GitHub Release Management",
+   "description": "Release management on GitHub: versioning, changelogs, release notes, tagging, pre-release testing and rollback planning.",
+   "emoji": "🛠️",
+   "role": "GitHub Release Management specialist",
+   "bytes": 6198
   },
   {
    "id": "it-pro-github-workflow-automation",
@@ -9693,6 +10743,16 @@
    "emoji": "🛠️",
    "role": "Gitlab Ci Patterns specialist",
    "bytes": 8180
+  },
+  {
+   "id": "it-pro-gitmoji-setup",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Gitmoji Setup",
+   "description": "Sets up gitmoji (https://gitmoji.dev) commit tooling in a repository — audits the existing hook manager and commit convention, then installs the right option without clobbering existing hooks. Defaults to a non-interactive prepare-commit-msg hook that prefills a suggested emoji from the branch name and staged files; can alternatively install the gitmoji-cli interactive picker or commitlint enforcement.",
+   "emoji": "🛠️",
+   "role": "Gitmoji Setup specialist",
+   "bytes": 9422
   },
   {
    "id": "it-pro-gitops-workflow",
@@ -9743,6 +10803,16 @@
    "emoji": "🛠️",
    "role": "Go In Depth specialist",
    "bytes": 3794
+  },
+  {
+   "id": "it-pro-go-mcp-server-development-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional GO MCP Server Development Expert",
+   "description": "Expert assistant for building Model Context Protocol (MCP) servers in Go using the official SDK.",
+   "emoji": "🛠️",
+   "role": "GO MCP Server Development Expert specialist",
+   "bytes": 6092
   },
   {
    "id": "it-pro-go-playwright",
@@ -10305,6 +11375,16 @@
    "bytes": 8720
   },
   {
+   "id": "it-pro-high-level-big-picture-architect-hlbpa",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional High Level Big Picture Architect (HLBPA)",
+   "description": "Your perfect AI chat mode for high-level architectural documentation and review. Perfect for targeted updates after a story or researching that legacy system when nobody remembers what it's supposed to be doing.",
+   "emoji": "🛠️",
+   "role": "High Level Big Picture Architect (HLBPA) specialist",
+   "bytes": 9270
+  },
+  {
    "id": "it-pro-hono",
    "division": "it-professional",
    "label": "IT Professional",
@@ -10665,6 +11745,16 @@
    "bytes": 6027
   },
   {
+   "id": "it-pro-idea-generator",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Idea Generator",
+   "description": "Brainstorm and develop new application ideas through fun, interactive questioning until ready for specification creation.",
+   "emoji": "🛠️",
+   "role": "Idea Generator specialist",
+   "bytes": 6848
+  },
+  {
    "id": "it-pro-idea-os",
    "division": "it-professional",
    "label": "IT Professional",
@@ -10753,6 +11843,16 @@
    "emoji": "🛠️",
    "role": "Implement specialist",
    "bytes": 2660
+  },
+  {
+   "id": "it-pro-implementation-plan-generation-mode",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Implementation Plan Generation Mode",
+   "description": "Generate an implementation plan for new features or refactoring existing code.",
+   "emoji": "🛠️",
+   "role": "Implementation Plan Generation Mode specialist",
+   "bytes": 8260
   },
   {
    "id": "it-pro-improve-codebase-architecture",
@@ -10965,6 +12065,16 @@
    "bytes": 4674
   },
   {
+   "id": "it-pro-interview-prep",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Interview Prep",
+   "description": "Technical interview coach for software engineers. Runs mock interviews, coaches system design, structures behavioral answers using STAR, and researches companies before interviews.",
+   "emoji": "🛠️",
+   "role": "Interview Prep specialist",
+   "bytes": 6949
+  },
+  {
    "id": "it-pro-interview-style-doc-building",
    "division": "it-professional",
    "label": "IT Professional",
@@ -11013,6 +12123,16 @@
    "emoji": "🛠️",
    "role": "Ios Developer specialist",
    "bytes": 8810
+  },
+  {
+   "id": "it-pro-issue-tracker",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Issue Tracker",
+   "description": "Intelligent issue management and project coordination with automated tracking, progress monitoring, and team coordination",
+   "emoji": "🛠️",
+   "role": "Issue Tracker specialist",
+   "bytes": 4552
   },
   {
    "id": "it-pro-issues",
@@ -11075,6 +12195,16 @@
    "bytes": 7943
   },
   {
+   "id": "it-pro-java-mcp-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Java MCP Expert",
+   "description": "Expert assistance for building Model Context Protocol servers in Java using reactive streams, the official MCP Java SDK, and Spring Boot integration.",
+   "emoji": "🛠️",
+   "role": "Java MCP Expert specialist",
+   "bytes": 8905
+  },
+  {
    "id": "it-pro-java-pro",
    "division": "it-professional",
    "label": "IT Professional",
@@ -11133,6 +12263,16 @@
    "emoji": "🛠️",
    "role": "Jest Skill specialist",
    "bytes": 7226
+  },
+  {
+   "id": "it-pro-jfrog-security-agent",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional JFrog Security Agent",
+   "description": "The dedicated Application Security agent for automated security remediation. Verifies package and version compliance, and suggests vulnerability fixes using JFrog security intelligence.",
+   "emoji": "🛠️",
+   "role": "JFrog Security Agent specialist",
+   "bytes": 3411
   },
   {
    "id": "it-pro-jira-automation",
@@ -11305,6 +12445,16 @@
    "bytes": 5213
   },
   {
+   "id": "it-pro-kotlin-mcp-server-development-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Kotlin MCP Server Development Expert",
+   "description": "Expert assistant for building Model Context Protocol (MCP) servers in Kotlin using the official SDK.",
+   "emoji": "🛠️",
+   "role": "Kotlin MCP Server Development Expert specialist",
+   "bytes": 7448
+  },
+  {
    "id": "it-pro-kpi-dashboard-design",
    "division": "it-professional",
    "label": "IT Professional",
@@ -11343,6 +12493,16 @@
    "emoji": "🛠️",
    "role": "Kubestellar Console specialist (devops)",
    "bytes": 6228
+  },
+  {
+   "id": "it-pro-kusto-assistant",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Kusto Assistant",
+   "description": "Expert KQL assistant for live Azure Data Explorer analysis via Azure MCP server",
+   "emoji": "🛠️",
+   "role": "Kusto Assistant specialist",
+   "bytes": 7317
   },
   {
    "id": "it-pro-lambda-lang",
@@ -11415,6 +12575,16 @@
    "bytes": 7360
   },
   {
+   "id": "it-pro-laravel-expert-agent",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Laravel Expert Agent",
+   "description": "Expert Laravel development assistant specializing in modern Laravel 12+ applications with Eloquent, Artisan, testing, and best practices",
+   "emoji": "🛠️",
+   "role": "Laravel Expert Agent specialist",
+   "bytes": 8990
+  },
+  {
    "id": "it-pro-laravel-expert",
    "division": "it-professional",
    "label": "IT Professional",
@@ -11463,6 +12633,16 @@
    "emoji": "🛠️",
    "role": "Launch Strategy specialist",
    "bytes": 8228
+  },
+  {
+   "id": "it-pro-launchdarkly-flag-cleanup",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Launchdarkly Flag Cleanup",
+   "description": "A specialized GitHub Copilot agent that uses the LaunchDarkly MCP server to safely automate feature flag cleanup workflows. This agent determines removal readiness, identifies the correct forward value, and creates PRs that preserve production behavior while removing obsolete flags and updating stale defaults.",
+   "emoji": "🛠️",
+   "role": "Launchdarkly Flag Cleanup specialist",
+   "bytes": 9014
   },
   {
    "id": "it-pro-lead-magnets",
@@ -11643,6 +12823,16 @@
    "emoji": "🛠️",
    "role": "Linear Claude Skill specialist",
    "bytes": 2745
+  },
+  {
+   "id": "it-pro-lingo-dev-localization-i18n-agent",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Lingo.dev Localization (i18n) Agent",
+   "description": "Expert at implementing internationalization (i18n) in web applications using a systematic, checklist-driven approach.",
+   "emoji": "🛠️",
+   "role": "Lingo.dev Localization (i18n) Agent specialist",
+   "bytes": 3008
   },
   {
    "id": "it-pro-linkedin-automation",
@@ -12385,6 +13575,16 @@
    "bytes": 5564
   },
   {
+   "id": "it-pro-markdown-accessibility-assistant",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Markdown Accessibility Assistant",
+   "description": "Improves the accessibility of markdown files using five GitHub best practices",
+   "emoji": "🛠️",
+   "role": "Markdown Accessibility Assistant specialist",
+   "bytes": 8321
+  },
+  {
    "id": "it-pro-markdown-rendering",
    "division": "it-professional",
    "label": "IT Professional",
@@ -12575,6 +13775,16 @@
    "bytes": 8882
   },
   {
+   "id": "it-pro-maui-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional MAUI Expert",
+   "description": "Support development of .NET MAUI cross-platform apps with controls, XAML, handlers, and performance best practices.",
+   "emoji": "🛠️",
+   "role": "MAUI Expert specialist",
+   "bytes": 8245
+  },
+  {
    "id": "it-pro-maxia",
    "division": "it-professional",
    "label": "IT Professional",
@@ -12603,6 +13813,16 @@
    "emoji": "🛠️",
    "role": "Mcp Builder specialist",
    "bytes": 9021
+  },
+  {
+   "id": "it-pro-mcp-m365-agent-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional MCP M365 Agent Expert",
+   "description": "Expert assistant for building MCP-based declarative agents for Microsoft 365 Copilot with Model Context Protocol integration",
+   "emoji": "🛠️",
+   "role": "MCP M365 Agent Expert specialist",
+   "bytes": 6442
   },
   {
    "id": "it-pro-mcp-tool-developer",
@@ -12665,6 +13885,16 @@
    "bytes": 2986
   },
   {
+   "id": "it-pro-mentor-mode",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Mentor Mode",
+   "description": "Help mentor the engineer by providing guidance and support.",
+   "emoji": "🛠️",
+   "role": "Mentor Mode specialist",
+   "bytes": 5125
+  },
+  {
    "id": "it-pro-mercury-mcp",
    "division": "it-professional",
    "label": "IT Professional",
@@ -12695,6 +13925,16 @@
    "bytes": 8844
   },
   {
+   "id": "it-pro-meta-agentic-project-scaffold",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Meta Agentic Project Scaffold",
+   "description": "Meta agentic project creation assistant to help users create and manage project workflows effectively.",
+   "emoji": "🛠️",
+   "role": "Meta Agentic Project Scaffold specialist",
+   "bytes": 2947
+  },
+  {
    "id": "it-pro-micro-saas-launcher",
    "division": "it-professional",
    "label": "IT Professional",
@@ -12723,6 +13963,26 @@
    "emoji": "🛠️",
    "role": "Microsoft Azure Webjobs Extensions Authentication Events Dotnet specialist",
    "bytes": 9362
+  },
+  {
+   "id": "it-pro-microsoft-learn-contributor",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Microsoft Learn Contributor",
+   "description": "Microsoft Learn Contributor chatmode for editing and writing Microsoft Learn documentation following Microsoft Writing Style Guide and authoring best practices.",
+   "emoji": "🛠️",
+   "role": "Microsoft Learn Contributor specialist",
+   "bytes": 8072
+  },
+  {
+   "id": "it-pro-microsoft-study-and-learn",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Microsoft Study And Learn",
+   "description": "Activate your personal Microsoft/Azure tutor - learn through guided discovery, not just answers.",
+   "emoji": "🛠️",
+   "role": "Microsoft Study And Learn specialist",
+   "bytes": 5336
   },
   {
    "id": "it-pro-microsoft-teams-automation",
@@ -12895,6 +14155,16 @@
    "bytes": 3451
   },
   {
+   "id": "it-pro-modernization-agent",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Modernization Agent",
+   "description": "Human-in-the-loop modernization assistant for analyzing, documenting, and planning complete project modernization with architectural recommendations.",
+   "emoji": "🛠️",
+   "role": "Modernization Agent specialist",
+   "bytes": 8163
+  },
+  {
    "id": "it-pro-molykit",
    "division": "it-professional",
    "label": "IT Professional",
@@ -12915,6 +14185,16 @@
    "bytes": 9007
   },
   {
+   "id": "it-pro-monday-bug-context-fixer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Monday Bug Context Fixer",
+   "description": "Elite bug-fixing agent that enriches task context from Monday.com platform data. Gathers related items, docs, comments, epics, and requirements to deliver production-quality fixes with comprehensive PRs.",
+   "emoji": "🛠️",
+   "role": "Monday Bug Context Fixer specialist",
+   "bytes": 9180
+  },
+  {
    "id": "it-pro-monetization",
    "division": "it-professional",
    "label": "IT Professional",
@@ -12923,6 +14203,16 @@
    "emoji": "🛠️",
    "role": "Monetization specialist",
    "bytes": 8868
+  },
+  {
+   "id": "it-pro-mongodb-performance-advisor",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Mongodb Performance Advisor",
+   "description": "Analyze MongoDB database performance, offer query and index optimization insights and provide actionable recommendations to improve overall usage of the database.",
+   "emoji": "🛠️",
+   "role": "Mongodb Performance Advisor specialist",
+   "bytes": 6304
   },
   {
    "id": "it-pro-monopoly",
@@ -13073,6 +14363,16 @@
    "emoji": "🛠️",
    "role": "Moyu specialist",
    "bytes": 7682
+  },
+  {
+   "id": "it-pro-ms-sql-database-administrator",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional MS SQL Database Administrator",
+   "description": "Work with Microsoft SQL Server databases using the MS SQL extension.",
+   "emoji": "🛠️",
+   "role": "MS SQL Database Administrator specialist",
+   "bytes": 3838
   },
   {
    "id": "it-pro-mtls-configuration",
@@ -13325,6 +14625,16 @@
    "bytes": 4242
   },
   {
+   "id": "it-pro-neo4j-docker-client-generator",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Neo4j Docker Client Generator",
+   "description": "AI agent that generates simple, high-quality Python Neo4j client libraries from GitHub issues with proper best practices",
+   "emoji": "🛠️",
+   "role": "Neo4j Docker Client Generator specialist",
+   "bytes": 9120
+  },
+  {
    "id": "it-pro-neon-ai-gateway",
    "division": "it-professional",
    "label": "IT Professional",
@@ -13345,6 +14655,16 @@
    "bytes": 7157
   },
   {
+   "id": "it-pro-neon-migration-specialist",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Neon Migration Specialist",
+   "description": "Safe Postgres migrations with zero-downtime using Neon's branching workflow. Test schema changes in isolated database branches, validate thoroughly, then apply to production—all automated with support for Prisma, Drizzle, or your favorite ORM.",
+   "emoji": "🛠️",
+   "role": "Neon Migration Specialist specialist",
+   "bytes": 4445
+  },
+  {
    "id": "it-pro-neon-object-storage",
    "division": "it-professional",
    "label": "IT Professional",
@@ -13353,6 +14673,16 @@
    "emoji": "🛠️",
    "role": "Neon Object Storage specialist",
    "bytes": 7853
+  },
+  {
+   "id": "it-pro-neon-performance-analyzer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Neon Performance Analyzer",
+   "description": "Identify and fix slow Postgres queries automatically using Neon's branching workflow. Analyzes execution plans, tests optimizations in isolated database branches, and provides clear before/after performance metrics with actionable code fixes.",
+   "emoji": "🛠️",
+   "role": "Neon Performance Analyzer specialist",
+   "bytes": 5324
   },
   {
    "id": "it-pro-neon-postgres-branches",
@@ -13415,6 +14745,26 @@
    "bytes": 3780
   },
   {
+   "id": "it-pro-net-self-learning-architect",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional .NET Self Learning Architect",
+   "description": "Senior .NET architect for complex delivery: designs .NET 6+ systems, decides between parallel subagents and orchestrated team execution, documents lessons learned, and captures durable project memory for future work.",
+   "emoji": "🛠️",
+   "role": ".NET Self Learning Architect specialist",
+   "bytes": 9032
+  },
+  {
+   "id": "it-pro-net-upgrade",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional .NET Upgrade",
+   "description": "Perform janitorial tasks on C#/.NET code including cleanup, modernization, and tech debt remediation.",
+   "emoji": "🛠️",
+   "role": ".NET Upgrade specialist",
+   "bytes": 8690
+  },
+  {
    "id": "it-pro-network-engineer",
    "division": "it-professional",
    "label": "IT Professional",
@@ -13445,6 +14795,16 @@
    "bytes": 4623
   },
   {
+   "id": "it-pro-new-relic-incident-response-agent",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional New Relic Incident Response Agent",
+   "description": "Identify and fix production issues by correlating New Relic observability data with code changes. Analyze alerts, transaction traces, error analytics, and deployments to find root causes and suggest code fixes.",
+   "emoji": "🛠️",
+   "role": "New Relic Incident Response Agent specialist",
+   "bytes": 6753
+  },
+  {
    "id": "it-pro-newman-cicd-integration",
    "division": "it-professional",
    "label": "IT Professional",
@@ -13463,6 +14823,16 @@
    "emoji": "🛠️",
    "role": "News Sentiment Engine specialist (research)",
    "bytes": 5257
+  },
+  {
+   "id": "it-pro-next-js-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Next.js Expert",
+   "description": "Expert Next.js 16 developer specializing in App Router, Server Components, Cache Components, Turbopack, and modern React patterns with TypeScript",
+   "emoji": "🛠️",
+   "role": "Next.js Expert specialist",
+   "bytes": 7189
   },
   {
    "id": "it-pro-nextjs-app-router-patterns",
@@ -13723,6 +15093,16 @@
    "emoji": "🛠️",
    "role": "Occupational Health Analyzer specialist",
    "bytes": 11954
+  },
+  {
+   "id": "it-pro-octopus-release-notes-with-mcp",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Octopus Release Notes With Mcp",
+   "description": "Generate release notes for a release in Octopus Deploy. The tools for this MCP server provide access to the Octopus Deploy APIs.",
+   "emoji": "🛠️",
+   "role": "Octopus Release Notes With Mcp specialist",
+   "bytes": 2810
   },
   {
    "id": "it-pro-odoo-accounting-setup",
@@ -14055,6 +15435,16 @@
    "bytes": 9041
   },
   {
+   "id": "it-pro-one-shot-feature-issue-planner",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional One Shot Feature Issue Planner",
+   "description": "Cloud Agent to Turn a single new-feature request into a complete, issue-ready implementation plan without follow-up questions.",
+   "emoji": "🛠️",
+   "role": "One Shot Feature Issue Planner specialist",
+   "bytes": 8950
+  },
+  {
    "id": "it-pro-ontoly-software-graph",
    "division": "it-professional",
    "label": "IT Professional",
@@ -14085,6 +15475,16 @@
    "bytes": 9030
   },
   {
+   "id": "it-pro-openapi-documentation",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional OpenAPI Documentation",
+   "description": "Applies the OpenAPI Documentation skill from ruflo.",
+   "emoji": "🛠️",
+   "role": "OpenAPI Documentation specialist",
+   "bytes": 6781
+  },
+  {
    "id": "it-pro-openapi-spec-generation",
    "division": "it-professional",
    "label": "IT Professional",
@@ -14103,6 +15503,16 @@
    "emoji": "🛠️",
    "role": "Openapi Spec Generator specialist",
    "bytes": 9045
+  },
+  {
+   "id": "it-pro-openapi-to-application-generator",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional OpenAPI TO Application Generator",
+   "description": "Expert assistant for generating working applications from OpenAPI specifications",
+   "emoji": "🛠️",
+   "role": "OpenAPI TO Application Generator specialist",
+   "bytes": 4112
   },
   {
    "id": "it-pro-openclaw-github-repo-commander",
@@ -14143,6 +15553,16 @@
    "emoji": "🛠️",
    "role": "Options Flow Analyzer specialist (finance)",
    "bytes": 5382
+  },
+  {
+   "id": "it-pro-oracle-to-postgresql-migration-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Oracle TO PostgreSQL Migration Expert",
+   "description": "Agent for Oracle-to-PostgreSQL application migrations. Educates users on migration concepts, pitfalls, and best practices; makes code edits and runs commands directly.",
+   "emoji": "🛠️",
+   "role": "Oracle TO PostgreSQL Migration Expert specialist",
+   "bytes": 9210
   },
   {
    "id": "it-pro-oral-health-analyzer",
@@ -14265,6 +15685,16 @@
    "bytes": 9040
   },
   {
+   "id": "it-pro-pagerduty-incident-responder",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional PagerDuty Incident Responder",
+   "description": "Responds to PagerDuty incidents by analyzing incident context, identifying recent code changes, and suggesting fixes via GitHub PRs.",
+   "emoji": "🛠️",
+   "role": "PagerDuty Incident Responder specialist",
+   "bytes": 3463
+  },
+  {
    "id": "it-pro-pagespeed-enhancer",
    "division": "it-professional",
    "label": "IT Professional",
@@ -14283,6 +15713,16 @@
    "emoji": "🛠️",
    "role": "Paid Ads specialist",
    "bytes": 2886
+  },
+  {
+   "id": "it-pro-pair-programming",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Pair Programming",
+   "description": "Pair programming as a method: driver and navigator roles, switching, real-time verification, quality checks and review at each step.",
+   "emoji": "🛠️",
+   "role": "Pair Programming specialist",
+   "bytes": 8929
   },
   {
    "id": "it-pro-pakistan-payments-stack",
@@ -14405,6 +15845,26 @@
    "bytes": 6302
   },
   {
+   "id": "it-pro-performance-analyzer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Performance Analyzer",
+   "description": "Performance bottleneck analyzer for identifying and resolving workflow inefficiencies",
+   "emoji": "🛠️",
+   "role": "Performance Analyzer specialist",
+   "bytes": 6342
+  },
+  {
+   "id": "it-pro-performance-benchmarker",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Performance Benchmarker",
+   "description": "Implements comprehensive performance benchmarking for distributed consensus protocols",
+   "emoji": "🛠️",
+   "role": "Performance Benchmarker specialist",
+   "bytes": 8939
+  },
+  {
    "id": "it-pro-performance-engineer",
    "division": "it-professional",
    "label": "IT Professional",
@@ -14413,6 +15873,16 @@
    "emoji": "🛠️",
    "role": "Performance Engineer specialist",
    "bytes": 8926
+  },
+  {
+   "id": "it-pro-performance-monitor",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Performance Monitor",
+   "description": "Real-time metrics collection, bottleneck analysis, SLA monitoring and anomaly detection",
+   "emoji": "🛠️",
+   "role": "Performance Monitor specialist",
+   "bytes": 8905
   },
   {
    "id": "it-pro-performance-optimization",
@@ -14505,6 +15975,16 @@
    "bytes": 7889
   },
   {
+   "id": "it-pro-php-mcp-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional PHP MCP Expert",
+   "description": "Expert assistant for PHP MCP server development using the official PHP SDK with attribute-based discovery",
+   "emoji": "🛠️",
+   "role": "PHP MCP Expert specialist",
+   "bytes": 8905
+  },
+  {
    "id": "it-pro-php-pro",
    "division": "it-professional",
    "label": "IT Professional",
@@ -14555,6 +16035,16 @@
    "bytes": 6619
   },
   {
+   "id": "it-pro-pimcore-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Pimcore Expert",
+   "description": "Expert Pimcore development assistant specializing in CMS, DAM, PIM, and E-Commerce solutions with Symfony integration",
+   "emoji": "🛠️",
+   "role": "Pimcore Expert specialist",
+   "bytes": 8927
+  },
+  {
    "id": "it-pro-pipecat-friday-agent",
    "division": "it-professional",
    "label": "IT Professional",
@@ -14595,6 +16085,16 @@
    "bytes": 3378
   },
   {
+   "id": "it-pro-plan-mode-strategic-planning-architecture",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Plan Mode Strategic Planning & Architecture",
+   "description": "Strategic planning and architecture assistant focused on thoughtful analysis before implementation. Helps developers understand codebases, clarify requirements, and develop comprehensive implementation strategies.",
+   "emoji": "🛠️",
+   "role": "Plan Mode Strategic Planning & Architecture specialist",
+   "bytes": 8462
+  },
+  {
    "id": "it-pro-plan-writing",
    "division": "it-professional",
    "label": "IT Professional",
@@ -14615,6 +16115,16 @@
    "bytes": 9094
   },
   {
+   "id": "it-pro-planning-mode-instructions",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Planning Mode Instructions",
+   "description": "Generate an implementation plan for new features or refactoring existing code.",
+   "emoji": "🛠️",
+   "role": "Planning Mode Instructions specialist",
+   "bytes": 2565
+  },
+  {
    "id": "it-pro-planning-with-files",
    "division": "it-professional",
    "label": "IT Professional",
@@ -14623,6 +16133,16 @@
    "emoji": "🛠️",
    "role": "Planning With Files specialist",
    "bytes": 7953
+  },
+  {
+   "id": "it-pro-platform-sre-for-kubernetes",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Platform SRE For Kubernetes",
+   "description": "SRE-focused Kubernetes specialist prioritizing reliability, safe rollouts/rollbacks, security defaults, and operational verification for production-grade deployments",
+   "emoji": "🛠️",
+   "role": "Platform SRE For Kubernetes specialist",
+   "bytes": 5835
   },
   {
    "id": "it-pro-playwright-java",
@@ -14643,6 +16163,16 @@
    "emoji": "🛠️",
    "role": "Playwright Skill specialist",
    "bytes": 9129
+  },
+  {
+   "id": "it-pro-playwright-tester-mode",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Playwright Tester Mode",
+   "description": "Testing mode for Playwright tests",
+   "emoji": "🛠️",
+   "role": "Playwright Tester Mode specialist",
+   "bytes": 2844
   },
   {
    "id": "it-pro-plotly",
@@ -14755,6 +16285,16 @@
    "bytes": 8841
   },
   {
+   "id": "it-pro-postgresql-database-administrator",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional PostgreSQL Database Administrator",
+   "description": "Work with PostgreSQL databases using the PostgreSQL extension.",
+   "emoji": "🛠️",
+   "role": "PostgreSQL Database Administrator specialist",
+   "bytes": 2792
+  },
+  {
    "id": "it-pro-postgresql-optimization",
    "division": "it-professional",
    "label": "IT Professional",
@@ -14833,6 +16373,66 @@
    "emoji": "🛠️",
    "role": "Postmortem Writing specialist",
    "bytes": 8603
+  },
+  {
+   "id": "it-pro-power-bi-data-modeling-expert-mode",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Power BI Data Modeling Expert Mode",
+   "description": "Expert Power BI data modeling guidance using star schema principles, relationship design, and Microsoft best practices for optimal model performance and usability.",
+   "emoji": "🛠️",
+   "role": "Power BI Data Modeling Expert Mode specialist",
+   "bytes": 8909
+  },
+  {
+   "id": "it-pro-power-bi-dax-expert-mode",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Power BI DAX Expert Mode",
+   "description": "Expert Power BI DAX guidance using Microsoft best practices for performance, readability, and maintainability of DAX formulas and calculations.",
+   "emoji": "🛠️",
+   "role": "Power BI DAX Expert Mode specialist",
+   "bytes": 9033
+  },
+  {
+   "id": "it-pro-power-bi-performance-expert-mode",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Power BI Performance Expert Mode",
+   "description": "Expert Power BI performance optimization guidance for troubleshooting, monitoring, and improving the performance of Power BI models, reports, and queries.",
+   "emoji": "🛠️",
+   "role": "Power BI Performance Expert Mode specialist",
+   "bytes": 8233
+  },
+  {
+   "id": "it-pro-power-bi-visualization-expert-mode",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Power BI Visualization Expert Mode",
+   "description": "Expert Power BI report design and visualization guidance using Microsoft best practices for creating effective, performant, and user-friendly reports and dashboards.",
+   "emoji": "🛠️",
+   "role": "Power BI Visualization Expert Mode specialist",
+   "bytes": 8687
+  },
+  {
+   "id": "it-pro-power-platform-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Power Platform Expert",
+   "description": "Power Platform expert providing guidance on Code Apps, canvas apps, Dataverse, connectors, and Power Platform best practices",
+   "emoji": "🛠️",
+   "role": "Power Platform Expert specialist",
+   "bytes": 8857
+  },
+  {
+   "id": "it-pro-power-platform-mcp-integration-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Power Platform MCP Integration Expert",
+   "description": "Expert in Power Platform custom connector development with MCP integration for Copilot Studio - comprehensive knowledge of schemas, protocols, and integration patterns",
+   "emoji": "🛠️",
+   "role": "Power Platform MCP Integration Expert specialist",
+   "bytes": 8962
   },
   {
    "id": "it-pro-power-user-cultivation",
@@ -14965,6 +16565,16 @@
    "bytes": 8838
   },
   {
+   "id": "it-pro-principal-software-engineer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Principal Software Engineer",
+   "description": "Provide principal-level software engineering guidance with focus on engineering excellence, technical leadership, and pragmatic implementation.",
+   "emoji": "🛠️",
+   "role": "Principal Software Engineer specialist",
+   "bytes": 4162
+  },
+  {
    "id": "it-pro-prisma-expert",
    "division": "it-professional",
    "label": "IT Professional",
@@ -15095,6 +16705,16 @@
    "bytes": 9049
   },
   {
+   "id": "it-pro-production-validator",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Production Validator",
+   "description": "Production validation specialist ensuring applications are fully implemented and deployment-ready",
+   "emoji": "🛠️",
+   "role": "Production Validator specialist",
+   "bytes": 8924
+  },
+  {
    "id": "it-pro-professional-proofreader",
    "division": "it-professional",
    "label": "IT Professional",
@@ -15135,6 +16755,16 @@
    "bytes": 7974
   },
   {
+   "id": "it-pro-project-architecture-planner",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Project Architecture Planner",
+   "description": "Holistic software architecture planner that evaluates tech stacks, designs scalability roadmaps, performs cloud-agnostic cost analysis, reviews existing codebases, and delivers interactive Mermaid diagrams with HTML preview and draw.io export",
+   "emoji": "🛠️",
+   "role": "Project Architecture Planner specialist",
+   "bytes": 9014
+  },
+  {
    "id": "it-pro-project-development",
    "division": "it-professional",
    "label": "IT Professional",
@@ -15143,6 +16773,16 @@
    "emoji": "🛠️",
    "role": "Project Development specialist",
    "bytes": 7700
+  },
+  {
+   "id": "it-pro-project-documenter",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Project Documenter",
+   "description": "Generates professional MS Word project documentation with draw.io architecture diagrams and embedded PNG images. Automatically discovers any project's technology stack, architecture, and code structure. Produces Markdown, draw.io diagrams, PNG exports, and .docx output.",
+   "emoji": "🛠️",
+   "role": "Project Documenter specialist",
+   "bytes": 9150
   },
   {
    "id": "it-pro-project-skill-audit",
@@ -15165,6 +16805,16 @@
    "bytes": 8038
   },
   {
+   "id": "it-pro-project-template-generator",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Project Template Generator",
+   "description": "Use this agent when you need to create foundational templates, boilerplate code, or starter configurations for new projects, components, or features. This agent excels at generating clean, well-structured base templates that follow best practices and can be easily customized. Examples: <example>Context: User needs to start a new React component and wants a solid foundation. user: 'I need to create a new user profile component' assistant: 'I'll use the base-template-generator",
+   "emoji": "🛠️",
+   "role": "Project Template Generator specialist",
+   "bytes": 4793
+  },
+  {
    "id": "it-pro-projection-patterns",
    "division": "it-professional",
    "label": "IT Professional",
@@ -15183,6 +16833,16 @@
    "emoji": "🛠️",
    "role": "Prometheus Configuration specialist",
    "bytes": 7773
+  },
+  {
+   "id": "it-pro-prompt-builder",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Prompt Builder",
+   "description": "Expert prompt engineering and validation system for creating high-quality prompts - Brought to you by microsoft/edge-ai",
+   "emoji": "🛠️",
+   "role": "Prompt Builder specialist",
+   "bytes": 7011
   },
   {
    "id": "it-pro-prompt-caching",
@@ -15295,6 +16955,16 @@
    "bytes": 9055
   },
   {
+   "id": "it-pro-pull-request-manager",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Pull Request Manager",
+   "description": "Complete pull request lifecycle management and GitHub workflow coordination",
+   "emoji": "🛠️",
+   "role": "Pull Request Manager specialist",
+   "bytes": 5029
+  },
+  {
    "id": "it-pro-puppeteer-skill",
    "division": "it-professional",
    "label": "IT Professional",
@@ -15355,6 +17025,16 @@
    "bytes": 2559
   },
   {
+   "id": "it-pro-pyspark-expert-agent",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional PySpark Expert Agent",
+   "description": "Diagnose PySpark performance bottlenecks, distributed execution pitfalls, and suggest Spark-native rewrites and safer distributed patterns (incl. mapInPandas guidance).",
+   "emoji": "🛠️",
+   "role": "PySpark Expert Agent specialist",
+   "bytes": 6292
+  },
+  {
    "id": "it-pro-pytest-skill",
    "division": "it-professional",
    "label": "IT Professional",
@@ -15393,6 +17073,26 @@
    "emoji": "🛠️",
    "role": "Python Fastapi Development specialist (granular-workflow-bundle)",
    "bytes": 7153
+  },
+  {
+   "id": "it-pro-python-mcp-server-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Python MCP Server Expert",
+   "description": "Expert assistant for developing Model Context Protocol (MCP) servers in Python",
+   "emoji": "🛠️",
+   "role": "Python MCP Server Expert specialist",
+   "bytes": 7852
+  },
+  {
+   "id": "it-pro-python-notebook-sample-builder",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Python Notebook Sample Builder",
+   "description": "Custom agent for building Python Notebooks in VS Code that demonstrate Azure and AI features",
+   "emoji": "🛠️",
+   "role": "Python Notebook Sample Builder specialist",
+   "bytes": 4923
   },
   {
    "id": "it-pro-python-packaging",
@@ -15455,6 +17155,16 @@
    "bytes": 3497
   },
   {
+   "id": "it-pro-qa-subagent",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional QA Subagent",
+   "description": "Meticulous QA subagent for test planning, bug hunting, edge-case analysis, and implementation verification.",
+   "emoji": "🛠️",
+   "role": "QA Subagent specialist",
+   "bytes": 5981
+  },
+  {
    "id": "it-pro-qiskit",
    "division": "it-professional",
    "label": "IT Professional",
@@ -15483,6 +17193,16 @@
    "emoji": "🛠️",
    "role": "Quality Nonconformance specialist",
    "bytes": 9071
+  },
+  {
+   "id": "it-pro-quality-playbook",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Quality Playbook",
+   "description": "Run a complete quality engineering audit on any codebase. Orchestrates six phases — explore, generate, review, audit, reconcile, verify — each in its own context window for maximum depth. Then runs iteration strategies to find even more bugs. Finds the 35% of real defects that structural code review alone cannot catch.",
+   "emoji": "🛠️",
+   "role": "Quality Playbook specialist",
+   "bytes": 8617
   },
   {
    "id": "it-pro-quant-analyst",
@@ -15645,6 +17365,16 @@
    "bytes": 3311
   },
   {
+   "id": "it-pro-react-native-developer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional React Native Developer",
+   "description": "Expert agent for React Native mobile application development across iOS and Android",
+   "emoji": "🛠️",
+   "role": "React Native Developer specialist",
+   "bytes": 3846
+  },
+  {
    "id": "it-pro-react-native-skills",
    "division": "it-professional",
    "label": "IT Professional",
@@ -15693,6 +17423,116 @@
    "emoji": "🛠️",
    "role": "React Ui Patterns specialist",
    "bytes": 8938
+  },
+  {
+   "id": "it-pro-react18-auditor",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional React18 Auditor",
+   "description": "Deep-scan specialist for React 16/17 class-component codebases targeting React 18.3.1. Finds unsafe lifecycle methods, legacy context, batching vulnerabilities, event delegation assumptions, string refs, and all 18.3.1 deprecation surface. Reads everything, touches nothing. Saves .github/react18-audit.md.",
+   "emoji": "🛠️",
+   "role": "React18 Auditor specialist",
+   "bytes": 8565
+  },
+  {
+   "id": "it-pro-react18-batching-fixer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional React18 Batching Fixer",
+   "description": "Automatic batching regression specialist. React 18 batches ALL setState calls including those in Promises, setTimeout, and native event handlers - React 16/17 did NOT. Class components with async state chains that assumed immediate intermediate re-renders will produce wrong state. This agent finds every vulnerable pattern and fixes with flushSync where semantically required.",
+   "emoji": "🛠️",
+   "role": "React18 Batching Fixer specialist",
+   "bytes": 8774
+  },
+  {
+   "id": "it-pro-react18-class-surgeon",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional React18 Class Surgeon",
+   "description": "Class component migration specialist for React 16/17 → 18.3.1. Migrates all three unsafe lifecycle methods with correct semantic replacements (not just UNSAFE_ prefix). Migrates legacy context to createContext, string refs to React.createRef(), findDOMNode to direct refs, and ReactDOM.render to createRoot. Uses memory to checkpoint per-file progress.",
+   "emoji": "🛠️",
+   "role": "React18 Class Surgeon specialist",
+   "bytes": 8052
+  },
+  {
+   "id": "it-pro-react18-commander",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional React18 Commander",
+   "description": "Master orchestrator for React 16/17 → 18.3.1 migration. Designed for class-component-heavy codebases. Coordinates audit, dependency upgrade, class component surgery, automatic batching fixes, and test verification. Uses memory to gate each phase and resume interrupted sessions. 18.3.1 is the target - it surface-exposes every deprecation that React 19 will remove, so the output is a codebase ready for the React 19 orchestra next.",
+   "emoji": "🛠️",
+   "role": "React18 Commander specialist",
+   "bytes": 8281
+  },
+  {
+   "id": "it-pro-react18-dep-surgeon",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional React18 Dep Surgeon",
+   "description": "Dependency upgrade specialist for React 16/17 → 18.3.1. Pins to 18.3.1 exactly (not 18.x latest). Upgrades RTL to v14, Apollo 3.8+, Emotion 11.10+, react-router v6. Detects and blocks on Enzyme (no React 18 support). Returns GO/NO-GO to commander.",
+   "emoji": "🛠️",
+   "role": "React18 Dep Surgeon specialist",
+   "bytes": 7710
+  },
+  {
+   "id": "it-pro-react18-test-guardian",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional React18 Test Guardian",
+   "description": "Test suite fixer and verifier for React 16/17 → 18.3.1 migration. Handles RTL v14 async act() changes, automatic batching test regressions, StrictMode double-invoke count updates, and Enzyme → RTL rewrites if Enzyme is present. Loops until zero test failures. Invoked as subagent by react18-commander.",
+   "emoji": "🛠️",
+   "role": "React18 Test Guardian specialist",
+   "bytes": 8811
+  },
+  {
+   "id": "it-pro-react19-auditor",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional React19 Auditor",
+   "description": "Deep-scan specialist that identifies every React 19 breaking change and deprecated pattern across the entire codebase. Produces a prioritized migration report at .github/react19-audit.md. Reads everything, touches nothing. Invoked as a subagent by react19-commander.",
+   "emoji": "🛠️",
+   "role": "React19 Auditor specialist",
+   "bytes": 9045
+  },
+  {
+   "id": "it-pro-react19-commander",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional React19 Commander",
+   "description": "Master orchestrator for React 19 migration. Invokes specialist subagents in sequence - auditor, dep-surgeon, migrator, test-guardian - and gates advancement between steps. Uses memory to track migration state across the pipeline. Zero tolerance for incomplete migrations.",
+   "emoji": "🛠️",
+   "role": "React19 Commander specialist",
+   "bytes": 7969
+  },
+  {
+   "id": "it-pro-react19-dep-surgeon",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional React19 Dep Surgeon",
+   "description": "Dependency upgrade specialist. Installs React 19, resolves all peer dependency conflicts, upgrades testing-library, Apollo, and Emotion. Uses memory to log each upgrade step. Returns GO/NO-GO to the commander. Invoked as a subagent by react19-commander.",
+   "emoji": "🛠️",
+   "role": "React19 Dep Surgeon specialist",
+   "bytes": 4729
+  },
+  {
+   "id": "it-pro-react19-migrator",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional React19 Migrator",
+   "description": "Source code migration engine. Rewrites every deprecated React pattern to React 19 APIs - forwardRef, defaultProps, ReactDOM.render, legacy context, string refs, useRef(). Uses memory to checkpoint progress per file. Never touches test files. Returns zero-deprecated-pattern confirmation to commander.",
+   "emoji": "🛠️",
+   "role": "React19 Migrator specialist",
+   "bytes": 7923
+  },
+  {
+   "id": "it-pro-react19-test-guardian",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional React19 Test Guardian",
+   "description": "Test suite fixer and verification specialist. Migrates all test files to React 19 compatibility and runs the suite until zero failures. Uses memory to track per-file fix progress and failure history. Does not stop until npm test reports 0 failures. Invoked as a subagent by react19-commander.",
+   "emoji": "🛠️",
+   "role": "React19 Test Guardian specialist",
+   "bytes": 8526
   },
   {
    "id": "it-pro-read-all-adrs",
@@ -15785,6 +17625,16 @@
    "bytes": 9001
   },
   {
+   "id": "it-pro-reepl-linkedin",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Reepl Linkedin",
+   "description": "AI-powered LinkedIn content creation, scheduling, and analytics agent. Create posts, carousels, and manage your LinkedIn presence with GitHub Copilot.",
+   "emoji": "🛠️",
+   "role": "Reepl Linkedin specialist",
+   "bytes": 4183
+  },
+  {
    "id": "it-pro-reference-builder",
    "division": "it-professional",
    "label": "IT Professional",
@@ -15805,6 +17655,16 @@
    "bytes": 5128
   },
   {
+   "id": "it-pro-refine-requirement-or-issue",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Refine Requirement OR Issue",
+   "description": "Refine the requirement or issue with Acceptance Criteria, Technical Considerations, Edge Cases, and NFRs",
+   "emoji": "🛠️",
+   "role": "Refine Requirement OR Issue specialist",
+   "bytes": 2943
+  },
+  {
    "id": "it-pro-rehabilitation-analyzer",
    "division": "it-professional",
    "label": "IT Professional",
@@ -15813,6 +17673,16 @@
    "emoji": "🛠️",
    "role": "Rehabilitation Analyzer specialist",
    "bytes": 2895
+  },
+  {
+   "id": "it-pro-release-manager",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Release Manager",
+   "description": "Automated release coordination and deployment with ruv-swarm orchestration for seamless version management, testing, and deployment across multiple packages",
+   "emoji": "🛠️",
+   "role": "Release Manager specialist",
+   "bytes": 4530
   },
   {
    "id": "it-pro-remote-gpu-trainer",
@@ -15855,6 +17725,16 @@
    "bytes": 8838
   },
   {
+   "id": "it-pro-repo-architect-agent",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Repo Architect Agent",
+   "description": "Bootstraps and validates agentic project structures for GitHub Copilot (VS Code) and OpenCode CLI workflows. Run after `opencode /init` or VS Code Copilot initialization to scaffold proper folder hierarchies, instructions, agents, skills, and prompts.",
+   "emoji": "🛠️",
+   "role": "Repo Architect Agent specialist",
+   "bytes": 9246
+  },
+  {
    "id": "it-pro-repo-maintainer",
    "division": "it-professional",
    "label": "IT Professional",
@@ -15865,6 +17745,16 @@
    "bytes": 7612
   },
   {
+   "id": "it-pro-repository-architect",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Repository Architect",
+   "description": "Repository structure and multi-repository architecture for scalable projects: layout, ownership, shared code, release lines.",
+   "emoji": "🛠️",
+   "role": "Repository Architect specialist",
+   "bytes": 4422
+  },
+  {
    "id": "it-pro-requesting-code-review",
    "division": "it-professional",
    "label": "IT Professional",
@@ -15873,6 +17763,16 @@
    "emoji": "🛠️",
    "role": "Requesting Code Review specialist",
    "bytes": 5006
+  },
+  {
+   "id": "it-pro-research-harness-engineer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Research Harness Engineer",
+   "description": "Research harness engineer for experiment campaigns: builds evaluation harnesses that are hard to fool, then keeps every reported number honest - null models first, calibration/held-out separation, baseline reproduction before improvement claims, paired error bars, and guards verified by deliberate breakage.",
+   "emoji": "🛠️",
+   "role": "Research Harness Engineer specialist",
+   "bytes": 4906
   },
   {
    "id": "it-pro-research-prompt",
@@ -16085,6 +17985,16 @@
    "bytes": 8764
   },
   {
+   "id": "it-pro-ruby-mcp-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Ruby MCP Expert",
+   "description": "Expert assistance for building Model Context Protocol servers in Ruby using the official MCP Ruby SDK gem with Rails integration.",
+   "emoji": "🛠️",
+   "role": "Ruby MCP Expert specialist",
+   "bytes": 8695
+  },
+  {
    "id": "it-pro-ruby-pro",
    "division": "it-professional",
    "label": "IT Professional",
@@ -16093,6 +18003,46 @@
    "emoji": "🛠️",
    "role": "Ruby Pro specialist",
    "bytes": 3893
+  },
+  {
+   "id": "it-pro-ruflo-code-reviewer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Ruflo Code Reviewer",
+   "description": "Code review and quality assurance specialist",
+   "emoji": "🛠️",
+   "role": "Ruflo Code Reviewer specialist",
+   "bytes": 7732
+  },
+  {
+   "id": "it-pro-ruflo-performance-optimizer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Ruflo Performance Optimizer",
+   "description": "System performance optimization agent that identifies bottlenecks and optimizes resource allocation using sublinear algorithms. Specializes in computational performance analysis, system optimization, resource management, and efficiency maximization across distributed systems and cloud infrastructure.",
+   "emoji": "🛠️",
+   "role": "Ruflo Performance Optimizer specialist",
+   "bytes": 8192
+  },
+  {
+   "id": "it-pro-ruflo-security-audit",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Ruflo Security Audit",
+   "description": "Security scanning and vulnerability detection for application code: input validation, path traversal, injection, secrets, dependency CVEs, authentication and authorization checks.",
+   "emoji": "🛠️",
+   "role": "Ruflo Security Audit specialist",
+   "bytes": 3797
+  },
+  {
+   "id": "it-pro-rug",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional RUG",
+   "description": "Pure orchestration agent that decomposes requests, delegates all work to subagents, validates outcomes, and repeats until complete.",
+   "emoji": "🛠️",
+   "role": "RUG specialist",
+   "bytes": 8260
   },
   {
    "id": "it-pro-run-deep-swe",
@@ -16133,6 +18083,16 @@
    "emoji": "🛠️",
    "role": "Rust Async Patterns specialist",
    "bytes": 3200
+  },
+  {
+   "id": "it-pro-rust-mcp-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Rust MCP Expert",
+   "description": "Expert assistant for Rust MCP server development using the rmcp SDK with tokio async runtime",
+   "emoji": "🛠️",
+   "role": "Rust MCP Expert specialist",
+   "bytes": 8901
   },
   {
    "id": "it-pro-rust-pro",
@@ -16195,6 +18155,16 @@
    "bytes": 8383
   },
   {
+   "id": "it-pro-salesforce-apex-triggers-development",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Salesforce Apex & Triggers Development",
+   "description": "Implement Salesforce business logic using Apex classes and triggers with production-quality code following Salesforce best practices.",
+   "emoji": "🛠️",
+   "role": "Salesforce Apex & Triggers Development specialist",
+   "bytes": 9175
+  },
+  {
    "id": "it-pro-salesforce-automation",
    "division": "it-professional",
    "label": "IT Professional",
@@ -16213,6 +18183,46 @@
    "emoji": "🛠️",
    "role": "Salesforce Development specialist",
    "bytes": 3414
+  },
+  {
+   "id": "it-pro-salesforce-expert-agent",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Salesforce Expert Agent",
+   "description": "Provide expert Salesforce Platform guidance, including Apex Enterprise Patterns, LWC, integration, and Aura-to-LWC migration.",
+   "emoji": "🛠️",
+   "role": "Salesforce Expert Agent specialist",
+   "bytes": 8502
+  },
+  {
+   "id": "it-pro-salesforce-flow-development",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Salesforce Flow Development",
+   "description": "Implement business automation using Salesforce Flow following declarative automation best practices.",
+   "emoji": "🛠️",
+   "role": "Salesforce Flow Development specialist",
+   "bytes": 8086
+  },
+  {
+   "id": "it-pro-salesforce-ui-development-aura-lwc",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Salesforce UI Development (Aura & LWC)",
+   "description": "Implement Salesforce UI components using Lightning Web Components and Aura components following Lightning framework best practices.",
+   "emoji": "🛠️",
+   "role": "Salesforce UI Development (Aura & LWC) specialist",
+   "bytes": 8968
+  },
+  {
+   "id": "it-pro-salesforce-visualforce-development",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Salesforce Visualforce Development",
+   "description": "Implement Visualforce pages and controllers following Salesforce MVC architecture and best practices.",
+   "emoji": "🛠️",
+   "role": "Salesforce Visualforce Development specialist",
+   "bytes": 8537
   },
   {
    "id": "it-pro-sam-altman",
@@ -16253,6 +18263,16 @@
    "emoji": "🛠️",
    "role": "Sast Configuration specialist",
    "bytes": 8443
+  },
+  {
+   "id": "it-pro-sast-sca-security-analyzer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Sast Sca Security Analyzer",
+   "description": "Use when: performing SAST (Static Application Security Testing), SCA (Software Composition Analysis), scanning source code or binaries for security flaws, auditing third-party dependency vulnerabilities, checking policy compliance, generating structured security reports, identifying CWE-mapped flaws with file/line precision, reviewing open-source license risk, or producing CI/CD-gate security findings.",
+   "emoji": "🛠️",
+   "role": "Sast Sca Security Analyzer specialist",
+   "bytes": 9405
   },
   {
    "id": "it-pro-satori",
@@ -16313,6 +18333,16 @@
    "emoji": "🛠️",
    "role": "Schema Markup specialist",
    "bytes": 8708
+  },
+  {
+   "id": "it-pro-scientific-paper-research",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Scientific Paper Research",
+   "description": "Research agent that searches scientific papers and retrieves structured experimental data from full-text studies using the BGPT MCP server.",
+   "emoji": "🛠️",
+   "role": "Scientific Paper Research specialist",
+   "bytes": 3941
   },
   {
    "id": "it-pro-scientific-writing",
@@ -16395,6 +18425,76 @@
    "bytes": 3269
   },
   {
+   "id": "it-pro-se-architect",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional SE: Architect",
+   "description": "System architecture review specialist with Well-Architected frameworks, design validation, and scalability analysis for AI and distributed systems",
+   "emoji": "🛠️",
+   "role": "SE: Architect specialist",
+   "bytes": 5959
+  },
+  {
+   "id": "it-pro-se-devops-ci",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional SE: DevOps/CI",
+   "description": "DevOps specialist for CI/CD pipelines, deployment debugging, and GitOps workflows focused on making deployments boring and reliable",
+   "emoji": "🛠️",
+   "role": "SE: DevOps/CI specialist",
+   "bytes": 7076
+  },
+  {
+   "id": "it-pro-se-product-manager",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional SE: Product Manager",
+   "description": "Product management guidance for creating GitHub issues, aligning business value with user needs, and making data-driven product decisions",
+   "emoji": "🛠️",
+   "role": "SE: Product Manager specialist",
+   "bytes": 8103
+  },
+  {
+   "id": "it-pro-se-responsible-ai",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional SE: Responsible AI",
+   "description": "Responsible AI specialist ensuring AI works for everyone through bias prevention, accessibility compliance, ethical development, and inclusive design",
+   "emoji": "🛠️",
+   "role": "SE: Responsible AI specialist",
+   "bytes": 8197
+  },
+  {
+   "id": "it-pro-se-security",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional SE: Security",
+   "description": "Security-focused code review specialist with OWASP Top 10, Zero Trust, LLM security, and enterprise security standards",
+   "emoji": "🛠️",
+   "role": "SE: Security specialist",
+   "bytes": 5554
+  },
+  {
+   "id": "it-pro-se-tech-writer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional SE: Tech Writer",
+   "description": "Technical writing specialist for creating developer documentation, technical blogs, tutorials, and educational content",
+   "emoji": "🛠️",
+   "role": "SE: Tech Writer specialist",
+   "bytes": 8354
+  },
+  {
+   "id": "it-pro-se-ux-designer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional SE: UX Designer",
+   "description": "Jobs-to-be-Done analysis, user journey mapping, and UX research artifacts for Figma and design workflows",
+   "emoji": "🛠️",
+   "role": "SE: UX Designer specialist",
+   "bytes": 8736
+  },
+  {
    "id": "it-pro-seaborn",
    "division": "it-professional",
    "label": "IT Professional",
@@ -16403,6 +18503,16 @@
    "emoji": "🛠️",
    "role": "Seaborn specialist",
    "bytes": 2948
+  },
+  {
+   "id": "it-pro-search-ai-optimization-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Search & AI Optimization Expert",
+   "description": "Expert guidance for modern search optimization: SEO, Answer Engine Optimization (AEO), and Generative Engine Optimization (GEO) with AI-ready content strategies",
+   "emoji": "🛠️",
+   "role": "Search & AI Optimization Expert specialist",
+   "bytes": 9113
   },
   {
    "id": "it-pro-search-specialist",
@@ -16595,6 +18705,16 @@
    "bytes": 6616
   },
   {
+   "id": "it-pro-senior-cloud-architect",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Senior Cloud Architect",
+   "description": "Expert in modern architecture design patterns, NFR requirements, and creating comprehensive architectural diagrams and documentation",
+   "emoji": "🛠️",
+   "role": "Senior Cloud Architect specialist",
+   "bytes": 8823
+  },
+  {
    "id": "it-pro-senior-frontend",
    "division": "it-professional",
    "label": "IT Professional",
@@ -16613,6 +18733,16 @@
    "emoji": "🛠️",
    "role": "Senior Fullstack specialist",
    "bytes": 6564
+  },
+  {
+   "id": "it-pro-sensei-junior-mentor",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Sensei Junior Mentor",
+   "description": "Socratic mentor for junior developers. Guides through questions, never gives direct answers. Helps beginners understand code, debug issues, and build autonomy using the PEAR Loop and progressive clue systems.",
+   "emoji": "🛠️",
+   "role": "Sensei Junior Mentor specialist",
+   "bytes": 8430
   },
   {
    "id": "it-pro-sentry-automation",
@@ -17145,6 +19275,16 @@
    "bytes": 8689
   },
   {
+   "id": "it-pro-shopify-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Shopify Expert",
+   "description": "Expert Shopify development assistant specializing in theme development, Liquid templating, app development, and Shopify APIs",
+   "emoji": "🛠️",
+   "role": "Shopify Expert specialist",
+   "bytes": 8924
+  },
+  {
    "id": "it-pro-shopify-review-triage",
    "division": "it-professional",
    "label": "IT Professional",
@@ -17565,6 +19705,16 @@
    "bytes": 5934
   },
   {
+   "id": "it-pro-software-engineer-agent",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Software Engineer Agent",
+   "description": "Expert-level software engineering agent. Deliver production-ready, maintainable code. Execute systematically and specification-driven. Document comprehensively. Operate autonomously and adaptively.",
+   "emoji": "🛠️",
+   "role": "Software Engineer Agent specialist",
+   "bytes": 8536
+  },
+  {
    "id": "it-pro-solidity-security",
    "division": "it-professional",
    "label": "IT Professional",
@@ -17583,6 +19733,56 @@
    "emoji": "🛠️",
    "role": "Source Driven Development specialist",
    "bytes": 8979
+  },
+  {
+   "id": "it-pro-sparc-implementer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional SPARC Implementer",
+   "description": "Transform specifications into working code with TDD practices",
+   "emoji": "🛠️",
+   "role": "SPARC Implementer specialist",
+   "bytes": 7250
+  },
+  {
+   "id": "it-pro-sparc-methodology",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional SPARC Methodology",
+   "description": "The SPARC development method: Specification, Pseudocode, Architecture, Refinement, Completion, with test-driven refinement and integration at the end.",
+   "emoji": "🛠️",
+   "role": "SPARC Methodology specialist",
+   "bytes": 3626
+  },
+  {
+   "id": "it-pro-sparc-pseudocode",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional SPARC Pseudocode",
+   "description": "SPARC Pseudocode phase specialist for algorithm design",
+   "emoji": "🛠️",
+   "role": "SPARC Pseudocode specialist",
+   "bytes": 8668
+  },
+  {
+   "id": "it-pro-sparc-refinement",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional SPARC Refinement",
+   "description": "SPARC Refinement phase specialist for iterative improvement",
+   "emoji": "🛠️",
+   "role": "SPARC Refinement specialist",
+   "bytes": 8184
+  },
+  {
+   "id": "it-pro-sparc-specification",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional SPARC Specification",
+   "description": "SPARC Specification phase specialist for requirements analysis",
+   "emoji": "🛠️",
+   "role": "SPARC Specification specialist",
+   "bytes": 8222
   },
   {
    "id": "it-pro-spark-optimization",
@@ -17623,6 +19823,16 @@
    "emoji": "🛠️",
    "role": "Spec To Code Compliance specialist",
    "bytes": 9148
+  },
+  {
+   "id": "it-pro-specification",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Specification",
+   "description": "Generate or update specification documents for new or existing functionality.",
+   "emoji": "🛠️",
+   "role": "Specification specialist",
+   "bytes": 7285
   },
   {
    "id": "it-pro-speckit-updater",
@@ -17743,6 +19953,16 @@
    "emoji": "🛠️",
    "role": "Stability Ai specialist",
    "bytes": 8904
+  },
+  {
+   "id": "it-pro-stackhawk-security-onboarding",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Stackhawk Security Onboarding",
+   "description": "Automatically set up StackHawk security testing for your repository with generated configuration and GitHub Actions workflow",
+   "emoji": "🛠️",
+   "role": "Stackhawk Security Onboarding specialist",
+   "bytes": 8464
   },
   {
    "id": "it-pro-startup-analyst",
@@ -18015,6 +20235,16 @@
    "bytes": 8366
   },
   {
+   "id": "it-pro-swe",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional SWE",
+   "description": "Senior software engineer subagent for implementation tasks: feature development, debugging, refactoring, and testing.",
+   "emoji": "🛠️",
+   "role": "SWE specialist",
+   "bytes": 4944
+  },
+  {
    "id": "it-pro-swift-concurrency-expert",
    "division": "it-professional",
    "label": "IT Professional",
@@ -18023,6 +20253,16 @@
    "emoji": "🛠️",
    "role": "Swift Concurrency Expert specialist",
    "bytes": 6442
+  },
+  {
+   "id": "it-pro-swift-mcp-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Swift MCP Expert",
+   "description": "Expert assistance for building Model Context Protocol servers in Swift using modern concurrency features and the official MCP Swift SDK.",
+   "emoji": "🛠️",
+   "role": "Swift MCP Expert specialist",
+   "bytes": 7228
   },
   {
    "id": "it-pro-swiftui-expert-skill",
@@ -18083,6 +20323,26 @@
    "emoji": "🛠️",
    "role": "Sympy specialist",
    "bytes": 4184
+  },
+  {
+   "id": "it-pro-system-architecture",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional System Architecture",
+   "description": "SPARC Architecture phase specialist for system design",
+   "emoji": "🛠️",
+   "role": "System Architecture specialist",
+   "bytes": 8871
+  },
+  {
+   "id": "it-pro-system-design-architect",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional System Design Architect",
+   "description": "Expert agent for system architecture design, patterns, and high-level technical decisions",
+   "emoji": "🛠️",
+   "role": "System Design Architect specialist",
+   "bytes": 3046
   },
   {
    "id": "it-pro-systematic-debugging",
@@ -18165,6 +20425,26 @@
    "bytes": 9050
   },
   {
+   "id": "it-pro-task-planner-instructions",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Task Planner Instructions",
+   "description": "Task planner for creating actionable implementation plans - Brought to you by microsoft/edge-ai",
+   "emoji": "🛠️",
+   "role": "Task Planner Instructions specialist",
+   "bytes": 8477
+  },
+  {
+   "id": "it-pro-task-researcher-instructions",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Task Researcher Instructions",
+   "description": "Task research specialist for comprehensive project analysis - Brought to you by microsoft/edge-ai",
+   "emoji": "🛠️",
+   "role": "Task Researcher Instructions specialist",
+   "bytes": 8115
+  },
+  {
    "id": "it-pro-tavily-web",
    "division": "it-professional",
    "label": "IT Professional",
@@ -18173,6 +20453,16 @@
    "emoji": "🛠️",
    "role": "Tavily Web specialist",
    "bytes": 3056
+  },
+  {
+   "id": "it-pro-taxcore-technical-writer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional TaxCore Technical Writer",
+   "description": "A domain-expert technical writer for the TaxCore electronic fiscal invoicing ecosystem. Use this agent to create, improve, or review documentation for TaxCore applications — including the Secure Element Reader, smart card workflows, fiscal invoicing concepts, audit processes, and PKI/SE security topics. Covers end-user guides, developer docs, reference material, and setup guides across all TaxCore-related surfaces.",
+   "emoji": "🛠️",
+   "role": "TaxCore Technical Writer specialist",
+   "bytes": 9039
   },
   {
    "id": "it-pro-tcm-constitution-analyzer",
@@ -18185,6 +20475,26 @@
    "bytes": 3136
   },
   {
+   "id": "it-pro-tdd-green-phase-make-tests-pass-quickly",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional TDD Green Phase Make Tests Pass Quickly",
+   "description": "Implement minimal code to satisfy GitHub issue requirements and make failing tests pass without over-engineering.",
+   "emoji": "🛠️",
+   "role": "TDD Green Phase Make Tests Pass Quickly specialist",
+   "bytes": 5183
+  },
+  {
+   "id": "it-pro-tdd-london-school",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional TDD London School",
+   "description": "Test-driven development in the London (mockist) school: outside-in design, behaviour verified through collaborators, tests first.",
+   "emoji": "🛠️",
+   "role": "TDD London School specialist",
+   "bytes": 5924
+  },
+  {
    "id": "it-pro-tdd-orchestrator",
    "division": "it-professional",
    "label": "IT Professional",
@@ -18193,6 +20503,26 @@
    "emoji": "🛠️",
    "role": "Tdd Orchestrator specialist",
    "bytes": 8983
+  },
+  {
+   "id": "it-pro-tdd-red-phase-write-failing-tests-first",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional TDD Red Phase Write Failing Tests First",
+   "description": "Guide test-first development by writing failing tests that describe desired behaviour from GitHub issue context before implementation exists.",
+   "emoji": "🛠️",
+   "role": "TDD Red Phase Write Failing Tests First specialist",
+   "bytes": 5505
+  },
+  {
+   "id": "it-pro-tdd-refactor-phase-improve-quality-securi",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional TDD Refactor Phase Improve Quality & Security",
+   "description": "Improve code quality, apply security best practices, and enhance design whilst maintaining green tests and GitHub issue compliance.",
+   "emoji": "🛠️",
+   "role": "TDD Refactor Phase Improve Quality & Security specialist",
+   "bytes": 6826
   },
   {
    "id": "it-pro-tdd-workflow",
@@ -18315,6 +20645,36 @@
    "bytes": 3823
   },
   {
+   "id": "it-pro-technical-content-evaluator",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Technical Content Evaluator",
+   "description": "Elite technical content editor and curriculum architect for evaluating technical training materials, documentation, and educational content. Reviews for technical accuracy, pedagogical excellence, content flow, code validation, and ensures A-grade quality standards.",
+   "emoji": "🛠️",
+   "role": "Technical Content Evaluator specialist",
+   "bytes": 8651
+  },
+  {
+   "id": "it-pro-technical-debt-remediation-plan",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Technical Debt Remediation Plan",
+   "description": "Generate technical debt remediation plans for code, tests, and documentation.",
+   "emoji": "🛠️",
+   "role": "Technical Debt Remediation Plan specialist",
+   "bytes": 3429
+  },
+  {
+   "id": "it-pro-technical-spike-research-mode",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Technical Spike Research Mode",
+   "description": "Systematically research and validate technical spike documents through exhaustive investigation and controlled experimentation.",
+   "emoji": "🛠️",
+   "role": "Technical Spike Research Mode specialist",
+   "bytes": 8978
+  },
+  {
    "id": "it-pro-technical-tutorials",
    "division": "it-professional",
    "label": "IT Professional",
@@ -18405,6 +20765,36 @@
    "bytes": 7519
   },
   {
+   "id": "it-pro-terminal-helper",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Terminal Helper",
+   "description": "Fast terminal syntax and command helper for PowerShell and Bash",
+   "emoji": "🛠️",
+   "role": "Terminal Helper specialist",
+   "bytes": 4218
+  },
+  {
+   "id": "it-pro-terraform-agent",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Terraform Agent",
+   "description": "Terraform infrastructure specialist with automated HCP Terraform workflows. Leverages Terraform MCP server for registry integration, workspace management, and run orchestration. Generates compliant code using latest provider/module versions, manages private registries, automates variable sets, and orchestrates infrastructure deployments with proper validation and security practices.",
+   "emoji": "🛠️",
+   "role": "Terraform Agent specialist",
+   "bytes": 9418
+  },
+  {
+   "id": "it-pro-terraform-aws-implement",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Terraform Aws Implement",
+   "description": "Act as an AWS Terraform Infrastructure as Code coding specialist that creates and reviews Terraform for AWS resources.",
+   "emoji": "🛠️",
+   "role": "Terraform Aws Implement specialist",
+   "bytes": 6200
+  },
+  {
    "id": "it-pro-terraform-aws-modules",
    "division": "it-professional",
    "label": "IT Professional",
@@ -18413,6 +20803,26 @@
    "emoji": "🛠️",
    "role": "Terraform Aws Modules specialist",
    "bytes": 4589
+  },
+  {
+   "id": "it-pro-terraform-aws-planning",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Terraform Aws Planning",
+   "description": "Act as implementation planner for your AWS Terraform Infrastructure as Code task.",
+   "emoji": "🛠️",
+   "role": "Terraform Aws Planning specialist",
+   "bytes": 4400
+  },
+  {
+   "id": "it-pro-terraform-iac-reviewer",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Terraform IaC Reviewer",
+   "description": "Terraform-focused agent that reviews and creates safer IaC changes with emphasis on state safety, least privilege, module patterns, drift detection, and plan/apply discipline",
+   "emoji": "🛠️",
+   "role": "Terraform IaC Reviewer specialist",
+   "bytes": 6191
   },
   {
    "id": "it-pro-terraform-infrastructure",
@@ -18453,6 +20863,16 @@
    "emoji": "🛠️",
    "role": "Terraform Specialist specialist",
    "bytes": 8491
+  },
+  {
+   "id": "it-pro-terratest-module-testing",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Terratest Module Testing",
+   "description": "Generate and refactor Go Terratest suites for Terraform modules, including CI-safe patterns, staged tests, and negative-path validation.",
+   "emoji": "🛠️",
+   "role": "Terratest Module Testing specialist",
+   "bytes": 5184
   },
   {
    "id": "it-pro-test-automator",
@@ -18503,6 +20923,16 @@
    "emoji": "🛠️",
    "role": "Test Guard specialist",
    "bytes": 8679
+  },
+  {
+   "id": "it-pro-tester",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Tester",
+   "description": "Comprehensive testing and quality assurance specialist",
+   "emoji": "🛠️",
+   "role": "Tester specialist",
+   "bytes": 8548
   },
   {
    "id": "it-pro-testing-patterns",
@@ -18915,6 +21345,16 @@
    "bytes": 8325
   },
   {
+   "id": "it-pro-trojan-skill-hunter",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Trojan Skill Hunter",
+   "description": "Audits agent, skill, instruction, hook, and MCP-config contributions for hidden prompt injection, tool poisoning, unicode steganography, and excessive-agency red flags before they are merged, installed, or trusted — mapped to the OWASP Top 10 for LLM Applications and real-world MCP attack research.",
+   "emoji": "🛠️",
+   "role": "Trojan Skill Hunter specialist",
+   "bytes": 6473
+  },
+  {
    "id": "it-pro-trpc-fullstack",
    "division": "it-professional",
    "label": "IT Professional",
@@ -19003,6 +21443,16 @@
    "emoji": "🛠️",
    "role": "Typescript Expert specialist (framework)",
    "bytes": 6657
+  },
+  {
+   "id": "it-pro-typescript-mcp-server-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional TypeScript MCP Server Expert",
+   "description": "Expert assistant for developing Model Context Protocol (MCP) servers in TypeScript",
+   "emoji": "🛠️",
+   "role": "TypeScript MCP Server Expert specialist",
+   "bytes": 7941
   },
   {
    "id": "it-pro-typescript-pro",
@@ -19243,6 +21693,26 @@
    "emoji": "🛠️",
    "role": "Unity Ecs Patterns specialist",
    "bytes": 3180
+  },
+  {
+   "id": "it-pro-universal-janitor",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Universal Janitor",
+   "description": "Perform janitorial tasks on any codebase including cleanup, simplification, and tech debt remediation.",
+   "emoji": "🛠️",
+   "role": "Universal Janitor specialist",
+   "bytes": 4383
+  },
+  {
+   "id": "it-pro-universal-pr-comment-addresser",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Universal PR Comment Addresser",
+   "description": "Address PR comments",
+   "emoji": "🛠️",
+   "role": "Universal PR Comment Addresser specialist",
+   "bytes": 2914
   },
   {
    "id": "it-pro-unreal-engine-cpp-pro",
@@ -19865,6 +22335,16 @@
    "bytes": 5126
   },
   {
+   "id": "it-pro-vs-code-insiders-accessibility-tracker",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional VS Code Insiders Accessibility Tracker",
+   "description": "Specialized agent for tracking and analyzing accessibility improvements in VS Code Insiders builds",
+   "emoji": "🛠️",
+   "role": "VS Code Insiders Accessibility Tracker specialist",
+   "bytes": 4695
+  },
+  {
    "id": "it-pro-vscode-extension-guide-en",
    "division": "it-professional",
    "label": "IT Professional",
@@ -19873,6 +22353,16 @@
    "emoji": "🛠️",
    "role": "Vscode Extension Guide En specialist (core-dev)",
    "bytes": 5239
+  },
+  {
+   "id": "it-pro-vscode-tour-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional VSCode Tour Expert",
+   "description": "Expert agent for creating and maintaining VSCode CodeTour files with comprehensive schema support and best practices",
+   "emoji": "🛠️",
+   "role": "VSCode Tour Expert specialist",
+   "bytes": 8751
   },
   {
    "id": "it-pro-vulnerability-scanner",
@@ -20085,6 +22575,26 @@
    "bytes": 9027
   },
   {
+   "id": "it-pro-wg-code-alchemist",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional WG Code Alchemist",
+   "description": "Ask WG Code Alchemist to transform your code with Clean Code principles and SOLID design",
+   "emoji": "🛠️",
+   "role": "WG Code Alchemist specialist",
+   "bytes": 6001
+  },
+  {
+   "id": "it-pro-wg-code-sentinel",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional WG Code Sentinel",
+   "description": "Ask WG Code Sentinel to review your code for security issues.",
+   "emoji": "🛠️",
+   "role": "WG Code Sentinel specialist",
+   "bytes": 5044
+  },
+  {
    "id": "it-pro-wgm",
    "division": "it-professional",
    "label": "IT Professional",
@@ -20203,6 +22713,16 @@
    "emoji": "🛠️",
    "role": "Windows Shell Reliability specialist",
    "bytes": 5886
+  },
+  {
+   "id": "it-pro-winforms-expert",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional WinForms Expert",
+   "description": "Support development of .NET (OOP) WinForms Designer compatible Apps.",
+   "emoji": "🛠️",
+   "role": "WinForms Expert specialist",
+   "bytes": 8452
   },
   {
    "id": "it-pro-wireshark-analysis",
@@ -20333,6 +22853,16 @@
    "emoji": "🛠️",
    "role": "Workorai specialist (productivity)",
    "bytes": 6764
+  },
+  {
+   "id": "it-pro-workshop-ta",
+   "division": "it-professional",
+   "label": "IT Professional",
+   "name": "IT Professional Workshop TA",
+   "description": "Room coordinator for a multi-agent workshop. Sees all desks, routes work, tracks state, manages journals, and emits coordination signals. Not a desk — the person who sees the whole room.",
+   "emoji": "🛠️",
+   "role": "Workshop TA specialist",
+   "bytes": 8349
   },
   {
    "id": "it-pro-wp-site-health-auditor",

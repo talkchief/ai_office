@@ -1,7 +1,7 @@
 // Turn a folder of Agent Skills (one SKILL.md per subfolder) into Agency personas the CEO can hire, then rebuild the Agency index.
 //
 //   node scripts/import-skills.mjs <skills folder> [--division it-professional] [--label "IT Professional"] [--prefix "IT Professional "]
-//                                  [--max 7000] [--skip-risk offensive] [--source "<url> (MIT)"]
+//                                  [--max 7000] [--skip-risk offensive] [--source "<url> (MIT)"] [--catalogue "Agentic Awesome Skills"]
 //   node scripts/import-skills.mjs --reindex        → rebuild agency/index.json from the persona files on disk, nothing else
 //
 // Each persona is named "<prefix><skill title>", carries the skill's own text as its method (cut at a heading past --max characters),
@@ -25,7 +25,7 @@ const cutAtHeading = (text, max) => { if (text.length <= max) return text; const
 const oneLine = (s, max) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, max);
 
 // One persona per skill: the office's persona shape (identity, mission, method, rules) around the skill's own text.
-export function personaFromSkill(markdown, { id, prefix = 'IT Professional ', max = 7000, source = '' } = {}) {
+export function personaFromSkill(markdown, { id, prefix = 'IT Professional ', max = 7000, source = '', catalogue = 'Agentic Awesome Skills' } = {}) {
   const { meta, body } = readFrontMatter(markdown);
   const skillId = meta.id || meta.name || id, title = titleOf(meta.name && !/^\d/.test(meta.name) ? meta.name : skillId), name = `${prefix}${title}`;
   const description = oneLine(meta.description, 480) || `Applies the ${title} skill.`;
@@ -48,7 +48,7 @@ You are **${name}**: you carry one skill, "${title}", and apply it exactly as wr
 - **Role**: ${title} specialist${category ? ' (' + category + ')' : ''}
 - **Personality**: Methodical; follows the skill's steps in order and names the step behind every result
 - **Memory**: Keeps the skill's checklist and the files it touched for the current task
-- **Experience**: The ${title} skill from the Agentic Awesome Skills catalogue${category ? ', ' + category : ''}
+- **Experience**: The ${title} skill from the ${catalogue} catalogue${category ? ', ' + category : ''}
 
 ## 🎯 Core Mission
 - Apply the ${title} skill to the assignment, step by step, without skipping a step
@@ -89,12 +89,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const source = args.find(a => !a.startsWith('--') && (args.indexOf(a) === 0 || !args[args.indexOf(a) - 1].startsWith('--')));
   if (!source || !fs.existsSync(source)) { console.error('usage: node scripts/import-skills.mjs <skills folder> [--division id] [--label "Name"] [--prefix "Name "] [--max 7000] [--skip-risk offensive]'); process.exit(2); }
   const division = flag('--division', 'it-professional'), label = flag('--label', 'IT Professional'), prefix = flag('--prefix', 'IT Professional '), max = Number(flag('--max', 7000)) || 7000;
-  const skip = new Set(String(flag('--skip-risk', 'offensive')).split(',').map(s => s.trim().toLowerCase()).filter(Boolean)), sourceNote = flag('--source', '');
+  const skip = new Set(String(flag('--skip-risk', 'offensive')).split(',').map(s => s.trim().toLowerCase()).filter(Boolean)), sourceNote = flag('--source', ''), catalogue = flag('--catalogue', 'Agentic Awesome Skills');
   const out = path.join(AGENCY, 'personas', division); fs.mkdirSync(out, { recursive: true });
   let written = 0, skipped = 0; const seen = new Set();
   for (const dir of fs.readdirSync(source).sort()) {
     const skill = path.join(source, dir, 'SKILL.md'); if (!fs.existsSync(skill)) continue;
-    const persona = personaFromSkill(fs.readFileSync(skill, 'utf8'), { id: dir, prefix, max, source: sourceNote });
+    const persona = personaFromSkill(fs.readFileSync(skill, 'utf8'), { id: dir, prefix, max, source: sourceNote, catalogue });
     if (skip.has(persona.risk)) { skipped++; continue; }
     let id = persona.id; for (let n = 2; seen.has(id); n++) id = persona.id.slice(0, 44) + '-' + n; seen.add(id);
     fs.writeFileSync(path.join(out, id + '.md'), persona.text); written++;

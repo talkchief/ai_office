@@ -57,7 +57,44 @@ export function retryAfterMs(res) {
   const at = Date.parse(h); return Number.isFinite(at) ? Math.max(0, at - Date.now()) : null;
 }
 const sleep = (ms, signal) => new Promise(resolve => { const done = () => { clearTimeout(t); signal?.removeEventListener?.('abort', done); resolve(); }; const t = setTimeout(done, ms); signal?.addEventListener?.('abort', done, { once: true }); });
-export async function fetchWithRetries(fetchImpl, url, init, { attempts = 3, pause = 400, resend = true, total = RESEND_TOTAL_MS, pauses = RESEND_PAUSES, onWait } = {}) {
+// An error a provider reports inside a successful answer: OpenRouter accepts a streamed request and, when the upstream then
+// refuses it (its rate limit arrives this way), sends a 200 whose first event is an error object; a small JSON answer can
+// carry one too. The first data event is peeked (comment lines such as ": OPENROUTER PROCESSING" are skipped) and an error
+// there is treated like its code; anything else is handed on untouched, the peeked bytes first.
+const RETRY_MESSAGE = /rate.?limit|too many requests|overloaded|temporarily|try again|capacity|unavailable|timed? ?out|internal server error|bad gateway|upstream/i;
+export const PEEK_MS = 30000;
+const errorIn = data => { try { const v = JSON.parse(data); const e = v?.error; if (!e) return null; const code = Number(e.code || e.status || v.code) || 0, message = String(e.message || e || ''); return { code, message, retry: RETRY_STATUS.has(code) || RETRY_MESSAGE.test(message) }; } catch { return null; } };
+async function peekAnswer(res, ms = PEEK_MS) {
+  const type = String(res.headers?.get?.('content-type') || '');
+  if (!res.body || res.status !== 200) return { res };
+  if (/application\/json/.test(type)) { const text = await res.text(); return { res: new Response(text, { status: res.status, statusText: res.statusText, headers: res.headers }), error: errorIn(text) }; }
+  if (!/text\/event-stream/.test(type)) return { res };
+  const reader = res.body.getReader(), decoder = new TextDecoder(), chunks = []; let text = '', done = false, error = null;
+  const deadline = Date.now() + ms;
+  while (!done && text.length < 16384) {
+    let timer; const next = await Promise.race([reader.read(), new Promise(r => { timer = setTimeout(() => r({ late: true }), Math.max(1, deadline - Date.now())); })]); clearTimeout(timer);
+    if (next.late) break;
+    if (next.done) { done = true; break; }
+    chunks.push(next.value); text += decoder.decode(next.value, { stream: true });
+    const block = text.split('\n\n').find(b => /^data:/m.test(b)); if (!block) continue;
+    if (!text.includes(block + '\n\n') && !done) continue;
+    const data = block.split('\n').filter(l => l.startsWith('data:')).map(l => l.slice(5).trim()).join('\n');
+    error = errorIn(data); break;
+  }
+  if (error?.retry) { try { await reader.cancel(); } catch {} return { res, error }; }
+  // Hand the answer on as it was: the peeked bytes first, then the rest of the stream.
+  let i = 0;
+  const body = new ReadableStream({
+    async pull(controller) {
+      if (i < chunks.length) { controller.enqueue(chunks[i++]); return; }
+      if (done) { controller.close(); return; }
+      try { const next = await reader.read(); if (next.done) { done = true; controller.close(); } else controller.enqueue(next.value); } catch (e) { controller.error(e); }
+    },
+    cancel(reason) { return reader.cancel(reason).catch(() => {}); },
+  });
+  return { res: new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers }), error };
+}
+export async function fetchWithRetries(fetchImpl, url, init, { attempts = 3, pause = 400, resend = true, total = RESEND_TOTAL_MS, pauses = RESEND_PAUSES, peekMs = PEEK_MS, onWait } = {}) {
   let netFails = 0, waits = 0, waited = 0;
   for (;;) {
     let res;
@@ -67,12 +104,15 @@ export async function fetchWithRetries(fetchImpl, url, init, { attempts = 3, pau
       if (netFails >= attempts || !RETRY_NETWORK.test(text) || !canResend(init?.body) || init?.signal?.aborted) throw error;
       await sleep(pause * netFails, init?.signal); continue;
     }
-    if (!resend || !RETRY_STATUS.has(res.status) || !canResend(init?.body) || init?.signal?.aborted) return res;
+    if (!resend || !canResend(init?.body) || init?.signal?.aborted) return res;
+    let status = res.status;
+    if (status === 200) { const peeked = await peekAnswer(res, peekMs); res = peeked.res; if (!peeked.error?.retry) return res; status = peeked.error.code || 503; }
+    else if (!RETRY_STATUS.has(status)) return res;
     const delay = Math.min(retryAfterMs(res) ?? pauses[Math.min(waits, pauses.length - 1)], 60000);
     if (waited + delay > total) return res;
     try { await res.body?.cancel?.(); } catch {}
     waits++; waited += delay;
-    try { onWait?.({ status: res.status, attempt: waits, delay, url: String(url) }); } catch {}
+    try { onWait?.({ status, attempt: waits, delay, url: String(url) }); } catch {}
     await sleep(delay, init?.signal);
     if (init?.signal?.aborted) throw init.signal.reason || new Error('The call was stopped while waiting for the provider.');
   }

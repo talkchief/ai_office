@@ -150,7 +150,18 @@ export function initOfficeWork(ctx) {
     const html = rightNowHTML(rows);
     if (el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; el.querySelectorAll('[data-agent]').forEach(row => row.onclick = () => { const id = row.dataset.agent; if (id === 'program-manager') projectUI.open(); else ctx.openAgent && ctx.openAgent(id, 'activity'); }); }
     const ago = lastRefreshAt ? Math.max(0, Math.round((Date.now() - lastRefreshAt) / 1000)) : null;
-    const prov = $('spaceProvider'); if (prov) { const n = providerHealth?.lastHour || 0; prov.hidden = !n; if (n) prov.textContent = `The model provider failed ${n} time${n === 1 ? '' : 's'} in the last hour${providerHealth.last ? ' (last: ' + providerHealth.last.reason.slice(0, 80) + ')' : ''}. Tasks retry on their own; if it keeps happening, change the model under Manage → Models & keys.`; }
+    // The provider notice can be dismissed; it stays away until a newer failure than the one dismissed comes in.
+    const prov = $('spaceProvider'); if (prov) {
+      const n = providerHealth?.lastHour || 0, at = providerHealth?.last?.at || 0; let dismissed = 0; try { dismissed = Number(localStorage.getItem('providerNoticeDismissed')) || 0; } catch {}
+      prov.hidden = !n || at <= dismissed;
+      if (!prov.hidden && prov.dataset.at !== String(at)) {
+        prov.dataset.at = String(at);
+        const text = document.createElement('span'); text.textContent = `The model provider failed ${n} time${n === 1 ? '' : 's'} in the last hour${providerHealth.last ? ' (last: ' + providerHealth.last.reason.slice(0, 80) + ')' : ''}. Tasks retry on their own; if it keeps happening, change the model under Manage → Models & keys.`;
+        const close = document.createElement('button'); close.type = 'button'; close.className = 'space-notice-close'; close.setAttribute('aria-label', 'Dismiss this notice'); close.title = 'Dismiss'; close.textContent = '×';
+        close.onclick = () => { try { localStorage.setItem('providerNoticeDismissed', String(at)); } catch {} prov.hidden = true; };
+        prov.replaceChildren(text, close);
+      }
+    }
     const off = $('spaceOffline'); if (off) { off.hidden = !connectionStale; if (connectionStale) off.textContent = `Lost the server${ago != null ? ' ' + ago + 's ago' : ''}. Showing the last known state; work animations paused until it’s back.`; }
   }
   setInterval(renderNow, 1500);
