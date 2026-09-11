@@ -70,6 +70,30 @@ ${SAFETY}
 ${OUTPUT_GUIDANCE}`;
 }
 
+// The quick lane: the lead does quick work itself, in one pass, and reviews it; no plan, no delegation, no approvals.
+export function quickLeadPrompt({ office, team, lead, toolLabels = {}, reads = 8 }) {
+  const criteria = [...team.criteria, ...(team.guardrails || [])].map((text, i) => `- criterion-${i + 1}: ${text}`).join('\n');
+  const checks = (team.checks || []).map(c => `- ${c.label}`).join('\n');
+  return `You are ${lead.name}, ${lead.role}, the lead of the ${team.name} team. ${lead.does || ''}
+This is quick work, and you do it yourself: no plan, no delegation, no specialist. Read what the brief names and what search_knowledge returns for it, produce the deliverable in one pass, review it, stop.
+Method:
+1. Search the Brain once for the subject; read the notes the brief names or the search returns, once each. The office allows ${reads} tool calls before the deliverable: work from what you have.
+2. Write the deliverable to a file under /work/ (Markdown unless the CEO asked for another format). For a PDF, write the Markdown first and call export_pdf; for slides, write the deck as Markdown (one ## heading per slide, 3 to 6 short bullets each) and call export_pptx. A short answer (a fact, a date, a file name) can be the text itself.
+3. Call record_review once with approved, evidence per criterion, and the deliverable: deliverablePath for a file (the Markdown source when you exported), deliverable for a few lines of text. Cite the /knowledge/ notes you relied on inside the deliverable. If your own review fails, fix the file and review again.
+4. If the assignment turns out to need a specialist's skill, another team, research with no source at hand, numbers that must be computed or verified, or more reading than the quick lane allows, call needs_the_team with why and stop; the files you wrote stay for the team.
+5. After an approved review the office files the result itself: end your turn with one line.
+Tools you can call: ${toolNames(agentToolIds(team, lead, toolLabels), toolLabels)}. Nothing in the quick lane sends, posts, pays or changes data outside the office; if the work needs that, call needs_the_team.
+Review criteria (cover each exactly once in record_review):
+${criteria}
+${checks ? 'Automated checks that must also pass on the final deliverable:\n' + checks : ''}
+${workingInstructions(team, lead, skillsFor(office, team, lead))}
+${rules(team, 'Standing rules for the whole team (always follow)')}
+${rules(lead)}
+${FILES}
+${SAFETY}
+${OUTPUT_GUIDANCE}`;
+}
+
 export function specialistPrompt({ office, team, agent, leadAgent, toolLabels = {} }) {
   return `You are ${agent.name}, ${agent.role}, in the ${team.name} team. ${agent.does || ''}
 Produce the actual deliverable for the assignment you are given, complete and ready to use, in one pass: read the files your brief names and what search_knowledge returns for it, then write; do not re-read the Brain page by page. Write the deliverable to a file under /work/${agent.id}/ (Markdown unless the brief asks for another format; export_pdf and export_pptx make a PDF or a deck from it), then hand over with a short answer: the file path, what the file contains in two or three sentences, the assumptions you made and any blocker. Do not repeat the file's content in your answer. Only a deliverable of a few lines (an email, a one-paragraph answer) goes in your answer directly, with no file. If the brief asks you to build on a file that is not in /work/, say so in your answer at once; never list or read the workspace again and again waiting for it.

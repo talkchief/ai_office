@@ -6,6 +6,7 @@ import path from 'node:path';
 import { OfficeStore } from '../office-store.mjs';
 import { loadRoster } from '../roster.mjs';
 import { programManagerPrompt, leadPrompt, specialistPrompt } from '../engine/prompts.mjs';
+import { quickLeadPrompt } from '../engine/prompts.mjs';
 
 const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'talkchief-prompts-'));
 const labels = { Google_Calendar: 'Google Calendar', web: 'Web search & fetch' };
@@ -87,4 +88,10 @@ test('a lead and the Program Manager are told which person has a tool the team l
   const pm = programManagerPrompt({ office, name: 'Northgate', teams: office.teams, toolLabels: labels });
   assert.match(pm, /FINANCE[\s\S]*Tools: Google Calendar; INVOICING also has Web search & fetch/);
   assert.ok(specialistPrompt({ office, team: fin, agent: invo, leadAgent: alead, toolLabels: labels }).includes('Tools you can call: Google Calendar, Web search & fetch.'));
+});
+
+test('the quick-lane prompt tells the lead to work alone, export, review and hand the task to the team when it is bigger', () => {
+  const office = { skills: [], agents: [], teams: [] }, team = { id: 'marketing', name: 'Marketing', criteria: ['Cites its sources'], guardrails: [], checks: [], tools: [], skills: [], rules: [] }, lead = { id: 'mlead', name: 'Maya', role: 'Marketing Lead', does: 'Leads marketing.', rules: [], skills: [], tools: [] };
+  const text = quickLeadPrompt({ office, team, lead });
+  assert.match(text, /This is quick work, and you do it yourself/); assert.match(text, /export_pdf/); assert.match(text, /record_review once/); assert.match(text, /needs_the_team/); assert.match(text, /criterion-1: Cites its sources/); assert.match(text, /allows 8 tool calls/);
 });

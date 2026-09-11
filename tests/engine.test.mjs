@@ -34,13 +34,13 @@ function sendHub(sent) {
   const sendEmail = tool(async ({ to, body }) => { sent.push({ to, body }); return `sent to ${to}`; }, { name: 'send_email', description: 'Send an email', schema: z.object({ to: z.string(), body: z.string() }) });
   return { tools: [sendEmail], calls: [], async ensure() {}, toolsFor(args) { this.calls.push(args); return args.evaluation || args.readOnly ? { tools: [], interruptOn: {} } : { tools: [sendEmail], interruptOn: { send_email: { allowedDecisions: ['approve', 'edit', 'reject'] } } }; } };
 }
-function fixture({ dir = temp(), pm, lead, specialist, settings = {}, hub = null, configure, keep = false, knowledgeIndex = null, brain = null, engineOptions = {} } = {}) {
+function fixture({ dir = temp(), pm, lead, specialist, triage, settings = {}, hub = null, configure, keep = false, knowledgeIndex = null, brain = null, engineOptions = {} } = {}) {
   const office = new OfficeStore({ dataDir: dir, initialAgents: loadRoster().agents });
   if (configure) { const config = office.get(); configure(config); office.update(config); }
   const team = office.team('marketing'), workers = office.agents().filter(a => a.department === 'marketing' && a.id !== team.lead).map(a => a.id);
-  const scripts = { pm: pm || defaultPm, lead: lead ? lead(workers) : defaultLead(workers[0]), specialist: specialist || (() => ({ text: 'Verified result and evidence.' })) };
+  const scripts = { pm: pm || defaultPm, lead: lead ? lead(workers) : defaultLead(workers[0]), specialist: specialist || (() => ({ text: 'Verified result and evidence.' })), triage: triage || (() => ({ text: '{"lane":"standard","why":"the test default"}' })) };
   const meter = { active: 0, peak: 0, start() { this.active++; this.peak = Math.max(this.peak, this.active); }, end() { this.active--; } };
-  const models = { resolve: ({ role }) => ({ model: role === 'specialist' ? 'specialist' : role === 'pm' ? 'pm' : 'lead', effort: '' }), instance: async ({ model }) => new ScriptedModel(model, scripts[model], { meter }) };
+  const models = { resolve: ({ role }) => ({ model: role === 'specialist' ? 'specialist' : role === 'pm' ? 'pm' : role === 'triage' ? 'triage' : 'lead', effort: '' }), instance: async ({ model }) => new ScriptedModel(model, scripts[model], { meter }) };
   const completed = [];
   const engine = new OfficeEngine({ dataDir: dir, office, models, toolHub: hub, knowledgeDir: path.join(dir, 'knowledge'), knowledgeIndex, brain, settings: () => settings, onComplete: async job => { completed.push(job.id); }, ...engineOptions });
   return { dir, office, engine, workers, worker: workers[0], meter, completed, close: async () => { await engine.close(); if (!keep) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } };
@@ -733,4 +733,79 @@ test('the Program Manager plans with write_todos, sees its project-management sk
     assert.ok(refused, 'a delegation before the plan was refused'); assert.ok(f.engine.events(id).some(e => e.type === 'delegation_refused'));
     assert.equal(done.runs.filter(r => r.role === 'lead').length, 1, 'the refused delegation never ran');
   } finally { await f.close(); }
+});
+
+/* ---------- the fast lane ---------- */
+const QUICK_TRIAGE = () => ({ text: '{"lane":"quick","team":"marketing","effort":"low","why":"a short brief from a note the Brain holds"}' });
+// A lead script that behaves in the quick lane (its prompt says "quick work") and falls back to the standard lead otherwise.
+const quickLead = (quick, workers) => { const standard = defaultLead(workers[0]); return context => /This is quick work/.test(context.system) ? quick(context) : standard(context); };
+const quickDelivers = ({ last, system }) => {
+  if (last.type === 'human') return { calls: [call('write_file', { file_path: '/work/brief.md', content: '# Brief\n\nVerified result and evidence, from /knowledge/Company/plan.md.' })] };
+  if (last.type === 'tool' && !/^Review recorded/.test(last.text)) return { calls: [call('record_review', { approved: true, summary: 'Checked every criterion myself.', criteria: criteria(system).map(id => ({ id, passed: true, evidence: 'Present in the file.' })), deliverablePath: '/work/brief.md' })] };
+  return { text: 'Filed.' };
+};
+
+test('quick lane: the lead alone reads, writes and reviews; the office files the result without the Program Manager', async () => {
+  const f = fixture({ triage: QUICK_TRIAGE, lead: workers => quickLead(quickDelivers, workers), pm: () => ({ text: 'The Program Manager should not run in the quick lane.' }) });
+  try {
+    const id = start(f, { text: 'Make a one-page brief from the company plan note.' }); const done = await until(f.engine, id, ['done']);
+    assert.equal(done.lane, 'quick'); assert.equal(done.laneTeam, 'marketing'); assert.equal(done.laneEffort, 'low');
+    assert.deepEqual(done.runs.map(r => [r.role, r.state, r.lane, r.effort]), [['lead', 'done', 'quick', 'low']]);
+    assert.equal(done.review.approved, true); assert.equal(done.review.self, true); assert.match(done.result, /^# Brief/);
+    assert.ok(done.events.some(e => e.type === 'lane_chosen' && /^Quick lane, MARKETING, effort low/i.test(e.message)));
+    assert.ok(done.events.some(e => e.type === 'completed' && e.agent === f.office.team('marketing').lead && /Quick lane/.test(e.message)));
+    assert.ok(!done.events.some(e => e.agent === 'pm'), 'the Program Manager never ran'); assert.equal(done.pmStarted, undefined);
+    assert.deepEqual(f.completed, [id]);
+    assert.ok(fs.existsSync(path.join(f.engine.workspaceDir(id), 'brief.md')), 'the lead wrote through the office file system');
+  } finally { await f.close(); }
+});
+
+test('quick lane: past the budget the task is promoted to the team with its files kept, and the Program Manager is told', async () => {
+  let n = 0, pmFirst = '';
+  const thrashing = ({ last }) => { n++; if (n === 1) return { calls: [call('write_file', { file_path: '/work/notes.md', content: 'Partial notes.' })] }; return { calls: [call('ls', { path: `/work/dir-${n}` })] }; };
+  const f = fixture({ triage: QUICK_TRIAGE, lead: workers => quickLead(thrashing, workers), pm: context => { if (context.last.type === 'human' && !pmFirst) pmFirst = context.last.text; return defaultPm(context); } });
+  try {
+    const id = start(f, { text: 'Write the launch report.' }); const done = await until(f.engine, id, ['done'], 30000);
+    assert.equal(done.lane, 'standard'); assert.ok(done.promotedAt); assert.match(done.promoteWhy, /14 tool calls/);
+    assert.deepEqual(done.runs.map(r => [r.role, r.state]), [['lead', 'promoted'], ['lead', 'done'], ['specialist', 'done']]);
+    assert.ok(done.events.some(e => e.type === 'steps_capped')); assert.ok(done.events.some(e => e.type === 'lane_promoted' && /Promoted to the team/.test(e.message)));
+    assert.match(pmFirst, /started in the quick lane/); assert.match(pmFirst, /\/work\/notes\.md/);
+    assert.equal(done.review.approved, true); assert.equal(done.review.self, undefined, 'the final review is the standard lead review of a specialist');
+  } finally { await f.close(); }
+});
+
+test('quick lane: needs_the_team promotes at once, and a lead that ends without a review is re-prompted once, then promoted', async () => {
+  const asks = ({ last }) => last.type === 'human' ? { calls: [call('needs_the_team', { why: 'this needs web research nobody here can do alone' })] } : { text: 'Handed to the team.' };
+  const f = fixture({ triage: QUICK_TRIAGE, lead: workers => quickLead(asks, workers) });
+  try {
+    const id = start(f); const done = await until(f.engine, id, ['done'], 30000);
+    assert.ok(done.events.some(e => e.type === 'lane_promotion_requested' && /web research/.test(e.message))); assert.match(done.promoteWhy, /web research/);
+    assert.deepEqual(done.runs.map(r => [r.role, r.state]), [['lead', 'promoted'], ['lead', 'done'], ['specialist', 'done']]);
+  } finally { await f.close(); }
+  const silent = ({ last }) => ({ text: last.type === 'human' && /you have not recorded your review/.test(last.text) ? 'Sorry, nothing to record.' : 'Here is my answer in prose, no review.' });
+  const g = fixture({ triage: QUICK_TRIAGE, lead: workers => quickLead(silent, workers) });
+  try {
+    const id = start(g); const done = await until(g.engine, id, ['done'], 30000);
+    assert.equal(done.events.filter(e => e.type === 'reprompted').length, 1); assert.match(done.promoteWhy, /did not record a review/);
+    assert.equal(done.runs[0].state, 'promoted'); assert.equal(done.review.approved, true);
+  } finally { await g.close(); }
+});
+
+test('triage: a pinned lane is honoured, an unparseable answer means the standard lane, and the fast lane can be switched off', async () => {
+  const f = fixture({ triage: () => ({ text: '{"lane":"standard","why":"triage says no"}' }), lead: workers => quickLead(quickDelivers, workers) });
+  try {
+    const id = start(f, { lane: 'quick' }); const done = await until(f.engine, id, ['done']);
+    assert.equal(done.lane, 'quick'); assert.equal(done.lanePinned, true); assert.equal(done.runs.length, 1); assert.equal(done.review.self, true);
+  } finally { await f.close(); }
+  const g = fixture({ triage: () => ({ text: 'I cannot say.' }) });
+  try {
+    const id = start(g); const done = await until(g.engine, id, ['done']);
+    assert.equal(done.lane, 'standard'); assert.ok(done.events.some(e => e.type === 'lane_chosen' && /^Standard lane/.test(e.message))); assert.equal(done.runs.length, 2);
+  } finally { await g.close(); }
+  let asked = false;
+  const h = fixture({ triage: () => { asked = true; return QUICK_TRIAGE(); }, settings: { fastLane: false } });
+  try {
+    const id = start(h); const done = await until(h.engine, id, ['done']);
+    assert.equal(asked, false, 'no triage call when the fast lane is off'); assert.equal(done.lane, 'standard'); assert.equal(done.runs.length, 2);
+  } finally { await h.close(); }
 });

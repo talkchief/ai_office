@@ -116,7 +116,7 @@ export function renderTaskWorkspace(job, tab, actions = '') {
   const lead = name(job.team.lead);
 
   /* ---- the head: who, the state, the title, the facts that are not about the model ---- */
-  const head = `<div class="tv-head"><div class="tv-top"><span class="mg-eyebrow">Task · ${esc(job.team.name)} · ${esc(lead)}</span>${stateMark(job)}${job.projectName ? `<span class="tv-chip">${esc(job.projectName)}</span>` : ''}</div><h1 class="tv-title">${esc(job.title)}</h1>
+  const head = `<div class="tv-head"><div class="tv-top"><span class="mg-eyebrow">Task · ${esc(job.team.name)} · ${esc(lead)}</span>${stateMark(job)}${job.lane === 'quick' ? '<span class="tv-chip" title="Quick work: the lead delivered and reviewed it alone">Quick lane</span>' : ''}${job.projectName ? `<span class="tv-chip">${esc(job.projectName)}</span>` : ''}</div><h1 class="tv-title">${esc(job.title)}</h1>
     <div class="tv-facts">${job.createdAt ? `<span>created <b>${esc(short(job.createdAt))}</b></span>` : ''}${dur ? `<span>took <b>${esc(dur)}</b></span>` : ''}${job.dueAt ? `<span>due <b>${esc(short(job.dueAt))}</b></span>` : ''}${job.state === 'done' && (job.doneAt || job.review?.at) ? `<span>approved <b>${esc(short(job.doneAt || job.review.at))}</b> · filed in the Brain</span>` : ''}${total ? `<span><b>${submitted}</b> of <b>${total}</b> assignments submitted</span>` : ''}</div></div>`;
 
   /* ---- the decision: what this task needs from you, with the controls inside it ---- */

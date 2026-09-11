@@ -6,14 +6,14 @@ import { randomUUID } from 'node:crypto';
 import { Command } from '@langchain/langgraph';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import { safeFileName } from '../channels/channel.mjs';
-import { HumanMessage, ToolMessage } from '@langchain/core/messages';
+import { HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
-import { createMiddleware, todoListMiddleware } from 'langchain';
-import { createDeepAgent, registerHarnessProfile } from 'deepagents';
+import { createAgent, createMiddleware, todoListMiddleware } from 'langchain';
+import { createDeepAgent, createFilesystemMiddleware, registerHarnessProfile } from 'deepagents';
 import { z } from 'zod';
 import { officeBackend, FILE_PERMISSIONS, PM_FILE_PERMISSIONS, SKILL_SOURCES } from './backend.mjs';
 import { ROOT } from '../config.mjs';
-import { programManagerPrompt, leadPrompt, specialistPrompt, leadName } from './prompts.mjs';
+import { programManagerPrompt, leadPrompt, specialistPrompt, quickLeadPrompt, leadName } from './prompts.mjs';
 import { exportPdfTool, exportPptxTool, assembleFilesTool, listWorkspaceFiles, workspaceFile, mimeOf } from './documents.mjs';
 import { fetchWithRetries } from '../models.mjs';
 import { DatabasePool, validateQuery, markdownTable, schemaText } from '../connectors/database.mjs';
@@ -25,7 +25,7 @@ import { SshRunner, validateCommand } from '../connectors/ssh.mjs';
 export const PROVIDERS_WITHOUT_GENERAL_WORKER = ['anthropic', 'openai', 'google'];
 for (const provider of PROVIDERS_WITHOUT_GENERAL_WORKER) registerHarnessProfile(provider, { generalPurposeSubagent: { enabled: false } });
 import { checkOutput, coveredCriteria } from './checks.mjs';
-import { RunTracker, toolOutputText, parseTaskInput } from './stream.mjs';
+import { RunTracker, toolOutputText, parseTaskInput, runTitle } from './stream.mjs';
 import { Notifications } from '../notifications.mjs';
 import { Threads } from '../threads.mjs';
 
@@ -38,7 +38,7 @@ export const involved = job => [...new Set((job.runs || []).filter(r => r.role =
 // Calls that change something outside the office through the Vault pause for the CEO, like every outbound action: a request to an
 // outside service, an upload, a data change on a database, a command on a server. Reads (api_get, db_query, db_schema) are free.
 export const VAULT_APPROVALS = { api_request: { allowedDecisions: ['approve', 'edit', 'reject'] }, api_upload: { allowedDecisions: ['approve', 'reject'] }, db_write: { allowedDecisions: ['approve', 'edit', 'reject'] }, ssh_run: { allowedDecisions: ['approve', 'edit', 'reject'] } };
-export const DEFAULT_SETTINGS = { maxConcurrentJobs: 2, runTimeoutMinutes: 20, escalateAfterHours: 1, outboundTools: [], readOnlyTools: [] };
+export const DEFAULT_SETTINGS = { maxConcurrentJobs: 2, runTimeoutMinutes: 20, escalateAfterHours: 1, outboundTools: [], readOnlyTools: [], fastLane: true };
 const clean = value => String(value ?? '').trim();
 const httpError = (message, status = 400) => Object.assign(new Error(message), { status });
 const bounded = (value, fallback, min, max) => { const n = Number(value); return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.round(n))) : fallback; };
@@ -75,6 +75,27 @@ export function isProviderError(error) {
   if (PROVIDER_STATUS.has(status)) return true;
   return /api.?key|unauthori[sz]ed|authenticat|permission denied|insufficient|quota|credit|rate.?limit|too many requests|overloaded|model.{0,40}(not found|does not exist)|no such model|provider/i.test(String(error?.message || ''));
 }
+
+// The fast lane. Quick work (a lookup, a short answer, a summary, a PDF or a deck from a note the Brain already holds, a short
+// draft from existing material) is done by the team's lead alone, as a plain agent, in seconds; everything else goes through
+// the Program Manager. The lane is decided on arrival (triage) and can only widen: past its budget, or when the lead asks for
+// the team, a quick task is promoted to the standard lane with its workspace kept.
+class PromoteError extends Error {}
+const TRIAGE_MS = 6000, QUICK_SILENCE_MS = 45000, QUICK_READS = 8, QUICK_CALLS = 14;
+const QUICK_FINISH = new Set(['write_file', 'edit_file', 'export_pdf', 'export_pptx', 'assemble_files', 'record_review', 'needs_the_team', 'report_progress']);
+const QUICK_READ_TOOLS = new Set(['vault_list', 'api_get', 'db_list', 'db_schema', 'db_query', 'ssh_list']);
+const TRIAGE_PROMPT = `You size a task for a company office. Answer with one JSON object and nothing else: {"lane":"quick"|"standard","team":"<team id>","effort":"low"|"medium"|"high","why":"<one short sentence>"}.
+quick: one person can finish it in minutes with what the company Brain already holds or what the brief itself says: a lookup, a short answer, a summary, a format conversion (a PDF or a deck from an existing note), a short draft (an email, a note, a checklist) from existing material.
+standard: research with no source at hand, work for several people or teams, numbers that must be computed or verified, anything that needs a specialist's skill, anything the CEO will send out that needs a second pair of eyes, anything you are unsure about.
+team: the team whose purpose fits best, one of the ids given. effort: low for lookups, formatting and drafts from existing material; medium for standard deliverables; high for numbers, analysis and decisions.`;
+const oneLine = (value, max) => clean(value).replace(/\s+/g, ' ').slice(0, max);
+const textOf = content => typeof content === 'string' ? content : Array.isArray(content) ? content.map(p => typeof p === 'string' ? p : p?.text || '').join('') : '';
+const parseJsonReply = text => { const m = /\{[\s\S]*\}/.exec(String(text || '')); if (!m) return null; try { return JSON.parse(m[0]); } catch { return null; } };
+const withTimeout = (promise, ms, signal) => new Promise((resolve, reject) => {
+  const timer = setTimeout(() => reject(new Error(`no answer within ${Math.round(ms / 1000)} s`)), ms); timer.unref?.();
+  const stop = () => { clearTimeout(timer); reject(signal?.reason || new Error('Stopped.')); }; signal?.addEventListener?.('abort', stop, { once: true });
+  promise.then(v => { clearTimeout(timer); signal?.removeEventListener?.('abort', stop); resolve(v); }, e => { clearTimeout(timer); signal?.removeEventListener?.('abort', stop); reject(e); });
+});
 
 export class OfficeEngine {
   constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent, pmSkillsDir = null, toolLabels = () => ({}), memoryFactory = null, projectFor = () => null, brain = null, vault = null, connectors = {}, providerRetryDelays = [30000, 90000, 180000, 300000] }) {
@@ -138,7 +159,7 @@ export class OfficeEngine {
     return new Set(this.list().filter(j => !TERMINAL.has(j.state) && j.state !== 'backlog').flatMap(j => [...(j.runs || []).filter(r => ['working', 'paused'].includes(r.state)).map(r => r.agent), ...(j.autoRoute ? involved(j) : j.depts || [j.dept]).map(d => office.teams.find(t => t.id === d)?.lead)]).filter(Boolean));
   }
   /* ---------- creating and scheduling ---------- */
-  create({ dept, depts, text, title, model, effort, kind = 'task', testId, suiteId, routine = null, backlog = false, priority = 1, assignee = null, dueAt = null, autoStart = true, completionApproval, requireHumanApproval, projectId = null, ownerId = null, visibility = 'private', sharedWith = null, origin = null }) {
+  create({ dept, depts, text, title, model, effort, kind = 'task', testId, suiteId, routine = null, backlog = false, priority = 1, assignee = null, dueAt = null, autoStart = true, completionApproval, requireHumanApproval, projectId = null, ownerId = null, visibility = 'private', sharedWith = null, origin = null, lane = null }) {
     const office = this.office.get();
     const audience = this.audience({ visibility, sharedWith });
     const autoRoute = depts === 'auto' || dept === 'auto';
@@ -156,7 +177,7 @@ export class OfficeEngine {
     const now = Date.now();
     const job = { schemaVersion: 2, id: randomUUID(), kind, dept: team.id, depts: all, autoRoute, title: clean(title || text).slice(0, 100), text: clean(text), assignee: assignee || null, dueAt: due, projectId: project ? project.id : null, projectName: project ? project.name : null,
       priority: [0, 1, 2].includes(priority) ? priority : 1, routine, suiteId: suiteId || null, testId: testcase?.id || null, testName: testcase?.name || null, agent: autoRoute ? 'pm' : team.lead,
-      model: clean(model) || null, effort: clean(effort) || null, state: backlog ? 'backlog' : 'queued', stateSince: now, createdAt: now, updatedAt: now,
+      model: clean(model) || null, effort: clean(effort) || null, lane: ['quick', 'standard'].includes(lane) ? lane : null, lanePinned: ['quick', 'standard'].includes(lane), state: backlog ? 'backlog' : 'queued', stateSince: now, createdAt: now, updatedAt: now,
       officeRevision: office.revision, skills: office.skills.filter(s => skillIds.has(s.id)),
       completionApproval: kind !== 'evaluation' && (teams.some(t => t.completionApproval) || !!completionApproval || !!requireHumanApproval),
       checks: [...teams.flatMap(t => (t.checks || []).map(c => ({ ...c, team: t.id }))), ...(testcase?.requiredText || []).map((value, i) => ({ id: `test-${i + 1}`, label: `Test requires: ${value}`, type: 'contains', value }))],
@@ -228,11 +249,11 @@ export class OfficeEngine {
     this.event(id, 'queue_updated', null, input.state === 'backlog' ? 'Task saved as an idea.' : 'Task queued with priority ' + ['low', 'normal', 'high'][this.get(id).priority ?? 1] + '.');
     queueMicrotask(() => this.pump()); return this.get(id);
   }
-  brief(job) {
+  brief(job, quickTeam = null) {
     const office = this.office.get(), assignee = job.assignee ? office.agents.find(a => a.id === job.assignee) : null;
     const later = this.threads.list(job.id).filter(m => m.role === 'ceo').slice(1).map(m => '- ' + m.text);
     const project = job.projectId ? this.projectFor(job.projectId) : null;
-    return [project ? this.projectBrief(project) + '\n' : '', job.autoRoute ? 'CEO task (choose which department leads to involve; delegate only to the teams that fit):' : `CEO task for ${job.depts.map(d => office.teams.find(t => t.id === d)?.name || d).join(' + ')}:`, job.text,
+    return [project ? this.projectBrief(project) + '\n' : '', quickTeam ? `CEO task for ${quickTeam.name} (quick lane: you deliver it yourself):` : job.autoRoute ? 'CEO task (choose which department leads to involve; delegate only to the teams that fit):' : `CEO task for ${job.depts.map(d => office.teams.find(t => t.id === d)?.name || d).join(' + ')}:`, job.text,
       assignee ? `The CEO wants ${assignee.name} (${assignee.role}) to do this.` : '', job.dueAt ? `Due: ${new Date(job.dueAt).toISOString().slice(0, 16).replace('T', ' ')} UTC.` : '',
       later.length ? 'Later notes from the CEO:\n' + later.join('\n') : '', this.seedNotes(job.text)].filter(Boolean).join('\n');
   }
@@ -283,10 +304,18 @@ export class OfficeEngine {
         const input = this.inputFrom(job.next, job);
         this.update(id, j => { j.next = null; j.startedAt ||= Date.now(); j.harness = true; j.prunedAt = null; }, { touch: false });
         if (['queued', 'blocked', 'escalated'].includes(job.state)) this.setState(id, job.runs.length ? 'working' : 'planning', { error: null });
-        const built = await this.build(this.get(id), signal);
+        // The lane: quick work goes to the lead alone, everything else to the Program Manager. Decided once, on arrival.
+        if (!job.lane && !job.runs.length && job.kind === 'task' && this.settings().fastLane !== false) await this.triage(id, signal);
+        else if (!job.lane) this.update(id, j => { j.lane = 'standard'; }, { touch: false });
+        let current = this.get(id);
+        if (current.lane === 'quick') { if (await this.runQuick(id, signal, alive) !== 'promoted') return this.detail(id); current = this.get(id); }
+        const built = await this.build(current, signal);
         tracker = new RunTracker(this, id, built.models);
         const config = { configurable: { thread_id: id }, recursionLimit: 250, signal, version: 'v2' };
-        for await (const event of built.pm.streamEvents(input, config)) { if (signal.aborted) break; alive(); tracker.handle(event); }
+        // A task arriving from the quick lane briefs the Program Manager afresh, with what the lead already wrote.
+        const first = !current.pmStarted; this.update(id, j => { j.pmStarted = true; }, { touch: false });
+        const pmInput = first && current.promotedAt ? { messages: [new HumanMessage(this.brief(current) + '\n\n' + this.promotionNote(current))] } : input;
+        for await (const event of built.pm.streamEvents(pmInput, config)) { if (signal.aborted) break; alive(); tracker.handle(event); }
         clearTimeout(stallTimer);
         if (signal.aborted) throw signal.reason || new Error('Stopped.');
         tracker.flush();
@@ -726,6 +755,158 @@ export class OfficeEngine {
       return new ToolMessage({ tool_call_id: call.id, name: 'task', content: 'Refused: plan first. Call write_todos with one item per work package (team, deliverable, what you need back), then delegate with task.' });
     } });
   }
+  /* ---------- the fast lane ---------- */
+  // Sizing a task on arrival: rules first (a project, several teams, a routine, an approval to close go to the Program Manager),
+  // then one plain model call, low effort, no tools, six seconds at most. Any doubt or failure means the standard lane.
+  async triage(id, signal) {
+    const job = this.get(id), office = this.office.get();
+    const teams = (job.autoRoute ? office.teams : job.depts.map(d => office.teams.find(t => t.id === d))).filter(t => t && office.agents.some(a => a.id === t.lead));
+    const standard = why => { this.update(id, j => { j.lane = 'standard'; j.laneWhy = why; }, { touch: false }); this.event(id, 'lane_chosen', null, `Standard lane: ${why}`, { lane: 'standard' }); return 'standard'; };
+    if (job.lane) return job.lane;
+    if (job.projectId) return standard('a project task goes to the Program Manager.');
+    if (!job.autoRoute && job.depts.length > 1) return standard('more than one team is named.');
+    if (job.routine) return standard('routines run through the Program Manager.');
+    if (job.completionApproval) return standard('the CEO approves completion.');
+    if (!teams.length) return standard('no team with a lead fits.');
+    if (clean(job.text).length > 1500) return standard('a long brief.');
+    const spec = this.models.resolve({ task: job, role: 'triage' });
+    if (!spec.model) return standard('no model is configured.');
+    let hits = []; try { hits = this.knowledgeIndex?.search(clean(job.text).slice(0, 200), { k: 5 }) || []; } catch {}
+    const ask = [`Task: ${clean(job.text).slice(0, 1500)}`, `Teams:\n${teams.map(t => `- ${t.id}: ${t.name}${t.purpose ? ' — ' + oneLine(t.purpose, 140) : ''}`).join('\n')}`, hits.length ? `Brain notes that match: ${hits.map(h => h.path).join('; ')}` : 'Brain notes that match: none found.'].join('\n\n');
+    try {
+      const model = await this.models.instance({ model: spec.model, effort: 'low', streaming: false, maxTokens: 300 });
+      const reply = await withTimeout(model.invoke([new SystemMessage(TRIAGE_PROMPT), new HumanMessage(ask)]), TRIAGE_MS, signal);
+      const parsed = parseJsonReply(textOf(reply?.content)) || {};
+      const why = oneLine(parsed.why, 200) || 'sized by the office';
+      const team = teams.find(t => t.id === String(parsed.team || '')) || (teams.length === 1 ? teams[0] : null);
+      if (parsed.lane !== 'quick' || !team) return standard(why);
+      const effort = ['low', 'medium', 'high'].includes(parsed.effort) ? parsed.effort : 'low';
+      this.update(id, j => { j.lane = 'quick'; j.laneTeam = team.id; j.laneEffort = effort; j.laneWhy = why; if (!j.autoRoute || true) j.agent = team.lead; }, { touch: false });
+      this.event(id, 'lane_chosen', team.lead, `Quick lane, ${team.name}, effort ${effort}: ${why}`, { lane: 'quick', team: team.id, effort });
+      return 'quick';
+    } catch (error) { return standard(`triage did not answer (${clean(error?.message).slice(0, 80) || 'no reply'}).`); }
+  }
+  // The lean lead: a plain agent with the team's charter, the office file system, the Brain search, the export tools, the
+  // read-only Vault and connector tools, its own review, and one way out (needs_the_team). No plan, no specialists, no approvals.
+  async buildQuick(job, team, lead, signal, onPromote) {
+    const office = this.office.get(), toolLabels = this.toolLabels();
+    await this.toolHub?.ensure?.();
+    const spec = this.models.resolve({ task: job, routine: job.routine, agent: lead, team, role: 'lead' });
+    if (!spec.model) throw httpError('No model is configured for this role. Choose one in Settings → Models.', 409);
+    // The CEO's own effort settings win; otherwise the lane's (low for quick work).
+    const effort = ['task', 'routine', 'agent', 'team'].includes(spec.effortFrom) ? spec.effort : (job.laneEffort || 'low');
+    const model = await this.models.instance({ model: spec.model, effort });
+    const providerId = this.models.model?.(spec.model)?.provider, provider = providerId ? this.models.provider?.(providerId)?.type : undefined;
+    const spotChecks = this.toolHub ? this.toolHub.toolsFor({ agent: lead, team, provider, readOnly: true }).tools : [];
+    const tools = [this.reviewTool(job.id, team), this.needsTeamTool(job.id, lead.id, onPromote), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id),
+      ...this.vaultTools(job.id, team, lead.id).filter(t => QUICK_READ_TOOLS.has(t.name)), ...this.connectorTools(job.id, team, lead.id).filter(t => QUICK_READ_TOOLS.has(t.name)), ...spotChecks];
+    const backend = officeBackend({ workspaceDir: path.join(this.workspaces, job.id), knowledgeDir: this.knowledgeDir, memoryRoutes: this.memory?.routesFor({ role: 'lead', teamId: team.id }) || {} });
+    const graph = createAgent({ name: leadName(team.id), model, systemPrompt: quickLeadPrompt({ office, team, lead, toolLabels }), tools, checkpointer: this.saver,
+      middleware: [createFilesystemMiddleware({ backend, permissions: FILE_PERMISSIONS, tools: ['ls', 'read_file', 'write_file', 'edit_file', 'glob', 'grep'] }), this.quickBudget(job.id, lead.id, onPromote), this.loopGuard(job.id, lead.id), this.pace(job.id, team, lead.id, signal)] });
+    return { graph, models: { [lead.id]: spec.model }, effort };
+  }
+  // The quick lane: the lead alone, its own review, the office files the result. Past the budget, or when the lead asks for the
+  // team, the task is promoted to the standard lane with its workspace kept. Returns 'done' or 'promoted'.
+  async runQuick(id, signal, alive) {
+    const job = this.get(id), office = this.office.get();
+    const team = office.teams.find(t => t.id === (job.laneTeam || job.dept)), lead = team ? office.agents.find(a => a.id === team.lead) : null;
+    if (!team || !lead) return this.promote(id, 'the team or its lead is gone');
+    const attempt = (job.quickAttempts || 0) + 1;
+    if (attempt > 2) return this.promote(id, 'the quick lane was interrupted twice');
+    this.update(id, j => { j.quickAttempts = attempt; j.promote = null; j.agent = lead.id; }, { touch: false });
+    // The lane's own clock and exit: 45 s without an event, the budget, or needs_the_team all end the stream here.
+    const exit = new AbortController(); let quietTimer = null;
+    const leave = why => { if (!exit.signal.aborted) exit.abort(new PromoteError(why)); };
+    const { graph, models, effort } = await this.buildQuick(job, team, lead, signal, leave);
+    const run = { id: `${Date.now().toString(36)}-q${attempt}`, agent: lead.id, role: 'lead', dept: team.id, by: 'office', title: runTitle(job.text), brief: clean(job.text).slice(0, 2000), state: 'working', startedAt: Date.now(), tools: [], lane: 'quick', effort };
+    this.update(id, j => { j.runs.push(run); }, { touch: false });
+    this.event(id, 'run_started', lead.id, run.title, { run: run.id, role: 'lead', lane: 'quick' });
+    if (this.get(id).state !== 'working') this.setState(id, 'working');
+    const tracker = new RunTracker(this, id, models);
+    const tick = () => { alive(); clearTimeout(quietTimer); quietTimer = setTimeout(() => leave(`${Math.round(QUICK_SILENCE_MS / 1000)} seconds passed without progress`), QUICK_SILENCE_MS); quietTimer.unref?.(); };
+    const laneSignal = AbortSignal.any([signal, exit.signal]), config = { configurable: { thread_id: `${id}:quick:${attempt}` }, recursionLimit: 60, signal: laneSignal, version: 'v2' };
+    const stream = async input => { tick(); for await (const event of graph.streamEvents(input, config)) { if (laneSignal.aborted) break; tick(); tracker.handle(event); } };
+    const reviewed = () => { const r = this.get(id).reviewsByDept?.[team.id]; return r && r.at >= run.startedAt ? r : null; };
+    try {
+      await stream({ messages: [new HumanMessage(this.brief(job, team))] });
+      // One re-prompt when the lead stopped without recording a review.
+      if (!laneSignal.aborted && !reviewed() && !this.get(id).promote) {
+        this.event(id, 'reprompted', lead.id, 'The lead stopped without recording a review.');
+        await stream({ messages: [new HumanMessage('Office: you have not recorded your review. If the deliverable is ready, call record_review with it now; if this needs more people or more reading, call needs_the_team.')] });
+      }
+    } catch (error) {
+      if (!exit.signal.aborted) { clearTimeout(quietTimer); tracker.flush(); this.closeRun(id, run.id, 'failed', error); throw error; }
+    } finally { clearTimeout(quietTimer); tracker.flush(); }
+    if (signal.aborted && !exit.signal.aborted) { this.closeRun(id, run.id, 'failed', signal.reason); throw signal.reason || new Error('Stopped.'); }
+    const after = this.get(id), review = reviewed();
+    const why = exit.signal.aborted ? (exit.signal.reason?.message || 'no progress') : after.promote?.why || '';
+    if (!why && review?.approved) {
+      this.closeRun(id, run.id, 'done', null, review.summary);
+      const out = await this.finish(id, { summary: review.summary, result: after.deliverables?.[team.id] || '', agent: lead.id, lane: 'quick' });
+      if (!out.ok) this.block(id, `Saving the result failed (${out.error}). Retry to file it again.`);
+      return 'done';
+    }
+    this.closeRun(id, run.id, 'promoted', null, why);
+    return this.promote(id, why || (review ? 'the lead did not approve its own work' : 'the lead did not record a review'));
+  }
+  promote(id, why) {
+    const job = this.get(id), office = this.office.get(), lead = office.teams.find(t => t.id === job.laneTeam)?.lead || null;
+    this.update(id, j => { j.lane = 'standard'; j.promotedAt = Date.now(); j.promoteWhy = why; j.promote = null; j.agent = j.autoRoute ? 'pm' : office.teams.find(t => t.id === j.dept)?.lead || j.agent; }, { touch: false });
+    this.event(id, 'lane_promoted', lead, `Promoted to the team: ${why}.`, { lane: 'standard' });
+    return 'promoted';
+  }
+  closeRun(id, runId, state, error = null, output = '') {
+    let closed = null;
+    this.update(id, j => { const r = j.runs.find(r => r.id === runId); if (!r || r.state !== 'working') return; r.state = state; r.finishedAt = Date.now(); if (output) r.output = String(output).slice(0, 60000); if (error) r.error = clean(error?.message || error).slice(0, 2000); if (j.liveCalls?.[r.agent]?.state === 'running') j.liveCalls[r.agent].state = state === 'done' ? 'returned' : state; closed = { ...r }; }, { touch: false });
+    if (closed) this.event(id, state === 'failed' ? 'run_failed' : 'run_finished', closed.agent, closed.title, { run: closed.id, role: closed.role, state });
+  }
+  // What the Program Manager is told when a task arrives from the quick lane.
+  promotionNote(job) {
+    const office = this.office.get(), team = office.teams.find(t => t.id === job.laneTeam), lead = team ? office.agents.find(a => a.id === team.lead) : null;
+    let files = []; try { files = listWorkspaceFiles(this.workspaceDir(job.id)).map(f => '/work/' + (f.path || f.rel || f.name || f)).slice(0, 12); } catch {}
+    return `Office: this task started in the quick lane with ${lead?.name || 'a lead'} (${team?.name || 'a team'}), who could not finish it alone: ${job.promoteWhy || 'it needs the team'}. ${files.length ? 'Files already in the workspace, to build on rather than redo: ' + files.join(', ') + '.' : 'Nothing was written yet.'} Plan it for the team now.`;
+  }
+  // Filing a result: the approved deliverable becomes the task's result, the Brain is written, the CEO is told. Used by
+  // complete_task and by the quick lane.
+  async finish(id, { summary, result, agent = 'pm', direct = false, cited = [], lane = null }) {
+    const job = this.get(id);
+    this.setState(id, 'saving');
+    const version = { n: (job.resultVersions?.length || 0) + 1, at: Date.now(), summary: clean(summary).slice(0, 2000), correction: job.correction || null, result };
+    this.update(id, j => {
+      j.result = result; j.resultSummary = version.summary; j.resultVersions = [...(j.resultVersions || []), version]; j.correction = null;
+      if (direct) { j.review = { approved: true, direct: true, lead: 'pm', by: 'pm', at: Date.now(), criteria: [], summary: `Answered by the Program Manager from the Brain, no team engaged: ${cited.join(', ')}.`, sources: cited }; j.sources = [...new Set([...(j.sources || []), ...cited])].slice(0, 60); }
+    });
+    if (direct) this.event(id, 'answered_from_brain', 'pm', `Answered from the Brain: ${cited.join(', ')}.`);
+    try { await this.onComplete(this.get(id)); }
+    catch (error) { this.setState(id, 'working'); return { ok: false, error: clean(error.message).slice(0, 300) }; }
+    this.setState(id, 'done', { doneAt: Date.now(), pendingActions: [], error: null });
+    this.event(id, 'completed', agent, `Result version ${version.n} saved.${lane === 'quick' ? ' Quick lane: the lead delivered and reviewed it.' : ''}`);
+    if (job.kind !== 'evaluation') this.notifications.notify({ kind: 'done', title: `Done: ${job.title}`, body: version.summary, jobId: id, dept: job.dept, action: { type: 'open' }, userId: job.ownerId || null });
+    return { ok: true, version: version.n };
+  }
+  // The lead's way out of the quick lane: the assignment turned out to need the team.
+  needsTeamTool(id, agentId, onPromote) {
+    return tool(async ({ why }) => {
+      const text = clean(why).slice(0, 500) || 'the lead asked for the team';
+      this.update(id, j => { j.promote = { why: text, at: Date.now() }; }, { touch: false });
+      this.event(id, 'lane_promotion_requested', agentId, text);
+      onPromote?.(text);
+      return 'Noted: the task goes to the Program Manager and the full team now. End your turn.';
+    }, { name: 'needs_the_team', description: 'Call this when the assignment turns out to need a specialist, another team, research with no source at hand, or more reading than the quick lane allows. The task then runs through the Program Manager and the full team; the files you wrote stay.', schema: z.object({ why: z.string().describe('What the assignment needs that you cannot give it alone') }) });
+  }
+  // The quick lane's budget: eight tool calls before the deliverable (reading closes, finishing stays open), fourteen in all.
+  quickBudget(jobId, agentId, onPromote) {
+    let n = 0;
+    return createMiddleware({ name: 'quick_budget', wrapToolCall: async (request, handler) => {
+      const call = request.toolCall; n++;
+      if (n > QUICK_CALLS) { const why = `${QUICK_CALLS} tool calls without a finished deliverable`; this.update(jobId, j => { j.promote = { why, at: Date.now() }; }, { touch: false }); onPromote?.(why); return new ToolMessage({ tool_call_id: call.id, name: call.name, content: 'Refused: the quick lane is over. The task goes to the team now; end your turn.' }); }
+      if (n > QUICK_READS && !QUICK_FINISH.has(call.name)) {
+        if (n === QUICK_READS + 1) this.event(jobId, 'steps_capped', agentId, `${QUICK_READS} tool calls in the quick lane; reading is closed, only finishing is open.`);
+        return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `Refused: the quick lane allows ${QUICK_READS} tool calls before the deliverable. Write the deliverable now and call record_review, or call needs_the_team if this needs more people or more reading.` });
+      }
+      return handler(request);
+    } });
+  }
   /* ---------- office tools ---------- */
   // A lead whose assignment needs another team's expertise hands that part to the Program Manager and keeps working on its own part.
   // The PM must delegate it before the task can close; the other lead's review is then required like any involved team's.
@@ -784,7 +965,9 @@ export class OfficeEngine {
       const broken = leadRuns.filter(r => ['interrupted', 'failed'].includes(r.state)).map(r => r.startedAt || 0), lastBroken = broken.length ? Math.max(...broken) : -1;
       const deliveredBefore = !handedOver && lastBroken >= 0 && !!clean(deliverablePath) && job.runs.some(r => specialists.has(r.agent) && r.state === 'done' && (r.startedAt || 0) >= lastBroken && (r.finishedAt || 0) <= since);
       if (deliveredBefore) this.event(id, 'review_resumed', current.lead, `Reviewing ${clean(deliverablePath)}, handed over before the interruption.`);
-      if (specialists.size && !handedOver && !deliveredBefore) {
+      // In the quick lane the lead did the work itself and reviews its own deliverable.
+      const quick = job.lane === 'quick' && !job.promotedAt;
+      if (specialists.size && !handedOver && !deliveredBefore && !quick) {
         this.event(id, 'review_refused', current.lead, 'No specialist has handed work over in this round.');
         return `Refused: nobody on your team has handed work over in this round. Delegate the work to a specialist with the task tool (subagent_type is the specialist id: ${[...specialists].join(', ')}), then review what they return.`;
       }
@@ -805,14 +988,15 @@ export class OfficeEngine {
       const placeholders = [...new Set((text.match(/\(content from \/work\/[^)]*\)|\[insert [^\]]*\]|\bTODO\b|\bTBD\b|lorem ipsum/gi) || []).map(p => p.slice(0, 60)))];
       const ok = approved === true && covered.ok && text.length > 0 && checks.every(c => c.passed) && !placeholders.length;
       const rounds = (job.reworkRounds?.[team.id] || 0) + (ok ? 0 : 1);
-      const review = { at: Date.now(), agent: current.lead, dept: team.id, approved: ok, summary: clean(summary).slice(0, 5000), criteria, checks, missing: covered.missing, file };
+      const review = { at: Date.now(), agent: current.lead, dept: team.id, approved: ok, summary: clean(summary).slice(0, 5000), criteria, checks, missing: covered.missing, file, ...(quick ? { self: true, lane: 'quick' } : {}) };
       this.update(id, j => { j.reviews.push(review); j.review = review; (j.reviewsByDept ||= {})[team.id] = review; (j.reworkRounds ||= {})[team.id] = rounds; if (ok) (j.deliverables ||= {})[team.id] = text.slice(0, 120000); if (text) j.result = text.slice(0, 120000); });
       this.event(id, 'review_recorded', current.lead, review.summary || (ok ? 'Approved.' : 'Changes required.'), { approved: ok, checks });
       // Progress: a provider failure after this point starts a fresh series of automatic retries.
       if (this.get(id)?.autoRetries) this.update(id, j => { j.autoRetries = 0; }, { touch: false });
       if (this.get(id).state !== 'cancelled') this.setState(id, 'working');
-      if (ok) return 'Review recorded as APPROVED. Report back to the Program Manager with a short summary.';
+      if (ok) return quick ? 'Review recorded as APPROVED. The office files the result now: end your turn with one line.' : 'Review recorded as APPROVED. Report back to the Program Manager with a short summary.';
       const reasons = [approved !== true ? 'you did not approve it' : '', covered.missing.length ? `criteria without passing evidence: ${covered.missing.join(', ')}` : '', !text ? (fileProblem ? 'deliverable file problem: ' + fileProblem : 'no final deliverable was included: give deliverablePath (the handed-over file under /work/), or the text when it is a few lines') : '', ...checks.filter(c => !c.passed).map(c => `automated check failed: ${c.label}`), placeholders.length ? `the deliverable still holds placeholders (${placeholders.slice(0, 3).join(', ')}): a combined document must carry every part in full; use assemble_files` : ''].filter(Boolean);
+      if (quick) return `Review recorded as NOT approved (${reasons.join('; ')}). ${rounds > reworkRounds(current) ? 'Call needs_the_team now.' : 'Fix the deliverable yourself and review again, or call needs_the_team.'}`;
       if (rounds > reworkRounds(current)) return `Review recorded as NOT approved (${reasons.join('; ')}). The rework limit is reached: report to the Program Manager that this needs the CEO’s direction.`;
       return `Review recorded as NOT approved (${reasons.join('; ')}). Send specific corrections to the specialist, then review again.`;
     }, { name: 'record_review', description: 'Record your review of the team’s actual work. Call once per review round, with evidence for every criterion and the final deliverable: deliverablePath, the handed-over file under /work/ (the office reads it), or deliverable, the text itself when it is a few lines.',
@@ -832,19 +1016,9 @@ export class OfficeEngine {
       if (!direct && stale.length) { this.event(id, 'completion_refused', 'pm', `No approved review from ${stale.map(leadName).join(', ')}.`); return `Refused: ${stale.map(leadName).join(', ')} has no approved review of the latest work. Ask the lead to review, then call complete_task again.`; }
       const office = this.office.get(), used = job.autoRoute ? involved(job) : job.depts, parts = used.map(d => job.deliverables?.[d]).filter(Boolean);
       const result = direct ? clean(answer) : parts.length === 1 ? parts[0] : used.map(d => `## ${office.teams.find(t => t.id === d)?.name || d}\n\n${job.deliverables?.[d] || ''}`).join('\n\n');
-      this.setState(id, 'saving');
-      const version = { n: (job.resultVersions?.length || 0) + 1, at: Date.now(), summary: clean(summary).slice(0, 2000), correction: job.correction || null, result };
-      this.update(id, j => {
-        j.result = result; j.resultSummary = version.summary; j.resultVersions = [...(j.resultVersions || []), version]; j.correction = null;
-        if (direct) { j.review = { approved: true, direct: true, lead: 'pm', by: 'pm', at: Date.now(), criteria: [], summary: `Answered by the Program Manager from the Brain, no team engaged: ${cited.join(', ')}.`, sources: cited }; j.sources = [...new Set([...(j.sources || []), ...cited])].slice(0, 60); }
-      });
-      if (direct) this.event(id, 'answered_from_brain', 'pm', `Answered from the Brain: ${cited.join(', ')}.`);
-      try { await this.onComplete(this.get(id)); }
-      catch (error) { this.setState(id, 'working'); return `Saving the result failed (${clean(error.message).slice(0, 300)}). Call complete_task again.`; }
-      this.setState(id, 'done', { doneAt: Date.now(), pendingActions: [], error: null });
-      this.event(id, 'completed', 'pm', `Result version ${version.n} saved.`);
-      if (job.kind !== 'evaluation') this.notifications.notify({ kind: 'done', title: `Done: ${job.title}`, body: version.summary, jobId: id, dept: job.dept, action: { type: 'open' }, userId: job.ownerId || null });
-      return `Task completed and filed as version ${version.n}. End your turn with a one-line confirmation.`;
+      const out = await this.finish(id, { summary, result, agent: 'pm', direct, cited });
+      if (!out.ok) return `Saving the result failed (${out.error}). Call complete_task again.`;
+      return `Task completed and filed as version ${out.version}. End your turn with a one-line confirmation.`;
     }, { name: 'complete_task', description: 'Complete the task once every involved lead has recorded an approved review of the latest work; or, for a plain question the Brain answers with no team engaged, file the answer directly. Files the result for the CEO.', schema: z.object({ summary: z.string().describe('One paragraph: what was delivered'), answer: z.string().optional().describe('Only for a question answered from the Brain with no team engaged: the full answer, naming the /knowledge/ notes it rests on') }) });
   }
   askTool(id) {
