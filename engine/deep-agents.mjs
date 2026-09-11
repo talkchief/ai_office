@@ -83,7 +83,7 @@ export function isProviderError(error) {
 // the Program Manager. The lane is decided on arrival (triage) and can only widen: past its budget, or when the lead asks for
 // the team, a quick task is promoted to the standard lane with its workspace kept.
 class PromoteError extends Error {}
-const TRIAGE_MS = 6000, QUICK_SILENCE_MS = 45000, QUICK_READS = 8, QUICK_CALLS = 14;
+const TRIAGE_MS = 6000, QUICK_SILENCE_MS = 45000, QUICK_READS = 8, QUICK_CALLS = 14, QUICK_GRACE = 3;
 const QUICK_FINISH = new Set(['write_file', 'edit_file', 'export_pdf', 'export_pptx', 'assemble_files', 'record_review', 'needs_the_team', 'report_progress']);
 const QUICK_READ_TOOLS = new Set(['vault_list', 'api_get', 'db_list', 'db_schema', 'db_query', 'ssh_list']);
 const BINARY_FILE = /\.(pdf|pptx|docx|xlsx|png|jpe?g|gif|webp|bmp|zip)$/i;
@@ -947,12 +947,17 @@ export class OfficeEngine {
       return 'Noted: the task goes to the Program Manager and the full team now. End your turn.';
     }, { name: 'needs_the_team', description: 'Call this when the assignment turns out to need a specialist, another team, research with no source at hand, or more reading than the quick lane allows. The task then runs through the Program Manager and the full team; the files you wrote stay.', schema: z.object({ why: z.string().describe('What the assignment needs that you cannot give it alone') }) });
   }
-  // The quick lane's budget: eight tool calls before the deliverable (reading closes, finishing stays open), fourteen in all.
+  // The quick lane's budget: eight tool calls before the deliverable (reading closes, finishing stays open), fourteen in all;
+  // then three more for the review alone, so a lead that wrote the deliverable and kept tuning it still finishes here.
   quickBudget(jobId, agentId, onPromote) {
     let n = 0;
     return createMiddleware({ name: 'quick_budget', wrapToolCall: async (request, handler) => {
       const call = request.toolCall; n++;
-      if (n > QUICK_CALLS) { const why = `${QUICK_CALLS} tool calls without a finished deliverable`; this.update(jobId, j => { j.promote = { why, at: Date.now() }; }, { touch: false }); onPromote?.(why); return new ToolMessage({ tool_call_id: call.id, name: call.name, content: 'Refused: the quick lane is over. The task goes to the team now; end your turn.' }); }
+      if (n > QUICK_CALLS + QUICK_GRACE) { const why = `${QUICK_CALLS + QUICK_GRACE} tool calls without a finished deliverable`; this.update(jobId, j => { j.promote = { why, at: Date.now() }; }, { touch: false }); onPromote?.(why); return new ToolMessage({ tool_call_id: call.id, name: call.name, content: 'Refused: the quick lane is over. The task goes to the team now; end your turn.' }); }
+      if (n > QUICK_CALLS && !['record_review', 'needs_the_team'].includes(call.name)) {
+        if (n === QUICK_CALLS + 1) this.event(jobId, 'steps_capped', agentId, `${QUICK_CALLS} tool calls in the quick lane; only the review is open now.`);
+        return new ToolMessage({ tool_call_id: call.id, name: call.name, content: 'Refused: the quick lane’s budget is spent. Call record_review now with the deliverable you wrote (deliverablePath is the Markdown; the export you made stands), or needs_the_team.' });
+      }
       if (n > QUICK_READS && !QUICK_FINISH.has(call.name)) {
         if (n === QUICK_READS + 1) this.event(jobId, 'steps_capped', agentId, `${QUICK_READS} tool calls in the quick lane; reading is closed, only finishing is open.`);
         return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `Refused: the quick lane allows ${QUICK_READS} tool calls before the deliverable. Write the deliverable now and call record_review, or call needs_the_team if this needs more people or more reading.` });

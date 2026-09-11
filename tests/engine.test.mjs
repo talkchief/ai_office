@@ -778,7 +778,7 @@ test('quick lane: past the budget the task is promoted to the team with its file
   const f = fixture({ triage: QUICK_TRIAGE, lead: workers => quickLead(thrashing, workers), pm: context => { if (context.last.type === 'human' && !pmFirst) pmFirst = context.last.text; return defaultPm(context); } });
   try {
     const id = start(f, { text: 'Write the launch report.' }); const done = await until(f.engine, id, ['done'], 30000);
-    assert.equal(done.lane, 'standard'); assert.ok(done.promotedAt); assert.match(done.promoteWhy, /14 tool calls/);
+    assert.equal(done.lane, 'standard'); assert.ok(done.promotedAt); assert.match(done.promoteWhy, /17 tool calls/);
     assert.deepEqual(done.runs.map(r => [r.role, r.state]), [['lead', 'promoted'], ['lead', 'done'], ['specialist', 'done']]);
     assert.ok(done.events.some(e => e.type === 'steps_capped')); assert.ok(done.events.some(e => e.type === 'lane_promoted' && /Promoted to the team/.test(e.message)));
     assert.match(pmFirst, /started in the quick lane/); assert.match(pmFirst, /\/work\/notes\.md/);
@@ -900,5 +900,22 @@ test('a binary export is never read back into the conversation: read_file on the
     const id = start(f); const done = await until(f.engine, id, ['done']);
     assert.equal(done.events.filter(e => e.type === 'binary_read_refused' && e.agent === f.worker).length, 1);
     assert.match(done.runs.find(r => r.role === 'specialist').output, /Handed over \/work\/brief\.md/); assert.equal(done.review.approved, true);
+  } finally { await f.close(); }
+});
+
+test('quick lane: a lead that wrote the deliverable but kept tuning it is told to review, and finishes in the lane', async () => {
+  let n = 0;
+  const tuning = ({ last, system }) => {
+    n++;
+    if (n === 1) return { calls: [call('write_file', { file_path: '/work/summary.md', content: '# Summary\n\nVerified result and evidence.' })] };
+    if (last.type === 'tool' && /budget is spent/.test(last.text)) return { calls: [call('record_review', { approved: true, summary: 'Reviewed my summary.', criteria: criteria(system).map(id => ({ id, passed: true, evidence: 'Present.' })), deliverablePath: '/work/summary.md' })] };
+    if (last.type === 'tool' && /^Review recorded/.test(last.text)) return { text: 'Filed.' };
+    return { calls: [call('edit_file', { file_path: '/work/summary.md', old_string: 'evidence', new_string: 'evidence' })] };
+  };
+  const f = fixture({ triage: QUICK_TRIAGE, lead: workers => quickLead(tuning, workers) });
+  try {
+    const id = start(f, { text: 'Make a one-page summary of the plan note.' }); const done = await until(f.engine, id, ['done'], 30000);
+    assert.equal(done.lane, 'quick'); assert.equal(done.review.self, true); assert.equal(done.runs.length, 1, 'no promotion');
+    assert.ok(done.events.some(e => e.type === 'steps_capped' && /only the review is open/.test(e.message)));
   } finally { await f.close(); }
 });
