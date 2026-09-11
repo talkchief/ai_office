@@ -811,9 +811,11 @@ export class OfficeEngine {
     let hits = []; try { hits = this.knowledgeIndex?.search(clean(job.text).slice(0, 200), { k: 5 }) || []; } catch {}
     const ask = [`Task: ${clean(job.text).slice(0, 1500)}`, `Teams:\n${teams.map(t => `- ${t.id}: ${t.name}${t.purpose ? ' — ' + oneLine(t.purpose, 140) : ''}`).join('\n')}`, hits.length ? `Brain notes that match: ${hits.map(h => h.path).join('; ')}` : 'Brain notes that match: none found.'].join('\n\n');
     try {
-      const model = await this.models.instance({ model: spec.model, effort: 'low', streaming: false, maxTokens: 300 });
+      // A thinking model's reasoning counts against the output cap on some endpoints: leave room for it.
+      const model = await this.models.instance({ model: spec.model, effort: 'low', streaming: false, maxTokens: 1500 });
       const reply = await withTimeout(model.invoke([new SystemMessage(TRIAGE_PROMPT), new HumanMessage(ask)]), TRIAGE_MS, signal);
-      const parsed = parseJsonReply(textOf(reply?.content)) || {};
+      const said = textOf(reply?.content), parsed = parseJsonReply(said);
+      if (!parsed) return standard(`triage answered without a lane (${oneLine(said, 80) || 'empty reply'}).`);
       const why = oneLine(parsed.why, 200) || 'sized by the office';
       const team = teams.find(t => t.id === String(parsed.team || '')) || (teams.length === 1 ? teams[0] : null);
       const effort = ['low', 'medium', 'high'].includes(parsed.effort) ? parsed.effort : (parsed.lane === 'quick' ? 'low' : '');
