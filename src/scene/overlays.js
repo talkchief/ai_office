@@ -21,15 +21,15 @@ export function makeOverlays({ hud, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, onDept, on
     b.className = 'badge';
     const members = AGENTS.filter(a => a.dept === k);
     b.innerHTML = `
-      <div class="b-name"><span class="dot" style="background:${dept.chip}"></span>${esc(dept.short)}<span class="live"></span><span class="b-state"><i></i><span>IDLE</span></span></div>
+      <div class="b-name"><span class="dot" style="background:${dept.chip}"></span>${esc(dept.short)}<span class="live"></span><span class="b-state"><i></i><span>IDLE</span></span><button type="button" class="b-gear" data-act="manage" title="Open this team in Manage" aria-label="Open this team in Manage"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="2.3"/><path d="M8 1.6v1.7M8 12.7v1.7M14.4 8h-1.7M3.3 8H1.6M12.5 3.5l-1.2 1.2M4.7 11.3l-1.2 1.2M12.5 12.5l-1.2-1.2M4.7 4.7L3.5 3.5"/></svg></button></div>
       <div class="b-seats">${members.map(a => `<span class="seat${a.lead ? ' lead' : ''}" data-seat="${esc(a.id)}" title="${esc(a.name)}"></span>`).join('')}<span class="b-n"><b class="b-num">0</b>of ${n}</span></div>
       <p class="b-now quiet"><span class="b-line">Everyone is at their desk.</span></p><div class="b-bar" style="display:none"><i></i></div>
-      <div class="b-more"><div class="b-more-in"><div class="b-counts"></div><div class="b-free"></div><div class="b-foot"><button type="button" data-act="open">Open team</button><button type="button" data-act="task" class="p">Give a task</button></div></div></div>
+      <div class="b-more"><div class="b-more-in"><div class="b-counts"></div><div class="b-free"></div><div class="b-foot"><button type="button" data-act="open" class="p">Open team</button></div></div></div>
       <div class="b-metrics"></div>
       <div class="b-appr" style="display:none"><span class="k">Waits for you</span><span><b class="ap-n">1</b> <span class="ap-w">decision</span></span><button type="button">Review</button></div>`;
     b.addEventListener('click', (e) => {
       if (e.target.closest('.b-appr')) { onApproval(k); e.stopPropagation(); return; }
-      const act = e.target.closest('[data-act]'); if (act) { e.stopPropagation(); if (act.dataset.act === 'task') window.dispatchEvent(new CustomEvent('office:compose', { detail: k })); else onDept(k); return; }
+      const act = e.target.closest('[data-act]'); if (act) { e.stopPropagation(); if (act.dataset.act === 'manage') window.dispatchEvent(new CustomEvent('office:manage', { detail: { dept: k } })); else if (act.dataset.act === 'task') window.dispatchEvent(new CustomEvent('office:compose', { detail: k })); else onDept(k); return; }
       const task = e.target.closest('[data-task]'); if (task) { e.stopPropagation(); window.dispatchEvent(new CustomEvent('office:open-task', { detail: task.dataset.task })); return; }
       const seat = e.target.closest('[data-seat]'); if (seat) { e.stopPropagation(); onAgent(seat.dataset.seat); return; }
       if (matchMedia('(hover: none)').matches && !b.classList.contains('open')) { b.classList.add('open'); e.stopPropagation(); return; } // a tap opens the card; a second tap enters the team

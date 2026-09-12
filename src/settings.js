@@ -53,7 +53,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     <div class="settings-main"><div class="mg-area-head"><div><span class="mg-eyebrow" id="settingsGroup"></span><h1 id="settingsTitle"></h1><p id="settingsIntro"></p></div><div class="mg-area-meta" id="settingsMeta"></div></div><p id="settingsMessage" role="status"></p><div id="settingsContent"></div></div>`;
   document.body.appendChild(page);
   const $ = id => document.getElementById(id), content = $('settingsContent'), main = page.querySelector('.settings-main');
-  let section = null, dirty = false, config = null, tools = [], providers = { models: [] }, draft = null, team = null, teamSection = 'overview', reportDays = 7, pendingNote = null, pendingProject = null, projectTab = 'work', projectArt = { kind: '', q: '' }, projectWorkFilter = 'all', projectListTab = 'active', projectListQuery = '', toolPoll = null, statusPoll = null, statusTries = 0, metaStatus = '';
+  let section = null, dirty = false, config = null, tools = [], providers = { models: [] }, draft = null, team = null, teamSection = 'overview', reportDays = 7, pendingNote = null, pendingProject = null, pendingTeam = null, projectTab = 'work', projectArt = { kind: '', q: '' }, projectWorkFilter = 'all', projectListTab = 'active', projectListQuery = '', toolPoll = null, statusPoll = null, statusTries = 0, metaStatus = '';
 
   /* ---------- feedback: a failure stays on the page and in a toast; a success is a toast ---------- */
   const feedback = (text, error = false, extra = {}) => {
@@ -229,6 +229,8 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       [config, tools, providers] = await Promise.all([api('/office'), api('/tools').catch(() => []), MANAGED_MODELS ? Promise.resolve({ models: [] }) : api('/providers').catch(() => ({ models: [] }))]); draft = structuredClone(config);
       let resume = null; try { resume = JSON.parse(sessionStorage.getItem(RESUME) || 'null'); sessionStorage.removeItem(RESUME); } catch {}
       if (resume?.team && draft.teams.some(t => t.id === resume.team)) { team = resume.team; teamSection = resume.section || teamSection; }
+      // Arriving from a team card or a person's card on the office floor.
+      if (pendingTeam) { const want = pendingTeam; pendingTeam = null; if (draft.teams.some(t => t.id === want.team)) { team = want.team; teamSection = want.agent ? 'people' : 'overview'; } }
       if (!draft.teams.some(t => t.id === team)) team = draft.teams[0].id;
       setMeta(isOfficeAdmin() ? mark('ok', 'Saved') : mark('off', 'Read-only')); refreshMeta('teams', mark('ok', 'Saved'));
       renderTeam(); content.classList.toggle('mg-readonly', !isOfficeAdmin());
@@ -1376,5 +1378,6 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   }
 
   route();
-  return { open, close, isOpen: () => !page.hidden, onEvent: (type, data) => { if (type === 'office.updated' && data?.area === 'tools' && section === 'tools' && $('spaceRefreshTools') && $('spaceToolEditor')?.hidden) showTools(); }, openNote: id => { pendingNote = id; open('brain'); if (section === 'brain') showBrain(); }, openProject: id => { pendingProject = id; open('projects'); if (section === 'projects') showProjects(); } };
+  return { open, close, isOpen: () => !page.hidden, onEvent: (type, data) => { if (type === 'office.updated' && data?.area === 'tools' && section === 'tools' && $('spaceRefreshTools') && $('spaceToolEditor')?.hidden) showTools(); }, openNote: id => { pendingNote = id; open('brain'); if (section === 'brain') showBrain(); }, openProject: id => { pendingProject = id; open('projects'); if (section === 'projects') showProjects(); },
+    openTeam: (teamId, agentId) => { pendingTeam = { team: teamId, agent: agentId || null }; open('teams'); if (section === 'teams') showTeams(); } };
 }

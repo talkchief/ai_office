@@ -924,7 +924,7 @@
 .space-command:focus-within { border-color:color-mix(in srgb,var(--ink) 35%,transparent); }
 .space-command-actions,.space-feed-head { display:flex; align-items:center; justify-content:space-between; gap:10px; } .space-command-actions { margin-top:12px; }
 .space-command-actions>span { font:9px var(--ui); color:var(--grey); }
-.space-command button[type=submit],#spaceDialog button:where(:not(.secondary):not(#spaceClose)) { background:var(--ink); color:var(--cream); border:0; padding:8px 12px; border-radius:99px; font:500 10px var(--ui); cursor:pointer; }
+.space-command button[type=submit],#spaceDialog button:where(:not(.secondary):not(#spaceClose):not(.pm-proj):not(.pm-task):not(.pm-send)) { background:var(--ink); color:var(--cream); border:0; padding:8px 12px; border-radius:99px; font:500 10px var(--ui); cursor:pointer; }
 .space-command button.space-save-draft { background:transparent; color:var(--grey); margin-left:auto; }
 .space-draft-label { color:#287657; font-size:10px!important; }
 .space-command button[type=submit] { white-space:nowrap; padding:6px 10px; }
@@ -955,6 +955,88 @@
 .space-closed-tasks { margin:18px 0 0; border-top:1px solid var(--hairline); padding-top:13px; }
 .space-closed-tasks>summary { color:var(--ink); cursor:pointer; font-family:var(--serif); font-size:19px; letter-spacing:.02em; margin:18px 2px 12px; }
 .space-closed-tasks>summary span { margin-left:8px; font:400 10px var(--ui); color:var(--grey); letter-spacing:0; }
+/* The way into Manage from a team card or a person's card. */
+.b-gear, .mh-gear { border:0; background:transparent; color:var(--grey); cursor:pointer; padding:2px; margin-left:6px; line-height:0; border-radius:6px; opacity:.55; transition:opacity .15s, color .15s, background .15s; }
+.b-gear:hover, .mh-gear:hover { opacity:1; color:var(--ink); background:color-mix(in srgb,var(--ink) 7%,transparent); }
+.mh-gear { margin-left:auto; align-self:center; }
+body.dark .b-gear:hover, body.dark .mh-gear:hover { background:rgba(255,255,255,.08); }
+
+/* A state, said in colour: the same five everywhere the office reports one. */
+.st { display:inline; font-weight:600; }
+.st-ok { color:#1E7A55; } .st-busy { color:#2A6DB5; } .st-warn { color:#8F6407; } .st-fail { color:#B2382C; } .st-off { color:var(--grey); }
+body.dark .st-ok { color:#5CC292; } body.dark .st-busy { color:#7FB3F0; } body.dark .st-warn { color:#E4B75B; } body.dark .st-fail { color:#F0857A; }
+#rail .mh-state[data-phase=working] { color:#2A6DB5; border-color:rgba(42,109,181,.45); }
+#rail .mh-state[data-phase=planning] { color:#B4830B; border-color:rgba(180,131,11,.45); }
+#rail .mh-state[data-phase=verifying],#rail .mh-state[data-phase=reviewing] { color:#684C91; border-color:rgba(104,76,145,.45); }
+#rail .mh-state[data-phase=submitted] { color:#A8408A; border-color:rgba(168,64,138,.45); }
+#rail .mh-state[data-phase=helping] { color:#A08A1E; border-color:rgba(160,138,30,.45); }
+#rail .mh-state[data-phase="needs you"] { color:#b14236; border-color:rgba(177,66,54,.5); background:#FCEBE9; }
+#rail .mh-state[data-phase=done] { color:#248267; border-color:rgba(36,130,103,.45); }
+body.dark #rail .mh-state[data-phase=working] { color:#7FB3F0; } body.dark #rail .mh-state[data-phase="needs you"] { color:#F0857A; background:rgba(177,66,54,.16); }
+/* The team card's own state: idle is quiet, the rest are not. */
+:is(.badge,#railHeader) .b-state.idle { color:var(--grey); }
+:is(.badge,#railHeader) .b-state.idle i { background:#C3C2BA; }
+:is(.badge,#railHeader) .b-state.blocked i { background:#b14236; }
+:is(.badge,#railHeader) .b-state.blocked { color:#b14236; }
+
+/* ---- the Program Manager's box ---- */
+#spaceDialog[data-view=projects]>header { padding:0; height:0; overflow:visible; }
+#spaceDialog[data-view=projects] #spaceTitle { display:none; }
+#spaceDialog[data-view=projects] #spaceClose { position:absolute; top:14px; right:16px; z-index:4; width:30px; height:30px; border-radius:50%; display:grid; place-items:center; color:var(--grey); }
+#spaceDialog[data-view=projects] #spaceContent { padding:0; }
+.pm { display:flex; flex-direction:column; }
+.pm-head { padding:26px 30px 20px; border-bottom:1px solid var(--hairline); }
+.pm-head h2 { margin:0; font:400 27px/1.2 var(--serif); color:var(--ink); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.pm-pill { font:500 10px var(--ui); letter-spacing:.06em; text-transform:uppercase; color:#1E7A55; background:#E9F5EE; border-radius:99px; padding:4px 10px; }
+.pm-head p { margin:10px 0 0; font:12.5px/1.6 var(--ui); color:var(--grey); max-width:62ch; }
+.pm-form { padding:20px 30px 4px; }
+.pm-label { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin:0 0 9px; font:600 12.5px var(--ui); color:var(--ink); }
+.pm-label em { font:11px ui-monospace, Menlo, Consolas, monospace; font-style:normal; color:var(--grey); }
+.pm-box { border:1px solid var(--hairline); border-radius:14px; background:var(--cream); overflow:hidden; }
+.pm-box textarea { display:block; width:100%; border:0; background:transparent; padding:15px 16px; font:13px/1.6 var(--ui); color:var(--ink); resize:vertical; min-height:96px; }
+.pm-box textarea:focus { outline:none; }
+.pm-bar { display:flex; align-items:center; gap:10px; padding:9px 12px; border-top:1px solid var(--hairline); background:color-mix(in srgb,var(--ink) 2%,transparent); }
+.pm-sp { flex:1; }
+.pm-attach { display:inline-flex; align-items:center; gap:6px; font:500 11.5px var(--ui); color:var(--grey); cursor:pointer; }
+.pm-attach::before { content:"📎"; font-size:11px; }
+.pm-attach:hover { color:var(--ink); }
+.pm-attach input { position:absolute; width:1px; height:1px; opacity:0; }
+.pm-files { font:11px ui-monospace, Menlo, Consolas, monospace; color:var(--grey); }
+.pm-kbd, .pm-foot kbd { font:10.5px ui-monospace, Menlo, Consolas, monospace; color:var(--grey); border:1px solid var(--hairline); border-radius:5px; padding:2px 6px; }
+#spaceDialog .pm-send, .pm-send { border:0; border-radius:10px; background:var(--ink); color:var(--cream); font:600 12px var(--ui); padding:9px 15px; cursor:pointer; }
+.pm-send:disabled { opacity:.55; cursor:progress; }
+.pm-sec { padding:20px 30px 0; }
+.pm-sec-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin:0 0 11px; }
+.pm-sec-head h3 { margin:0; font:600 12.5px var(--ui); color:var(--ink); display:flex; align-items:center; gap:8px; }
+.pm-count { font:600 10.5px ui-monospace, Menlo, Consolas, monospace; color:var(--grey); background:var(--hairline); border-radius:99px; padding:1px 7px; }
+.pm-link { font:11.5px var(--ui); color:var(--grey); text-decoration:none; }
+.pm-link:hover { color:var(--ink); text-decoration:underline; }
+.pm-sync { font:11.5px var(--ui); color:var(--grey); display:inline-flex; align-items:center; gap:6px; }
+.pm-sync::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--hairline); }
+.pm-sync.on::before { background:#2E5EA8; } .pm-sync.warn::before { background:#B4830B; }
+.pm-chips { display:flex; flex-wrap:wrap; gap:8px; }
+#spaceDialog .pm-proj, .pm-proj { display:inline-flex; align-items:center; gap:7px; border:1px solid var(--hairline); background:var(--mg-card,#fff); border-radius:99px; padding:7px 13px; font:12px var(--ui); color:var(--ink); cursor:pointer; }
+.pm-proj:hover { border-color:var(--ink); }
+.pm-proj i { width:7px; height:7px; border-radius:50%; background:#9C9B93; }
+.pm-proj i.on { background:#2E5EA8; } .pm-proj i.done { background:#1E7A55; }
+.pm-tasks { display:flex; flex-direction:column; gap:9px; }
+#spaceDialog .pm-task, .pm-task { display:flex; flex-direction:column; gap:8px; width:100%; text-align:left; border:1px solid var(--hairline); border-radius:12px; background:transparent; padding:13px 15px; cursor:pointer; }
+.pm-task:hover { background:color-mix(in srgb,var(--ink) 3%,transparent); }
+.pm-task-top { display:flex; align-items:center; gap:9px; }
+.pm-task-top b { flex:1; min-width:0; font:600 13px/1.4 var(--ui); color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pm-badge { font:600 9px var(--ui); letter-spacing:.12em; text-transform:uppercase; color:#5B66CE; background:#EAEDFA; border-radius:5px; padding:3px 7px; }
+.pm-chip { font:600 10.5px var(--ui); border-radius:99px; padding:3px 10px; white-space:nowrap; color:var(--grey); background:var(--hairline); }
+.pm-chip.ok { color:#1E7A55; background:#E9F5EE; } .pm-chip.busy { color:#2E5EA8; background:#E8EFFA; }
+.pm-chip.warn { color:#8F6407; background:#FBF3DC; } .pm-chip.fail { color:#B2382C; background:#FBECEA; }
+.pm-task-body { font:12px/1.6 var(--ui); color:var(--grey); background:color-mix(in srgb,var(--ink) 3%,transparent); border-radius:9px; padding:9px 11px; }
+.pm-task-body b { color:var(--ink); font-weight:600; }
+.pm-none { margin:0; font:12px var(--ui); color:var(--grey); }
+.pm-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:22px; padding:13px 30px; border-top:1px solid var(--hairline); font:11.5px var(--ui); color:var(--grey); }
+body.dark .pm-box { background:rgba(255,255,255,.03); }
+body.dark .pm-pill { background:rgba(92,194,146,.14); color:#7FD3AC; }
+body.dark .pm-badge { background:rgba(152,165,239,.16); color:#A9B4F5; }
+body.dark .pm-proj { background:transparent; }
+
 .space-projects>summary { color:var(--ink); cursor:pointer; font-family:var(--serif); font-size:19px; letter-spacing:.02em; margin:18px 2px 12px; }
 .space-projects>summary span { margin-left:8px; font:400 10px var(--ui); color:var(--grey); letter-spacing:0; }
 .space-card-context b { font-weight:700; }.space-job.cancelled { opacity:.65; }
@@ -1174,9 +1256,13 @@ body.dark #topbar .badge.brainTag { background: #1E1F24; }
 /* pod cards: name, seats, one sentence; everything else opens on hover */
 :is(.badge,#railHeader) { --label: #4A4947; }
 body.dark :is(.badge,#railHeader) { --label: #B7B4AC; }
-.badge { text-align: left; width: 236px; min-width: 236px; max-width: 236px; padding: 13px 16px 13px; border-radius: 16px; overflow: visible; }
+.badge { text-align: left; width: 186px; min-width: 186px; max-width: 186px; padding: 9px 12px; border-radius: 13px; overflow: visible; }
 .badge:hover, .badge.open { z-index: 3; }
-:is(.badge,#railHeader) .b-name { justify-content: flex-start; font-weight: 600; font-size: 11.5px; letter-spacing: .18em; gap: 8px; }
+:is(.badge,#railHeader) .b-name { justify-content: flex-start; font-weight: 600; font-size: 10px; letter-spacing: .14em; gap: 6px; }
+.badge .b-name .dot { width: 8px !important; height: 8px !important; }
+.badge .b-state { font-size: 8.5px !important; }
+.badge .seat { width: 9px !important; height: 9px !important; }
+.badge .b-eye, .badge .b-jobs, .badge .b-rows { font-size: 9.5px; }
 :is(.badge,#railHeader) .b-name .dot { width: 10px; height: 10px; }
 :is(.badge,#railHeader) .b-name .live { display: none !important; }
 :is(.badge,#railHeader) .b-state { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font: 500 9.5px ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em; color: var(--grey); text-transform: uppercase; }
@@ -1752,7 +1838,7 @@ body.dark #settingsPage .secondary { background: transparent; color: var(--ink);
   #zoomCtl { right: 14px; bottom: calc(44dvh + 14px); } #overviewBtn.right { right: 14px; }
   #rail { width: 100vw; } #rail.left, #rail.right { box-shadow: none; }
   #inboxDrawer { right: 8px; left: 8px; width: auto; top: 56px; max-height: calc(100dvh - 64px); }
-  .badge { min-width: 190px; max-width: 220px; padding: 10px 12px 8px; }
+  .badge { min-width: 160px; max-width: 178px; padding: 8px 10px 7px; }
   #brainBtn { top: 60px; left: 12px; padding: 7px 10px; } #overviewBtn { top: 60px; left: 112px; }
   .space-options-grid, #settingsPage .space-grid { grid-template-columns: 1fr; }
   #mPicker { bottom: 64px; }
@@ -1829,6 +1915,7 @@ body.dark #settingsPage .secondary { background: transparent; color: var(--ink);
         <div class="mh-name"></div>
         <div class="mh-role"></div>
       </div>
+      <button type="button" id="railAgentManage" class="mh-gear" title="Open this person in Manage" aria-label="Open this person in Manage"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="2.3"/><path d="M8 1.6v1.7M8 12.7v1.7M14.4 8h-1.7M3.3 8H1.6M12.5 3.5l-1.2 1.2M4.7 11.3l-1.2 1.2M12.5 12.5l-1.2-1.2M4.7 4.7L3.5 3.5"/></svg></button>
     </div>
     <div class="mh-tag"></div>
     <div id="mNowCard" class="now-card" hidden></div>

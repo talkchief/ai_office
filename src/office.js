@@ -58,13 +58,63 @@ export function initOfficeWork(ctx) {
   function close() { dialog.close(); modalKind = ''; if (toolPoll) { clearInterval(toolPoll); toolPoll = null; } }
   $('spaceClose').onclick = close; dialog.addEventListener('cancel', close); dialog.addEventListener('keydown', event => event.stopPropagation());
   // The Program Manager takes work for any team and picks the leads itself.
+  const readFileAsBase64 = file => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(',')[1]); r.onerror = reject; r.readAsDataURL(file); });
   const projectUI = {
     open() {
       open('projects', 'Program Manager');
       const mine = jobs.filter(j => j.autoRoute).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
-      content.innerHTML = `<p>Give the Program Manager anything that spans teams, or when you are not sure who should own it. It brings in the right leads and closes the task once they approve the work.</p><form id="spacePmForm"><label>What needs to get done?<textarea name="text" rows="4" required></textarea></label><div class="space-actions"><button type="submit">Send to the Program Manager ↗</button></div></form><h3>Projects</h3>${projectsOpen.length ? `<div class="space-pm-projects">${projectsOpen.map(p => `<span>${esc(p.name)}${p.status === 'paused' ? ' · paused' : ''}</span>`).join('')}</div>` : '<p>No projects yet.</p>'}<p><a href="#/settings/projects" class="space-text-action">Define a project: charter, timeline, files ↗</a></p><h3>The Program Manager's tasks</h3>${mine.map(j => `<button class="space-note" data-job="${j.id}"><b>${esc(j.title)}</b><span>${labels[j.state] || esc(j.state)}${j.progressLine ? ' · ' + esc(j.progressLine) : ''}</span></button>`).join('') || '<p>None yet.</p>'}`;
+      const running = mine.filter(j => ['planning', 'working', 'reviewing', 'saving', 'queued'].includes(j.state));
+      const waiting = mine.filter(j => ['waiting', 'blocked'].includes(j.state));
+      const state = j => labels[j.state] || j.state;
+      const kind = j => j.state === 'done' ? 'ok' : ['blocked'].includes(j.state) ? 'fail' : j.state === 'waiting' ? 'warn' : ['planning', 'working', 'reviewing', 'saving', 'queued'].includes(j.state) ? 'busy' : 'off';
+      const line = j => j.state === 'done' ? (j.resultPreview || '') : j.progressLine || (j.state === 'blocked' ? j.error || '' : '');
+      const card = j => `<button type="button" class="pm-task" data-job="${esc(j.id)}">
+        <span class="pm-task-top">${j.milestoneId ? '<span class="pm-badge">Milestone</span>' : ''}<b>${esc(j.title)}</b><span class="pm-chip ${kind(j)}">${esc(state(j))}</span></span>
+        ${line(j) ? `<span class="pm-task-body"><b>${esc(state(j))}</b> · ${esc(String(line(j)).slice(0, 240))}</span>` : ''}</button>`;
+      content.innerHTML = `<div class="pm">
+        <header class="pm-head">
+          <h2>Program Manager <span class="pm-pill">brings in the right leads</span></h2>
+          <p>Give the Program Manager anything that spans teams, or when you are not sure who should own it. It brings in the right leads and closes the task once they approve the work.</p>
+        </header>
+        <form id="spacePmForm" class="pm-form">
+          <div class="pm-label"><span>What needs to get done?</span><em>Esc to cancel</em></div>
+          <div class="pm-box">
+            <textarea name="text" rows="4" required placeholder="Describe what spans teams, needs a decision, or has to be coordinated…"></textarea>
+            <div class="pm-bar">
+              <label class="pm-attach" title="Attach documents the teams should read"><input type="file" id="spacePmFiles" multiple accept=".pdf,.docx,.txt,.md,.csv">Attach</label>
+              <span class="pm-files" id="spacePmFileNote"></span>
+              <span class="pm-sp"></span>
+              <kbd class="pm-kbd">⌘ Enter</kbd>
+              <button type="submit" class="pm-send">Send to the Program Manager →</button>
+            </div>
+          </div>
+        </form>
+        <section class="pm-sec">
+          <div class="pm-sec-head"><h3>Projects</h3><a href="#/settings/projects" class="pm-link" data-pm-projects>Define a project: charter, timeline, files ↗</a></div>
+          ${projectsOpen.length ? `<div class="pm-chips">${projectsOpen.map(p => `<button type="button" class="pm-proj" data-pm-project="${esc(p.id)}"><i class="${p.status === 'active' ? 'on' : p.status === 'paused' ? 'off' : 'done'}"></i>${esc(p.name)}</button>`).join('')}</div>` : '<p class="pm-none">No project yet. Define one and the Program Manager plans it.</p>'}
+        </section>
+        <section class="pm-sec">
+          <div class="pm-sec-head"><h3>The Program Manager's tasks <span class="pm-count">${mine.length}</span></h3><span class="pm-sync ${running.length ? 'on' : waiting.length ? 'warn' : ''}">${running.length ? `${running.length} under way` : waiting.length ? `${waiting.length} waiting for you` : 'Nothing running'}</span></div>
+          ${mine.length ? `<div class="pm-tasks">${mine.slice(0, 12).map(card).join('')}</div>` : '<p class="pm-none">Nothing yet. Whatever you send above lands here.</p>'}
+        </section>
+        <footer class="pm-foot"><span>${running.length ? esc(running[0].title.slice(0, 60)) : 'The Program Manager is free'}</span><span>Press <kbd class="pm-kbd">Esc</kbd> to dismiss</span></footer>
+      </div>`;
       content.querySelectorAll('[data-job]').forEach(b => b.onclick = () => showTask(b.dataset.job));
-      $('spacePmForm').onsubmit = async event => { event.preventDefault(); const button = event.target.querySelector('button'); button.disabled = true; try { const job = await api('/tasks', 'POST', { dept: 'auto', depts: 'auto', text: event.target.elements.text.value }); await refresh(); projectUI.open(); feedback(`Task received: ${job.title}. Open it from the list when you want to follow the plan.`); } catch (error) { feedback(error.message, true); button.disabled = false; } };
+      content.querySelectorAll('[data-pm-project]').forEach(b => b.onclick = () => { close(); settings.openProject(b.dataset.pmProject); });
+      content.querySelector('[data-pm-projects]').onclick = event => { event.preventDefault(); close(); settings.open('projects'); };
+      const files = $('spacePmFiles'), note = $('spacePmFileNote');
+      files.onchange = () => { const n = files.files.length; note.textContent = n ? `${n} file${n === 1 ? '' : 's'} attached` : ''; };
+      $('spacePmForm').onsubmit = async event => {
+        event.preventDefault();
+        const button = event.target.querySelector('button[type=submit]'), picked = [...(files.files || [])];
+        button.disabled = true;
+        try {
+          const job = await api('/tasks', 'POST', { dept: 'auto', depts: 'auto', text: event.target.elements.text.value });
+          for (const file of picked) { const data = await readFileAsBase64(file); await api(`/tasks/${job.id}/attach`, 'POST', { name: file.name, data, type: file.type }); }
+          await refresh(); projectUI.open();
+          feedback(`Task received: ${job.title}. Open it from the list when you want to follow the plan.`);
+        } catch (error) { feedback(error.message, true); button.disabled = false; }
+      };
     },
     refresh: async () => {},
     activity: () => { const j = jobs.find(j => j.autoRoute && ['planning', 'working', 'reviewing'].includes(j.state)); return j ? { state: 'running', title: j.title } : null; },
@@ -73,6 +123,7 @@ export function initOfficeWork(ctx) {
     if (event.key !== 'Enter' || event.shiftKey || event.isComposing || !(event.target instanceof HTMLTextAreaElement)) return;
     const t = event.target;
     if (t.id === 'spaceBrief') { event.preventDefault(); t.form?.querySelector('button[type=submit]:not(.space-save-draft)')?.click(); }
+    else if (t.closest('#spacePmForm')) { event.preventDefault(); t.form?.querySelector('button[type=submit]')?.click(); }
     else if (t.id === 'spaceRevision') { event.preventDefault(); (t.closest('details, .space-owner-approval') || t.parentElement)?.querySelector('button[data-action]:not(.space-text-action)')?.click(); }
   }, true);
   const inbox = initInbox({ api, openTask: id => showTask(id), openNote: id => settings.openNote(id), retryTask: id => api(`/tasks/${id}/retry`, 'POST', {}) });
@@ -421,12 +472,19 @@ export function initOfficeWork(ctx) {
     for (const j of mine) { j.seenAt = Date.now(); api(`/tasks/${j.id}/seen`, 'POST', {}).catch(() => {}); }
     render();
   }
+  // One vocabulary of colour for a state, wherever the rail says one.
+  const stateKind = s => s === 'done' ? 'ok'
+    : ['blocked', 'escalated', 'failed', 'interrupted'].includes(s) ? 'fail'
+    : ['waiting', 'awaiting_ceo'].includes(s) ? 'warn'
+    : ['working', 'planning', 'reviewing', 'saving', 'queued', 'executing', 'awaiting_lead_review'].includes(s) ? 'busy' : 'off';
+  const stateWord = s => labels[s] || String(s || '').replace(/^./, c => c.toUpperCase()) || 'Unknown';
   function renderAgent(id) {
     agentOpen = id; acknowledgeAgent(id);
     const assigned = jobs.filter(j => j.agent === id || j.subtasks.some(s => s.agent === id || s.eligible?.includes(id)));
-    $('mNow').innerHTML = `<b>${assigned.some(j => ['working', 'planning', 'reviewing'].includes(j.state)) ? 'Assigned work' : 'Ready for your next task'}</b>`;
+    const busy = assigned.some(j => ['working', 'planning', 'reviewing'].includes(j.state));
+    $('mNow').innerHTML = `<b class="st st-${busy ? 'busy' : 'off'}">${busy ? 'Assigned work' : 'Ready for your next task'}</b>`;
     $('mStats').innerHTML = ''; $('mChart').hidden = true;
-    $('mFeed').innerHTML = assigned.map(j => `<button class="space-agent-task" data-job="${j.id}"><b>${esc(j.title)}</b><span>${labels[j.state]} · ${j.completedSteps}/${j.subtasks.length} subtasks submitted</span>${j.subtasks.filter(s => s.agent === id || s.eligible?.includes(id)).map(s => `<span>${s.state === 'done' ? 'Submitted' : labels[s.state]}: ${esc(s.title)}</span>`).join('')}<span>Open plan, deliverables and verification →</span></button>`).join('') || '<p>No tasks assigned. Real plans and progress will appear here.</p>';
+    $('mFeed').innerHTML = assigned.map(j => `<button class="space-agent-task" data-job="${j.id}"><b>${esc(j.title)}</b><span><b class="st st-${stateKind(j.state)}">${stateWord(j.state)}</b> · ${j.completedSteps}/${j.subtasks.length} subtasks submitted</span>${j.subtasks.filter(s => s.agent === id || s.eligible?.includes(id)).map(s => `<span><b class="st st-${stateKind(s.state)}">${s.state === 'done' ? 'Submitted' : stateWord(s.state)}</b>: ${esc(s.title)}</span>`).join('')}<span>Open plan, deliverables and verification →</span></button>`).join('') || '<p>No tasks assigned. Real plans and progress will appear here.</p>';
     $('mFeed').querySelectorAll('[data-job]').forEach(b => b.onclick = () => showTask(b.dataset.job));
   }
   async function showSettings(tab) {
@@ -657,6 +715,8 @@ export function initOfficeWork(ctx) {
   const rowHTML = key => { const list = jobs.filter(j => involves(j, key)); return `<div class="b-tasks"><span>ACTIVE<b data-tk="${key}-doing">${list.filter(j => ['planning','working','reviewing'].includes(j.state)).length}</b></span><span>QUEUED<b data-tk="${key}-next">${list.filter(j=>j.state==='queued').length}</b></span><span>APPROVED<b data-tk="${key}-done">${list.filter(j=>j.state==='done').length}</b></span></div>`; };
   for(const key of DEPT_KEYS)(deptRT[key].counts||deptRT[key].apprRow).insertAdjacentHTML(deptRT[key].counts?'beforeend':'beforebegin',rowHTML(key)+(deptRT[key].counts?`<div class="b-jobs" data-tjobs="${key}"></div>`:''));
   window.addEventListener('office:open-task', event => { if (event.detail) showTask(event.detail); });
+  // The gear on a team card or a person's card: their charter, their people and their instructions live in Manage.
+  window.addEventListener('office:manage', event => { const { dept, agent } = event.detail || {}; if (dept) settings.openTeam(dept, agent); });
   window.addEventListener('office:compose', event => { const k = event.detail; if (!DEPT_KEYS.includes(k)) return; selectedTeam = k; $('spaceDept').innerHTML = `<i style="background:${teamChip(k).chip}"></i><span>${esc(teamChip(k).name)}</span><span class="space-chevron">⌄</span>`; fillOptions(); $('spaceBrief').focus(); });
   let liveStatus = 'connecting', taskTimer = null;
   const refreshOpenTask = id => { if (dialog.open && modalKind === 'task' && modalTask === id && !taskDirty) { clearTimeout(taskTimer); taskTimer = setTimeout(() => showTask(id, false), 500); } };

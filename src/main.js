@@ -211,6 +211,7 @@ document.getElementById('railHeader').addEventListener('click', (e) => {
   if (e.target.closest('.b-appr')) { const s = stuckIn(k)[0]; if (s) openAgentRail(s.a.id); return; }
   const task = e.target.closest('[data-task]'); if (task) { window.dispatchEvent(new CustomEvent('office:open-task', { detail: task.dataset.task })); return; }
   const who = e.target.closest('[data-seat]'); if (who) { openAgentRail(who.dataset.seat); return; }
+  if (e.target.closest('[data-act="manage"]')) { e.stopPropagation(); window.dispatchEvent(new CustomEvent('office:manage', { detail: { dept: k } })); return; }
   if (e.target.closest('[data-act="task"]')) { window.dispatchEvent(new CustomEvent('office:compose', { detail: k })); return; }
   if (e.target.closest('.b-tasks') && DEMO && tasks) tasks.toggle();
 });
@@ -237,6 +238,8 @@ function openAgentRail(id, tab = 'chat', fly = true) {
   document.querySelector('#railAgent .mh-name').innerHTML = (r.a.lead ? '<span class="star">★ </span>' : '') + r.a.name;
   document.querySelector('#railAgent .mh-role').textContent = `${r.v1.role} · ${dept.name}`;
   document.querySelector('#railAgent .mh-tag').textContent = r.v1.tagline;
+  const gear = document.getElementById('railAgentManage');
+  if (gear) gear.onclick = event => { event.stopPropagation(); window.dispatchEvent(new CustomEvent('office:manage', { detail: { dept: r.a.dept, agent: r.a.id } })); };
   document.getElementById('mChips').innerHTML = (r.v1.chips || []).map(c => `<button>${esc(c)}</button>`).join('');
   document.getElementById('mChips').querySelectorAll('button').forEach(b => b.addEventListener('click', () => sendChat(b.textContent)));
   rail.classList.add('agentOpen');
@@ -257,7 +260,7 @@ function renderNowCard(id) {
   let st = document.querySelector('#railAgent .mh-state'); if (!st) { st = document.createElement('span'); st.className = 'mh-state'; document.querySelector('#railAgent .mh').appendChild(st); }
   const since = r.phaseSince && phase !== 'idle' ? ' · ' + Math.max(1, Math.round((performance.now() - r.phaseSince) / 60000)) + 'm' : '';
   if (r.lastPhase !== phase) { r.lastPhase = phase; r.phaseSince = performance.now(); }
-  st.textContent = (phase === 'idle' ? 'FREE' : phase.toUpperCase()) + since; st.classList.toggle('on', phase !== 'idle');
+  st.textContent = (phase === 'idle' ? 'FREE' : phase.toUpperCase()) + since; st.classList.toggle('on', phase !== 'idle'); st.dataset.phase = phase;
   const busy = phase !== 'idle';
   if (!busy) { el.hidden = true; return; }
   let step = '', title = r.liveTitle || (r.ask ? r.ask : ''), meta = '', draft = '', chain = '';
