@@ -1,6 +1,6 @@
 // One status vocabulary for the Manage area, and the office roll-up the directory and the rail read.
 // A mark is a coloured dot and a word: Connected, Signed in, Failed, Not set, Waits for you, Saved… the same everywhere.
-import { MANAGED_MODELS } from './session.js';
+import { MANAGED_MODELS, PLATFORM_ONLY } from './session.js';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export const mark = (kind, label, attrs = '') => `<span class="mg-st mg-st-${kind}" ${attrs}><i></i>${esc(label)}</span>`;
 export const dot = (kind, title = '') => `<span class="mg-dot mg-dot-${kind}" ${title ? `title="${esc(title)}"` : ''}></span>`;
@@ -23,6 +23,9 @@ export function toolState(t) {
 /** The roll-up: one object the directory, the rail and the area headers read. Cached for a short while; `force` refreshes. */
 let cache = null, cachedAt = 0, inflight = null;
 export async function officeSummary(api, { force = false } = {}) {
+  // A platform administrator's session belongs to no office, so every one of these would be refused (403).
+  // It asks for nothing and says so with null; the directory and the rail show the Platform line instead.
+  if (PLATFORM_ONLY) return null;
   if (!force && cache && Date.now() - cachedAt < 15000) return cache;
   if (inflight) return inflight;
   inflight = (async () => {

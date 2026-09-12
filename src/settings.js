@@ -66,7 +66,8 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   const setMeta = (status, lastChange = '') => { metaStatus = status; $('settingsMeta').innerHTML = `${status}${lastChange ? `<span>${lastChange}</span>` : ''}`; };
   async function refreshMeta(next = section, status = metaStatus) {
     const area = SECTIONS.find(s => s[0] === next)?.[4]; let last = '';
-    if (area) { try { const rows = await api(`/audit?limit=1&area=${area}`); if (rows[0]) last = `last change ${when(rows[0].at)} · ${esc(rows[0].actor === 'ceo' ? 'you' : rows[0].actor || 'office')}`; } catch {} }
+    // The audit log is an office's own: a platform administrator's session would only be refused.
+    if (area && !PLATFORM_ONLY) { try { const rows = await api(`/audit?limit=1&area=${area}`); if (rows[0]) last = `last change ${when(rows[0].at)} · ${esc(rows[0].actor === 'ceo' ? 'you' : rows[0].actor || 'office')}`; } catch {} }
     if (section === next) setMeta(status, last);
   }
   async function refreshRail() {

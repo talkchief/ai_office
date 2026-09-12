@@ -1,10 +1,14 @@
 // The CEO's inbox: a bell in the top bar and a drawer listing everything that needs you, with the action inline.
+import { PLATFORM_ONLY } from './session.js';
 const ACTION_LABEL = { decide: 'Review and decide', answer: 'Answer', retry: 'Retry', open: 'Open', note: 'Read' };
 const KIND_LABEL = { ceo_decision: 'Decision', ceo_approval: 'Approval', question: 'Question', blocked: 'Blocked', escalated: 'Needs you', done: 'Done', overdue: 'Overdue', digest: 'Digest', routine_failed: 'Routine', config_changed: 'Settings', provider_error: 'Models' };
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const ago = at => { const m = Math.round((Date.now() - at) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : new Date(at).toLocaleDateString(); };
 
 export function initInbox({ api, openTask, openNote, retryTask }) {
+  // The inbox is an office's own. A platform administrator has no office in their session, so the bell
+  // would only collect refusals: the whole thing stays out of the page, and the handle answers quietly.
+  if (PLATFORM_ONLY) return { refresh: () => {}, onEvent: () => {}, open: () => {}, close: () => {}, counts: { unread: 0, needsYou: 0 } };
   let items = [], counts = { unread: 0, needsYou: 0 };
   const bell = document.createElement('button');
   bell.id = 'inboxBell'; bell.type = 'button'; bell.setAttribute('aria-label', 'Inbox'); bell.setAttribute('aria-expanded', 'false');

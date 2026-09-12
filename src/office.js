@@ -197,10 +197,10 @@ export function initOfficeWork(ctx) {
     const a = id => s?.areas?.[id] || {};
     const item = ([id, label]) => `<button type="button" class="mg-dir-item" data-go="${id}">${esc(label)}${a(id).line ? `<small>${esc(a(id).line)}</small>` : ''}${a(id).dot ? dot(a(id).dot) : ''}</button>`;
     const connect = $('claudeConnect');
-    $('spaceManageMenu').innerHTML = `<div class="mg-dir-head"><h2>Manage</h2><span class="mg-eyebrow">${esc(s?.name || 'Your office')}${s ? ' · ' + esc(s.areas.teams.line) : ''}</span>${HOSTED && USER ? `<span class="mg-eyebrow mg-who">${esc(USER.name)} · ${esc(USER.email)} · ${esc(USER.role)}</span>` : ''}<span class="mg-needs">${s ? (s.attention.length ? `${dot(s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn')}<b>${s.attention.length}</b>&nbsp;need${s.attention.length === 1 ? 's' : ''} you` : `${dot('ok')}Nothing needs you`) : 'Checking…'}</span></div>
+    $('spaceManageMenu').innerHTML = `<div class="mg-dir-head"><h2>Manage</h2><span class="mg-eyebrow">${PLATFORM_ONLY ? 'Platform' : esc(s?.name || 'Your office')}${s ? ' · ' + esc(s.areas.teams.line) : ''}</span>${HOSTED && USER ? `<span class="mg-eyebrow mg-who">${esc(USER.name)} · ${esc(USER.email)} · ${esc(USER.role)}</span>` : ''}<span class="mg-needs">${s ? (s.attention.length ? `${dot(s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn')}<b>${s.attention.length}</b>&nbsp;need${s.attention.length === 1 ? 's' : ''} you` : `${dot('ok')}Nothing needs you`) : 'Checking…'}</span></div>
       <div class="mg-dir-attn">${(s?.attention || []).slice(0, 4).map(x => `<div class="mg-attn">${mark(x.kind, x.label)}<span>${esc(x.text)}</span><button type="button" data-go="${x.go}">${esc(x.action)}</button></div>`).join('')}</div>
       <div class="mg-dir-body">${DIRECTORY.map(([group, items], i) => `<div class="mg-dir-col"><span class="mg-eyebrow">${group}</span>${items.map(item).join('')}${i === DIRECTORY.length - 1 ? '<div id="claudeConnectSlot"></div>' : ''}</div>`).join('')}</div>
-      <div class="mg-dir-foot">${s ? esc(s.foot) : 'Reading the office…'}${HOSTED ? '<button type="button" class="mg-signout" id="spaceSignOut">Sign out</button>' : ''}${s ? mark(s.healthy ? 'ok' : (s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn'), s.healthy ? 'Office healthy' : (s.attention.some(x => x.kind === 'fail') ? 'Something failed' : 'Needs attention')) : ''}</div>`;
+      <div class="mg-dir-foot">${s ? esc(s.foot) : PLATFORM_ONLY ? 'Platform administration — this account belongs to no office' : 'Reading the office…'}${HOSTED ? '<button type="button" class="mg-signout" id="spaceSignOut">Sign out</button>' : ''}${s ? mark(s.healthy ? 'ok' : (s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn'), s.healthy ? 'Office healthy' : (s.attention.some(x => x.kind === 'fail') ? 'Something failed' : 'Needs attention')) : ''}</div>`;
     $('claudeConnectSlot').replaceWith(connect); // the unlock / models shortcut keeps the label auth.js gives it
     const signOut = $('spaceSignOut'); if (signOut) signOut.onclick = async () => { try { await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); } catch {} location.reload(); };
     const d = $('spaceManageDot'); if (s) { d.hidden = !s.attention.length; d.className = 'mg-dot mg-dot-' + (s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn'); d.title = s.attention.length + ' need you'; }
@@ -245,7 +245,7 @@ export function initOfficeWork(ctx) {
   }
   const audienceOf = (visibility, picked) => ({ visibility, sharedWith: { users: picked.filter(v => v.startsWith('u:')).map(v => v.slice(2)), groups: picked.filter(v => v.startsWith('g:')).map(v => v.slice(2)) } });
   const audienceInput = () => HOSTED ? audienceOf($('spaceVisibility')?.value || 'private', [...($('spaceShare')?.selectedOptions || [])].map(o => o.value)) : {};
-  if (HOSTED) { $('spaceVisibility').onchange = () => { $('spaceShareWrap').hidden = $('spaceVisibility').value === 'public'; }; fillAudience(); }
+  if (HOSTED && !PLATFORM_ONLY) { $('spaceVisibility').onchange = () => { $('spaceShareWrap').hidden = $('spaceVisibility').value === 'public'; }; fillAudience(); }
   panel.querySelector('form').onsubmit = async event => {
     event.preventDefault(); const button = event.submitter; button.disabled = true;
     try {
