@@ -122,6 +122,10 @@ export class OfficeEngine {
     // A task's own counters are what the CEO reads on the task; this ledger is what an office is billed from, and it
     // holds the calls that belong to no task at all.
     this.db.exec('CREATE TABLE IF NOT EXISTS office_usage (seq INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, tag TEXT NOT NULL, model TEXT, job_id TEXT, input INTEGER NOT NULL DEFAULT 0, output INTEGER NOT NULL DEFAULT 0, cached INTEGER NOT NULL DEFAULT 0, total INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS office_usage_at ON office_usage(at);');
+    // The price of the call, frozen as it was charged: what is billed is billed, so a later price change cannot move it.
+    // The rates are kept beside the cost so a line on an invoice can be explained rather than only re-totalled.
+    for (const column of ['rate_in REAL', 'rate_out REAL', 'rate_cached REAL', 'cost_nano INTEGER NOT NULL DEFAULT 0'])
+      try { this.db.exec(`ALTER TABLE office_usage ADD COLUMN ${column}`); } catch { /* already there */ }
     Object.assign(this, { office, models, toolHub, knowledgeIndex, bus, settingsFn: settings, onComplete, onChange, name, agentFactory, pmSkillsDir, toolLabels, projectFor });
     this.foreignAbortDelay = 5000;
     // Long-term memory shares the task database; null when the office runs without it (tests, older set-ups).
@@ -161,20 +165,29 @@ export class OfficeEngine {
   // the CEO reads on the task; this is what the office is billed from, and it holds the calls that belong to no task.
   recordUsage({ tag = 'task', model = '', jobId = null, input = 0, output = 0, cached = 0 } = {}) {
     const total = (input || 0) + (output || 0); if (!total) return;
-    try { this.db.prepare('INSERT INTO office_usage(at, tag, model, job_id, input, output, cached, total) VALUES (?,?,?,?,?,?,?,?)').run(Date.now(), String(tag).slice(0, 24), String(model || 'unknown').slice(0, 120), jobId ? String(jobId) : null, input || 0, output || 0, cached || 0, total); }
+    // The rate in force at this moment, and the cost it produces, both stored on the row. Cost is kept in whole
+    // billionths so a sum of a million small calls stays exact; fresh input is what was not served from cache.
+    const price = (() => { try { return this.models?.priceOf?.(model) || null; } catch { return null; } })();
+    const fresh = Math.max(0, (input || 0) - (cached || 0));
+    const costNano = price ? Math.round(((fresh * price.in + (cached || 0) * price.cached + (output || 0) * price.out) / 1e6) * 1e9) : 0;
+    try { this.db.prepare('INSERT INTO office_usage(at, tag, model, job_id, input, output, cached, total, rate_in, rate_out, rate_cached, cost_nano) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(Date.now(), String(tag).slice(0, 24), String(model || 'unknown').slice(0, 120), jobId ? String(jobId) : null, input || 0, output || 0, cached || 0, total, price?.in ?? null, price?.out ?? null, price?.cached ?? null, costNano); }
     catch (error) { console.warn('usage:', error.message); }
   }
   /** What this office has spent since a moment: the totals, and the same split by what the call was for and by model. */
   usageSince(since = 0) {
-    const zero = () => ({ input: 0, output: 0, cached: 0, total: 0, calls: 0 });
+    const zero = () => ({ input: 0, output: 0, cached: 0, total: 0, calls: 0, costNano: 0 });
     const out = { ...zero(), byTag: {}, byModel: {} };
     let rows = [];
-    try { rows = this.db.prepare('SELECT tag, model, SUM(input) i, SUM(output) o, SUM(cached) c, SUM(total) t, COUNT(*) n FROM office_usage WHERE at >= ? GROUP BY tag, model').all(Number(since) || 0); }
+    try { rows = this.db.prepare('SELECT tag, model, SUM(input) i, SUM(output) o, SUM(cached) c, SUM(total) t, COUNT(*) n, SUM(cost_nano) m FROM office_usage WHERE at >= ? GROUP BY tag, model').all(Number(since) || 0); }
     catch { return out; }
     for (const r of rows) {
-      const add = into => { into.input += r.i || 0; into.output += r.o || 0; into.cached += r.c || 0; into.total += r.t || 0; into.calls += r.n || 0; };
+      const add = into => { into.input += r.i || 0; into.output += r.o || 0; into.cached += r.c || 0; into.total += r.t || 0; into.calls += r.n || 0; into.costNano += r.m || 0; };
       add(out); add(out.byTag[r.tag] ||= zero()); add(out.byModel[r.model] ||= zero());
     }
+    // Billionths are what is stored; the money is what is read.
+    const money = o => { o.cost = o.costNano / 1e9; return o; };
+    money(out); Object.values(out.byTag).forEach(money); Object.values(out.byModel).forEach(money);
     return out;
   }
   detail(id) { const job = this.get(id); return job && { ...job, events: this.events(id), messages: this.threads.list(id) }; }

@@ -66,3 +66,32 @@ test('the ledger holds every model call the office makes, including those that b
     assert.equal(engine.usageSince(Date.now() + 60000).total, 0, 'a window that has not started yet is empty');
   } finally { engine.db.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }); }
 });
+
+test('what is billed is billed: the rate is frozen on the call and a later price change cannot move it', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'talkchief-price-'));
+  const office = new OfficeStore({ dataDir: dir, initialAgents: loadRoster().agents });
+  let price = { in: 3, out: 15, cached: 0.3 };            // whole currency per million tokens
+  const engine = new OfficeEngine({ dataDir: dir, office, models: { priceOf: () => price }, knowledgeDir: path.join(dir, 'k') });
+  try {
+    // 600k fresh input at 3, 400k cached at 0.3, 100k output at 15 → 1.80 + 0.12 + 1.50
+    engine.recordUsage({ tag: 'task', model: 'm1', jobId: 'j1', input: 1000000, output: 100000, cached: 400000 });
+    assert.equal(engine.usageSince(0).cost.toFixed(6), '3.420000', 'cached input is billed at its own rate, and is not billed twice');
+
+    price = { in: 30, out: 150, cached: 3 };               // the provider puts its price up tenfold
+    engine.recordUsage({ tag: 'task', model: 'm1', jobId: 'j2', input: 1000000, output: 100000, cached: 400000 });
+    const both = engine.usageSince(0);
+    assert.equal(both.cost.toFixed(6), '37.620000', 'the new call costs the new price; the call already billed does not move');
+    assert.equal(both.byTag.task.cost.toFixed(6), '37.620000');
+  } finally { engine.db.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }); }
+});
+
+test('a model with no price is still measured, and simply costs nothing yet', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'talkchief-noprice-'));
+  const office = new OfficeStore({ dataDir: dir, initialAgents: loadRoster().agents });
+  const engine = new OfficeEngine({ dataDir: dir, office, models: { priceOf: () => null }, knowledgeDir: path.join(dir, 'k') });
+  try {
+    engine.recordUsage({ tag: 'task', model: 'unpriced', jobId: 'j1', input: 900, output: 100 });
+    const all = engine.usageSince(0);
+    assert.equal(all.total, 1000); assert.equal(all.cost, 0, 'tokens are counted whether or not a price has been set');
+  } finally { engine.db.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }); }
+});

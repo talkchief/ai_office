@@ -22,7 +22,7 @@ export function registerAdminApi(router, { accounts, platform, registry, mail = 
       const file = path.join(registry.dirs(tenantId).data, 'workflows.sqlite');
       if (!fs.existsSync(file)) return null;
       const db = new DatabaseSync(file, { readOnly: true });
-      try { const r = db.prepare('SELECT SUM(input) i, SUM(output) o, SUM(cached) c, SUM(total) t, COUNT(*) n FROM office_usage').get(); return { input: r?.i || 0, output: r?.o || 0, cached: r?.c || 0, total: r?.t || 0, calls: r?.n || 0 }; }
+      try { const r = db.prepare('SELECT SUM(input) i, SUM(output) o, SUM(cached) c, SUM(total) t, COUNT(*) n, SUM(cost_nano) m FROM office_usage').get(); return { input: r?.i || 0, output: r?.o || 0, cached: r?.c || 0, total: r?.t || 0, calls: r?.n || 0, costNano: r?.m || 0, cost: (r?.m || 0) / 1e9 }; }
       finally { db.close(); }
     } catch { return null; }
   };

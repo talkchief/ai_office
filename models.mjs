@@ -213,7 +213,14 @@ export class ModelRegistry {
       const id = text(m.id, 120); if (!id || seen.has(id)) fail('Each model needs a unique ID.'); seen.add(id);
       if (!ids.has(m.provider)) fail(`${id}: choose an existing provider.`);
       const s = m.supports || {};
-      return { id, provider: m.provider, label: text(m.label, 80) || id, enabled: m.enabled !== false, supports: { effort: !!s.effort, reasoning: !!s.reasoning, tools: s.tools !== false } };
+      // What this model costs, in whole currency per million tokens, as the CEO types it. A cached input token is
+      // billed at its own rate; left blank it costs what fresh input costs, because a blank is "not told", not "free".
+      const rate = v => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.min(n, 100000) : 0; };
+      const pin = rate(m.price?.in), pout = rate(m.price?.out);
+      const blank = m.price?.cached === undefined || m.price?.cached === null || m.price?.cached === '';
+      const pcached = blank ? pin : rate(m.price.cached);
+      const price = pin || pout || pcached ? { in: pin, out: pout, cached: pcached } : null;
+      return { id, provider: m.provider, label: text(m.label, 80) || id, enabled: m.enabled !== false, supports: { effort: !!s.effort, reasoning: !!s.reasoning, tools: s.tools !== false }, ...(price ? { price } : {}) };
     });
     const known = new Set(models.map(m => m.id));
     const roleDefaults = {}, roleEfforts = {};
@@ -232,6 +239,8 @@ export class ModelRegistry {
   }
   provider(id) { return this.value.providers.find(p => p.id === id); }
   model(id) { return this.value.models.find(m => m.id === normModel(id)); }
+  /** What a model costs per million tokens, or null when no price has been set for it. */
+  priceOf(id) { return this.model(id)?.price || null; }
   usable(provider) { return !!provider?.enabled && (!!this.keyFor(provider).key || (provider.type === 'openai-compatible' && !!provider.baseURL && /^http:\/\/(localhost|127\.0\.0\.1)/.test(provider.baseURL))); }
   ready() { return this.value.providers.some(p => this.usable(p) && this.value.models.some(m => m.provider === p.id && m.enabled !== false)); }
   // What the browser may see: never a key.
