@@ -96,7 +96,10 @@ test('mail becomes work: a verified sender gets a task with its file and a threa
     instance.engine.update(job.id, j => { j.result = '# Brief\n\nDone.'; j.resultVersions = [{ n: 1, summary: 'The brief is ready.' }]; }); instance.engine.setState(job.id, 'done');
     await new Promise(r => setTimeout(r, 100));
     const result = JSON.parse(fs.readFileSync(outbox, 'utf8')).at(-1);
-    assert.match(result.subject, /^Done: Draft the spring launch brief \[AO-/); assert.match(result.text, /The brief is ready\./); assert.deepEqual(result.attachments.map(a => a.name), ['result.md']); assert.equal(result.to[0], 'dana@acme.test');
+    assert.match(result.subject, /^Done: Draft the spring launch brief \[AO-/); assert.match(result.text, /The brief is ready\./); assert.equal(result.to[0], 'dana@acme.test');
+    // Markdown is never attached to an email. This result is a couple of lines, so it is the email itself.
+    assert.deepEqual(result.attachments, [], 'no .md file is ever attached');
+    assert.match(result.text, /Done\./, 'a short result is inline in the body');
   } finally { await registry.closeAll(); accounts.close(); fs.rmSync(root, { recursive: true, force: true, maxRetries: 5 }); }
 });
 

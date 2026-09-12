@@ -13,7 +13,7 @@ import { attachmentProblem, safeFileName, extensionOf, TEXT_EXTENSIONS } from '.
 import { isQuestion } from '../engine/deep-agents.mjs';
 import { extractDocument } from '../documents.mjs';
 import { run as runContext } from '../server/request-context.mjs';
-import { listWorkspaceFiles } from '../engine/documents.mjs';
+import { listWorkspaceFiles, renderPdf } from '../engine/documents.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -123,7 +123,9 @@ export function createIntake({ accounts, registry, mail = { mailer: null, domain
     // answer back with whatever it produced. Answering from a single untooled model call could not read a note, so it
     // guessed. Only a question about a task already under way is still answered from that task's record.
     const long = text.length > 12000, ready = instance.models.ready();
-    const brief = long ? text.slice(0, 11000) + '\n\n(The message is long: the whole of it is attached as /work/inbox/message.md.)' : text || `Files received by email from ${m.from.address}: ${good.map(f => f.name).join(', ')}. Read them under /work/inbox/ and do what they ask.`;
+    const asked = long ? text.slice(0, 11000) + '\n\n(The message is long: the whole of it is attached as /work/inbox/message.md.)' : text || `Files received by email from ${m.from.address}: ${good.map(f => f.name).join(', ')}. Read them under /work/inbox/ and do what they ask.`;
+    // The answer goes back by email, so the deliverable has to be something a mail client can open on a phone.
+    const brief = `${asked}\n\nThis came in by email and the answer is emailed back. Keep a short answer short: a few paragraphs belong in the reply itself, not in a file. When the deliverable is a report, a document or a deck, write the Markdown and then call export_pdf (export_pptx for slides) — a Markdown file is never sent by email, because it cannot be read on a phone.`;
     // Added to a project the subject names the project, so the work takes its title from the message itself.
     const workTitle = project ? (text.split('\n').map(s => s.trim()).find(Boolean) || `Work for ${project.name}`).slice(0, 100) : title;
     const job = engine.create({ dept: 'auto', depts: 'auto', text: brief, title: workTitle, projectId: project?.id || null, ownerId: viewer.id, visibility: 'private', autoStart: false, backlog: !ready, origin: { channel: 'email', from: m.from.address, messageId: m.messageId || undefined, subject: String(m.subject || '').slice(0, 200) } });
@@ -174,11 +176,24 @@ export function createIntake({ accounts, registry, mail = { mailer: null, domain
     const EXPORTS = { '.pdf': 'application/pdf', '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation' };
     const made = listWorkspaceFiles(dir).filter(f => EXPORTS[path.extname(f.name).toLowerCase()] && !f.name.startsWith('inbox/'))
       .sort((a, b) => (b.modifiedAt || 0) - (a.modifiedAt || 0)).slice(0, 3);
-    const attachments = made.length
-      ? made.map(f => ({ name: path.basename(f.name), contentType: EXPORTS[path.extname(f.name).toLowerCase()], bytes: fs.readFileSync(path.join(dir, f.name)) }))
-      : job.result ? [{ name: 'result.md', contentType: 'text/markdown', bytes: Buffer.from(String(job.result)) }] : [];
+    const attachments = made.map(f => ({ name: path.basename(f.name), contentType: EXPORTS[path.extname(f.name).toLowerCase()], bytes: fs.readFileSync(path.join(dir, f.name)) }));
+    // Markdown is never attached: a .md file cannot be read on a phone. A result this short is better as the email itself;
+    // a longer one is printed to PDF here when the task exported nothing (renderPdf falls back to pdfkit without a
+    // browser). If even that fails the prose still goes in the body, because a result must never be lost to a print error.
+    const INLINE = 1200;
+    const produced = String(job.result || ''); let inline = '';
+    if (!attachments.length && produced) {
+      if (produced.length <= INLINE) inline = produced;
+      else {
+        try {
+          const out = path.join(dir, 'result.pdf');
+          await renderPdf({ markdown: produced, title: job.title, out });
+          attachments.push({ name: 'result.pdf', contentType: 'application/pdf', bytes: fs.readFileSync(out) });
+        } catch (error) { log(`  mail: could not print the result of ${job.id} as a PDF: ${error.message}`); inline = produced; }
+      }
+    }
     const summary = job.resultVersions?.at(-1)?.summary || job.review?.summary || '';
-    await sendOnThread(instance, tenant, viewer, job.id, { to: addressFor(job), subject: `Done: ${job.title} [AO-${tagOf(job.id)}]`, inReplyTo: job.origin?.messageId || null, attachments, text: [summary, `The full result is in the office: ${link(job.id)}`, attachments.length ? `Attached: ${attachments.map(a => a.name).join(', ')}.` : ''].filter(Boolean).join('\n\n') });
+    await sendOnThread(instance, tenant, viewer, job.id, { to: addressFor(job), subject: `Done: ${job.title} [AO-${tagOf(job.id)}]`, inReplyTo: job.origin?.messageId || null, attachments, text: [summary, inline, `The full result is in the office: ${link(job.id)}`, attachments.length ? `Attached: ${attachments.map(a => a.name).join(', ')}.` : ''].filter(Boolean).join('\n\n') });
   }
   async function mailNotice(instance, job, item) {
     const tenant = accounts.tenant(instance.tenant.id), viewer = viewerOf(tenant.id, job.ownerId); if (!viewer) return;
