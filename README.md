@@ -34,7 +34,7 @@ A project starts from a brief: say what to build or achieve, attach the document
 - **Vault** — keys, database connections and SSH targets that agents use through the office without ever seeing the secret; see Connectors and approvals below.
 - **Skills** — reusable methods you give to teams or people, typed by you or added from the Agency. See [SKILLS.md](SKILLS.md).
 - **Routines** — tasks the office starts on its own clock, for any team.
-- **Reports & KPIs** — throughput, cycle time, review wait, your response time, rework, overdue work, tokens by model.
+- **Reports & KPIs** — throughput, cycle time, review wait, your response time, rework, overdue work, tokens and cost by model.
 - **Brain** — upload documents (PDF, Word, text, Markdown, CSV), search everything, edit notes, rebuild the search index.
 - **Audit log** — every configuration change, who made it and what changed.
 
@@ -130,7 +130,10 @@ the seeding variables are ignored.
 intake, with a Copy button). Mail to it from the member's own account email, or from an address they verified with a six-digit
 code, becomes a task for the Program Manager: the subject is the title, the body the brief, attachments (PDF, Word, Excel,
 PowerPoint, CSV, text, Markdown, JSON, PNG, JPEG; 5 MB each, and only these types: a program or an archive is refused at the door) land under the task's `/work/inbox/` and readable ones are also
-filed in the Brain under `Inbox/<person>/`. A plain question is answered by the Program Manager on the same thread instead. The
+filed in the Brain under `Inbox/<person>/`. A question goes the same way rather than being answered off the cuff, so whoever
+takes it has the Brain, the workspace and the exports behind them — ask for a report as a PDF and the PDF comes back attached.
+A subject beginning `Project: <name>` reaches the projects board: a name the office knows takes the mail as a task of its own,
+a new one is planned by the Program Manager from the body and the attachments. Every reply opens with your own name. The
 office writes back a receipt, the finished result (with the newest PDF or the result as Markdown) and any question the team
 has; approvals stay in the app. Replying to a receipt adds a note to that task; a question in the reply is answered from it.
 Mail from anyone else is dropped and logged, never bounced. Set up at the provider: point the domain's MX at the provider
@@ -143,6 +146,18 @@ The webhook answers `202` and processes the message in the background; a repeate
 **Moving a self-hosted office in.** Register the office in hosted mode, stop both servers, then
 `node scripts/tenant-import.mjs --tenant <tenantId> --data ./data --brain ./brain`. On the next start every task, project and
 routine without an owner belongs to the office's owner.
+
+## What the work costs
+
+Every model call is recorded: input, output and cached tokens kept apart, with the model that served it, what the call was
+for — the work of a task, the sizing before it, a question, a chat, planning a project, writing its closing summary — and the
+task when there is one. Delegation is included: a lead's call and a specialist's call each land on that person's run, so you
+can see where a task's tokens actually went.
+
+Give a model its price per million tokens in **Manage → Models & keys** and every call is stamped with the rate it was charged
+at, so a price you change later never moves what was already billed. A cached input token is billed at its own rate; leave that
+blank and it costs what fresh input costs. A model with no price is still measured — tokens are the record, price is what the
+office has been told about them.
 
 ## The build loop
 
