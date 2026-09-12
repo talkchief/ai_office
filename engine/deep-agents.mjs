@@ -26,7 +26,7 @@ import { SshRunner, validateCommand } from '../connectors/ssh.mjs';
 export const PROVIDERS_WITHOUT_GENERAL_WORKER = ['anthropic', 'openai', 'google'];
 for (const provider of PROVIDERS_WITHOUT_GENERAL_WORKER) registerHarnessProfile(provider, { generalPurposeSubagent: { enabled: false } });
 import { checkOutput, coveredCriteria } from './checks.mjs';
-import { RunTracker, toolOutputText, parseTaskInput, runTitle } from './stream.mjs';
+import { RunTracker, toolOutputText, parseTaskInput, runTitle, usageParts} from './stream.mjs';
 import { Notifications } from '../notifications.mjs';
 import { Threads } from '../threads.mjs';
 
@@ -118,6 +118,10 @@ export class OfficeEngine {
     this.saver = SqliteSaver.fromConnString(path.join(dataDir, 'workflows.sqlite')); this.db = this.saver.db;
     this.db.pragma('journal_mode = WAL'); this.db.pragma('busy_timeout = 5000');
     this.db.exec('CREATE TABLE IF NOT EXISTS office_jobs (id TEXT PRIMARY KEY, body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS office_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL, body TEXT NOT NULL); CREATE INDEX IF NOT EXISTS office_events_job ON office_events(job_id, seq);');
+    // One row per model call, whatever made it: the work of a task, the sizing before it, a question, a chat, a plan.
+    // A task's own counters are what the CEO reads on the task; this ledger is what an office is billed from, and it
+    // holds the calls that belong to no task at all.
+    this.db.exec('CREATE TABLE IF NOT EXISTS office_usage (seq INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, tag TEXT NOT NULL, model TEXT, job_id TEXT, input INTEGER NOT NULL DEFAULT 0, output INTEGER NOT NULL DEFAULT 0, cached INTEGER NOT NULL DEFAULT 0, total INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS office_usage_at ON office_usage(at);');
     Object.assign(this, { office, models, toolHub, knowledgeIndex, bus, settingsFn: settings, onComplete, onChange, name, agentFactory, pmSkillsDir, toolLabels, projectFor });
     this.foreignAbortDelay = 5000;
     // Long-term memory shares the task database; null when the office runs without it (tests, older set-ups).
@@ -152,6 +156,27 @@ export class OfficeEngine {
   }
   events(id) { return this.db.prepare('SELECT seq, body FROM office_events WHERE job_id = ? ORDER BY seq').all(id).map(r => ({ seq: r.seq, ...JSON.parse(r.body) })); }
   list() { return this.db.prepare('SELECT body FROM office_jobs ORDER BY rowid DESC').all().map(r => JSON.parse(r.body)); }
+  // The office's ledger of model calls. `tag` says what a call was for: the work of a task, the sizing before it, a
+  // question about one, a chat with an agent, planning a project, writing its summary. A task's own counters are what
+  // the CEO reads on the task; this is what the office is billed from, and it holds the calls that belong to no task.
+  recordUsage({ tag = 'task', model = '', jobId = null, input = 0, output = 0, cached = 0 } = {}) {
+    const total = (input || 0) + (output || 0); if (!total) return;
+    try { this.db.prepare('INSERT INTO office_usage(at, tag, model, job_id, input, output, cached, total) VALUES (?,?,?,?,?,?,?,?)').run(Date.now(), String(tag).slice(0, 24), String(model || 'unknown').slice(0, 120), jobId ? String(jobId) : null, input || 0, output || 0, cached || 0, total); }
+    catch (error) { console.warn('usage:', error.message); }
+  }
+  /** What this office has spent since a moment: the totals, and the same split by what the call was for and by model. */
+  usageSince(since = 0) {
+    const zero = () => ({ input: 0, output: 0, cached: 0, total: 0, calls: 0 });
+    const out = { ...zero(), byTag: {}, byModel: {} };
+    let rows = [];
+    try { rows = this.db.prepare('SELECT tag, model, SUM(input) i, SUM(output) o, SUM(cached) c, SUM(total) t, COUNT(*) n FROM office_usage WHERE at >= ? GROUP BY tag, model').all(Number(since) || 0); }
+    catch { return out; }
+    for (const r of rows) {
+      const add = into => { into.input += r.i || 0; into.output += r.o || 0; into.cached += r.c || 0; into.total += r.t || 0; into.calls += r.n || 0; };
+      add(out); add(out.byTag[r.tag] ||= zero()); add(out.byModel[r.model] ||= zero());
+    }
+    return out;
+  }
   detail(id) { const job = this.get(id); return job && { ...job, events: this.events(id), messages: this.threads.list(id) }; }
   setState(id, to, extra = {}) {
     let from;
@@ -845,6 +870,7 @@ export class OfficeEngine {
       // A thinking model's reasoning counts against the output cap on some endpoints: leave room for it.
       const model = await this.models.instance({ model: spec.model, effort: 'low', streaming: false, maxTokens: 1500 });
       const reply = await withTimeout(model.invoke([new SystemMessage(TRIAGE_PROMPT), new HumanMessage(ask)]), TRIAGE_MS, signal);
+      this.recordUsage({ tag: 'triage', model: spec.model, jobId: id, ...usageParts(reply?.usage_metadata) });
       const said = textOf(reply?.content), parsed = parseJsonReply(said);
       if (!parsed) return standard(`triage answered without a lane (${oneLine(said, 80) || 'empty reply'}).`);
       const why = oneLine(parsed.why, 200) || 'sized by the office';

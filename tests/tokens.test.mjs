@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { RunTracker } from '../engine/stream.mjs';
+import { OfficeEngine } from '../engine/deep-agents.mjs';
+import { OfficeStore } from '../office-store.mjs';
+import { loadRoster } from '../roster.mjs';
 
 // A stand-in for the engine with only what the tracker touches.
 function fakeEngine() {
@@ -39,4 +45,24 @@ test('there is no token cap: a task may use as much as the work needs', () => {
   const tracker = new RunTracker(engine, 'job-1', { pm: 'test-model' });
   tracker.handle({ event: 'on_chat_model_end', run_id: 'r-3', metadata: { lc_agent_name: 'program-manager' }, data: { output: { usage_metadata: { input_tokens: 1000000, output_tokens: 0 }, tool_calls: [] } } });
   assert.equal(engine.job.tokens, 51000000); assert.equal(engine.job.state, 'working');
+});
+
+test('the ledger holds every model call the office makes, including those that belong to no task', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'talkchief-usage-'));
+  const office = new OfficeStore({ dataDir: dir, initialAgents: loadRoster().agents });
+  const engine = new OfficeEngine({ dataDir: dir, office, models: {}, knowledgeDir: path.join(dir, 'k') });
+  try {
+    engine.recordUsage({ tag: 'task', model: 'm1', jobId: 'j1', input: 100, output: 20, cached: 60 });
+    engine.recordUsage({ tag: 'triage', model: 'm1', jobId: 'j1', input: 10, output: 2 });
+    engine.recordUsage({ tag: 'chat', model: 'm2', input: 5, output: 1 });
+    engine.recordUsage({ tag: 'chat', model: 'm2', input: 0, output: 0 });
+    const all = engine.usageSince(0);
+    assert.equal(all.calls, 3, 'a call that spent nothing is not a row');
+    assert.deepEqual([all.input, all.output, all.cached, all.total], [115, 23, 60, 138]);
+    // Every task pays for its own sizing, and a chat belongs to no task at all: a rollup over tasks would miss both.
+    assert.equal(all.byTag.triage.total, 12);
+    assert.equal(all.byTag.chat.total, 6);
+    assert.equal(all.byModel.m1.total, 132); assert.equal(all.byModel.m2.total, 6);
+    assert.equal(engine.usageSince(Date.now() + 60000).total, 0, 'a window that has not started yet is empty');
+  } finally { engine.db.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }); }
 });

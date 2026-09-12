@@ -14,6 +14,18 @@ export function registerAdminApi(router, { accounts, platform, registry, mail = 
   // own database rather than loaded: a bill that only counts the offices that happen to be awake is not a bill.
   const ZERO = () => ({ input: 0, output: 0, cached: 0, total: 0, tasks: 0 });
   const addJob = (into, j) => { const u = j.usage || { total: j.tokens || 0 }; into.input += u.input || 0; into.output += u.output || 0; into.cached += u.cached || 0; into.total += u.total || 0; into.tasks += 1; return into; };
+  // What the office actually spent: the ledger counts the calls that belong to no task too — the sizing before a task,
+  // a question, a chat, planning a project. A rollup over tasks alone cannot see them. Null when an office predates it.
+  const ledgerOf = (tenantId, instance) => {
+    if (instance) { try { return instance.engine.usageSince(0); } catch { return null; } }
+    try {
+      const file = path.join(registry.dirs(tenantId).data, 'workflows.sqlite');
+      if (!fs.existsSync(file)) return null;
+      const db = new DatabaseSync(file, { readOnly: true });
+      try { const r = db.prepare('SELECT SUM(input) i, SUM(output) o, SUM(cached) c, SUM(total) t, COUNT(*) n FROM office_usage').get(); return { input: r?.i || 0, output: r?.o || 0, cached: r?.c || 0, total: r?.t || 0, calls: r?.n || 0 }; }
+      finally { db.close(); }
+    } catch { return null; }
+  };
   const usageOf = (tenantId, jobs) => {
     if (jobs) return jobs.reduce(addJob, ZERO());
     try {
@@ -49,7 +61,7 @@ export function registerAdminApi(router, { accounts, platform, registry, mail = 
     const jobs = instance ? instance.engine.list() : null, usage = usageOf(t.id, jobs);
     return { id: t.id, name: t.name, slug: t.slug, owner: owner ? { id: owner.id, email: owner.email, name: owner.name } : null, users: stats.users, groups: stats.groups, createdAt: t.createdAt, suspendedAt: t.suspendedAt,
       loaded: status.loaded, running: status.running || 0, openTasks: jobs ? jobs.filter(j => !['done', 'cancelled', 'backlog'].includes(j.state)).length : null, tasks: jobs ? jobs.length : null,
-      tokens: usage.total, usage, teams: instance ? instance.office.get().teams.length : null };
+      tokens: usage.total, usage, ledger: ledgerOf(t.id, instance), teams: instance ? instance.office.get().teams.length : null };
   }) }));
   // A new office when registration is closed: the administrator names it and its owner. An address that
   // already has an account becomes the owner at once; a new one gets an invitation link (mailed too, if

@@ -264,7 +264,10 @@ export function registerApi(router, ctx) {
       if ((j.updatedAt || 0) >= since) add(window, j);
       runs += (j.runs || []).filter(r => (r.startedAt || 0) >= since).length;
     }
-    return { ok: true, source: 'office', reason: 'the office runs on API keys', window: { ...window, tokens: window.total, runs }, office };
+    // The ledger holds every model call the office made, including the ones that belong to no task: the sizing before a
+    // task, a question, a chat, planning a project, writing its summary. The task totals above cannot see those.
+    const ledger = engine.usageSince(0), ledgerWindow = engine.usageSince(since);
+    return { ok: true, source: 'office', reason: 'the office runs on API keys', window: { ...window, tokens: window.total, runs }, office, ledger, ledgerWindow };
   });
   router.on('GET', '/api/health', ({ user }) => { const o = office.get(); return { ok: true, version: ctx.version, name: ctx.name, mode: tenant ? 'hosted' : 'single', ready: models.ready(), providers: managedModels ? { managed: true, ready: models.ready() } : models.summary(), limits: { ...office.limits }, platform: { managedModels }, depts: o.teams.map(t => t.id), teams: o.teams.map(t => ({ id: t.id, name: t.name, lead: t.lead })),
     agents: o.agents.map(({ id, name, role, does, department, lead }) => ({ id, name, role, does, department, lead })), notes: ctx.graph().notes, knowledge: ctx.index.status(), connectors: hub.status, inbox: engine.notifications.counts(inboxScope(user)), settings: settings.get(), provider: engine.providerHealth(), faults: isAdmin(user) ? engine.faults.slice(-5) : [] }; });

@@ -4,6 +4,7 @@
 // tasks (the first milestone's queued now, later ones in the backlog) and, as each milestone is achieved, starts the next.
 import fs from 'node:fs';
 import path from 'node:path';
+import { usageOfMessage } from './engine/stream.mjs';
 
 const text = (value, max = 4000) => String(value ?? '').replace(/\s+$/g, '').trim().slice(0, max);
 const oneLine = (value, max) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -114,7 +115,7 @@ export function parsePlan(raw, { office, brief = '', today = Date.now() } = {}) 
 }
 
 // One Program Manager call at high effort; a plan that does not parse is asked for once more with the problems named.
-export async function planProject({ brief, documents = [], skills = [], catalogue = [], office, models, today = Date.now(), instance = null }) {
+export async function planProject({ brief, documents = [], skills = [], catalogue = [], office, models, today = Date.now(), instance = null, onUsage = () => {} }) {
   const { HumanMessage, SystemMessage } = await import('@langchain/core/messages');
   const spec = models.resolve({ role: 'pm' });
   if (!spec.model) throw Object.assign(new Error('No model is configured for the Program Manager. Choose one in Settings → Models & keys.'), { status: 409 });
@@ -126,6 +127,8 @@ export async function planProject({ brief, documents = [], skills = [], catalogu
     const messages = [new SystemMessage(PLANNER_PROMPT), new HumanMessage(ask)];
     if (last?.problems?.length) messages.push(new HumanMessage(`Office: the plan you sent could not be used (${last.problems.join('; ')}). Send the whole JSON plan again, complete.`));
     const reply = await model.invoke(messages);
+    // Inside the loop: a plan that had to be sent again cost twice, and a bill should say so.
+    try { onUsage({ message: reply, model: spec.model }); } catch {}
     last = parsePlan(textOf(reply?.content), { office, brief, today });
     if (last.plan) return last.plan;
   }
@@ -158,7 +161,8 @@ export async function planProjectFrom({ brief, documents = [], office, models, p
   const dirs = [engine?.pmSkillsDir || (root ? path.join(root, 'agency', 'pm-skills') : ''), engine?.knowledgeDir ? path.join(engine.knowledgeDir, 'Agents Office', 'pm-skills') : ''].filter(Boolean);
   const skills = loadPlanningSkills({ dirs });
   const catalogue = loadCatalogueMethods({ agency, brief });
-  const plan = await planProject({ brief, documents: documents.map(d => ({ name: d.name, content: d.content })), skills, catalogue, office: office.get(), models });
+  const plan = await planProject({ brief, documents: documents.map(d => ({ name: d.name, content: d.content })), skills, catalogue, office: office.get(), models,
+    onUsage: ({ message, model }) => engine?.recordUsage?.({ tag: 'plan', model, ...usageOfMessage(message) }) });
   const { project, tasks } = applyPlan({ plan, projects, engine, ownerId, audience });
   // A document that will not file is worth a line in the log, never the loss of the project that was just planned.
   for (const doc of documents) { try { await knowledge.upload({ folder: projects.folder(project), name: doc.name, content: doc.content }); } catch (error) { log(`project document: ${error.message}`); } }

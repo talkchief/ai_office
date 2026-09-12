@@ -49,6 +49,11 @@ export function toolOutputText(output) {
 }
 const argsOf = input => { if (input && typeof input.input === 'string') { try { return JSON.parse(input.input); } catch { return {}; } } return input?.input && typeof input.input === 'object' ? input.input : input || {}; };
 
+// The three numbers a bill is made of, however the provider spells the cached part. `cached` is the portion of the
+// input served from cache, not an extra amount, so a total is always input + output.
+export const usageParts = usage => { const d = usage?.input_token_details || {}; return { input: usage?.input_tokens || 0, output: usage?.output_tokens || 0, cached: d.cache_read || d.cache_read_input_tokens || d.cached_tokens || 0 }; };
+export const usageOfMessage = message => usageParts(message?.usage_metadata || message?.kwargs?.usage_metadata);
+
 export class RunTracker {
   constructor(engine, jobId, models = {}) {
     this.engine = engine; this.id = jobId; this.models = models; this.office = engine.office.get();
@@ -147,10 +152,10 @@ export class RunTracker {
     // are kept apart: this is what a bill is made of. `cached` is the part of `input` the provider served from its
     // cache, not an extra amount, so the total stays input + output.
     const agent = this.agentOf(event), model = this.models[agent] || 'unknown';
-    const inTok = usage?.input_tokens || 0, outTok = usage?.output_tokens || 0;
-    const details = usage?.input_token_details || {};
-    const cached = details.cache_read || details.cache_read_input_tokens || details.cached_tokens || 0;
+    const { input: inTok, output: outTok, cached } = usageParts(usage);
     const used = inTok + outTok;
+    // Every model call the office makes lands in one ledger, so a bill is a sum rather than a search.
+    if (used) this.engine.recordUsage?.({ tag: 'task', model, jobId: this.id, input: inTok, output: outTok, cached });
     // The planning tool runs inside the agent's middleware and emits no tool events, so the plan is read from the model's own reply.
     const calls = output?.tool_calls || output?.kwargs?.tool_calls || [];
     for (const c of calls) if (c?.name === 'write_todos' && agent === 'pm' && Array.isArray(c.args?.todos)) { const todos = c.args.todos.slice(0, 30).map(t => ({ content: String(t.content || '').slice(0, 300), status: String(t.status || 'pending') })); this.engine.update(this.id, j => { j.todos = todos; }); this.engine.event(this.id, 'todos_updated', 'pm', `${todos.filter(t => t.status === 'completed').length}/${todos.length} planned steps done.`); }

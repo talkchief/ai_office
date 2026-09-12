@@ -2,6 +2,7 @@
 // and what is next. One model call at the end of a project, written with the office's executive-summary method, stored on the
 // project and shown on its Results tab so the CEO never has to read the tasks to find out what they got.
 import { loadPlanningSkills } from './project-planner.mjs';
+import { usageOfMessage } from './engine/stream.mjs';
 
 export const SUMMARY_LIMITS = { taskChars: 3500, tasksChars: 45000, artifacts: 80, links: 24, headline: 160, summaryChars: 8000, items: 12 };
 // The Program Manager's methods for closing a project, built in, read on every summary.
@@ -85,7 +86,7 @@ export function parseSummary(raw, { links = [] } = {}) {
 }
 
 // One call to the Program Manager's model, at high effort, with two attempts.
-export async function summariseProject({ project, tasks = [], artifacts = [], skills = [], models, instance = null, today = Date.now() }) {
+export async function summariseProject({ project, tasks = [], artifacts = [], skills = [], models, instance = null, today = Date.now(), onUsage = () => {} }) {
   const { HumanMessage, SystemMessage } = await import('@langchain/core/messages');
   const spec = models.resolve({ role: 'pm' });
   if (!spec.model) throw Object.assign(new Error('No model is configured for the Program Manager. Choose one in Settings → Models & keys.'), { status: 409 });
@@ -98,6 +99,7 @@ export async function summariseProject({ project, tasks = [], artifacts = [], sk
     const messages = [new SystemMessage(SUMMARY_PROMPT), new HumanMessage(ask)];
     if (last?.problems?.length) messages.push(new HumanMessage(`Office: your summary could not be used (${last.problems.join('; ')}). Send the whole JSON object again, complete.`));
     const reply = await model.invoke(messages);
+    try { onUsage({ message: reply, model: spec.model }); } catch {}
     last = parseSummary(textOf(reply?.content), { links });
     if (last.summary) return { ...last.summary, at: Date.now(), by: 'pm', tasks: tasks.filter(t => t.state === 'done').length, artifacts: artifacts.length };
   }
