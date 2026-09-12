@@ -1,16 +1,27 @@
 # Talkchief AI Space deployment
 
-Live URL: **https://test.talkchief.io:8443**.
+Live URL: **https://office.talkchief.io** (renamed from `test.talkchief.io:8443` on
+12 September 2026; that name no longer resolves).
 
-Nginx terminates TLS on port 8443 and proxies to `127.0.0.1:4520`. The dedicated
+Nginx terminates TLS on port 443 and proxies to `127.0.0.1:4520`; 8443 still listens
+so older links keep working. Port 80 redirects to the canonical name. The dedicated
 `agents-office` system account runs the enabled systemd service with Node 22.23.2
 from `/opt/agents-office-runtime`. Other server applications retain their existing
 ports and Node installations.
+
+The name is proxied by Cloudflare, which challenges non-browser clients by default —
+that silently blocks the mail provider's webhook. A WAF custom rule with the **Skip**
+action on `/api/mail/inbound/` lets it through. Bot Fight Mode cannot be skipped by a
+WAF rule on the free plan: turn it off, or set the record to DNS-only. Test the public
+path from outside; a local `curl` on this host can resolve straight to the origin and
+tell you everything is fine while the world gets a 403.
 
 Installed configuration:
 
 - `/etc/systemd/system/agents-office.service`
 - `/etc/nginx/conf.d/agents-office.conf`
+- `/etc/nginx/conf.d/cloudflare-realip.inc` (included by the site; without it nginx refuses to start,
+  and every visitor would be logged and rate-limited as a Cloudflare edge address)
 - `/etc/agents-office.env` (root-owned, mode 0600; office access key and optional model keys)
 - `office.config.local.json` (deployment name and knowledge path)
 
@@ -57,7 +68,7 @@ PATH=/opt/agents-office-runtime/bin:$PATH npm run build
 systemctl restart agents-office
 systemctl status agents-office
 journalctl -u agents-office -n 30 --no-pager
-curl -fsS https://test.talkchief.io:8443/api/auth/status
+curl -fsS https://office.talkchief.io/api/auth/status
 ```
 
 Stage UI builds with `AO_DIST=/tmp/talkchief-build` and point the staging server
@@ -101,7 +112,9 @@ tools. In the default single mode the office access code is the only login; `AO_
 (email and password), one office per company, roles (owner, admin, member), private tasks shared with
 people and groups, platform-owned models and limits, and email intake (see the README's hosted section).
 For hosted mode the reverse proxy must let the mail provider's webhook through with a larger body:
-`location /api/mail/inbound/ { client_max_body_size 40m; proxy_pass …; }` (the nginx site has it).
+the nginx site sets `client_max_body_size 40m` for the whole server, matching the 40 MB cap
+`serve.mjs` puts on the raw body. Without it nginx's 1 MB default rejects every forwarded message
+that carries an attachment, before the office ever sees it.
 
 Authenticated configuration requests accept up to 16 MiB for the office, 4 MiB for connector
 definitions and 512 KiB for knowledge notes. Ordinary requests are limited to 64 KiB.

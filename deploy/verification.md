@@ -1,5 +1,11 @@
 # Talkchief AI Space — implementation verification
 
+> **Address note (12 September 2026):** the office now runs at
+> **https://office.talkchief.io** on port 443, behind Cloudflare. The URL below is left
+> as written: this is a dated record of what the 9 September verification actually ran
+> against, not current deployment guidance. For how the service is deployed today, see
+> `README.md`.
+
 Verified on 9 September 2026 against the running service at
 https://test.talkchief.io:8443 and an isolated instance using the same source and
 built HTML. Production data was preserved. The deployed HTML SHA-256 is
