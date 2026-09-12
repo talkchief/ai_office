@@ -32,13 +32,14 @@ export function mailHtml(markdown) {
 }
 
 /**
- * Both parts of one message, with the office's sign-off and an optional footer line.
+ * Both parts of one message: the office's greeting, what the agent wrote, its sign-off and an optional footer.
  * `body` is what the agent wrote; everything else is the office speaking.
  */
-export function mailParts(body, { signature = '', footer = '' } = {}) {
-  const text = [mailText(body), [signature ? `— ${signature}` : '', footer].filter(Boolean).join('\n')].filter(Boolean).join('\n\n');
+export function mailParts(body, { greeting = '', signature = '', footer = '' } = {}) {
+  const text = [greeting, mailText(body), [signature ? `— ${signature}` : '', footer].filter(Boolean).join('\n')].filter(Boolean).join('\n\n');
   const sign = [signature ? `— ${esc(signature)}` : '', footer ? esc(footer) : ''].filter(Boolean).join('<br>');
   const html = `<div style="font:15px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1a1a;max-width:640px">`
+    + (greeting ? `<p style="margin:0 0 14px">${esc(greeting)}</p>` : '')
     + mailHtml(body)
     + (sign ? `<p style="margin:22px 0 0;padding-top:12px;border-top:1px solid #e4e4e0;color:#6b6b66;font-size:13px">${sign}</p>` : '')
     + `</div>`;

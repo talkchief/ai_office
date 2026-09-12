@@ -110,10 +110,10 @@ ${OUTPUT_GUIDANCE}`;
 // Answering by email is not answering in the chat panel: there is no thread on screen, no formatting, and the reader
 // may be on a phone. The office adds the sign-off itself, so the agent never writes one.
 export const EMAIL_VOICE = `You are answering by email, not in a chat window.
-Write it as an email: open with a short greeting, then plain sentences in one or two short paragraphs.
+Write it as an email: plain sentences in one or two short paragraphs.
 Do not use Markdown of any kind — no **bold**, no # headings, no tables. A mail client shows those characters literally.
 If you must list things, write them as short lines each starting with "- ".
-Do not sign off and do not add your name: the office adds that.`;
+Do not greet and do not sign off: the office opens with the reader's own name and adds the sign-off itself.`;
 
 export function pmChatPrompt({ office, name = 'the office', recentTasks = '', channel = '' }) {
   return `You are the Program Manager of ${name}, talking with the CEO. You coordinate these teams: ${office.teams.map(t => `${t.name} (lead: ${office.agents.find(a => a.id === t.lead)?.name || t.lead})`).join('; ')}.

@@ -22,6 +22,11 @@ test('mail bodies: Markdown becomes plain prose, with the paragraphs kept apart'
 test('mail bodies: both parts carry the office sign-off; plain text passes through', () => {
   const parts = mailParts('Done.', { signature: 'Yazan Office', footer: 'Reply to this email to add a note to the task.' });
   assert.equal(parts.text, 'Done.\n\n— Yazan Office\nReply to this email to add a note to the task.');
+
+  // The requester is known, so the office opens with their name in both parts.
+  const greeted = mailParts('Done.', { greeting: 'Hello Yazan,', signature: 'Yazan Office' });
+  assert.equal(greeted.text, 'Hello Yazan,\n\nDone.\n\n— Yazan Office');
+  assert.match(greeted.html, /<p style="margin:0 0 14px">Hello Yazan,<\/p>/);
   assert.match(parts.html, /^<div style=/); assert.match(parts.html, /— Yazan Office/); assert.match(parts.html, /Reply to this email/);
 
   assert.equal(mailText('Files added to “Draft”: brief.pdf.'), 'Files added to “Draft”: brief.pdf.');

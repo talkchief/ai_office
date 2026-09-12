@@ -1,6 +1,7 @@
 // Mail becomes work. A message to a member's alias (<office>.<person>.<suffix>@domain) from a verified sender becomes a task
-// for the Program Manager: subject → title, body → brief, attachments → the task's files. A question is answered on the same
-// thread. A reply on a thread is a note, an answer, a correction or a question about that task. The office writes back a
+// for the Program Manager: subject → title, body → brief, attachments → the task's files. A question is work too and goes
+// the same way, so the lane that takes it has the Brain search and the exports. A reply on a thread is a note, an answer,
+// a correction or a question about that task, answered from its record. The office writes back a
 // receipt, the finished result and any question the team has; approvals stay in the app. Unknown aliases and senders are
 // dropped and logged, never bounced.
 import { RateLimiter } from '../server/ratelimit.mjs';
@@ -27,6 +28,8 @@ export function createIntake({ accounts, registry, mail = { mailer: null, domain
   const limiter = new RateLimiter({ max: 30, windowMs: 3600000 });
   const watched = new WeakSet();
   const link = id => `${publicOrigin()}/#task=${id}`;
+  // The requester is a member of this office, so every message opens with their name rather than a bare "Hello".
+  const greetingFor = viewer => { const first = String(viewer?.name || '').trim().split(/\s+/)[0]; return first ? `Hello ${first},` : 'Hello,'; };
   const viewerOf = (tenantId, userId) => { const m = accounts.membership(userId, tenantId); return m && { id: m.id, email: m.email, name: m.name, role: m.role, tenantId, groups: accounts.groupsOf(userId, tenantId) }; };
   const aliasFor = (tenant, userId, jobId = null) => { const h = accounts.mailHandleFor(userId, tenant.id); return h && domain() ? `${tenant.slug}.${h.handle}.${h.suffix}${jobId ? '+' + tagOf(jobId) : ''}@${domain()}` : null; };
   const drop = (m, reason, detail = {}) => { accounts.mailLog({ level: 'warn', summary: `Dropped mail: ${reason}`, detail: { from: m.from?.address, to: m.recipients, subject: String(m.subject || '').slice(0, 120), ...detail } }); log(`  mail: dropped (${reason}) from ${m.from?.address || '?'}`); return { outcome: 'dropped', reason }; };
@@ -43,7 +46,7 @@ export function createIntake({ accounts, registry, mail = { mailer: null, domain
     if (!mailer()?.enabled) return null;
     const known = jobId ? accounts.threadMessageIds(jobId) : [];
     // Agents write Markdown; a mail client shows that literally. Both parts are built from the same text.
-    const parts = mailParts(text, { signature: instance.name, footer: jobId ? 'Reply to this email to add a note to the task.' : '' });
+    const parts = mailParts(text, { greeting: greetingFor(viewer), signature: instance.name, footer: jobId ? 'Reply to this email to add a note to the task.' : '' });
     const result = await mailer().send({ to, subject, text: parts.text, html: parts.html, replyTo: aliasFor(tenant, viewer.id, jobId), inReplyTo: inReplyTo || known.at(-1) || null, references: [...known, ...references], attachments, tag: jobId ? tagOf(jobId) : '' });
     accounts.recordMailMessage({ tenantId: tenant.id, jobId, direction: 'out', messageId: result.messageId, providerId: result.id });
     return result;
@@ -115,13 +118,10 @@ export function createIntake({ accounts, registry, mail = { mailer: null, domain
       }
       if (!project) return planProjectByMail(instance, tenant, viewer, m, { name: wanted, text, good, skipped });
     }
-    // A plain question with nothing attached: the Program Manager answers from the Brain on the same thread, no task.
-    if (text && isQuestion(text) && !good.length && text.length < 1200) {
-      let answer; try { answer = (await instance.chat({ agent: 'pm', text, channel: 'email' }, viewer)).reply; } catch (error) { answer = `The office could not answer right now: ${error.message}`; }
-      await sendOnThread(instance, tenant, viewer, null, { to: m.from.address, subject: `Re: ${m.subject || 'Your question'}`, text: answer, inReplyTo: m.messageId, references: m.references });
-      instance.audit.record({ area: 'mail', actor: viewer.email, summary: `Answered a question by email from ${m.from.address}` });
-      return { outcome: 'answered' };
-    }
+    // A question is work like any other and goes through triage: a lookup lands in the quick lane, where the lead has
+    // the Brain search, the workspace, export_pdf and export_pptx and the read-only Vault, and the office mails the
+    // answer back with whatever it produced. Answering from a single untooled model call could not read a note, so it
+    // guessed. Only a question about a task already under way is still answered from that task's record.
     const long = text.length > 12000, ready = instance.models.ready();
     const brief = long ? text.slice(0, 11000) + '\n\n(The message is long: the whole of it is attached as /work/inbox/message.md.)' : text || `Files received by email from ${m.from.address}: ${good.map(f => f.name).join(', ')}. Read them under /work/inbox/ and do what they ask.`;
     // Added to a project the subject names the project, so the work takes its title from the message itself.

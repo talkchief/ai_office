@@ -81,14 +81,15 @@ test('mail becomes work: a verified sender gets a task with its file and a threa
     assert.ok(instance.engine.threads.list(job.id).some(m => m.text === 'Also mention the budget.' && m.role === 'ceo'));
     const tagged = await intake.handle(await fixture({ ...to(receipt.replyTo, receipt.replyTo.split('+')[1].split('@')[0]), MessageID: 'pm-3', Subject: 'numbers', TextBody: '', HtmlBody: '', Headers: [], Attachments: [{ Name: 'numbers.csv', ContentType: 'text/csv', Content: Buffer.from('a,b\n1,2').toString('base64') }] }));
     assert.equal(tagged.outcome, 'attached'); assert.deepEqual(instance.engine.get(job.id).attachments.map(a => a.name), ['brief.pdf', 'notes.txt', 'numbers.csv']);
-    // A question with nothing attached is answered by the Program Manager on the thread (here: no model, so the office says so), not turned into a task.
+    // A question is work too: it becomes a task, so the lane that takes it has the Brain search, the workspace and the
+    // exports. Answering it from one untooled model call could not read a note, so it guessed.
     const q = await intake.handle(await fixture({ ...to(alias), MessageID: 'pm-4', Subject: 'Question', TextBody: 'What did we deliver last week?', Attachments: [], Headers: [{ Name: 'Message-ID', Value: '<q@acme.test>' }] }));
-    assert.equal(q.outcome, 'answered');
+    assert.equal(q.outcome, 'task');
     const answered = JSON.parse(fs.readFileSync(outbox, 'utf8')).at(-1);
-    assert.match(answered.text, /could not answer right now/);
-    // Every outbound message carries both parts: plain prose and an HTML alternative.
-    assert.match(answered.text, /— /); assert.match(answered.html, /<div style=/); assert.match(answered.html, /could not answer right now/);
-    assert.equal(instance.engine.list().filter(j => j.origin?.channel === 'email').length, 1);
+    // Every outbound message opens with the requester's own name and carries both parts: plain prose and an HTML alternative.
+    assert.match(answered.text, /^Hello Dana,/); assert.match(answered.text, /— /);
+    assert.match(answered.html, /<div style=/); assert.match(answered.html, /Hello Dana,/);
+    assert.equal(instance.engine.list().filter(j => j.origin?.channel === 'email').length, 2);
     // Idempotency lives at the webhook: the provider id is recorded once.
     assert.equal(accounts.recordInbound({ provider: 'postmark', providerMessageId: '73e6d360' }), true); assert.equal(accounts.recordInbound({ provider: 'postmark', providerMessageId: '73e6d360' }), false);
     // The office writes back when an email task finishes.

@@ -325,9 +325,9 @@ await step('tests: the full suite passes', async () => {
       await new Promise(r => setTimeout(r, 800));
       const emailTasks = (await call('/api/tasks')).json.filter(t => t.origin?.channel === 'email'); if (emailTasks.length !== 1) throw new Error(`${emailTasks.length} email tasks; expected one`);
       const audit = await call('/api/audit?area=mail'); if (!audit.json.some(a => /not verified/.test(a.summary))) throw new Error('the dropped mail was not audited: ' + JSON.stringify(audit.json.map(a => a.summary)));
-      const outbox = JSON.parse(fs.readFileSync(path.join(tmp, 'mail-outbox.json'), 'utf8')), receipt = outbox.find(m => /^Received\./.test(m.text));
+      const outbox = JSON.parse(fs.readFileSync(path.join(tmp, 'mail-outbox.json'), 'utf8')), receipt = outbox.find(m => /^Hello [^\n]+\n\nReceived\./.test(m.text));
       if (!receipt || receipt.inReplyTo !== '<CAF1=abc123@mail.acme.test>' || !/\[AO-[a-z0-9]{8}\]/.test(receipt.subject)) throw new Error('receipt: ' + JSON.stringify(outbox.map(m => [m.subject, m.inReplyTo])));
-      return `“${task.title}” · brief.pdf attached, macro.xlsm refused · repeat ignored · stranger dropped and audited · receipt threaded`;
+      return `“${task.title}” · brief.pdf attached, macro.xlsm refused · repeat ignored · stranger dropped and audited · receipt greets by name and is threaded`;
     });
     await step('hosted: the audit log names the person', async () => {
       const rows = await call('/api/audit'); if (!rows.json.some(a => a.actor === 'owner@check.test')) throw new Error('actors: ' + JSON.stringify(rows.json.map(a => a.actor).slice(0, 5)));
