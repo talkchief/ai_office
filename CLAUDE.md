@@ -29,7 +29,7 @@ For a running office, read `GET /api/office`, change what the owner asked for, a
 - `does` is the person's job description, read before every assignment. `brief` is the owner's standing instructions to that person (up to 2,000 characters). Both are required: a person without them is refused with a sentence. Anything longer, or with steps and a template, is a skill.
 - A team's `purpose` and `instructions` are required too (its charter). The six default teams ship with charters in `office-charters.mjs` and every default seat ships with a brief in `office.agents.json`; an older office gets them filled once, only where a field was empty. When the CEO adds a team or a person, they write these; hiring from the Agency fills them from the persona.
 - `model` is a model id from Settings → Models & keys, or empty for the team's, then the role's default.
-- `rules` are the owner's standing rules in their own words. The office adds them when the owner ticks "remember" on a correction. Only remove one when the owner asks.
+- `rules` are the owner's standing rules in their own words. Add one in Settings → Teams & people → Standing rules, or through `PUT /api/office`; a correction on a task does not offer to remember itself. Only remove one when the owner asks.
 - Teams can be added, renamed and removed (up to 10 teams; a team is a lead and one to six specialists). A team with unfinished work cannot be removed.
 
 **First start only:** a brand-new office seeds its people from `office.agents.json` → `<brain>/Agents Office/agents.json` → `office.agents.local.json` (later wins), 35 seats in six departments. After the first start these files are not read again, so edits to them do nothing for a running office.

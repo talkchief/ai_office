@@ -429,6 +429,9 @@ body.dark #settingsPage.mg .team-chip{background:color-mix(in srgb,var(--tc,#B9B
 #settingsPage.mg .pw-chip.warn{background:var(--mg-warn-bg);color:var(--mg-warn)}
 #settingsPage.mg .pw-chip.fail{background:var(--mg-fail-bg);color:var(--mg-fail)}
 #settingsPage.mg .pw-chip.off{background:var(--mg-hover);color:var(--grey);border-color:var(--hairline)}
+#settingsPage.mg .pw-chip.gone{background:#FBEFE4;color:#C2691E}
+body.dark #settingsPage.mg .pw-chip.gone{background:rgba(194,105,30,.16);color:#E8A166}
+#settingsPage.mg .pw-ring.gone{border-color:#C2691E}#settingsPage.mg .pw-ring.gone::after{background:#C2691E}
 #settingsPage.mg .pw-when{display:flex;flex-direction:column;align-items:flex-end;gap:1px;text-align:right}
 #settingsPage.mg .pw-when b{font:500 11.5px var(--ui);color:var(--ink)}
 #settingsPage.mg .pw-when span{font:10.5px var(--mg-mono);color:var(--mg-mute)}

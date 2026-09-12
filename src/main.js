@@ -235,7 +235,7 @@ function openAgentRail(id, tab = 'chat', fly = true) {
   office.select(id); // the figure pushes back from the desk, stands and waves (design 1i)
   const dept = DEPTS[r.a.dept];
   document.querySelector('#railAgent .mh-dot').style.background = dept.chip;
-  document.querySelector('#railAgent .mh-name').innerHTML = (r.a.lead ? '<span class="star">★ </span>' : '') + r.a.name;
+  document.querySelector('#railAgent .mh-name').textContent = r.a.name;
   document.querySelector('#railAgent .mh-role').textContent = `${r.v1.role} · ${dept.name}`;
   document.querySelector('#railAgent .mh-tag').textContent = r.v1.tagline;
   const gear = document.getElementById('railAgentManage');
@@ -319,7 +319,9 @@ function sendChat(text) {
     if (r.state === 'stuck' && /\b(approve|reject)\b/.test(low)) { resolveApproval(id, /approve/.test(low)); return; }
     const rv = !context.taskId && tasks && tasks.isLive() && text.match(/^\s*revise\s*[:\-–]\s*(.+)$/i);
     if (rv && tasks.revise(id, rv[1].trim())) { chatPush(id, { who: 'agent', text: 'On it — revising now. It will land here when it is ready.' }); return; }
-    const tr = !context.taskId && tasks && await tasks.handleChat(id, text);
+    const picked = [...(document.getElementById('mFiles')?.files || [])];
+    const tr = !context.taskId && tasks && await tasks.handleChat(id, text, picked);
+    if (picked.length) { const el = document.getElementById('mFiles'); if (el) el.value = ''; }
     if (tr) { chatPush(id, { who: 'agent', text: tr }); return; }
     if (tasks && tasks.isLive()) {
       chatPush(id, { who: 'work', i: '…', text: `${r.a.name} is thinking` });

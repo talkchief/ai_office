@@ -310,6 +310,7 @@ export function initBrain({ scene, brainGroup, getR, esc, hud, toScreen, getCame
     requestAnimationFrame(draw);
   }
   function close() { if (!openNow) return; openNow = false; ov.classList.remove('on'); document.body.classList.remove('brainOpen'); }
+  document.getElementById('bvBack')?.addEventListener('click', event => { event.stopPropagation(); close(); });
   function toggle() { openNow ? close() : open(); }
   document.getElementById('bvClose').addEventListener('click', close);
   addEventListener('resize', () => { if (openNow) draw(); });

@@ -58,6 +58,18 @@ export function initOfficeWork(ctx) {
   function close() { dialog.close(); modalKind = ''; if (toolPoll) { clearInterval(toolPoll); toolPoll = null; } }
   $('spaceClose').onclick = close; dialog.addEventListener('cancel', close); dialog.addEventListener('keydown', event => event.stopPropagation());
   // The Program Manager takes work for any team and picks the leads itself.
+  // What @ can reach in the Program Manager's box: the projects, their milestones, and the tasks the office is carrying.
+  const mentionItems = () => {
+    const out = [];
+    for (const p of projectsOpen) {
+      const ms = p.milestones || [], done = ms.filter(m => m.done).length;
+      out.push({ kind: 'project', id: p.id, label: p.name, hint: ms.length ? `${done} of ${ms.length} milestones` : 'no milestones yet' });
+      for (const m of ms) out.push({ kind: 'milestone', id: m.id, label: m.title, hint: p.name, projectId: p.id });
+    }
+    for (const j of jobs.slice(0, 80)) out.push({ kind: 'task', id: j.id, label: j.title, hint: labels[j.state] || j.state });
+    return out;
+  };
+  const MENTION_WORD = { project: 'project', milestone: 'milestone', task: 'task' };
   const readFileAsBase64 = file => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(',')[1]); r.onerror = reject; r.readAsDataURL(file); });
   const projectUI = {
     open() {
@@ -66,7 +78,7 @@ export function initOfficeWork(ctx) {
       const running = mine.filter(j => ['planning', 'working', 'reviewing', 'saving', 'queued'].includes(j.state));
       const waiting = mine.filter(j => ['waiting', 'blocked'].includes(j.state));
       const state = j => labels[j.state] || j.state;
-      const kind = j => j.state === 'done' ? 'ok' : ['blocked'].includes(j.state) ? 'fail' : j.state === 'waiting' ? 'warn' : ['planning', 'working', 'reviewing', 'saving', 'queued'].includes(j.state) ? 'busy' : 'off';
+      const kind = j => j.state === 'done' ? 'ok' : j.state === 'cancelled' ? 'gone' : ['blocked'].includes(j.state) ? 'fail' : j.state === 'waiting' ? 'warn' : ['planning', 'working', 'reviewing', 'saving', 'queued'].includes(j.state) ? 'busy' : 'off';
       const line = j => j.state === 'done' ? (j.resultPreview || '') : j.progressLine || (j.state === 'blocked' ? j.error || '' : '');
       const card = j => `<button type="button" class="pm-task" data-job="${esc(j.id)}">
         <span class="pm-task-top">${j.milestoneId ? '<span class="pm-badge">Milestone</span>' : ''}<b>${esc(j.title)}</b><span class="pm-chip ${kind(j)}">${esc(state(j))}</span></span>
@@ -79,7 +91,8 @@ export function initOfficeWork(ctx) {
         <form id="spacePmForm" class="pm-form">
           <div class="pm-label"><span>What needs to get done?</span><em>Esc to cancel</em></div>
           <div class="pm-box">
-            <textarea name="text" rows="4" required placeholder="Describe what spans teams, needs a decision, or has to be coordinated…"></textarea>
+              <textarea name="text" rows="4" required placeholder="Describe what spans teams, needs a decision, or has to be coordinated… type @ to name a project, a milestone or a task"></textarea>
+            <div class="pm-pick" id="spacePmPick" role="listbox" aria-label="Projects, milestones and tasks" hidden></div>
             <div class="pm-bar">
               <label class="pm-attach" title="Attach documents the teams should read"><input type="file" id="spacePmFiles" multiple accept=".pdf,.docx,.txt,.md,.csv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.1 12.3 19.8a5 5 0 0 1-7.1-7.1l8.7-8.7a3.3 3.3 0 0 1 4.7 4.7l-8.7 8.7a1.7 1.7 0 0 1-2.4-2.4l8-8"/></svg>Attach</label>
               <span class="pm-files" id="spacePmFileNote"></span>
@@ -102,6 +115,43 @@ export function initOfficeWork(ctx) {
       content.querySelectorAll('[data-job]').forEach(b => b.onclick = () => showTask(b.dataset.job));
       content.querySelectorAll('[data-pm-project]').forEach(b => b.onclick = () => { close(); settings.openProject(b.dataset.pmProject); });
       content.querySelector('[data-pm-projects]').onclick = event => { event.preventDefault(); close(); settings.open('projects'); };
+      // @ opens the picker; what you choose is written into the sentence, and a project you name files the task under it.
+      const area = content.querySelector('#spacePmForm textarea'), picker = $('spacePmPick');
+      let marks = [], hits = [], cursor = 0, at = -1;
+      const closePick = () => { picker.hidden = true; at = -1; hits = []; };
+      const drawPick = () => {
+        if (!hits.length) return closePick();
+        picker.innerHTML = hits.map((h, i) => `<button type="button" role="option" aria-selected="${i === cursor}" data-pick="${i}"><i class="k-${h.kind}">${MENTION_WORD[h.kind]}</i><b>${esc(h.label)}</b><span>${esc(h.hint || '')}</span></button>`).join('');
+        picker.hidden = false;
+        picker.children[cursor]?.scrollIntoView({ block: 'nearest' });
+      };
+      const scan = () => {
+        const upto = area.value.slice(0, area.selectionStart), m = /@([\w'’\- ]{0,40})$/.exec(upto);
+        if (!m) return closePick();
+        at = m.index; const q = m[1].trim().toLowerCase();
+        hits = mentionItems().filter(x => !q || x.label.toLowerCase().includes(q) || MENTION_WORD[x.kind].startsWith(q)).slice(0, 8);
+        cursor = 0; drawPick();
+      };
+      const choose = i => {
+        const hit = hits[i]; if (!hit) return;
+        const text = `${MENTION_WORD[hit.kind]} “${hit.label}”`;
+        const before = area.value.slice(0, at), after = area.value.slice(area.selectionStart);
+        area.value = before + text + (after.startsWith(' ') ? '' : ' ') + after;
+        const caret = (before + text + ' ').length; area.focus(); area.setSelectionRange(caret, caret);
+        if (!marks.some(x => x.kind === hit.kind && x.id === hit.id)) marks.push(hit);
+        closePick();
+      };
+      area.addEventListener('input', scan);
+      area.addEventListener('click', scan);
+      area.addEventListener('keydown', event => {
+        if (picker.hidden) return;
+        if (event.key === 'ArrowDown') { event.preventDefault(); cursor = (cursor + 1) % hits.length; drawPick(); }
+        else if (event.key === 'ArrowUp') { event.preventDefault(); cursor = (cursor - 1 + hits.length) % hits.length; drawPick(); }
+        else if (event.key === 'Enter' || event.key === 'Tab') { event.preventDefault(); event.stopPropagation(); choose(cursor); }
+        else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closePick(); }
+      });
+      picker.addEventListener('mousedown', event => { const b = event.target.closest('[data-pick]'); if (!b) return; event.preventDefault(); choose(+b.dataset.pick); });
+      area.addEventListener('blur', () => setTimeout(closePick, 120));
       const files = $('spacePmFiles'), note = $('spacePmFileNote');
       files.onchange = () => { const n = files.files.length; note.textContent = n ? `${n} file${n === 1 ? '' : 's'} attached` : ''; };
       $('spacePmForm').onsubmit = async event => {
@@ -109,7 +159,9 @@ export function initOfficeWork(ctx) {
         const button = event.target.querySelector('button[type=submit]'), picked = [...(files.files || [])];
         button.disabled = true;
         try {
-          const job = await api('/tasks', 'POST', { dept: 'auto', depts: 'auto', text: event.target.elements.text.value });
+          const project = marks.find(m => m.kind === 'project') || (marks.find(m => m.kind === 'milestone')?.projectId ? { id: marks.find(m => m.kind === 'milestone').projectId } : null);
+          const milestone = marks.find(m => m.kind === 'milestone');
+          const job = await api('/tasks', 'POST', { dept: 'auto', depts: 'auto', text: event.target.elements.text.value, ...(project ? { projectId: project.id } : {}), ...(milestone ? { milestoneId: milestone.id } : {}) });
           for (const file of picked) { const data = await readFileAsBase64(file); await api(`/tasks/${job.id}/attach`, 'POST', { name: file.name, data, type: file.type }); }
           await refresh(); projectUI.open();
           feedback(`Task received: ${job.title}. Open it from the list when you want to follow the plan.`);
@@ -380,7 +432,7 @@ export function initOfficeWork(ctx) {
     const cancel = '<button type="button" class="tv-btn tv-btn-text tv-danger" data-action="cancel">Cancel task</button>';
     if (job.realState === 'awaiting_ceo' && (job.pendingActions || []).some(a => a.name !== 'complete_task')) return `<div class="tv-pending">${job.pendingActions.map(a => `<div class="tv-pend"><b>${esc(a.name === 'complete_task' ? 'Close the task and file the result' : 'Run ' + a.name)}</b>${a.name === 'complete_task' ? '' : `<pre>${esc(JSON.stringify(a.args, null, 2))}</pre>`}</div>`).join('')}</div><div class="tv-act"><button type="button" class="tv-btn tv-btn-p" data-action="approve">Approve · run it once</button></div><details class="tv-more" data-detail-key="revision"><summary>Reject with a note</summary><label class="tv-field">What should the team do instead?<textarea id="spaceRevision" rows="2"></textarea></label><div class="tv-act"><button type="button" class="tv-btn" data-action="reject">Reject</button></div></details>`;
     if (job.realState === 'escalated') return `<label class="tv-field">Your answer<textarea id="spaceRevision" rows="3" placeholder="Tell the team what to do."></textarea></label><div class="tv-act"><button type="button" class="tv-btn tv-btn-p" data-action="answer">Send to the team</button><span class="tv-sp"></span>${cancel}</div>`;
-    if (job.state === 'done') return `<details class="tv-more" data-detail-key="revision"><summary>Ask for changes</summary><label class="tv-field">What should change? The lead reworks it, reviews it again, and you get a new version.<textarea id="spaceRevision" rows="3"></textarea></label><div class="tv-act"><label class="tv-remember"><input type="checkbox" id="spaceRemember"> Remember this for the team from now on</label><span class="tv-sp"></span><button type="button" class="tv-btn tv-btn-p" data-action="message" data-kind="correction">Send correction</button></div></details>`;
+    if (job.state === 'done') return `<details class="tv-more" data-detail-key="revision"><summary>Ask for changes</summary><label class="tv-field">What should change? The lead reworks it, reviews it again, and you get a new version.<textarea id="spaceRevision" rows="3"></textarea></label><div class="tv-act"><span class="tv-sp"></span><button type="button" class="tv-btn tv-btn-p" data-action="message" data-kind="correction">Send correction</button></div></details>`;
     if (queued) return `<label class="tv-field">Task brief<textarea id="spaceQueueBrief" rows="3">${esc(job.text)}</textarea></label><div class="tv-act"><label class="tv-inline">Priority <select id="spaceQueuePriority">${[[2, 'High'], [1, 'Normal'], [0, 'Low']].map(([value, label]) => `<option value="${value}" ${value === (job.priority ?? 1) ? 'selected' : ''}>${label}</option>`).join('')}</select></label><span class="tv-sp"></span><button type="button" class="tv-btn" data-action="queue" data-queue-state="${job.state}">Save changes</button><button type="button" class="tv-btn tv-btn-p" data-action="queue" data-queue-state="${job.state === 'backlog' ? 'queued' : 'backlog'}">${job.state === 'backlog' ? 'Start task' : 'Move to ideas'}</button>${cancel}</div>`;
     if (job.state === 'blocked') return `<label class="tv-field">Tell the team what to change, or leave it blank to retry as it was<textarea id="spaceRevision" rows="2" placeholder="Describe a correction…"></textarea></label><div class="tv-act"><button type="button" class="tv-btn tv-btn-p" data-action="retry">Retry task</button><button type="button" class="tv-btn" data-go-models>Change the model</button><span class="tv-sp"></span>${cancel}</div>`;
     if (job.state === 'waiting') return `${job.review?.approved ? '<div class="tv-act"><button type="button" class="tv-btn tv-btn-p" data-action="approve">Approve completion</button></div>' : ''}<details class="tv-more" data-detail-key="revision"><summary>Request changes</summary><label class="tv-field">What needs to change?<textarea id="spaceRevision" rows="2"></textarea></label><div class="tv-act"><button type="button" class="tv-btn" data-action="reject">Send for revision</button><span class="tv-sp"></span>${cancel}</div></details>`;
@@ -443,7 +495,7 @@ export function initOfficeWork(ctx) {
     content.querySelectorAll('[data-action]').forEach(button=>button.onclick=async()=>{
       button.disabled=true;
       try{
-        await api(`/tasks/${job.id}/${button.dataset.action}`,'POST',button.dataset.action==='queue'?{text:$('spaceQueueBrief').value,priority:Number($('spaceQueuePriority').value),state:button.dataset.queueState}:(()=>{const v=$('spaceRevision')?.value||'';if(['message','answer','reject'].includes(button.dataset.action)&&!v.trim())throw new Error('Write your message first.');return {feedback:v,text:v,kind:button.dataset.kind,remember:$('spaceRemember')?.checked?'team':undefined};})());
+        await api(`/tasks/${job.id}/${button.dataset.action}`,'POST',button.dataset.action==='queue'?{text:$('spaceQueueBrief').value,priority:Number($('spaceQueuePriority').value),state:button.dataset.queueState}:(()=>{const v=$('spaceRevision')?.value||'';if(['message','answer','reject'].includes(button.dataset.action)&&!v.trim())throw new Error('Write your message first.');return {feedback:v,text:v,kind:button.dataset.kind,remember:undefined};})());
         taskDirty=false;taskInputDraft={};taskSignature='';await refresh();await showTask(job.id,false);
       }catch(error){feedback(error.message,true);button.disabled=false;}
     });
@@ -474,6 +526,7 @@ export function initOfficeWork(ctx) {
   }
   // One vocabulary of colour for a state, wherever the rail says one.
   const stateKind = s => s === 'done' ? 'ok'
+    : s === 'cancelled' ? 'gone'
     : ['blocked', 'escalated', 'failed', 'interrupted'].includes(s) ? 'fail'
     : ['waiting', 'awaiting_ceo'].includes(s) ? 'warn'
     : ['working', 'planning', 'reviewing', 'saving', 'queued', 'executing', 'awaiting_lead_review'].includes(s) ? 'busy' : 'off';
@@ -744,6 +797,16 @@ export function initOfficeWork(ctx) {
     isLive:()=>true,isOpen:()=>dialog.open,open:()=>{open('board','Office work');content.innerHTML=jobs.map(j=>`<button class="space-note" data-job="${j.id}"><b>${esc(j.title)}</b><span>${labels[j.state]} · ${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)}</span></button>`).join('')||'<p>No tasks yet.</p>';content.querySelectorAll('[data-job]').forEach(b=>b.onclick=()=>showTask(b.dataset.job));},
     toggle(){dialog.open?close():this.open();},close,openFor(){this.open();},openTask:showTask,refresh,renderAgent,railFor:id=>{agentOpen=id;acknowledgeAgent(id);const el=$('mRt');if(el)el.hidden=true;if(chat.agent!==id){chat.agent=id;chat.refs=[];chat.kind='question';chat.remember='';}closePicker();renderChatBar();},syncPills:noop,
     onStuck:noop,onResolve:noop,pendingReject:()=>false,rejectLive:noop,resolveLive:noop,revise:()=>false,addTask:()=>null,routines:[],
-    handleChat:async(id,text)=>{const match=text.match(/^\s*(?:add\s+(?:a\s+)?task|task|todo)\s*:\s*(.+)$/is);if(match){try{const job=await api('/tasks','POST',{dept:R[id].a.dept,text:match[1]});await refresh();return `Task received by the team lead: ${job.title}. Open Work to follow the plan and verification.`;}catch(error){return error.message;}}return null;},
+    handleChat:async(id,text,docs=[])=>{
+      // A message with a file is work, not conversation: it becomes a task for that person's team, with the file on it.
+      if (docs.length) {
+        try {
+          const job = await api('/tasks', 'POST', { dept: R[id].a.dept, text });
+          for (const file of docs) await api(`/tasks/${job.id}/attach`, 'POST', { name: file.name, data: await readFileAsBase64(file), type: file.type });
+          await refresh();
+          return `Task received with ${docs.length} file${docs.length === 1 ? '' : 's'}: ${job.title}. ${R[id].a.name} has it.`;
+        } catch (error) { return `That could not be sent: ${error.message}`; }
+      }
+      const match=text.match(/^\s*(?:add\s+(?:a\s+)?task|task|todo)\s*:\s*(.+)$/is);if(match){try{const job=await api('/tasks','POST',{dept:R[id].a.dept,text:match[1]});await refresh();return `Task received by the team lead: ${job.title}. Open Work to follow the plan and verification.`;}catch(error){return error.message;}}return null;},
   };
 }

@@ -682,13 +682,13 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     : ['blocked', 'escalated', 'failed'].includes(state) ? ['fail', 'Blocked', 'warn']
     : ['waiting', 'awaiting_ceo'].includes(state) ? ['warn', 'Waits for you', 'warn']
     : ['working', 'planning', 'reviewing', 'saving', 'executing', 'awaiting_lead_review'].includes(state) ? ['busy', 'In progress', 'spin']
-    : state === 'queued' ? ['busy', 'Queued', 'circle'] : state === 'cancelled' ? ['off', 'Cancelled', 'circle'] : ['off', 'Idea', 'circle'];
+    : state === 'queued' ? ['busy', 'Queued', 'circle'] : state === 'cancelled' ? ['gone', 'Cancelled', 'circle'] : ['off', 'Idea', 'circle'];
   // A step of a task: the assignment a specialist was given, and how it ended.
   const STEP_CHIP = state => state === 'done' ? ['ok', 'Done', 'check']
     : state === 'failed' ? ['fail', 'Failed', 'warn']
     : ['working', 'paused'].includes(state) ? ['busy', 'Under way', 'spin']
     : state === 'interrupted' ? ['off', 'Stopped', 'circle']
-    : state === 'cancelled' ? ['off', 'Cancelled', 'circle'] : ['off', String(state || '').replace(/^./, c => c.toUpperCase()) || 'Step', 'circle'];
+    : state === 'cancelled' ? ['gone', 'Cancelled', 'circle'] : ['off', String(state || '').replace(/^./, c => c.toUpperCase()) || 'Step', 'circle'];
   const pwChip = ([kind, label, icon]) => `<span class="pw-chip ${kind}">${PW_ICON[icon]}${esc(label)}</span>`;
   const pwWhen = ms => { if (!ms) return ''; const d = new Date(ms);
     return `<b>${esc(d.toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' }))}</b><span>${esc(d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }))}</span>`; };

@@ -955,15 +955,41 @@
 .space-closed-tasks { margin:18px 0 0; border-top:1px solid var(--hairline); padding-top:13px; }
 .space-closed-tasks>summary { color:var(--ink); cursor:pointer; font-family:var(--serif); font-size:19px; letter-spacing:.02em; margin:18px 2px 12px; }
 .space-closed-tasks>summary span { margin-left:8px; font:400 10px var(--ui); color:var(--grey); letter-spacing:0; }
+/* The way out of the Brain's map, for anyone who does not know Esc. */
+.bv-back { position:absolute; top:18px; left:18px; z-index:6; border:1px solid rgba(236,234,226,.28); background:rgba(20,21,24,.72); color:#ECEAE2; font:600 12px var(--ui); padding:9px 14px; border-radius:10px; cursor:pointer; backdrop-filter:blur(6px); }
+.bv-back:hover { background:rgba(40,42,48,.9); border-color:rgba(236,234,226,.5); }
+.bv-top { left:170px; }
+@media (max-width:760px){ .bv-back { top:12px; left:12px; padding:7px 10px; font-size:11px; } .bv-top { left:12px; top:56px; } }
+
+/* @ in the Program Manager's box: the work you mean, picked from a list. */
+.pm-box { position:relative; }
+.pm-pick { position:absolute; left:12px; right:12px; top:calc(100% + 6px); z-index:6; max-height:260px; overflow:auto; background:var(--cream); border:1px solid var(--hairline); border-radius:12px; box-shadow:0 18px 40px rgba(22,21,20,.16); padding:5px; }
+.pm-pick[hidden] { display:none; }
+#spaceDialog .pm-pick button, .pm-pick button { display:grid !important; grid-template-columns:auto 1fr auto; align-items:baseline; gap:9px; width:100%; text-align:left; border:0 !important; background:transparent !important; color:var(--ink) !important; border-radius:9px; padding:8px 10px !important; font:12px var(--ui) !important; cursor:pointer; }
+.pm-pick button[aria-selected=true], .pm-pick button:hover { background:color-mix(in srgb,var(--ink) 6%,transparent) !important; }
+.pm-pick i { font-style:normal; font:600 8.5px var(--ui); letter-spacing:.1em; text-transform:uppercase; color:#5B66CE; background:#EAEDFA; border-radius:5px; padding:2px 6px; }
+.pm-pick i.k-milestone { color:#8F6407; background:#FBF3DC; } .pm-pick i.k-task { color:#1E7A55; background:#E9F5EE; }
+.pm-pick b { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pm-pick span { font:10.5px ui-monospace, Menlo, Consolas, monospace; color:var(--grey); white-space:nowrap; }
+body.dark .pm-pick { background:#1E1F23; }
+/* The clip on a message to a person. */
+.m-attach { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:8px; color:var(--grey); cursor:pointer; flex:none; }
+.m-attach:hover { color:var(--ink); background:rgba(22,21,20,.06); }
+.m-attach input { position:absolute; width:1px; height:1px; opacity:0; }
+.m-attach svg { width:14px; height:14px; }
+
 /* The way into Manage from a team card or a person's card. */
 .b-gear, .mh-gear { border:0; background:transparent; color:var(--grey); cursor:pointer; padding:2px; margin-left:6px; line-height:0; border-radius:6px; opacity:.55; transition:opacity .15s, color .15s, background .15s; }
 .b-gear:hover, .mh-gear:hover { opacity:1; color:var(--ink); background:color-mix(in srgb,var(--ink) 7%,transparent); }
-.mh-gear { margin-left:auto; align-self:center; }
+.mh-gear { margin-left:auto; align-self:flex-start; order:9; }
+#railAgent .mh { align-items:flex-start; }
+#railAgent .mh-state { order:8; align-self:flex-start; }
 body.dark .b-gear:hover, body.dark .mh-gear:hover { background:rgba(255,255,255,.08); }
 
 /* A state, said in colour: the same five everywhere the office reports one. */
 .space-agent-task .st, .space-note .st, .st { display:inline; font-weight:600; }
-.st-ok { color:#1E7A55; } .st-busy { color:#2A6DB5; } .st-warn { color:#8F6407; } .st-fail { color:#B2382C; } .st-off { color:var(--grey); }
+.st-ok { color:#1E7A55; } .st-busy { color:#2A6DB5; } .st-warn { color:#8F6407; } .st-fail { color:#B2382C; } .st-off { color:var(--grey); } .st-gone { color:#C2691E; }
+body.dark .st-gone { color:#E8A166; }
 body.dark .st-ok { color:#5CC292; } body.dark .st-busy { color:#7FB3F0; } body.dark .st-warn { color:#E4B75B; } body.dark .st-fail { color:#F0857A; }
 #rail .mh-state[data-phase=working] { color:#2A6DB5; border-color:rgba(42,109,181,.45); }
 #rail .mh-state[data-phase=planning] { color:#B4830B; border-color:rgba(180,131,11,.45); }
@@ -1029,6 +1055,8 @@ body.dark #rail .mh-state[data-phase=working] { color:#7FB3F0; } body.dark #rail
 .pm-chip { font:600 10.5px var(--ui); border-radius:99px; padding:3px 10px; white-space:nowrap; color:var(--grey); background:var(--hairline); }
 .pm-chip.ok { color:#1E7A55; background:#E9F5EE; } .pm-chip.busy { color:#2E5EA8; background:#E8EFFA; }
 .pm-chip.warn { color:#8F6407; background:#FBF3DC; } .pm-chip.fail { color:#B2382C; background:#FBECEA; }
+.pm-chip.gone { color:#C2691E; background:#FBEFE4; }
+body.dark .pm-chip.gone { color:#E8A166; background:rgba(194,105,30,.16); }
 .pm-task-body { font:12px/1.6 var(--ui); color:var(--grey); background:color-mix(in srgb,var(--ink) 3%,transparent); border-radius:9px; padding:9px 11px; }
 .pm-task-body b { color:var(--ink); font-weight:600; }
 .pm-none { margin:0; font:12px var(--ui); color:var(--grey); }
@@ -1929,6 +1957,7 @@ body.dark #settingsPage .secondary { background: transparent; color: var(--ink);
       <div id="mMsgs"></div>
       <div id="mChips"></div>
       <div class="mInput">
+        <label class="m-attach" title="Attach a document — your message becomes a task with it"><input type="file" id="mFiles" multiple accept=".pdf,.docx,.txt,.md,.csv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.1 12.3 19.8a5 5 0 0 1-7.1-7.1l8.7-8.7a3.3 3.3 0 0 1 4.7 4.7l-8.7 8.7a1.7 1.7 0 0 1-2.4-2.4l8-8"/></svg></label>
         <input id="mIn" placeholder="Message… leads and the Program Manager: type @ to pick a task" autocomplete="off">
         <button id="mSend">SEND</button>
       </div>
@@ -1947,6 +1976,7 @@ body.dark #settingsPage .secondary { background: transparent; color: var(--ink);
 <div id="brainOv">
   <canvas id="bvCv"></canvas>
   <div class="bv-top"><input id="bvSearch" placeholder="Search the Brain…" autocomplete="off" spellcheck="false"><div id="bvChips"></div></div>
+  <button type="button" id="bvBack" class="bv-back">← Back to the office</button>
   <div class="bv-brand">THE BRAIN <small id="bvMeta"></small></div>
   <div class="bv-pane" id="bvPane"></div>
   <div class="bv-foot">Esc closes · scroll zooms · drag pans · click a note to read it</div>
