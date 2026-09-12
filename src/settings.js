@@ -53,7 +53,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     <div class="settings-main"><div class="mg-area-head"><div><span class="mg-eyebrow" id="settingsGroup"></span><h1 id="settingsTitle"></h1><p id="settingsIntro"></p></div><div class="mg-area-meta" id="settingsMeta"></div></div><p id="settingsMessage" role="status"></p><div id="settingsContent"></div></div>`;
   document.body.appendChild(page);
   const $ = id => document.getElementById(id), content = $('settingsContent'), main = page.querySelector('.settings-main');
-  let section = null, dirty = false, config = null, tools = [], providers = { models: [] }, draft = null, team = null, teamSection = 'overview', reportDays = 7, pendingNote = null, pendingProject = null, projectTab = 'work', projectArt = { kind: '', q: '' }, projectWorkFilter = 'all', toolPoll = null, statusPoll = null, statusTries = 0, metaStatus = '';
+  let section = null, dirty = false, config = null, tools = [], providers = { models: [] }, draft = null, team = null, teamSection = 'overview', reportDays = 7, pendingNote = null, pendingProject = null, projectTab = 'work', projectArt = { kind: '', q: '' }, projectWorkFilter = 'all', projectListTab = 'active', projectListQuery = '', toolPoll = null, statusPoll = null, statusTries = 0, metaStatus = '';
 
   /* ---------- feedback: a failure stays on the page and in a toast; a success is a toast ---------- */
   const feedback = (text, error = false, extra = {}) => {
@@ -582,11 +582,35 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       const newest = (a, b) => (b.createdAt || b.updatedAt || 0) - (a.createdAt || a.updatedAt || 0);
       const list = data.projects.filter(p => p.status !== 'archived').sort(newest), archived = data.projects.filter(p => p.status === 'archived').sort(newest);
       setMeta(list.length ? mark(list.some(p => p.next?.dueAt && p.next.dueAt < Date.now()) ? 'warn' : 'ok', `${list.length} open`) : mark('off', 'No projects'));
-      content.innerHTML = `<div class="mg-toolbar"><span class="mg-count">${list.length} open · ${archived.length} archived</span><span class="mg-spacer"></span><button id="spaceNewProject" type="button" class="mg-btn mg-btn-primary">+ New project</button></div>
-        ${list.length ? `<div class="mg-ledger-wrap"><table class="mg-ledger"><thead><tr><th>Project</th><th>State</th><th>Milestones</th><th>Next</th><th>Tasks</th><th>Teams</th><th>Target</th></tr></thead><tbody>${list.map(p => { const done = p.milestones.filter(m => m.done).length, total = p.milestones.length; return `<tr class="mg-row" data-project="${esc(p.id)}" tabindex="0"><td><span class="mg-name">${esc(p.name)}</span><span class="mg-sub" style="font-family:var(--ui);font-size:12px">${esc(p.description.slice(0, 140))}</span></td><td>${projectMark(p)}</td><td class="k">${total ? `${done} / ${total}` : '—'}</td><td>${p.next ? `${esc(p.next.title)}${p.next.dueAt ? `<span class="mg-sub">${esc(dateShort(p.next.dueAt))}</span>` : ''}` : '<span class="mg-muted">—</span>'}</td><td class="k">${p.done ? `${p.done} done${p.open ? ' · ' : ''}` : ''}${p.open || !p.done ? `${p.open} open` : ''}</td><td><div class="mg-chips">${p.teams.map(t => `<span class="mg-chip mg-chip-ink">${esc(data.teams.find(x => x.id === t)?.name || t)}</span>`).join('') || '<span class="mg-muted">—</span>'}</div></td><td class="k">${p.dueAt ? esc(dateShort(p.dueAt)) : '—'}</td></tr>`; }).join('')}</tbody></table></div>` : empty('No projects yet.', 'Define the first one: what it is for, who owns it, the milestones, and the files the teams should start from.')}
-        ${archived.length ? `<details class="mg-fold"><summary>${archived.length} archived</summary><div class="mg-fold-body">${archived.map(p => `<button type="button" class="space-text-action" data-project="${esc(p.id)}">${esc(p.name)}</button>`).join(' ')}</div></details>` : ''}`;
-      $('spaceNewProject').onclick = () => briefProject(data.teams);
-      content.querySelectorAll('[data-project]').forEach(b => { b.onclick = () => editProject(b.dataset.project, data.teams); b.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); b.click(); } }; });
+      const teamName = id => (data.teams.find(t => t.id === id) || {}).name || id;
+      const shown = () => (projectListTab === 'archived' ? archived : projectListTab === 'all' ? [...list, ...archived] : list)
+        .filter(p => projectListQuery.toLowerCase().split(/\s+/).filter(Boolean).every(w => `${p.name} ${p.description} ${(p.teams || []).map(teamName).join(' ')}`.toLowerCase().includes(w)));
+      const row = p => { const done = (p.milestones || []).filter(m => m.done).length, total = (p.milestones || []).length, pct = total ? Math.round(100 * done / total) : 0;
+        const due = p.dueAt ? new Date(p.dueAt) : null;
+        return `<tr class="pl-row" data-project="${esc(p.id)}" tabindex="0" role="button" title="Open this project">
+          <td><span class="pl-name">${esc(p.name)}</span><span class="pl-desc">${esc(String(p.description || '').slice(0, 150))}</span></td>
+          <td>${projectMark(p)}</td>
+          <td><span class="pl-ms"><b>${done} / ${total}</b><span class="pl-bar"><i style="width:${pct}%"></i></span></span></td>
+          <td class="pl-next">${p.next ? esc(String(p.next.title).slice(0, 46)) : '<span class="pl-dash">—</span>'}</td>
+          <td><span class="pl-tasks ${p.open ? 'on' : ''}"><b>${p.open || 0}</b><span>open</span></span></td>
+          <td><span class="pl-teams">${(p.teams || []).length ? (p.teams || []).map(t => `<span class="pl-team">${esc(teamName(t))}</span>`).join('') : '<span class="pl-dash">the Program Manager picks</span>'}</span></td>
+          <td class="r"><span class="pl-when">${due ? `<b>${esc(due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))}</b><span>${due.getFullYear()}</span>` : '<b class="pl-dash">no target</b>'}</span></td></tr>`; };
+      const draw = () => {
+        const rows = shown();
+        $('spaceProjectRows').innerHTML = rows.length ? rows.map(row).join('') : `<tr><td colspan="7" class="pl-none">${projectListQuery ? 'No project matches those words.' : 'No project here yet.'}</td></tr>`;
+        $('spaceProjectCount').textContent = `Showing ${rows.length} of ${list.length + archived.length} project${list.length + archived.length === 1 ? '' : 's'}`;
+        $('spaceProjectRows').querySelectorAll('[data-project]').forEach(b => { b.onclick = () => editProject(b.dataset.project, data.teams); b.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); b.click(); } }; });
+      };
+      content.innerHTML = `<div class="pl-top">
+        <div class="pl-tabs" role="tablist">${[['active', 'Active', list.length], ['archived', 'Archived', archived.length], ['all', 'All', list.length + archived.length]].map(([id, label, n]) => `<button type="button" data-pl-tab="${id}" aria-pressed="${projectListTab === id}">${label} <span>${n}</span></button>`).join('')}</div>
+        <span class="mg-spacer"></span>
+        <div class="mg-search" style="max-width:280px">${SEARCH_ICON}<input id="spaceProjectFilter" placeholder="Filter by name, purpose or team" value="${esc(projectListQuery)}"></div>
+        <button id="spaceNewProject" type="button" class="mg-btn mg-btn-primary">+ New project</button>
+      </div>
+      <div class="pl-wrap"><table class="pl"><thead><tr><th>Project</th><th>State</th><th>Milestones</th><th>Next</th><th>Tasks</th><th>Teams</th><th class="r">Target</th></tr></thead><tbody id="spaceProjectRows"></tbody></table>
+        <div class="pl-foot"><span id="spaceProjectCount"></span><span class="mg-spacer"></span><span>Every project keeps its charter, its milestones and its folder in the Brain.</span></div></div>`;
+      draw();
+
     } catch (error) { feedback(error.message, true); }
   }
   // A project from a brief: the CEO says what to build or achieve and attaches documents; the Program Manager plans the rest.
@@ -662,8 +686,11 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     : t.state === 'queued' ? 'Waiting to start' : t.subtasks?.length ? `${pwTaskPct(t)}% complete` : 'Under way';
   const pwRing = kind => `<span class="pw-ring ${kind}" aria-hidden="true"></span>`;
 
-  const projectWork = (detail, teams) => {
+  const projectWork = (detail, teams, roster) => {
     const p = detail.project, all = detail.tasks || [], ms = p.milestones || [];
+    // Who is on it: the office's own names, so a row says the team and the person, not an id.
+    const nameOf = id => (roster?.agents || []).find(a => a.id === id)?.name || '';
+    const leadOf = t => nameOf((t.runs || []).filter(r => r.role === 'lead' && r.agent).at(-1)?.agent) || nameOf(t.agent);
     const tasks = all.filter(t => t.state !== 'cancelled'), ready = readyMilestones(ms), readyIds = new Set(ready.map(m => m.id)), first = ready[0] || null, seen = new Set();
     const rows = ms.map((m, i) => {
       const own = tasksOf(ms, m, tasks, { first }); own.forEach(t => seen.add(t.id));
@@ -701,16 +728,16 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       </div></div>`;
     const task = t => { const c = TASK_CHIP(t.state), steps = t.subtasks || [];
       return `<div class="pw-row pw-task" data-open-task="${esc(t.id)}" role="button" tabindex="0" title="Open this task">
-      <div class="pw-name"><span class="pw-tree" aria-hidden="true"></span>${steps.length ? `<button type="button" class="pw-x pw-x-step" data-steps-toggle="${esc(t.id)}" aria-expanded="false" aria-label="Show what this task was broken into"><svg viewBox="0 0 16 16" class="pw-i"><path d="M4 6.2l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>` : '<span class="pw-nox" aria-hidden="true"></span>'}${pwRing(c[0])}<span class="pw-tt">${esc(t.title)}<span class="pw-team">${esc(t.teamName || '')}${steps.length ? ` · ${steps.filter(s => s.state === 'done').length} of ${steps.length} assignment${steps.length === 1 ? '' : 's'}` : ''}</span></span></div>
+      <div class="pw-name"><span class="pw-tree" aria-hidden="true"></span>${steps.length ? `<button type="button" class="pw-x pw-x-step" data-steps-toggle="${esc(t.id)}" aria-expanded="false" aria-label="Show what this task was broken into"><svg viewBox="0 0 16 16" class="pw-i"><path d="M4 6.2l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>` : '<span class="pw-nox" aria-hidden="true"></span>'}${pwRing(c[0])}<span class="pw-tt">${esc(t.title)}<span class="pw-team">${esc(t.teamName || '')}${leadOf(t) ? ` · ${esc(leadOf(t))}` : ''}${steps.length ? ` · ${steps.filter(s => s.state === 'done').length} of ${steps.length} assignment${steps.length === 1 ? '' : 's'}` : ''}</span></span></div>
       <div class="pw-progress pw-progress-task ${c[0]}">${esc(pwTaskProgress(t))}</div>
       <div class="pw-status">${pwChip(c)}</div>
       <div class="pw-when">${pwWhen(t.doneAt || t.dueAt || t.createdAt)}</div></div>`
       + (steps.length ? `<div class="pw-steps" data-steps="${esc(t.id)}" hidden>${steps.map(s => { const sc = STEP_CHIP(s.state);
-        return `<div class="pw-row pw-step" data-open-task="${esc(t.id)}" role="button" tabindex="0" title="Open the task this belongs to"><div class="pw-name"><span class="pw-tree pw-tree-2" aria-hidden="true"></span>${pwRing(sc[0])}<span class="pw-tt">${esc(String(s.title).slice(0, 120))}</span></div><div class="pw-progress"></div><div class="pw-status">${pwChip(sc)}</div><div class="pw-when"></div></div>`; }).join('')}</div>` : ''); };
+        return `<div class="pw-row pw-step" data-open-task="${esc(t.id)}" role="button" tabindex="0" title="Open the task this belongs to"><div class="pw-name"><span class="pw-tree pw-tree-2" aria-hidden="true"></span>${pwRing(sc[0])}<span class="pw-tt">${esc(String(s.title).slice(0, 120))}${nameOf(s.agent) ? `<span class="pw-team">${esc(nameOf(s.agent))}</span>` : ''}</span></div><div class="pw-progress"></div><div class="pw-status">${pwChip(sc)}</div><div class="pw-when"></div></div>`; }).join('')}</div>` : ''); };
 
     return `<section class="pw">
       <div class="pw-head">
-        <div class="pw-head-text"><h3>${PW_ICON.flag}Project execution &amp; milestones</h3><p>Every milestone, what it is worth, and the tasks under it. Open a task to follow it.</p></div>
+        <div class="pw-head-text"><h3>${PW_ICON.flag}Project execution &amp; milestones</h3><p>Every milestone, what it is worth, and who is on the tasks under it.</p></div>
         <div class="pw-head-actions">
           <div class="pw-seg" role="group" aria-label="Which milestones">${[['all', 'All milestones'], ['open', 'In progress'], ['stuck', 'Needs attention']].map(([id, label]) => `<button type="button" data-pw-filter="${id}" aria-pressed="${projectWorkFilter === id}">${label}</button>`).join('')}</div>
           <button type="button" class="mg-btn mg-btn-sm" id="spaceNewMilestone">${PW_ICON.plus}New milestone</button>
@@ -847,6 +874,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       const detail = id ? await api(`/projects/${id}`) : null;
       const p = detail?.project || { id: '', name: '', description: '', charter: '', teams: [], status: 'active', startAt: null, dueAt: null, milestones: [], visibility: 'private', sharedWith: { users: [], groups: [] } };
       // Hosted: the people and groups a project can be shared with; only the project's owner or an office admin may change the audience.
+      const roster = config || await api('/office').catch(() => null);
       const audience = HOSTED ? await Promise.all([api('/users'), api('/groups')]).then(([u, g]) => ({ users: u.users.filter(x => x.id !== USER?.id && x.id !== p.ownerId), groups: g.groups })).catch(() => null) : null;
       const mayShare = HOSTED && (isOfficeAdmin() || !p.id || p.ownerId === USER?.id);
       projectOpen = p.id || null;
@@ -869,7 +897,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
           ${detail.files.length ? `<div class="mg-ledger-wrap" style="margin:0"><table class="mg-ledger"><tbody>${detail.files.map(f => `<tr><td>${fileIcon(f.id)} <span class="mg-name">${esc(f.title || f.id.split('/').pop())}</span><span class="mg-sub">${esc(f.id)}</span></td><td class="k r">${f.updatedAt ? esc(when(f.updatedAt)) : ''}</td></tr>`).join('')}</tbody></table></div>` : ''}</div>
         ` : ''}
         </div>
-        <div data-project-page="tasks">${p.id ? projectWork(detail, teams) : ''}</div>
+        <div data-project-page="tasks">${p.id ? projectWork(detail, teams, roster) : ''}</div>
         <div data-project-page="results">${p.id ? resultsCard(detail) : ''}</div>`;
       // The work and the Results are two pages of the same project: a finished project opens on its Results.
       if (!p.id) projectTab = 'charter';

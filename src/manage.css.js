@@ -301,12 +301,47 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #settingsPage.mg .mg-upload small{color:var(--grey);font:11px var(--ui);width:100%}
 #settingsPage.mg .mg-doc{background:var(--mg-card);border:1px solid var(--hairline);border-radius:12px;padding:28px 32px;max-width:820px}
 
+/* ---- the project list: one row per project, what it is worth and who owns it ---- */
+#settingsPage.mg .pl-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+#settingsPage.mg .pl-tabs{display:inline-flex;padding:3px;border:1px solid var(--hairline);border-radius:10px;background:var(--mg-card)}
+#settingsPage.mg .pl-tabs button{border:0;background:transparent;border-radius:7px;padding:6px 12px;font:500 12px var(--ui);color:var(--grey);cursor:pointer;height:auto;display:inline-flex;align-items:center;gap:6px}
+#settingsPage.mg .pl-tabs button span{font:600 10.5px var(--mg-mono);opacity:.7}
+#settingsPage.mg .pl-tabs button[aria-pressed=true]{background:var(--ink);color:var(--cream)}
+#settingsPage.mg .pl-wrap{background:var(--mg-card);border:1px solid var(--hairline);border-radius:14px;overflow:hidden}
+#settingsPage.mg table.pl{width:100%;border-collapse:collapse}
+#settingsPage.mg table.pl th{text-align:left;padding:12px 18px;background:var(--mg-rail);border-bottom:1px solid var(--hairline);font:600 10px var(--mg-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--grey);white-space:nowrap}
+#settingsPage.mg table.pl td{padding:16px 18px;border-bottom:1px solid var(--hairline);vertical-align:middle;font:12px var(--ui)}
+#settingsPage.mg table.pl tbody tr:last-child td{border-bottom:0}
+#settingsPage.mg table.pl .r{text-align:right}
+#settingsPage.mg .pl-row{cursor:pointer}
+#settingsPage.mg .pl-row:hover td{background:var(--mg-hover)}
+#settingsPage.mg .pl-row:focus-visible td{background:var(--mg-hover);outline:2px solid var(--mg-busy);outline-offset:-2px}
+#settingsPage.mg .pl-name{display:block;font:600 14px/1.4 var(--ui);color:var(--ink)}
+#settingsPage.mg .pl-desc{display:block;margin-top:3px;font:12px/1.55 var(--ui);color:var(--grey);max-width:56ch}
+#settingsPage.mg .pl-ms{display:flex;flex-direction:column;gap:6px;min-width:84px}
+#settingsPage.mg .pl-ms b{font:600 12.5px var(--mg-mono);color:var(--ink)}
+#settingsPage.mg .pl-bar{display:block;height:4px;border-radius:2px;background:color-mix(in srgb,var(--ink) 12%,transparent);overflow:hidden}
+#settingsPage.mg .pl-bar i{display:block;height:100%;background:var(--mg-ok);border-radius:2px}
+#settingsPage.mg .pl-next{color:var(--grey);max-width:24ch}
+#settingsPage.mg .pl-tasks{display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25}
+#settingsPage.mg .pl-tasks b{font:600 15px var(--mg-mono);color:var(--mg-mute)}
+#settingsPage.mg .pl-tasks span{font:10.5px var(--mg-mono);color:var(--grey)}
+#settingsPage.mg .pl-tasks.on b{color:var(--mg-busy)}
+#settingsPage.mg .pl-teams{display:flex;flex-wrap:wrap;gap:5px;max-width:22ch}
+#settingsPage.mg .pl-team{display:inline-block;padding:2px 8px;border:1px solid var(--hairline);border-radius:6px;background:var(--mg-hover);font:600 9.5px var(--mg-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--grey);white-space:nowrap}
+#settingsPage.mg .pl-when b{display:block;font:600 12.5px var(--ui);color:var(--ink)}
+#settingsPage.mg .pl-when span{font:10.5px var(--mg-mono);color:var(--mg-mute)}
+#settingsPage.mg .pl-dash{color:var(--mg-mute)}
+#settingsPage.mg .pl-none{padding:26px 18px;text-align:center;color:var(--grey)}
+#settingsPage.mg .pl-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:11px 18px;background:var(--mg-rail);border-top:1px solid var(--hairline);font:11px var(--mg-mono);color:var(--mg-mute)}
+@media (max-width:1000px){#settingsPage.mg table.pl :is(th,td):nth-child(4),#settingsPage.mg table.pl :is(th,td):nth-child(6){display:none}}
+
 /* ---- a project's Work: the figures, then the milestone tree, then the way in ---- */
 #settingsPage.mg .pw{display:block}
 #settingsPage.mg .pw-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:0 0 16px}
 #settingsPage.mg .pw-head h3{display:flex;align-items:center;gap:9px;margin:0;font:400 23px/1.2 var(--serif);color:var(--ink)}
 #settingsPage.mg .pw-head h3 .pw-i{width:19px;height:19px;color:var(--mg-gold)}
-#settingsPage.mg .pw-head p{margin:5px 0 0;font:12.5px/1.5 var(--ui);color:var(--grey);max-width:62ch}
+#settingsPage.mg .pw-head p{margin:5px 0 0;font:12.5px/1.5 var(--ui);color:var(--grey);max-width:52ch;text-wrap:pretty}
 #settingsPage.mg .pw-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 #settingsPage.mg .pw-head-actions .mg-btn .pw-i{width:13px;height:13px;margin-right:5px}
 #settingsPage.mg .pw-seg{display:inline-flex;padding:3px;border:1px solid var(--hairline);border-radius:10px;background:var(--mg-card)}
