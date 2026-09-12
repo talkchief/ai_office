@@ -301,38 +301,124 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #settingsPage.mg .mg-upload small{color:var(--grey);font:11px var(--ui);width:100%}
 #settingsPage.mg .mg-doc{background:var(--mg-card);border:1px solid var(--hairline);border-radius:12px;padding:28px 32px;max-width:820px}
 
-/* ---- a project's Work: milestones with their tasks under them ---- */
-#settingsPage.mg .mg-ledger.pw td{vertical-align:middle}
-#settingsPage.mg .pw .pw-ms>td{background:var(--mg-rail);border-top:1px solid var(--hairline);padding-top:13px;padding-bottom:13px}
-#settingsPage.mg .pw .pw-ms:first-child>td{border-top:0}
-#settingsPage.mg .pw .pw-ms b{font:600 13.5px/1.4 var(--ui);color:var(--ink)}
-#settingsPage.mg .pw .pw-count{margin-left:10px;font:500 11px var(--mg-mono);color:var(--grey);white-space:nowrap}
-#settingsPage.mg .pw .pw-x{border:0;background:transparent;color:var(--grey);font:13px/1 var(--ui);cursor:pointer;padding:0 9px 0 0;height:auto}
-#settingsPage.mg .pw .pw-x[aria-expanded=false]{transform:rotate(-90deg);display:inline-block}
-#settingsPage.mg .pw .pw-bar{display:inline-block;width:78px;height:4px;border-radius:2px;background:color-mix(in srgb,var(--ink) 12%,transparent);overflow:hidden;margin-right:10px;vertical-align:middle}
-#settingsPage.mg .pw .pw-bar i{display:block;height:100%;width:0;border-radius:2px;background:var(--mg-ok)}
-#settingsPage.mg .pw .pw-ms.blocked .pw-bar i{background:var(--mg-fail)}
-#settingsPage.mg .pw .pw-ms.waiting .pw-bar i,#settingsPage.mg .pw .pw-ms.unplanned .pw-bar i{background:var(--mg-warn)}
-#settingsPage.mg .pw .pw-ms.active .pw-bar i{background:var(--mg-busy)}
-#settingsPage.mg .pw .pw-task{cursor:pointer}
-#settingsPage.mg .pw .pw-task:hover>td{background:var(--mg-hover)}
-#settingsPage.mg .pw .pw-task:focus-visible>td{background:var(--mg-hover);outline:2px solid var(--mg-busy);outline-offset:-2px}
-#settingsPage.mg .pw .pw-tree{display:inline-block;width:26px;height:11px;margin:0 6px 2px 10px;border-left:2px solid color-mix(in srgb,var(--ink) 18%,transparent);border-bottom:2px solid color-mix(in srgb,var(--ink) 18%,transparent);border-bottom-left-radius:5px;vertical-align:middle}
-#settingsPage.mg .pw .pw-team{color:var(--grey);font:12px var(--ui);white-space:nowrap}
-#settingsPage.mg .pw .pw-add>td{padding-top:6px;padding-bottom:12px}
-#settingsPage.mg .pw .pw-add .mg-btn{margin-left:42px;color:var(--grey)}
-#settingsPage.mg .pw .pw-add .mg-btn:hover{color:var(--ink)}
+/* ---- a project's Work: the figures, then the milestone tree, then the way in ---- */
+#settingsPage.mg .pw{display:block}
+#settingsPage.mg .pw-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:0 0 16px}
+#settingsPage.mg .pw-head h3{display:flex;align-items:center;gap:9px;margin:0;font:400 23px/1.2 var(--serif);color:var(--ink)}
+#settingsPage.mg .pw-head h3 .pw-i{width:19px;height:19px;color:var(--mg-gold)}
+#settingsPage.mg .pw-head p{margin:5px 0 0;font:12.5px/1.5 var(--ui);color:var(--grey);max-width:62ch}
+#settingsPage.mg .pw-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#settingsPage.mg .pw-head-actions .mg-btn .pw-i{width:13px;height:13px;margin-right:5px}
+#settingsPage.mg .pw-seg{display:inline-flex;padding:3px;border:1px solid var(--hairline);border-radius:10px;background:var(--mg-card)}
+#settingsPage.mg .pw-seg button{border:0;background:transparent;border-radius:7px;padding:5px 11px;font:500 11.5px var(--ui);color:var(--grey);cursor:pointer;height:auto}
+#settingsPage.mg .pw-seg button[aria-pressed=true]{background:var(--ink);color:var(--cream)}
+/* The figures */
+#settingsPage.mg .pw-kpis{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,1fr);gap:12px;margin:0 0 16px}
+#settingsPage.mg .pw-kpi{background:var(--mg-card);border:1px solid var(--hairline);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+#settingsPage.mg .pw-kpi-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+#settingsPage.mg .pw-big{font:400 34px/1 var(--serif);color:var(--ink);margin-top:6px}
+#settingsPage.mg .pw-dial{width:52px;height:52px;flex:none}
+#settingsPage.mg .pw-dial-bg{stroke:color-mix(in srgb,var(--ink) 10%,transparent)}
+#settingsPage.mg .pw-dial-fg{stroke:var(--mg-gold)}
+#settingsPage.mg .pw-kpi-foot{display:flex;flex-wrap:wrap;gap:6px 16px;padding-top:11px;border-top:1px solid var(--hairline);font:11.5px var(--ui);color:var(--grey)}
+#settingsPage.mg .pw-kpi-foot span{display:inline-flex;align-items:center;gap:6px}
+#settingsPage.mg .pw-kpi-foot .pw-i{width:13px;height:13px;color:var(--mg-ok)}
+#settingsPage.mg .pw-kpi-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+#settingsPage.mg .pw-kpi-note{font:11.5px var(--mg-mono);color:var(--grey)}
+#settingsPage.mg .pw-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+#settingsPage.mg .pw-tile{border:1px solid var(--hairline);border-radius:10px;padding:9px 11px;display:flex;flex-direction:column;gap:3px}
+#settingsPage.mg .pw-tile span{font:500 11px var(--ui);color:var(--grey)}
+#settingsPage.mg .pw-tile b{font:400 21px/1 var(--serif);color:var(--ink)}
+#settingsPage.mg .pw-tile.ok{background:var(--mg-ok-bg);border-color:transparent}#settingsPage.mg .pw-tile.ok span{color:var(--mg-ok)}
+#settingsPage.mg .pw-tile.busy{background:var(--mg-busy-bg);border-color:transparent}#settingsPage.mg .pw-tile.busy span{color:var(--mg-busy)}
+#settingsPage.mg .pw-tile.fail{background:var(--mg-fail-bg);border-color:transparent}#settingsPage.mg .pw-tile.fail span{color:var(--mg-fail)}
+#settingsPage.mg .pw-spread-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:6px;font:11.5px var(--ui);color:var(--grey)}
+#settingsPage.mg .pw-spread-head em{font-style:normal;font-family:var(--mg-mono);font-size:11px;color:var(--mg-mute);text-align:right}
+#settingsPage.mg .pw-spread-bar{display:flex;gap:2px;height:9px;border-radius:99px;overflow:hidden;background:color-mix(in srgb,var(--ink) 8%,transparent)}
+#settingsPage.mg .pw-spread-bar i{display:block;height:100%}
+#settingsPage.mg .pw-spread-bar .done{background:var(--mg-ok)}#settingsPage.mg .pw-spread-bar .going{background:var(--mg-busy)}
+#settingsPage.mg .pw-spread-bar .you{background:var(--mg-warn)}#settingsPage.mg .pw-spread-bar .stuck{background:var(--mg-fail)}
+#settingsPage.mg .pw-spread-bar .todo{background:color-mix(in srgb,var(--ink) 18%,transparent)}
+#settingsPage.mg .pw-facts{margin:0;display:grid;gap:9px}
+#settingsPage.mg .pw-facts div{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+#settingsPage.mg .pw-facts dt{font:11.5px var(--ui);color:var(--grey)}
+#settingsPage.mg .pw-facts dd{margin:0;font:500 12px var(--ui);color:var(--ink);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The tree */
+#settingsPage.mg .pw-table{background:var(--mg-card);border:1px solid var(--hairline);border-radius:14px;overflow:hidden}
+#settingsPage.mg .pw-row{display:grid;grid-template-columns:minmax(0,1fr) 150px 150px 128px;align-items:center;gap:16px;padding:11px 18px}
+#settingsPage.mg .pw-headrow{background:var(--mg-rail);border-bottom:1px solid var(--hairline);font:600 10px var(--mg-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--grey)}
+#settingsPage.mg .pw-headrow .pw-name{display:flex;align-items:center;gap:8px}
+#settingsPage.mg .pw-group{border-bottom:1px solid var(--hairline)}
+#settingsPage.mg .pw-group:last-of-type{border-bottom:0}
+#settingsPage.mg .pw-ms{background:color-mix(in srgb,var(--mg-rail) 60%,transparent);padding-top:13px;padding-bottom:13px}
+#settingsPage.mg .pw-name{display:flex;align-items:center;gap:9px;min-width:0}
+#settingsPage.mg .pw-title{display:flex;align-items:center;gap:9px;min-width:0;flex-wrap:wrap}
+#settingsPage.mg .pw-ms b{font:600 13.5px/1.45 var(--ui);color:var(--ink)}
+#settingsPage.mg .pw-kids{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border:1px solid var(--hairline);border-radius:99px;font:600 10.5px var(--mg-mono);color:var(--grey);background:var(--mg-card);white-space:nowrap}
+#settingsPage.mg .pw-kids .pw-i{width:11px;height:11px}
+#settingsPage.mg .pw-x{border:0;background:transparent;color:var(--grey);cursor:pointer;padding:2px;height:auto;display:inline-grid;place-items:center;flex:none}
+#settingsPage.mg .pw-x .pw-i{width:14px;height:14px;transition:transform .16s ease}
+#settingsPage.mg .pw-x[aria-expanded=false] .pw-i{transform:rotate(-90deg)}
+#settingsPage.mg .pw-ring{width:15px;height:15px;border-radius:50%;border:2px solid var(--mg-mute);flex:none;display:inline-block;position:relative}
+#settingsPage.mg .pw-ring::after{content:"";position:absolute;inset:3px;border-radius:50%;background:transparent}
+#settingsPage.mg .pw-ring.ok{border-color:var(--mg-ok);background:var(--mg-ok-bg)}#settingsPage.mg .pw-ring.ok::after{background:var(--mg-ok)}
+#settingsPage.mg .pw-ring.busy{border-color:var(--mg-busy)}#settingsPage.mg .pw-ring.busy::after{background:var(--mg-busy)}
+#settingsPage.mg .pw-ring.warn{border-color:var(--mg-warn)}#settingsPage.mg .pw-ring.warn::after{background:var(--mg-warn)}
+#settingsPage.mg .pw-ring.fail{border-color:var(--mg-fail)}#settingsPage.mg .pw-ring.fail::after{background:var(--mg-fail)}
+#settingsPage.mg .pw-progress{display:flex;align-items:center;gap:9px;font:11.5px var(--ui);color:var(--grey)}
+#settingsPage.mg .pw-bar{flex:1;min-width:0;height:7px;border-radius:99px;background:color-mix(in srgb,var(--ink) 10%,transparent);overflow:hidden}
+#settingsPage.mg .pw-bar i{display:block;height:100%;background:var(--mg-mute);border-radius:99px;transition:width .5s ease}
+#settingsPage.mg .pw-bar.ok i{background:var(--mg-ok)}#settingsPage.mg .pw-bar.busy i{background:var(--mg-busy)}
+#settingsPage.mg .pw-bar.warn i{background:var(--mg-warn)}#settingsPage.mg .pw-bar.fail i{background:var(--mg-fail)}
+#settingsPage.mg .pw-progress em{font-style:normal;font:600 11.5px var(--mg-mono);color:var(--ink);flex:none}
+#settingsPage.mg .pw-progress-task{font:11.5px var(--mg-mono);color:var(--mg-mute)}
+#settingsPage.mg .pw-progress-task.busy{color:var(--mg-busy)}#settingsPage.mg .pw-progress-task.warn{color:var(--mg-warn)}#settingsPage.mg .pw-progress-task.fail{color:var(--mg-fail)}
+#settingsPage.mg .pw-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:99px;border:1px solid transparent;font:600 11px var(--ui);white-space:nowrap}
+#settingsPage.mg .pw-chip .pw-i{width:12px;height:12px}
+#settingsPage.mg .pw-chip.ok{background:var(--mg-ok-bg);color:var(--mg-ok)}
+#settingsPage.mg .pw-chip.busy{background:var(--mg-busy-bg);color:var(--mg-busy)}
+#settingsPage.mg .pw-chip.warn{background:var(--mg-warn-bg);color:var(--mg-warn)}
+#settingsPage.mg .pw-chip.fail{background:var(--mg-fail-bg);color:var(--mg-fail)}
+#settingsPage.mg .pw-chip.off{background:var(--mg-hover);color:var(--grey);border-color:var(--hairline)}
+#settingsPage.mg .pw-when{display:flex;flex-direction:column;align-items:flex-end;gap:1px;text-align:right}
+#settingsPage.mg .pw-when b{font:500 11.5px var(--ui);color:var(--ink)}
+#settingsPage.mg .pw-when span{font:10.5px var(--mg-mono);color:var(--mg-mute)}
+#settingsPage.mg .pw-when .pw-due{font:9.5px var(--mg-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--mg-mute)}
+#settingsPage.mg .pw-task{border-top:1px solid var(--hairline);cursor:pointer}
+#settingsPage.mg .pw-task:hover{background:var(--mg-hover)}
+#settingsPage.mg .pw-task:focus-visible{background:var(--mg-hover);outline:2px solid var(--mg-busy);outline-offset:-2px}
+#settingsPage.mg .pw-tt{display:flex;flex-direction:column;gap:2px;min-width:0}
+#settingsPage.mg .pw-tt{font:12.5px/1.45 var(--ui);color:var(--ink)}
+#settingsPage.mg .pw-team{font:10.5px var(--mg-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--mg-mute)}
+#settingsPage.mg .pw-tree{width:22px;height:10px;margin-left:10px;border-left:1.5px solid color-mix(in srgb,var(--ink) 20%,transparent);border-bottom:1.5px solid color-mix(in srgb,var(--ink) 20%,transparent);border-bottom-left-radius:6px;flex:none}
+#settingsPage.mg .pw-empty{border-top:1px solid var(--hairline);font:12px var(--ui);color:var(--grey)}
+#settingsPage.mg .pw-addrow{border-top:1px solid var(--hairline);padding-top:8px;padding-bottom:10px}
+#settingsPage.mg .pw-add,#settingsPage.mg .pw-link{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:var(--grey);font:500 11.5px var(--ui);cursor:pointer;padding:2px 0;height:auto}
+#settingsPage.mg .pw-add{margin-left:34px}
+#settingsPage.mg .pw-add:hover,#settingsPage.mg .pw-link:hover{color:var(--ink)}
+#settingsPage.mg .pw-add .pw-i,#settingsPage.mg .pw-link .pw-i{width:12px;height:12px}
+#settingsPage.mg .pw-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:12px 18px;background:var(--mg-rail);border-top:1px solid var(--hairline)}
+#settingsPage.mg .pw-foot-actions{display:flex;align-items:center;gap:12px}
+#settingsPage.mg .pw-sep{width:1px;height:14px;background:var(--hairline)}
+#settingsPage.mg .pw-keys{display:flex;gap:14px;font:11px var(--ui);color:var(--mg-mute)}
+#settingsPage.mg .pw-keys span{display:inline-flex;align-items:center;gap:6px}
+#settingsPage.mg .pw-keys kbd{border:1px solid var(--hairline);border-radius:5px;padding:1px 6px;background:var(--mg-card);font:10.5px var(--mg-mono);color:var(--grey)}
+#settingsPage.mg .pw-i{display:inline-block;vertical-align:middle;flex:none}
+@keyframes pwSpin{to{transform:rotate(360deg)}}
+#settingsPage.mg .pw-spin{animation:pwSpin 1.1s linear infinite;transform-origin:50% 50%}
+@media (prefers-reduced-motion:reduce){#settingsPage.mg .pw-spin{animation:none}}
+@media (max-width:1100px){#settingsPage.mg .pw-kpis{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}#settingsPage.mg .pw-kpi-wide{grid-column:1 / -1;order:-1}}
+@media (max-width:860px){#settingsPage.mg .pw-kpis{grid-template-columns:minmax(0,1fr)}#settingsPage.mg .pw-row{grid-template-columns:minmax(0,1fr) 120px;row-gap:6px}#settingsPage.mg .pw-progress,#settingsPage.mg .pw-when{display:none}}
 /* Adding a task: one dialog, the milestone chosen from the ones the project has. */
 #settingsPage.mg .pw-modal{width:min(680px,100%);max-height:88vh;display:flex;flex-direction:column}
 #settingsPage.mg .pw-form{overflow:auto;padding:20px 22px 0}
 #settingsPage.mg .pw-field{margin:16px 0 0}
-#settingsPage.mg .pw-picks{display:grid;gap:8px;margin-top:8px}
+#settingsPage.mg .pw-picks{display:grid;gap:8px;margin-top:8px;max-height:246px;overflow:auto}
 #settingsPage.mg .pw-pick,#settingsPage.mg .pw-prio{display:flex;align-items:flex-start;gap:10px;padding:10px 13px;border:1px solid var(--hairline);border-radius:10px;cursor:pointer}
 #settingsPage.mg .pw-pick:hover,#settingsPage.mg .pw-prio:hover{border-color:var(--mg-line2)}
 #settingsPage.mg .pw-pick:has(input:checked),#settingsPage.mg .pw-prio:has(input:checked){border-color:var(--ink);background:var(--mg-hover)}
 #settingsPage.mg .pw-pick input,#settingsPage.mg .pw-prio input{margin:2px 0 0;width:auto;flex:none;accent-color:var(--ink)}
 #settingsPage.mg .pw-pick>span,#settingsPage.mg .pw-prio>span{flex:1;min-width:0}
-#settingsPage.mg .pw-picks{max-height:246px;overflow:auto}
 #settingsPage.mg .pw-pick b,#settingsPage.mg .pw-prio b{display:block;font:600 12.5px/1.4 var(--ui);color:var(--ink)}
 #settingsPage.mg .pw-pick small,#settingsPage.mg .pw-prio small{display:block;margin-top:2px;font:11.5px/1.4 var(--mg-mono);color:var(--grey)}
 #settingsPage.mg .pw-prios{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}

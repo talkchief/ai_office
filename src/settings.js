@@ -53,7 +53,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     <div class="settings-main"><div class="mg-area-head"><div><span class="mg-eyebrow" id="settingsGroup"></span><h1 id="settingsTitle"></h1><p id="settingsIntro"></p></div><div class="mg-area-meta" id="settingsMeta"></div></div><p id="settingsMessage" role="status"></p><div id="settingsContent"></div></div>`;
   document.body.appendChild(page);
   const $ = id => document.getElementById(id), content = $('settingsContent'), main = page.querySelector('.settings-main');
-  let section = null, dirty = false, config = null, tools = [], providers = { models: [] }, draft = null, team = null, teamSection = 'overview', reportDays = 7, pendingNote = null, pendingProject = null, projectTab = 'work', projectArt = { kind: '', q: '' }, toolPoll = null, statusPoll = null, statusTries = 0, metaStatus = '';
+  let section = null, dirty = false, config = null, tools = [], providers = { models: [] }, draft = null, team = null, teamSection = 'overview', reportDays = 7, pendingNote = null, pendingProject = null, projectTab = 'work', projectArt = { kind: '', q: '' }, projectWorkFilter = 'all', toolPoll = null, statusPoll = null, statusTries = 0, metaStatus = '';
 
   /* ---------- feedback: a failure stays on the page and in a toast; a success is a toast ---------- */
   const feedback = (text, error = false, extra = {}) => {
@@ -73,7 +73,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     try {
       const s = await officeSummary(api);
       for (const [id, a] of Object.entries(s.areas)) { const el = page.querySelector(`[data-rail-meta="${id}"]`); if (el) el.innerHTML = `${a.dot ? dot(a.dot) : ''}${a.count != null && a.count !== '' ? `<span>${Number(a.count).toLocaleString()}</span>` : ''}`; }
-      $('settingsRailOffice').innerHTML = `<b>${esc(s.name || 'Your office')}</b>v${esc(s.version || '')} · ${s.ready ? 'models ready' : 'no model ready'}<br>${s.attention.length ? `${dot(s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn')} ${s.attention.length} need${s.attention.length === 1 ? 's' : ''} you` : `${dot('ok')} nothing needs you`}`;
+      $('settingsRailOffice').innerHTML = `<b>${esc(s.name || 'Your office')}</b>${s.ready ? '' : 'no model ready<br>'}${s.attention.length ? `${dot(s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn')} ${s.attention.length} need${s.attention.length === 1 ? 's' : ''} you` : `${dot('ok')} nothing needs you`}`;
     } catch {}
   }
 
@@ -569,6 +569,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   /* ---------- Projects ---------- */
   let projectOpen = null;
   const projectSeen = new Set();
+  let projectKeys = null;
   const dayOf = ms => ms ? new Date(ms).toISOString().slice(0, 10) : '';
   const dateShort = ms => ms ? new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
   const projectMark = p => p.status === 'archived' ? mark('off', 'Archived') : p.status === 'paused' ? mark('off', 'Paused') : p.status === 'done' ? mark('ok', 'Done') : p.milestones?.length && p.milestones.every(m => m.done) ? mark('ok', 'Milestones achieved') : p.next?.dueAt && p.next.dueAt < Date.now() ? mark('warn', 'Milestone overdue') : mark('ok', 'On track');
@@ -577,7 +578,8 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       projectSeen.clear(); projectArt = { kind: '', q: '' };
       const data = await api('/projects');
       if (pendingProject) { const id = pendingProject; pendingProject = null; if (data.projects.some(p => p.id === id)) return editProject(id, data.teams); }
-      const list = data.projects.filter(p => p.status !== 'archived'), archived = data.projects.filter(p => p.status === 'archived');
+      const newest = (a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0);
+      const list = data.projects.filter(p => p.status !== 'archived').sort(newest), archived = data.projects.filter(p => p.status === 'archived').sort(newest);
       setMeta(list.length ? mark(list.some(p => p.next?.dueAt && p.next.dueAt < Date.now()) ? 'warn' : 'ok', `${list.length} open`) : mark('off', 'No projects'));
       content.innerHTML = `<div class="mg-toolbar"><span class="mg-count">${list.length} open · ${archived.length} archived</span><span class="mg-spacer"></span><button id="spaceNewProject" type="button" class="mg-btn mg-btn-primary">+ New project</button></div>
         ${list.length ? `<div class="mg-ledger-wrap"><table class="mg-ledger"><thead><tr><th>Project</th><th>State</th><th>Milestones</th><th>Next</th><th>Tasks</th><th>Teams</th><th>Target</th></tr></thead><tbody>${list.map(p => { const done = p.milestones.filter(m => m.done).length, total = p.milestones.length; return `<tr class="mg-row" data-project="${esc(p.id)}" tabindex="0"><td><span class="mg-name">${esc(p.name)}</span><span class="mg-sub" style="font-family:var(--ui);font-size:12px">${esc(p.description.slice(0, 140))}</span></td><td>${projectMark(p)}</td><td class="k">${total ? `${done} / ${total}` : '—'}</td><td>${p.next ? `${esc(p.next.title)}${p.next.dueAt ? `<span class="mg-sub">${esc(dateShort(p.next.dueAt))}</span>` : ''}` : '<span class="mg-muted">—</span>'}</td><td class="k">${p.done ? `${p.done} done${p.open ? ' · ' : ''}` : ''}${p.open || !p.done ? `${p.open} open` : ''}</td><td><div class="mg-chips">${p.teams.map(t => `<span class="mg-chip mg-chip-ink">${esc(data.teams.find(x => x.id === t)?.name || t)}</span>`).join('') || '<span class="mg-muted">—</span>'}</div></td><td class="k">${p.dueAt ? esc(dateShort(p.dueAt)) : '—'}</td></tr>`; }).join('')}</tbody></table></div>` : empty('No projects yet.', 'Define the first one: what it is for, who owns it, the milestones, and the files the teams should start from.')}
@@ -624,38 +626,132 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     if (!rows.length) return '<p class="mg-sub" style="margin:0">No file matches.</p>';
     return `<div class="mg-ledger-wrap" style="margin:0"><table class="mg-ledger"><tbody>${rows.map(a => `<tr><td>${fileIcon(a.name)} <span class="mg-name">${esc(String(a.name).split('/').pop())}</span><span class="mg-sub">from “${esc(a.taskTitle)}”</span></td><td>${esc(size(a.bytes))}</td><td>${a.modifiedAt ? esc(dateShort(a.modifiedAt)) : ''}</td><td class="r"><a class="mg-btn mg-btn-sm" href="${esc(a.url)}" download>Download</a></td></tr>`).join('')}</tbody></table></div>`;
   };
-  // The Work: every milestone with its tasks under it. A milestone's state and the tasks that count for it follow the same rules
-  // as the board (milestones.mjs), so the two never disagree.
-  const MS_STATE = { done: ['ok', 'Achieved'], blocked: ['fail', 'Blocked'], waiting: ['warn', 'Waits for you'], active: ['busy', 'In progress'], idle: ['off', 'Queued'], unplanned: ['warn', 'To plan'], later: ['off', 'To come'] };
-  const taskMark = state => mark(state === 'done' ? 'ok' : ['blocked', 'escalated', 'failed'].includes(state) ? 'fail' : ['waiting', 'awaiting_ceo'].includes(state) ? 'warn' : ['working', 'planning', 'reviewing', 'saving', 'queued'].includes(state) ? 'busy' : 'off', stateLabel(state));
-  const taskWhen = t => t.dueAt ? 'due ' + dateShort(t.dueAt) : t.doneAt ? dateShort(t.doneAt) : t.createdAt ? dateShort(t.createdAt) : '';
-  const teamsOf = list => [...new Set(list.map(t => t.teamName).filter(Boolean))].join(', ');
-  const taskRow = (t, msId) => `<tr class="pw-task" data-ms-child="${esc(msId)}" data-open-task="${esc(t.id)}" tabindex="0" role="button" title="Open the task">
-    <td><span class="pw-tree" aria-hidden="true"></span><span class="mg-name">${esc(t.title)}</span>${t.resultPreview ? `<span class="mg-sub" style="font-family:var(--ui)">${esc(String(t.resultPreview).slice(0, 110))}</span>` : ''}</td>
-    <td>${taskMark(t.state)}</td><td class="pw-team">${esc(t.teamName || '')}</td><td class="r k">${esc(taskWhen(t))}</td></tr>`;
+  // The Work: the project's execution board. A milestone is a parent row with what it is worth and what state it is in; its tasks
+  // sit under it with their own progress. The shape follows the CEO's design: the figures first, then the tree, then the way in.
+  const PW_ICON = {
+    check: '<svg viewBox="0 0 16 16" class="pw-i" aria-hidden="true"><path d="M3.6 8.4l3 3 5.8-6.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    spin: '<svg viewBox="0 0 16 16" class="pw-i pw-spin" aria-hidden="true"><circle cx="8" cy="8" r="5.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-dasharray="24" stroke-dashoffset="8" stroke-linecap="round"/></svg>',
+    warn: '<svg viewBox="0 0 16 16" class="pw-i" aria-hidden="true"><path d="M8 2.6l5.6 10.2H2.4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6.6v2.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="8" cy="11.4" r=".9" fill="currentColor"/></svg>',
+    clock: '<svg viewBox="0 0 16 16" class="pw-i" aria-hidden="true"><circle cx="8" cy="8" r="5.7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 4.7V8l2.2 1.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    circle: '<svg viewBox="0 0 16 16" class="pw-i" aria-hidden="true"><circle cx="8" cy="8" r="5.4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
+    fork: '<svg viewBox="0 0 16 16" class="pw-i" aria-hidden="true"><path d="M5 4.2v3.4a2 2 0 002 2h3.6M5 4.2v7.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="5" cy="3" r="1.5" fill="currentColor"/><circle cx="11.4" cy="9.6" r="1.5" fill="currentColor"/><circle cx="5" cy="13" r="1.5" fill="currentColor"/></svg>',
+    flag: '<svg viewBox="0 0 16 16" class="pw-i" aria-hidden="true"><path d="M4 14V3.2c2.4-1.2 4.8 1.2 7.2 0V9c-2.4 1.2-4.8-1.2-7.2 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    plus: '<svg viewBox="0 0 16 16" class="pw-i" aria-hidden="true"><path d="M8 3.4v9.2M3.4 8h9.2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>',
+  };
+  // One vocabulary for a milestone and for a task: the office's states, said the way the CEO reads them.
+  const MS_CHIP = { done: ['ok', 'Achieved', 'check'], active: ['busy', 'In progress', 'spin'], waiting: ['warn', 'Waits for you', 'warn'],
+    blocked: ['fail', 'Blocked', 'warn'], idle: ['busy', 'Queued', 'circle'], unplanned: ['warn', 'To plan', 'clock'], later: ['off', 'To come', 'circle'] };
+  const TASK_CHIP = state => state === 'done' ? ['ok', 'Done', 'check']
+    : ['blocked', 'escalated', 'failed'].includes(state) ? ['fail', 'Blocked', 'warn']
+    : ['waiting', 'awaiting_ceo'].includes(state) ? ['warn', 'Waits for you', 'warn']
+    : ['working', 'planning', 'reviewing', 'saving', 'executing', 'awaiting_lead_review'].includes(state) ? ['busy', 'In progress', 'spin']
+    : state === 'queued' ? ['busy', 'Queued', 'circle'] : state === 'cancelled' ? ['off', 'Cancelled', 'circle'] : ['off', 'Idea', 'circle'];
+  const pwChip = ([kind, label, icon]) => `<span class="pw-chip ${kind}">${PW_ICON[icon]}${esc(label)}</span>`;
+  const pwWhen = ms => { if (!ms) return ''; const d = new Date(ms);
+    return `<b>${esc(d.toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' }))}</b><span>${esc(d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }))}</span>`; };
+  const pwTaskPct = t => t.state === 'done' ? 100 : ['cancelled', 'backlog'].includes(t.state) ? 0
+    : t.subtasks?.length ? Math.round(100 * (t.completedSteps || 0) / t.subtasks.length) : ['working', 'reviewing', 'saving'].includes(t.state) ? 50 : 0;
+  const pwTaskProgress = t => t.state === 'done' ? '100% complete' : t.state === 'cancelled' ? 'Closed' : t.state === 'backlog' ? 'Not started'
+    : t.state === 'queued' ? 'Waiting to start' : t.subtasks?.length ? `${pwTaskPct(t)}% complete` : 'Under way';
+  const pwRing = kind => `<span class="pw-ring ${kind}" aria-hidden="true"></span>`;
+
   const projectWork = (detail, teams) => {
-    const p = detail.project, tasks = detail.tasks || [], ms = p.milestones || [];
-    const ready = readyMilestones(ms), readyIds = new Set(ready.map(m => m.id)), first = ready[0] || null, shown = new Set();
-    const groups = ms.map((m, i) => {
-      const own = tasksOf(ms, m, tasks, { first }); own.forEach(t => shown.add(t.id));
-      const state = milestoneState(m, own, readyIds.has(m.id)), [kind, label] = MS_STATE[state] || MS_STATE.later;
-      const done = own.filter(t => t.state === 'done').length, percent = own.length ? Math.round(done / own.length * 100) : m.done ? 100 : 0;
-      return `<tr class="pw-ms ${state}" data-ms="${esc(m.id)}">
-        <td><button type="button" class="pw-x" data-ms-toggle="${esc(m.id)}" aria-expanded="true" aria-label="Show or hide this milestone's tasks">⌄</button><b>Milestone ${i + 1} — ${esc(m.title)}</b><span class="pw-count">${own.length} task${own.length === 1 ? '' : 's'}</span></td>
-        <td><span class="pw-bar" title="${done} of ${own.length} done"><i style="width:${percent}%"></i></span>${mark(kind, label)}</td>
-        <td class="pw-team">${esc(teamsOf(own) || (p.teams || []).map(id => (teams || []).find(x => x.id === id)?.name || id).join(', '))}</td>
-        <td class="r k">${m.dueAt ? esc('due ' + dateShort(m.dueAt)) : ''}</td></tr>`
-        + own.map(t => taskRow(t, m.id)).join('')
-        + `<tr class="pw-add" data-ms-child="${esc(m.id)}"><td colspan="4"><button type="button" class="mg-btn mg-btn-sm" data-add-task="${esc(m.id)}">+ Add a task to this milestone</button></td></tr>`;
-    }).join('');
-    const loose = tasks.filter(t => !shown.has(t.id));
-    const rest = loose.length ? `<tr class="pw-ms later" data-ms="none"><td><button type="button" class="pw-x" data-ms-toggle="none" aria-expanded="true" aria-label="Show or hide">⌄</button><b>Not in a milestone</b><span class="pw-count">${loose.length} task${loose.length === 1 ? '' : 's'}</span></td><td></td><td class="pw-team">${esc(teamsOf(loose))}</td><td></td></tr>` + loose.map(t => taskRow(t, 'none')).join('') : '';
-    return `<div class="mg-card">
-      <div class="mg-card-head"><h3>The work</h3><span class="mg-count">${ms.length} milestone${ms.length === 1 ? '' : 's'} · ${tasks.length} task${tasks.length === 1 ? '' : 's'}</span><span class="mg-spacer"></span><button type="button" class="mg-btn mg-btn-primary mg-btn-sm" data-add-task="">+ New task</button></div>
-      <p class="mg-intro">Every milestone with the tasks that count for it. The Program Manager plans a milestone that has none; add one yourself when you want something specific. Open a task to follow it.</p>
-      ${ms.length || tasks.length ? `<div class="mg-ledger-wrap" style="margin:0"><table class="mg-ledger pw"><thead><tr><th>Task / milestone</th><th>Status</th><th>Team</th><th class="r">When</th></tr></thead><tbody>${groups}${rest}</tbody></table></div>`
-        : '<p class="mg-sub" style="margin:0">No milestones and no tasks yet. Add a milestone in the charter, or a task here.</p>'}
-      </div>` + newTaskModal(detail, teams);
+    const p = detail.project, all = detail.tasks || [], ms = p.milestones || [];
+    const tasks = all.filter(t => t.state !== 'cancelled'), ready = readyMilestones(ms), readyIds = new Set(ready.map(m => m.id)), first = ready[0] || null, seen = new Set();
+    const rows = ms.map((m, i) => {
+      const own = tasksOf(ms, m, tasks, { first }); own.forEach(t => seen.add(t.id));
+      const state = milestoneState(m, own, readyIds.has(m.id)), chip = MS_CHIP[state] || MS_CHIP.later;
+      const done = own.filter(t => t.state === 'done').length, percent = own.length ? Math.round(100 * done / own.length) : m.done ? 100 : 0;
+      return { m, i, own, state, chip, done, percent };
+    });
+    const loose = tasks.filter(t => !seen.has(t.id));
+    const counted = tasks.length, allDone = tasks.filter(t => t.state === 'done').length;
+    const overall = ms.length ? Math.round(100 * rows.reduce((sum, r) => sum + (r.m.done ? 1 : r.own.length ? r.done / r.own.length : 0), 0) / ms.length) : counted ? Math.round(100 * allDone / counted) : 0;
+    const health = { done: rows.filter(r => r.state === 'done').length, risk: rows.filter(r => ['blocked', 'waiting'].includes(r.state)).length, track: rows.filter(r => ['active', 'idle', 'unplanned'].includes(r.state)).length, later: rows.filter(r => r.state === 'later').length };
+    const spread = { done: allDone, going: tasks.filter(t => ['working', 'planning', 'reviewing', 'saving', 'executing', 'awaiting_lead_review', 'queued'].includes(t.state)).length,
+      you: tasks.filter(t => ['waiting', 'awaiting_ceo'].includes(t.state)).length, stuck: tasks.filter(t => ['blocked', 'escalated', 'failed'].includes(t.state)).length };
+    spread.todo = Math.max(0, counted - spread.done - spread.going - spread.you - spread.stuck);
+    const bar = [['done', spread.done], ['going', spread.going], ['you', spread.you], ['stuck', spread.stuck], ['todo', spread.todo]]
+      .filter(([, n]) => n > 0).map(([k, n]) => `<i class="${k}" style="width:${counted ? (100 * n / counted) : 0}%" title="${n}"></i>`).join('');
+    const next = ready.find(m => !m.done) || null;
+    const ring = 100 - overall;
+
+    const group = ({ m, i, own, state, chip, done, percent }) => `<div class="pw-group" data-ms-group="${esc(m.id)}" data-ms-state="${state}">
+      <div class="pw-row pw-ms">
+        <div class="pw-name"><button type="button" class="pw-x" data-ms-toggle="${esc(m.id)}" aria-expanded="true" aria-label="Show or hide the tasks of this milestone"><svg viewBox="0 0 16 16" class="pw-i"><path d="M4 6.2l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        ${pwRing(chip[0])}<span class="pw-title"><b>Milestone ${i + 1} — ${esc(m.title)}</b><span class="pw-kids">${PW_ICON.fork}${own.length}</span></span></div>
+        <div class="pw-progress"><span class="pw-bar ${chip[0]}"><i style="width:${percent}%"></i></span><em>${percent}%</em></div>
+        <div class="pw-status">${pwChip(chip)}</div>
+        <div class="pw-when">${pwWhen(m.doneAt || m.dueAt) || '<b>—</b>'}${m.dueAt && !m.doneAt ? '<span class="pw-due">due</span>' : ''}</div>
+      </div>
+      <div class="pw-kidrows" data-ms-child="${esc(m.id)}">
+        ${own.length ? own.map(t => task(t)).join('') : `<div class="pw-row pw-empty"><div class="pw-name"><span class="pw-tree" aria-hidden="true"></span>${readyIds.has(m.id) ? 'Nothing planned yet — the Program Manager takes this milestone, or add a task yourself.' : 'Nothing planned yet; it waits for the milestone before it.'}</div><div></div><div></div><div></div></div>`}
+        <div class="pw-row pw-addrow"><div class="pw-name"><button type="button" class="pw-add" data-add-task="${esc(m.id)}">${PW_ICON.plus}Add a task to this milestone</button></div><div></div><div></div><div></div></div>
+      </div></div>`;
+    const task = t => { const c = TASK_CHIP(t.state); return `<div class="pw-row pw-task" data-open-task="${esc(t.id)}" role="button" tabindex="0" title="Open this task">
+      <div class="pw-name"><span class="pw-tree" aria-hidden="true"></span>${pwRing(c[0])}<span class="pw-tt">${esc(t.title)}${t.teamName ? `<span class="pw-team">${esc(t.teamName)}</span>` : ''}</span></div>
+      <div class="pw-progress pw-progress-task ${c[0]}">${esc(pwTaskProgress(t))}</div>
+      <div class="pw-status">${pwChip(c)}</div>
+      <div class="pw-when">${pwWhen(t.doneAt || t.dueAt || t.createdAt)}</div></div>`; };
+
+    return `<section class="pw">
+      <div class="pw-head">
+        <div class="pw-head-text"><h3>${PW_ICON.flag}Project execution &amp; milestones</h3><p>Every milestone, what it is worth, and the tasks under it. Open a task to follow it.</p></div>
+        <div class="pw-head-actions">
+          <div class="pw-seg" role="group" aria-label="Which milestones">${[['all', 'All milestones'], ['open', 'In progress'], ['stuck', 'Needs attention']].map(([id, label]) => `<button type="button" data-pw-filter="${id}" aria-pressed="${projectWorkFilter === id}">${label}</button>`).join('')}</div>
+          <button type="button" class="mg-btn mg-btn-sm" id="spaceNewMilestone">${PW_ICON.plus}New milestone</button>
+          <button type="button" class="mg-btn mg-btn-primary mg-btn-sm" data-add-task="">${PW_ICON.plus}New task</button>
+        </div>
+      </div>
+      <div class="pw-kpis">
+        <div class="pw-kpi">
+          <div class="pw-kpi-top"><div><span class="mg-eyebrow">Overall completion</span><div class="pw-big">${overall}%</div></div>
+            <svg class="pw-dial" viewBox="0 0 36 36" aria-hidden="true"><circle class="pw-dial-bg" cx="18" cy="18" r="15.9" fill="none" stroke-width="3.4"/><circle class="pw-dial-fg" cx="18" cy="18" r="15.9" fill="none" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="${overall} ${ring}" transform="rotate(-90 18 18)"/></svg></div>
+          <div class="pw-kpi-foot"><span>${PW_ICON.check}${allDone} of ${counted} task${counted === 1 ? '' : 's'} done</span><span>${PW_ICON.flag}${ms.length} milestone${ms.length === 1 ? '' : 's'}</span></div>
+        </div>
+        <div class="pw-kpi pw-kpi-wide">
+          <div class="pw-kpi-head"><span class="mg-eyebrow">Milestone health</span><span class="pw-kpi-note">${ms.length} tracked</span></div>
+          <div class="pw-tiles">
+            <div class="pw-tile ok"><span>Achieved</span><b>${health.done}</b></div>
+            <div class="pw-tile busy"><span>Under way</span><b>${health.track}</b></div>
+            <div class="pw-tile ${health.risk ? 'fail' : 'off'}"><span>Needs attention</span><b>${health.risk}</b></div>
+          </div>
+          <div class="pw-spread"><div class="pw-spread-head"><span>Task distribution</span><em>${spread.done} done · ${spread.going} under way · ${spread.you} for you · ${spread.stuck} blocked · ${spread.todo} to come</em></div><div class="pw-spread-bar">${bar || '<i class="todo" style="width:100%"></i>'}</div></div>
+        </div>
+        <div class="pw-kpi">
+          <div class="pw-kpi-head"><span class="mg-eyebrow">Cadence</span></div>
+          <dl class="pw-facts">
+            <div><dt>Target</dt><dd>${p.dueAt ? esc(dateShort(p.dueAt)) : 'not set'}</dd></div>
+            <div><dt>Next milestone</dt><dd>${next ? esc(next.title.slice(0, 38)) : 'all achieved'}</dd></div>
+            <div><dt>Teams on it</dt><dd>${esc([...new Set(tasks.map(t => t.teamName).filter(Boolean))].join(', ') || 'none yet')}</dd></div>
+          </dl>
+        </div>
+      </div>
+      <div class="pw-table">
+        <div class="pw-row pw-headrow"><div class="pw-name"><button type="button" class="pw-x" id="spacePwFold" aria-expanded="true" aria-label="Fold every milestone"><svg viewBox="0 0 16 16" class="pw-i"><path d="M4 6.2l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>Task / milestone</div><div class="pw-progress">Progress</div><div class="pw-status">Status</div><div class="pw-when">When</div></div>
+        ${rows.map(group).join('')}
+        ${loose.length ? `<div class="pw-group" data-ms-group="none" data-ms-state="later"><div class="pw-row pw-ms"><div class="pw-name"><button type="button" class="pw-x" data-ms-toggle="none" aria-expanded="true" aria-label="Show or hide"><svg viewBox="0 0 16 16" class="pw-i"><path d="M4 6.2l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>${pwRing('off')}<span class="pw-title"><b>Not in a milestone</b><span class="pw-kids">${PW_ICON.fork}${loose.length}</span></span></div><div class="pw-progress"></div><div class="pw-status"></div><div class="pw-when"></div></div><div class="pw-kidrows" data-ms-child="none">${loose.map(t => task(t)).join('')}</div></div>` : ''}
+        ${!ms.length && !tasks.length ? '<div class="pw-row pw-empty"><div class="pw-name">No milestones and no tasks yet. Add a milestone, or a task.</div><div></div><div></div><div></div></div>' : ''}
+        <div class="pw-foot">
+          <div class="pw-foot-actions"><button type="button" class="pw-link" data-add-task="">${PW_ICON.plus}Add task</button><span class="pw-sep"></span><button type="button" class="pw-link" id="spaceNewMilestone2">${PW_ICON.plus}Add milestone</button></div>
+          <div class="pw-keys"><span><kbd>c</kbd> new task</span><span><kbd>m</kbd> new milestone</span></div>
+        </div>
+      </div>
+    </section>` + newTaskModal(detail, teams) + newMilestoneModal(detail);
+  };
+  // A milestone the CEO adds here: its name, when it is due, and whether it waits for the one before it.
+  const newMilestoneModal = detail => {
+    const ms = detail.project.milestones || [];
+    return `<div class="mg-modal" id="spaceMilestoneModal" hidden role="dialog" aria-modal="true" aria-label="New milestone"><div class="mg-modal-box pw-modal">
+      <div class="mg-modal-head"><h3>New milestone</h3><button type="button" class="mg-modal-x" data-ms-close aria-label="Close">✕</button></div>
+      <form id="spaceNewMilestoneForm" class="pw-form">
+        ${field('What is true when it is reached', '<input name="title" required maxlength="160" placeholder="A state of the world, not an activity">')}
+        <div class="mg-grid">
+          ${field('Due', '<input type="date" name="dueAt">')}
+          ${field('Waits for', `<select name="after"><option value="">The milestone before it</option><option value="none">Nothing — it can start at once</option>${ms.map((m, i) => `<option value="${esc(m.id)}">${i + 1}. ${esc(m.title.slice(0, 48))}</option>`).join('')}</select>`)}
+        </div>
+        <div class="mg-savebar"><span class="mg-savemsg" id="spaceNewMsHint">The Program Manager plans it and starts the work when its turn comes.</span><span class="mg-spacer"></span><button type="button" class="mg-btn" data-ms-close>Cancel</button><button type="submit" class="mg-btn mg-btn-primary">Add milestone</button></div>
+      </form></div></div>`;
   };
   // Adding a task: the title, which milestone it belongs to, who does it, how it is ranked, and when it is due.
   const newTaskModal = (detail, teams) => {
@@ -793,11 +889,59 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       if (p.id) {
         $('spaceProjectStatus').onchange = async event => { try { await api(`/projects/${p.id}/status`, 'POST', { status: event.target.value }); toast(`Project is now ${event.target.value}`, { kind: 'ok' }); dropSummary(); await editProject(p.id, teams); } catch (error) { feedback(error.message, true); } };
         $('spaceProjectUpload').onclick = async () => { const files = [...($('spaceProjectFiles').files || [])]; if (!files.length) return feedback('Choose a file first.', true); try { for (const file of files) { if (file.size > 25 * 1024 * 1024) throw new Error(`${file.name} is larger than 25 MB.`); toast(`Adding ${file.name}…`, { kind: 'info', ms: 2500 }); await api(`/projects/${p.id}/upload`, 'POST', { name: file.name, data: await readFile(file) }); } toast(`${files.length} file${files.length === 1 ? '' : 's'} added to the project`, { kind: 'ok' }); await editProject(p.id, teams); } catch (error) { feedback(error.message, true); } };
+        const taskModal = $('spaceTaskModal');
+        // Which milestones are shown, and folding them all at once.
+        const applyWorkFilter = () => content.querySelectorAll('[data-ms-group]').forEach(g => {
+          const state = g.dataset.msState;
+          g.hidden = projectWorkFilter === 'open' ? !['active', 'idle', 'unplanned'].includes(state) : projectWorkFilter === 'stuck' ? !['blocked', 'waiting'].includes(state) : false;
+        });
+        applyWorkFilter();
+        content.querySelectorAll('[data-pw-filter]').forEach(b => b.onclick = () => {
+          projectWorkFilter = b.dataset.pwFilter;
+          content.querySelectorAll('[data-pw-filter]').forEach(x => x.setAttribute('aria-pressed', x.dataset.pwFilter === projectWorkFilter));
+          applyWorkFilter();
+        });
+        if ($('spacePwFold')) $('spacePwFold').onclick = () => {
+          const open = $('spacePwFold').getAttribute('aria-expanded') !== 'true';
+          $('spacePwFold').setAttribute('aria-expanded', String(open));
+          content.querySelectorAll('[data-ms-toggle]').forEach(b => { b.setAttribute('aria-expanded', String(open)); foldMilestone(b.dataset.msToggle, open); });
+        };
+        // A milestone the CEO adds here goes onto the project with the rest.
+        const msModal = $('spaceMilestoneModal'), closeMsModal = () => { if (msModal) { msModal.hidden = true; $('spaceNewMilestoneForm')?.reset(); } };
+        const openMsModal = () => { if (!msModal) return; msModal.hidden = false; msModal.querySelector('[name=title]').focus(); };
+        if ($('spaceNewMilestone')) $('spaceNewMilestone').onclick = openMsModal;
+        if ($('spaceNewMilestone2')) $('spaceNewMilestone2').onclick = openMsModal;
+        if (msModal) {
+          msModal.onclick = event => { if (event.target === msModal || event.target.closest('[data-ms-close]')) closeMsModal(); };
+          msModal.onkeydown = event => { if (event.key === 'Escape') closeMsModal(); };
+          $('spaceNewMilestoneForm').onsubmit = async event => {
+            event.preventDefault();
+            const f = event.target.elements, title = f.title.value.trim(); if (!title) return;
+            const after = f.after.value === 'none' ? [] : f.after.value ? [f.after.value] : undefined;
+            const button = event.target.querySelector('button[type=submit]'); button.disabled = true; $('spaceNewMsHint').textContent = 'Adding…';
+            try {
+              const kept = (detail.project.milestones || []).map(m => ({ id: m.id, title: m.title, dueAt: m.dueAt, done: !!m.done, ...(Array.isArray(m.after) ? { after: m.after } : {}) }));
+              await api(`/projects/${p.id}`, 'PUT', { ...detail.project, milestones: [...kept, { title, dueAt: f.dueAt.value || null, done: false, ...(after ? { after } : {}) }] });
+              closeMsModal(); toast('Milestone added', { kind: 'ok', detail: 'The Program Manager plans it when its turn comes.' });
+              await editProject(p.id, teams);
+            } catch (error) { button.disabled = false; $('spaceNewMsHint').textContent = ''; feedback(error.message, true); }
+          };
+        }
+        // c for a task, m for a milestone, while the work page is open and nothing is being typed into.
+        if (projectKeys) document.removeEventListener('keydown', projectKeys);
+        projectKeys = event => {
+          if (projectTab !== 'tasks' || page.hidden || event.metaKey || event.ctrlKey || event.altKey) return;
+          const on = event.target instanceof Element ? event.target : null;
+          if (on && on.closest('input, textarea, select, [contenteditable], button')) return;
+          if (!taskModal?.hidden || !msModal?.hidden) return;
+          if (event.key === 'c') { event.preventDefault(); content.querySelector('[data-add-task]')?.click(); }
+          if (event.key === 'm') { event.preventDefault(); openMsModal(); }
+        };
+        document.addEventListener('keydown', projectKeys);
         // A milestone folds its tasks away; the rows under it carry its id.
         const foldMilestone = (id, open) => content.querySelectorAll(`[data-ms-child="${CSS.escape(id)}"]`).forEach(row => { row.hidden = !open; });
         content.querySelectorAll('[data-ms-toggle]').forEach(b => b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); foldMilestone(b.dataset.msToggle, open); });
         // Adding a task: the dialog opens on the milestone the CEO pressed.
-        const taskModal = $('spaceTaskModal');
         const closeTaskModal = () => { if (taskModal) { taskModal.hidden = true; $('spaceNewTask')?.reset(); } };
         content.querySelectorAll('[data-add-task]').forEach(b => b.onclick = () => {
           if (!taskModal) return;
