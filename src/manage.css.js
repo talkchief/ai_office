@@ -303,6 +303,9 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #settingsPage.mg .mg-doc{background:var(--mg-card);border:1px solid var(--hairline);border-radius:12px;padding:28px 32px;max-width:820px}
 
 /* ---- the project list: one row per project, what it is worth and who owns it ---- */
+#settingsPage.mg .mg-goback{border:1px solid var(--mg-line2);background:var(--mg-card);color:var(--ink);font:600 12px var(--ui);padding:8px 14px;border-radius:9px}
+#settingsPage.mg .mg-goback:hover{background:var(--mg-hover);border-color:var(--ink)}
+#settingsPage.mg .mg-goback:focus-visible{outline:2px solid var(--mg-busy);outline-offset:2px}
 #settingsPage.mg .pl-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px}
 #settingsPage.mg .pl-tabs{display:inline-flex;padding:3px;border:1px solid var(--hairline);border-radius:10px;background:var(--mg-card)}
 #settingsPage.mg .pl-tabs button{border:0;background:transparent;border-radius:7px;padding:6px 12px;font:500 12px var(--ui);color:var(--grey);cursor:pointer;height:auto;display:inline-flex;align-items:center;gap:6px}

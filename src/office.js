@@ -81,7 +81,7 @@ export function initOfficeWork(ctx) {
           <div class="pm-box">
             <textarea name="text" rows="4" required placeholder="Describe what spans teams, needs a decision, or has to be coordinated…"></textarea>
             <div class="pm-bar">
-              <label class="pm-attach" title="Attach documents the teams should read"><input type="file" id="spacePmFiles" multiple accept=".pdf,.docx,.txt,.md,.csv">Attach</label>
+              <label class="pm-attach" title="Attach documents the teams should read"><input type="file" id="spacePmFiles" multiple accept=".pdf,.docx,.txt,.md,.csv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.1 12.3 19.8a5 5 0 0 1-7.1-7.1l8.7-8.7a3.3 3.3 0 0 1 4.7 4.7l-8.7 8.7a1.7 1.7 0 0 1-2.4-2.4l8-8"/></svg>Attach</label>
               <span class="pm-files" id="spacePmFileNote"></span>
               <span class="pm-sp"></span>
               <kbd class="pm-kbd">⌘ Enter</kbd>

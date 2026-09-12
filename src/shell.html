@@ -962,7 +962,7 @@
 body.dark .b-gear:hover, body.dark .mh-gear:hover { background:rgba(255,255,255,.08); }
 
 /* A state, said in colour: the same five everywhere the office reports one. */
-.st { display:inline; font-weight:600; }
+.space-agent-task .st, .space-note .st, .st { display:inline; font-weight:600; }
 .st-ok { color:#1E7A55; } .st-busy { color:#2A6DB5; } .st-warn { color:#8F6407; } .st-fail { color:#B2382C; } .st-off { color:var(--grey); }
 body.dark .st-ok { color:#5CC292; } body.dark .st-busy { color:#7FB3F0; } body.dark .st-warn { color:#E4B75B; } body.dark .st-fail { color:#F0857A; }
 #rail .mh-state[data-phase=working] { color:#2A6DB5; border-color:rgba(42,109,181,.45); }
@@ -983,7 +983,8 @@ body.dark #rail .mh-state[data-phase=working] { color:#7FB3F0; } body.dark #rail
 #spaceDialog[data-view=projects]>header { padding:0; height:0; overflow:visible; }
 #spaceDialog[data-view=projects] #spaceTitle { display:none; }
 #spaceDialog[data-view=projects] #spaceClose { position:absolute; top:14px; right:16px; z-index:4; width:30px; height:30px; border-radius:50%; display:grid; place-items:center; color:var(--grey); }
-#spaceDialog[data-view=projects] #spaceContent { padding:0; }
+#spaceDialog[data-view=projects] #spaceContent { padding:0; scrollbar-width:none; }
+#spaceDialog[data-view=projects] #spaceContent::-webkit-scrollbar { width:0; height:0; }
 .pm { display:flex; flex-direction:column; }
 .pm-head { padding:26px 30px 20px; border-bottom:1px solid var(--hairline); }
 .pm-head h2 { margin:0; font:400 27px/1.2 var(--serif); color:var(--ink); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
@@ -993,12 +994,12 @@ body.dark #rail .mh-state[data-phase=working] { color:#7FB3F0; } body.dark #rail
 .pm-label { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin:0 0 9px; font:600 12.5px var(--ui); color:var(--ink); }
 .pm-label em { font:11px ui-monospace, Menlo, Consolas, monospace; font-style:normal; color:var(--grey); }
 .pm-box { border:1px solid var(--hairline); border-radius:14px; background:var(--cream); overflow:hidden; }
-.pm-box textarea { display:block; width:100%; border:0; background:transparent; padding:15px 16px; font:13px/1.6 var(--ui); color:var(--ink); resize:vertical; min-height:96px; }
+#spaceDialog .pm-box textarea, .pm-box textarea { display:block; width:100%; border:0; border-radius:0; background:transparent; padding:15px 16px; font:13px/1.6 var(--ui); color:var(--ink); resize:vertical; min-height:96px; box-shadow:none; }
 .pm-box textarea:focus { outline:none; }
 .pm-bar { display:flex; align-items:center; gap:10px; padding:9px 12px; border-top:1px solid var(--hairline); background:color-mix(in srgb,var(--ink) 2%,transparent); }
 .pm-sp { flex:1; }
 .pm-attach { display:inline-flex; align-items:center; gap:6px; font:500 11.5px var(--ui); color:var(--grey); cursor:pointer; }
-.pm-attach::before { content:"📎"; font-size:11px; }
+.pm-attach svg { width:13px; height:13px; }
 .pm-attach:hover { color:var(--ink); }
 .pm-attach input { position:absolute; width:1px; height:1px; opacity:0; }
 .pm-files { font:11px ui-monospace, Menlo, Consolas, monospace; color:var(--grey); }
@@ -1915,7 +1916,7 @@ body.dark #settingsPage .secondary { background: transparent; color: var(--ink);
         <div class="mh-name"></div>
         <div class="mh-role"></div>
       </div>
-      <button type="button" id="railAgentManage" class="mh-gear" title="Open this person in Manage" aria-label="Open this person in Manage"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="2.3"/><path d="M8 1.6v1.7M8 12.7v1.7M14.4 8h-1.7M3.3 8H1.6M12.5 3.5l-1.2 1.2M4.7 11.3l-1.2 1.2M12.5 12.5l-1.2-1.2M4.7 4.7L3.5 3.5"/></svg></button>
+      <button type="button" id="railAgentManage" class="mh-gear" title="Open this person in Manage" aria-label="Open this person in Manage"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M19.2 14.8a1.5 1.5 0 0 0 .3 1.65l.05.06a1.82 1.82 0 1 1-2.58 2.58l-.05-.06a1.5 1.5 0 0 0-2.55 1.06v.16a1.82 1.82 0 0 1-3.64 0v-.08a1.5 1.5 0 0 0-2.6-1.03l-.6.06a1.82 1.82 0 1 1-2.58-2.58l.06-.06a1.5 1.5 0 0 0-1.06-2.55h-.16a1.82 1.82 0 0 1 0-3.64h.08a1.5 1.5 0 0 0 1.03-2.6l-.06-.06a1.82 1.82 0 1 1 2.58-2.58l.6.06a1.5 1.5 0 0 0 2.55-1.06v-.16a1.82 1.82 0 0 1 3.64 0v.08a1.5 1.5 0 0 0 2.6 1.03l.06-.06a1.82 1.82 0 1 1 2.58 2.58l-.6.06a1.5 1.5 0 0 0 1.06 2.55h.16a1.82 1.82 0 0 1 0 3.64h-.08a1.5 1.5 0 0 0-1.37.91Z"/></svg></button>
     </div>
     <div class="mh-tag"></div>
     <div id="mNowCard" class="now-card" hidden></div>
