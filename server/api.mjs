@@ -11,7 +11,7 @@ import { officeReport, kpis } from '../reporting.mjs';
 import { collectArtifacts, filterArtifacts, ARTIFACT_KINDS } from './artifacts.mjs';
 import { extractDocument } from '../documents.mjs';
 import { ATTACHMENT_MAX_ENCODED } from '../channels/channel.mjs';
-import { planProject, applyPlan, loadPlanningSkills, loadCatalogueMethods, startNextMilestone } from '../project-planner.mjs';
+import { planProjectFrom, startNextMilestone } from '../project-planner.mjs';
 import { ROOT } from '../config.mjs';
 import { registerProviderRoutes } from './providers-api.mjs';
 import { canSeeJob, canSeeProject, canShare, visibleJobs, requireRole, isAdmin, notificationVisible, sseFilter, INVISIBLE } from './visibility.mjs';
@@ -191,14 +191,10 @@ export function registerApi(router, ctx) {
     const input = await body(req, ATTACHMENT_MAX_ENCODED * 10), brief = String(input.text || '').trim();
     if (brief.length < 10) throw httpError('Say what the project should build or achieve, in a sentence or two at least.', 400);
     const documents = []; for (const f of (Array.isArray(input.files) ? input.files : []).slice(0, 10)) documents.push(await extractDocument({ name: f.name, data: f.data }));
-    const skills = loadPlanningSkills({ dirs: [engine.pmSkillsDir || path.join(ROOT, 'agency', 'pm-skills'), path.join(engine.knowledgeDir, 'Agents Office', 'pm-skills')] });
-    const catalogue = loadCatalogueMethods({ agency: ctx.agency, brief });
-    const plan = await planProject({ brief, documents: documents.map(d => ({ name: d.name, content: d.content })), skills, catalogue, office: office.get(), models });
-    const { project: p, tasks } = applyPlan({ plan, projects, engine, ownerId: user?.id || null, audience: audience(user, input) });
-    for (const doc of documents) { try { await knowledge.upload({ folder: projects.folder(p), name: doc.name, content: doc.content }); } catch (error) { console.warn('project document:', error.message); } }
-    record({ area: 'projects', summary: `The Program Manager planned project “${p.name}”: ${p.milestones.length} milestone${p.milestones.length === 1 ? '' : 's'}, ${tasks.length} task${tasks.length === 1 ? '' : 's'}; methods read: ${[...skills.map(s => s.name), ...catalogue.map(s => s.name)].join(', ') || 'none'}` });
+    const { project: p, tasks, methods } = await planProjectFrom({ brief, documents, office, models, projects, engine, knowledge, agency: ctx.agency, ownerId: user?.id || null, audience: audience(user, input), root: ROOT, log: line => console.warn(line) });
+    record({ area: 'projects', summary: `The Program Manager planned project “${p.name}”: ${p.milestones.length} milestone${p.milestones.length === 1 ? '' : 's'}, ${tasks.length} task${tasks.length === 1 ? '' : 's'}; methods read: ${[...methods.builtIn, ...methods.catalogue].join(', ') || 'none'}` });
     ctx.syncProject?.(p.id); bus.publish('office.updated', { area: 'projects' });
-    return { project: projectOut(p, user), tasks: tasks.map(t => ({ id: t.id, title: t.title, state: t.state, milestoneId: t.milestoneId })), milestones: p.milestones.length, methods: { builtIn: skills.map(s => s.name), catalogue: catalogue.map(s => s.name) } };
+    return { project: projectOut(p, user), tasks: tasks.map(t => ({ id: t.id, title: t.title, state: t.state, milestoneId: t.milestoneId })), milestones: p.milestones.length, methods };
   });
   // The project page: its tasks, the files uploaded to its Brain folder, and every artifact its tasks produced, newest first.
   router.on('GET', '/api/projects/:id', ({ params, user }) => {

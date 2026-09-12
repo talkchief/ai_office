@@ -66,11 +66,55 @@ export function createIntake({ accounts, registry, mail = { mailer: null, domain
     return runContext({ user: viewer, tenantId, instance }, () => jobId ? onThread(instance, tenant, viewer, jobId, m) : fresh(instance, tenant, viewer, m));
   }
 
+  // "Project: <name>" with a name the office does not know yet: the Program Manager plans the whole project from the
+  // body and the attachments, exactly as the Projects form does. A short brief, no model or a refusal is answered on
+  // the thread rather than dropped, because the sender is waiting for something.
+  async function planProjectByMail(instance, tenant, viewer, m, { name, text, good, skipped }) {
+    const { projects, engine, knowledge, models, office } = instance;
+    const brief = [name, text].filter(Boolean).join('\n\n');
+    const say = body => sendOnThread(instance, tenant, viewer, null, { to: m.from.address, subject: `Re: ${m.subject || name}`, text: body, inReplyTo: m.messageId, references: m.references });
+    if (brief.trim().length < 10) { await say(`Say what “${name}” should build or achieve, in a sentence or two at least, and send it again.`); return { outcome: 'refused', reason: 'project brief too short' }; }
+    if (!models.ready()) { await say(`“${name}” cannot be planned yet: the office has no model ready. Send it again once the platform has one.`); return { outcome: 'refused', reason: 'no model ready' }; }
+    const documents = [];
+    for (const f of good.slice(0, 10)) {
+      try { documents.push(await extractDocument({ name: f.name, data: f.bytes.toString('base64') })); }
+      catch (error) { log(`  mail: could not read ${f.name} for the project: ${error.message}`); }
+    }
+    let planned;
+    try { planned = await planProjectFrom({ brief, documents, office, models, projects, engine, knowledge, agency: instance.agency, ownerId: viewer.id, audience: { visibility: 'private' }, root: ROOT, log }); }
+    catch (error) { await say(`The office could not plan “${name}”: ${error.message}`); return { outcome: 'refused', reason: error.message }; }
+    const p = planned.project;
+    instance.syncProject?.(p.id);
+    if (m.messageId) accounts.recordMailMessage({ tenantId: tenant.id, jobId: null, direction: 'in', messageId: m.messageId, providerId: m.providerMessageId });
+    instance.audit.record({ area: 'mail', actor: viewer.email, summary: `Planned project “${p.name}” from an email by ${m.from.address}: ${p.milestones.length} milestone${p.milestones.length === 1 ? '' : 's'}, ${planned.tasks.length} task${planned.tasks.length === 1 ? '' : 's'}` });
+    await say([`Planned. “${p.name}” is on the board.`,
+      p.purpose ? `Purpose: ${p.purpose}` : '',
+      p.milestones.length ? `Milestones: ${p.milestones.map(ms => ms.title).join(', ')}` : '',
+      planned.tasks.length ? `Starting with: ${planned.tasks.map(t => t.title).join('; ')}` : '',
+      `Open it under Projects: ${publicOrigin()}/#/settings/projects`,
+      receivedFiles(documents.map(d => d.name), skipped)].filter(Boolean).join('\n\n'));
+    return { outcome: 'project', projectId: p.id };
+  }
+
   async function fresh(instance, tenant, viewer, m) {
     const text = bodyText(m), title = cleanSubject(m.subject), { engine, knowledge } = instance;
     const files = (m.attachments || []).map(a => ({ ...a, name: safeFileName(a.name) || String(a.name || 'file'), problem: attachmentProblem(a) }));
     const good = files.filter(f => !f.problem), skipped = files.filter(f => f.problem);
     if (!text && !good.length) return drop(m, 'empty message');
+    // "Project: <name>" in the subject: work for a project the office already has, or a new one to plan. The name must
+    // match a project exactly (case aside); anything else is a new project, and the receipt says which happened.
+    const asProject = /^project\s*:\s*(.+)$/i.exec(title);
+    let project = null;
+    if (asProject) {
+      const wanted = asProject[1].trim();
+      project = instance.projects.list().find(p => String(p.name).trim().toLowerCase() === wanted.toLowerCase()) || null;
+      if (project?.status === 'archived') {
+        await sendOnThread(instance, tenant, viewer, null, { to: m.from.address, subject: `Re: ${m.subject || wanted}`, inReplyTo: m.messageId, references: m.references,
+          text: `“${project.name}” is archived, so it takes no new work. Reopen it under Settings → Projects and send this again.` });
+        return { outcome: 'refused', reason: 'project archived' };
+      }
+      if (!project) return planProjectByMail(instance, tenant, viewer, m, { name: wanted, text, good, skipped });
+    }
     // A plain question with nothing attached: the Program Manager answers from the Brain on the same thread, no task.
     if (text && isQuestion(text) && !good.length && text.length < 1200) {
       let answer; try { answer = (await instance.chat({ agent: 'pm', text, channel: 'email' }, viewer)).reply; } catch (error) { answer = `The office could not answer right now: ${error.message}`; }
@@ -80,7 +124,9 @@ export function createIntake({ accounts, registry, mail = { mailer: null, domain
     }
     const long = text.length > 12000, ready = instance.models.ready();
     const brief = long ? text.slice(0, 11000) + '\n\n(The message is long: the whole of it is attached as /work/inbox/message.md.)' : text || `Files received by email from ${m.from.address}: ${good.map(f => f.name).join(', ')}. Read them under /work/inbox/ and do what they ask.`;
-    const job = engine.create({ dept: 'auto', depts: 'auto', text: brief, title, ownerId: viewer.id, visibility: 'private', autoStart: false, backlog: !ready, origin: { channel: 'email', from: m.from.address, messageId: m.messageId || undefined, subject: String(m.subject || '').slice(0, 200) } });
+    // Added to a project the subject names the project, so the work takes its title from the message itself.
+    const workTitle = project ? (text.split('\n').map(s => s.trim()).find(Boolean) || `Work for ${project.name}`).slice(0, 100) : title;
+    const job = engine.create({ dept: 'auto', depts: 'auto', text: brief, title: workTitle, projectId: project?.id || null, ownerId: viewer.id, visibility: 'private', autoStart: false, backlog: !ready, origin: { channel: 'email', from: m.from.address, messageId: m.messageId || undefined, subject: String(m.subject || '').slice(0, 200) } });
     if (long) good.unshift({ name: 'message.md', contentType: 'text/markdown', bytes: Buffer.from(`# ${title}\n\nFrom: ${m.from.address}\n\n${text}\n`) });
     const attached = good.length ? engine.attach(job.id, good).attachments.map(a => a.name) : [];
     // Documents the Brain can read are filed under the member's inbox folder too, so every agent can search them.
@@ -93,7 +139,7 @@ export function createIntake({ accounts, registry, mail = { mailer: null, domain
     if (ready) engine.pump();
     instance.audit.record({ area: 'mail', actor: viewer.email, summary: `Task “${job.title}” created from an email by ${m.from.address}${attached.length ? ` with ${attached.length} file${attached.length === 1 ? '' : 's'}` : ''}` });
     await sendOnThread(instance, tenant, viewer, job.id, { to: m.from.address, subject: `Re: ${m.subject || title} [AO-${tagOf(job.id)}]`, inReplyTo: m.messageId, references: m.references,
-      text: [`Received. ${ready ? 'The Program Manager is on it and will bring in the right team.' : 'It is saved as an idea: the office has no model ready yet, so it starts once the platform has one.'}`, `Task: ${job.title}`, `Follow it here: ${link(job.id)}`, receivedFiles(attached, skipped)].filter(Boolean).join('\n\n') });
+      text: [`Received. ${ready ? 'The Program Manager is on it and will bring in the right team.' : 'It is saved as an idea: the office has no model ready yet, so it starts once the platform has one.'}`, `Task: ${job.title}${job.projectName ? ` — in project “${job.projectName}”` : ''}`, `Follow it here: ${link(job.id)}`, receivedFiles(attached, skipped)].filter(Boolean).join('\n\n') });
     return { outcome: 'task', jobId: job.id };
   }
 
@@ -121,10 +167,18 @@ export function createIntake({ accounts, registry, mail = { mailer: null, domain
   const addressFor = job => job.origin?.channel === 'email' && job.origin.from ? job.origin.from : accounts.user(job.ownerId)?.email;
   async function mailResult(instance, job) {
     const tenant = accounts.tenant(instance.tenant.id), viewer = viewerOf(tenant.id, job.ownerId); if (!viewer) return;
-    const dir = instance.engine.workspaceDir(job.id), pdf = listWorkspaceFiles(dir).filter(f => /\.pdf$/i.test(f.name) && !f.name.startsWith('inbox/')).sort((a, b) => (b.modifiedAt || 0) - (a.modifiedAt || 0))[0];
-    const attachments = pdf ? [{ name: path.basename(pdf.name), contentType: 'application/pdf', bytes: fs.readFileSync(path.join(dir, pdf.name)) }] : job.result ? [{ name: 'result.md', contentType: 'text/markdown', bytes: Buffer.from(String(job.result)) }] : [];
+    // The exports the task actually produced ride back with the mail. A report and a deck are both deliverables, and only
+    // export_pdf and export_pptx write these formats, so nothing from the scratch workspace comes along by accident; the
+    // Mailer drops anything past its cap rather than failing the send.
+    const dir = instance.engine.workspaceDir(job.id);
+    const EXPORTS = { '.pdf': 'application/pdf', '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation' };
+    const made = listWorkspaceFiles(dir).filter(f => EXPORTS[path.extname(f.name).toLowerCase()] && !f.name.startsWith('inbox/'))
+      .sort((a, b) => (b.modifiedAt || 0) - (a.modifiedAt || 0)).slice(0, 3);
+    const attachments = made.length
+      ? made.map(f => ({ name: path.basename(f.name), contentType: EXPORTS[path.extname(f.name).toLowerCase()], bytes: fs.readFileSync(path.join(dir, f.name)) }))
+      : job.result ? [{ name: 'result.md', contentType: 'text/markdown', bytes: Buffer.from(String(job.result)) }] : [];
     const summary = job.resultVersions?.at(-1)?.summary || job.review?.summary || '';
-    await sendOnThread(instance, tenant, viewer, job.id, { to: addressFor(job), subject: `Done: ${job.title} [AO-${tagOf(job.id)}]`, inReplyTo: job.origin?.messageId || null, attachments, text: [summary, `The full result is in the office: ${link(job.id)}`, attachments.length ? `Attached: ${attachments[0].name}.` : ''].filter(Boolean).join('\n\n') });
+    await sendOnThread(instance, tenant, viewer, job.id, { to: addressFor(job), subject: `Done: ${job.title} [AO-${tagOf(job.id)}]`, inReplyTo: job.origin?.messageId || null, attachments, text: [summary, `The full result is in the office: ${link(job.id)}`, attachments.length ? `Attached: ${attachments.map(a => a.name).join(', ')}.` : ''].filter(Boolean).join('\n\n') });
   }
   async function mailNotice(instance, job, item) {
     const tenant = accounts.tenant(instance.tenant.id), viewer = viewerOf(tenant.id, job.ownerId); if (!viewer) return;

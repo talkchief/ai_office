@@ -98,3 +98,41 @@ test('mail becomes work: a verified sender gets a task with its file and a threa
     assert.match(result.subject, /^Done: Draft the spring launch brief \[AO-/); assert.match(result.text, /The brief is ready\./); assert.deepEqual(result.attachments.map(a => a.name), ['result.md']); assert.equal(result.to[0], 'dana@acme.test');
   } finally { await registry.closeAll(); accounts.close(); fs.rmSync(root, { recursive: true, force: true, maxRetries: 5 }); }
 });
+
+test('“Project: <name>” adds work to a project the office knows, refuses an archived one, and answers rather than dropping when a new one cannot be planned', async () => {
+  const root = temp(), outbox = path.join(root, 'outbox.json');
+  const accounts = new Accounts({ file: path.join(root, 'accounts.sqlite') }), platform = new PlatformStore({ dir: path.join(root, 'platform'), env: {} });
+  const registry = new TenantRegistry({ accounts, platform, dir: path.join(root, 'tenants'), log: () => {} });
+  const mailer = new Mailer({ provider: 'postmark', domain: 'check.test', dryRun: true, outbox });
+  const intake = createIntake({ accounts, registry, mail: { mailer, domain: 'check.test' }, publicOrigin: () => 'https://office.test', log: () => {} });
+  registry.onLoad = intake.watch;
+  const last = () => JSON.parse(fs.readFileSync(outbox, 'utf8')).at(-1);
+  try {
+    const owner = accounts.createUser({ email: 'dana@acme.test', name: 'Dana Q', password: 'a long enough password' });
+    const tenant = accounts.createTenant({ name: 'Check Co', ownerId: owner.id });
+    const alias = intake.aliasFor(tenant, owner.id);
+    const instance = await registry.get(tenant.id);
+    const project = instance.projects.create({ name: 'Client portal', description: 'A self-service portal where clients follow their work.' }, { ownerId: owner.id });
+
+    // A name the office knows: the mail becomes a task inside that project, titled from the message, not from the subject.
+    const added = await intake.handle(await fixture({ ...to(alias), MessageID: 'p-1', Subject: 'Project: Client portal', TextBody: 'Add single sign-on to the portal.', Attachments: [], Headers: [{ Name: 'Message-ID', Value: '<p1@acme.test>' }] }));
+    assert.equal(added.outcome, 'task');
+    const job = instance.engine.get(added.jobId);
+    assert.equal(job.projectId, project.id, 'the task belongs to the project');
+    assert.equal(job.title, 'Add single sign-on to the portal.');
+    assert.match(last().text, /in project “Client portal”/, 'the receipt says which project took it');
+
+    // Archived: it takes no new work, and the sender is told why instead of being left waiting.
+    instance.projects.setStatus(project.id, 'archived');
+    const archived = await intake.handle(await fixture({ ...to(alias), MessageID: 'p-2', Subject: 'Project: Client portal', TextBody: 'One more thing for the portal.', Attachments: [], Headers: [{ Name: 'Message-ID', Value: '<p2@acme.test>' }] }));
+    assert.equal(archived.outcome, 'refused');
+    assert.match(last().text, /archived/);
+
+    // An unknown name is a new project to plan. Here no model is configured, so the office says so on the thread
+    // and creates nothing — a brief that cannot be planned must never leave a half-made project behind.
+    const planned = await intake.handle(await fixture({ ...to(alias), MessageID: 'p-3', Subject: 'Project: Billing rebuild', TextBody: 'Rebuild billing so invoices go out on the first of the month.', Attachments: [], Headers: [{ Name: 'Message-ID', Value: '<p3@acme.test>' }] }));
+    assert.equal(planned.outcome, 'refused');
+    assert.match(last().text, /no model ready/);
+    assert.equal(instance.projects.list().length, 1, 'nothing was created without a plan');
+  } finally { await registry.closeAll(); accounts.close(); fs.rmSync(root, { recursive: true, force: true, maxRetries: 5 }); }
+});
