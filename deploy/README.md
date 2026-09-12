@@ -44,6 +44,24 @@ A key in the environment is used when the office file has none. The same page ch
 the Program Manager, department leads, specialists, reviews and chat; a team, an agent, a routine or a
 task can override it. Until a key is set, ideas can be saved but no work starts.
 
+### PDFs
+
+`export_pdf` prints through a real browser with the office's print stylesheet. Without one it falls
+back to pdfkit, which lays tables out in equal-width columns — a table of many columns comes out with
+its header collapsed. Install a browser and name it:
+
+```sh
+dnf install -y chromium                     # EPEL on RHEL 9
+# /etc/systemd/system/agents-office.service.d/chrome.conf
+# [Service]
+# Environment=AO_CHROME=/usr/bin/chromium-browser
+```
+
+Playwright's own bundled Chromium is not enough on its own: it lives under the installing user's
+`~/.cache/ms-playwright`, and the service runs as `agents-office` with `ProtectHome=true`, so it
+cannot read it. Check which renderer produced a PDF with
+`strings file.pdf | grep -i producer` — `Skia/PDF` is the browser, `PDFKit` is the fallback.
+
 ### Connectors
 
 Connectors live in `data/tools.json` (mode 0600). Servers found by `claude mcp list` on this host show

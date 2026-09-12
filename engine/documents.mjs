@@ -66,8 +66,13 @@ const PRINT_CSS = `
   hr { border: 0; border-top: 1px solid #C9C4B8; margin: 14pt 0; }
   img { max-width: 100%; }
 `;
+// Agents write <br> inside a table cell to break a line, and the renderer escapes raw HTML, so it printed as text.
+// Only this one tag is let back through, and only with no attributes: enabling raw HTML would let a task's own
+// Markdown put script into the browser that prints it.
+const softBreaks = html => String(html).replace(/&lt;br\s*\/?&gt;/gi, '<br>');
+
 export function markdownToHtml(markdown, { title = '', date = new Date() } = {}) {
-  const body = md.render(String(markdown || ''));
+  const body = softBreaks(md.render(String(markdown || '')));
   // A document whose first heading is the title does not repeat it below the title block.
   const firstHeading = (String(markdown || '').match(/^#\s+(.+)$/m) || [])[1]?.trim();
   const stripped = title && firstHeading === title ? body.replace(/^\s*<h1>[\s\S]*?<\/h1>/, '') : body;
@@ -88,7 +93,12 @@ async function browserLaunch() {
   if (browserState.ok === false && Date.now() - browserState.checkedAt < 5 * 60000) return null;
   if (browserState.ok && browserState.launch) return browserState.launch;
   let chromium; try { ({ chromium } = require('playwright-core')); } catch { browserState = { checkedAt: Date.now(), ok: false }; return null; }
-  const attempts = [process.env.AO_CHROME ? { executablePath: process.env.AO_CHROME } : null, { channel: 'chrome' }, { channel: 'msedge' }, { channel: 'chromium' }].filter(Boolean);
+  // AO_CHROME first, then the browsers Playwright installs as channels, then a distribution's own package: a
+  // channel does not find /usr/bin/chromium-browser, and without this last step the office silently printed every
+  // PDF through the pdfkit fallback, whose tables collapse.
+  const INSTALLED = ['/usr/bin/chromium-browser', '/usr/bin/chromium', '/usr/bin/google-chrome-stable', '/usr/bin/google-chrome', '/usr/bin/microsoft-edge', '/snap/bin/chromium', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'];
+  const attempts = [process.env.AO_CHROME ? { executablePath: process.env.AO_CHROME } : null, { channel: 'chrome' }, { channel: 'msedge' }, { channel: 'chromium' },
+    ...INSTALLED.filter(p => { try { return fs.existsSync(p); } catch { return false; } }).map(p => ({ executablePath: p }))].filter(Boolean);
   for (const options of attempts) {
     try { const b = await chromium.launch({ ...options, headless: true }); browserState = { checkedAt: Date.now(), ok: true, launch: () => chromium.launch({ ...options, headless: true }) }; keep(b); return browserState.launch; }
     catch { /* try the next one */ }

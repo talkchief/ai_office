@@ -38,6 +38,14 @@ test('Markdown becomes a print-ready HTML document with the title block once, no
   assert.equal((html.match(/TalkChief research brief/g) || []).length, 2, 'title tag and title block; the first heading is not repeated');
   assert.ok(html.includes('<h2>What we found</h2>') && html.includes('<table>') && html.includes('<blockquote>') && html.includes('<pre>'));
   assert.ok(html.includes('@page { size: A4'));
+
+  // Agents break a long table cell with <br>. It renders as a break; every other raw tag stays escaped, so a task's
+  // own Markdown cannot put script into the browser that prints it.
+  const breaks = markdownToHtml('| A | B |\n|---|---|\n| one<br>two | three<br />four |');
+  assert.ok(breaks.includes('one<br>two') && breaks.includes('three<br>four'), '<br> and <br /> both render as breaks');
+  const unsafe = markdownToHtml('<script>alert(1)</script> and <img src=x onerror=y>');
+  assert.ok(!unsafe.includes('<script>') && !unsafe.includes('<img'), 'other raw HTML stays escaped');
+  assert.ok(unsafe.includes('&lt;script&gt;'));
 });
 
 test('the built-in renderer produces a real PDF without runaway pages', async () => {
