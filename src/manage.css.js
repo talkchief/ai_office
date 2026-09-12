@@ -391,6 +391,18 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #settingsPage.mg .pw-team{font:10.5px var(--mg-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--mg-mute)}
 #settingsPage.mg .pw-tree{width:22px;height:10px;margin-left:10px;border-left:1.5px solid color-mix(in srgb,var(--ink) 20%,transparent);border-bottom:1.5px solid color-mix(in srgb,var(--ink) 20%,transparent);border-bottom-left-radius:6px;flex:none}
 #settingsPage.mg .pw-empty{border-top:1px solid var(--hairline);font:12px var(--ui);color:var(--grey)}
+#settingsPage.mg .pw-nox{width:18px;flex:none}
+#settingsPage.mg .pw-x-step{padding:2px;margin-right:-2px}
+#settingsPage.mg .pw-x-step .pw-i{width:12px;height:12px}
+#settingsPage.mg .pw-x-step[aria-expanded=true] .pw-i{transform:none}
+#settingsPage.mg .pw-x-step[aria-expanded=false] .pw-i{transform:rotate(-90deg)}
+#settingsPage.mg .pw-steps{background:color-mix(in srgb,var(--mg-rail) 45%,transparent)}
+#settingsPage.mg .pw-step{border-top:1px solid var(--hairline);cursor:pointer;padding-top:8px;padding-bottom:8px}
+#settingsPage.mg .pw-step:hover{background:var(--mg-hover)}
+#settingsPage.mg .pw-step .pw-tt{font:12px/1.45 var(--ui);color:var(--grey)}
+#settingsPage.mg .pw-step .pw-ring{width:11px;height:11px;border-width:1.5px}
+#settingsPage.mg .pw-step .pw-chip{font-size:10px;padding:2px 8px}
+#settingsPage.mg .pw-tree-2{margin-left:36px;width:18px}
 #settingsPage.mg .pw-addrow{border-top:1px solid var(--hairline);padding-top:8px;padding-bottom:10px}
 #settingsPage.mg .pw-add,#settingsPage.mg .pw-link{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:var(--grey);font:500 11.5px var(--ui);cursor:pointer;padding:2px 0;height:auto}
 #settingsPage.mg .pw-add{margin-left:34px}

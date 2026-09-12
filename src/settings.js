@@ -647,6 +647,12 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     : ['waiting', 'awaiting_ceo'].includes(state) ? ['warn', 'Waits for you', 'warn']
     : ['working', 'planning', 'reviewing', 'saving', 'executing', 'awaiting_lead_review'].includes(state) ? ['busy', 'In progress', 'spin']
     : state === 'queued' ? ['busy', 'Queued', 'circle'] : state === 'cancelled' ? ['off', 'Cancelled', 'circle'] : ['off', 'Idea', 'circle'];
+  // A step of a task: the assignment a specialist was given, and how it ended.
+  const STEP_CHIP = state => state === 'done' ? ['ok', 'Done', 'check']
+    : state === 'failed' ? ['fail', 'Failed', 'warn']
+    : ['working', 'paused'].includes(state) ? ['busy', 'Under way', 'spin']
+    : state === 'interrupted' ? ['off', 'Stopped', 'circle']
+    : state === 'cancelled' ? ['off', 'Cancelled', 'circle'] : ['off', String(state || '').replace(/^./, c => c.toUpperCase()) || 'Step', 'circle'];
   const pwChip = ([kind, label, icon]) => `<span class="pw-chip ${kind}">${PW_ICON[icon]}${esc(label)}</span>`;
   const pwWhen = ms => { if (!ms) return ''; const d = new Date(ms);
     return `<b>${esc(d.toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' }))}</b><span>${esc(d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }))}</span>`; };
@@ -686,14 +692,21 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         <div class="pw-when">${pwWhen(m.doneAt || m.dueAt) || '<b>—</b>'}${m.dueAt && !m.doneAt ? '<span class="pw-due">due</span>' : ''}</div>
       </div>
       <div class="pw-kidrows" data-ms-child="${esc(m.id)}">
-        ${own.length ? own.map(t => task(t)).join('') : `<div class="pw-row pw-empty"><div class="pw-name"><span class="pw-tree" aria-hidden="true"></span>${readyIds.has(m.id) ? 'Nothing planned yet — the Program Manager takes this milestone, or add a task yourself.' : 'Nothing planned yet; it waits for the milestone before it.'}</div><div></div><div></div><div></div></div>`}
+        ${own.length ? own.map(t => task(t)).join('') : (() => {
+          const by = m.done && m.taskId ? all.find(t => t.id === m.taskId) : null;
+          if (by) return `<div class="pw-row pw-task" data-open-task="${esc(by.id)}" role="button" tabindex="0" title="Open the task that achieved this"><div class="pw-name"><span class="pw-tree" aria-hidden="true"></span><span class="pw-nox" aria-hidden="true"></span>${pwRing('ok')}<span class="pw-tt">${esc(by.title)}<span class="pw-team">achieved it${by.teamName ? ' · ' + esc(by.teamName) : ''}</span></span></div><div class="pw-progress pw-progress-task ok">achieved</div><div class="pw-status">${pwChip(TASK_CHIP(by.state))}</div><div class="pw-when">${pwWhen(m.doneAt || by.doneAt)}</div></div>`;
+          return `<div class="pw-row pw-empty"><div class="pw-name"><span class="pw-tree" aria-hidden="true"></span>${m.done ? 'Achieved before the office tracked tasks against milestones.' : readyIds.has(m.id) ? 'Nothing planned yet — the Program Manager takes this milestone, or add a task yourself.' : 'Nothing planned yet; it waits for the milestone before it.'}</div><div></div><div></div><div></div></div>`;
+        })()}
         <div class="pw-row pw-addrow"><div class="pw-name"><button type="button" class="pw-add" data-add-task="${esc(m.id)}">${PW_ICON.plus}Add a task to this milestone</button></div><div></div><div></div><div></div></div>
       </div></div>`;
-    const task = t => { const c = TASK_CHIP(t.state); return `<div class="pw-row pw-task" data-open-task="${esc(t.id)}" role="button" tabindex="0" title="Open this task">
-      <div class="pw-name"><span class="pw-tree" aria-hidden="true"></span>${pwRing(c[0])}<span class="pw-tt">${esc(t.title)}${t.teamName ? `<span class="pw-team">${esc(t.teamName)}</span>` : ''}</span></div>
+    const task = t => { const c = TASK_CHIP(t.state), steps = t.subtasks || [];
+      return `<div class="pw-row pw-task" data-open-task="${esc(t.id)}" role="button" tabindex="0" title="Open this task">
+      <div class="pw-name"><span class="pw-tree" aria-hidden="true"></span>${steps.length ? `<button type="button" class="pw-x pw-x-step" data-steps-toggle="${esc(t.id)}" aria-expanded="false" aria-label="Show what this task was broken into"><svg viewBox="0 0 16 16" class="pw-i"><path d="M4 6.2l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>` : '<span class="pw-nox" aria-hidden="true"></span>'}${pwRing(c[0])}<span class="pw-tt">${esc(t.title)}<span class="pw-team">${esc(t.teamName || '')}${steps.length ? ` · ${steps.filter(s => s.state === 'done').length} of ${steps.length} assignment${steps.length === 1 ? '' : 's'}` : ''}</span></span></div>
       <div class="pw-progress pw-progress-task ${c[0]}">${esc(pwTaskProgress(t))}</div>
       <div class="pw-status">${pwChip(c)}</div>
-      <div class="pw-when">${pwWhen(t.doneAt || t.dueAt || t.createdAt)}</div></div>`; };
+      <div class="pw-when">${pwWhen(t.doneAt || t.dueAt || t.createdAt)}</div></div>`
+      + (steps.length ? `<div class="pw-steps" data-steps="${esc(t.id)}" hidden>${steps.map(s => { const sc = STEP_CHIP(s.state);
+        return `<div class="pw-row pw-step" data-open-task="${esc(t.id)}" role="button" tabindex="0" title="Open the task this belongs to"><div class="pw-name"><span class="pw-tree pw-tree-2" aria-hidden="true"></span>${pwRing(sc[0])}<span class="pw-tt">${esc(String(s.title).slice(0, 120))}</span></div><div class="pw-progress"></div><div class="pw-status">${pwChip(sc)}</div><div class="pw-when"></div></div>`; }).join('')}</div>` : ''); };
 
     return `<section class="pw">
       <div class="pw-head">
@@ -935,6 +948,11 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         // A milestone folds its tasks away; the rows under it carry its id.
         const foldMilestone = (id, open) => content.querySelectorAll(`[data-ms-child="${CSS.escape(id)}"]`).forEach(row => { row.hidden = !open; });
         content.querySelectorAll('[data-ms-toggle]').forEach(b => b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); foldMilestone(b.dataset.msToggle, open); });
+        content.querySelectorAll('[data-steps-toggle]').forEach(b => b.onclick = event => {
+          event.stopPropagation();
+          const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open));
+          const rows = content.querySelector(`[data-steps="${CSS.escape(b.dataset.stepsToggle)}"]`); if (rows) rows.hidden = !open;
+        });
         // Adding a task: the dialog opens on the milestone the CEO pressed.
         const closeTaskModal = () => { if (taskModal) { taskModal.hidden = true; $('spaceNewTask')?.reset(); } };
         content.querySelectorAll('[data-add-task]').forEach(b => b.onclick = () => {

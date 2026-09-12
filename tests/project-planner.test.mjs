@@ -98,7 +98,7 @@ test('a next milestone with no tasks is handed to the Program Manager to plan an
     const [icp, landing] = project.milestones.map(m => m.id);
     const [first] = startNextMilestone({ project, projects, engine });
     const job = engine.get(first);
-    assert.equal(job.milestoneId, icp); assert.ok(job.autoRoute, 'the Program Manager owns it'); assert.ok(job.origin.planned, 'marked as planned by the office'); assert.equal(job.ownerId, 'u1'); assert.equal(job.title, 'Milestone: ICP agreed');
+    assert.equal(job.milestoneId, icp); assert.ok(job.autoRoute, 'the Program Manager owns it'); assert.ok(job.origin.planned, 'marked as planned by the office'); assert.equal(job.ownerId, 'u1'); assert.equal(job.title, 'Plan and deliver: ICP agreed');
     assert.match(job.text, /Plan and deliver the milestone “ICP agreed” of the project “Q4 campaign” \(due 2026-09-30\): read the project page/);
     assert.deepEqual(startNextMilestone({ project: projects.get(project.id), projects, engine }), [], 'once');
     projects.recordCompletion({ id: first, projectId: project.id, state: 'done', doneAt: TODAY, milestoneId: icp }, { tasks: [] });

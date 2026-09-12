@@ -157,7 +157,7 @@ export function startNextMilestone({ project, projects, engine }) {
     if (mine.length) continue;
     const due = next.dueAt ? ` (due ${day(next.dueAt)})` : '';
     try {
-      const job = engine.create({ dept: 'auto', depts: 'auto', title: oneLine(`Milestone: ${next.title}`, 100), projectId: project.id, milestoneId: next.id, ownerId: project.ownerId || null, origin: { channel: 'project', projectId: project.id, milestoneId: next.id, planned: true },
+      const job = engine.create({ dept: 'auto', depts: 'auto', title: oneLine(`Plan and deliver: ${next.title}`, 100), projectId: project.id, milestoneId: next.id, ownerId: project.ownerId || null, origin: { channel: 'project', projectId: project.id, milestoneId: next.id, planned: true },
         text: `Plan and deliver the milestone “${next.title}” of the project “${project.name}”${due}: read the project page and what the earlier tasks delivered, decide the work this milestone needs, delegate it to the teams, and close the task when the milestone is true.\n\nProject milestone: ${next.title}${due}.` });
       started.push(job.id);
     } catch {}

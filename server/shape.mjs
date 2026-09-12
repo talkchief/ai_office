@@ -18,13 +18,13 @@ export function listShape(job, office) {
   const steps = specialistRuns(job);
   return { ...rest, teamName: job.autoRoute ? 'Program Manager' : office.teams.find(t => t.id === job.dept)?.name || job.teamName || job.dept,
     resultPreview: excerpt(job), versions: (resultVersions || []).length, pendingActions: pendingActions.map(({ name, agent, requestedAt }) => ({ name, agent, requestedAt })),
-    runs: runs.map(({ output, ...r }) => ({ ...r, title: runTitle(r.title) })), subtasks: steps.map(r => ({ id: r.id, title: runTitle(r.title), agent: r.agent, eligible: [r.agent], state: stepState(r.state) })),
+    runs: runs.map(({ output, ...r }) => ({ ...r, title: runTitle(r.brief || r.title) })), subtasks: steps.map(r => ({ id: r.id, title: runTitle(r.brief || r.title), agent: r.agent, eligible: [r.agent], state: stepState(r.state) })),
     completedSteps: steps.filter(r => r.state === 'done').length };
 }
 
 export function detailShape(job, office) {
   const team = job.autoRoute ? { id: 'pm', name: 'Program Manager', lead: 'pm', criteria: [], guardrails: [] } : office.teams.find(t => t.id === job.dept) || { id: job.dept, name: job.teamName || job.dept, lead: job.agent, criteria: [], guardrails: [] };
   return { ...job, team, agents: [...office.agents, { id: 'pm', name: 'Program Manager', role: 'Program Manager', department: 'pm' }], requireHumanApproval: !!job.completionApproval, humanApproved: (job.decisions || []).some(d => d.action === 'complete_task' && d.type !== 'reject'),
-    subtasks: specialistRuns(job).map(r => ({ id: r.id, title: runTitle(r.title), agent: r.agent, eligible: [r.agent], state: stepState(r.state), instructions: r.title, acceptance: [], dependencies: [],
+    subtasks: specialistRuns(job).map(r => ({ id: r.id, title: runTitle(r.brief || r.title), agent: r.agent, eligible: [r.agent], state: stepState(r.state), instructions: r.brief || r.title, acceptance: [], dependencies: [],
       output: r.output || '', feedback: '', error: r.error || '', notes: [], tools: r.tools || [], requiredTools: [], modelUsed: r.model || '', effortUsed: r.effort || '', complexity: '', routingReason: '' })) };
 }

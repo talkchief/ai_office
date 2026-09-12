@@ -2,11 +2,27 @@
 const flat = content => typeof content === 'string' ? content : Array.isArray(content) ? content.map(p => typeof p === 'string' ? p : p?.type === 'text' ? p.text || '' : '').join('') : '';
 // A lead delegates by writing the whole instruction. The run's title is the ask itself: the persona preamble and the
 // "your task is to" scaffolding come off, the first sentence stays, and the full text is kept as the run's brief.
+// A line that only labels the section that follows: a heading, a bold label, a rule. It names nothing, so it is not a title.
+const LABEL = /^(#{1,6}\s|[-*_]{3,}$|\*\*[^*]{0,40}\*\*:?$|[A-Za-z][A-Za-z &/'-]{0,30}:$)/;
+// What is left of a line once the markdown marker, the sentence naming the worker and the words "your task is to" are gone.
+const spoken = line => line
+  .replace(/^#{1,6}\s*/, '').replace(/^[-*+]\s+/, '').replace(/^\d+[.)]\s+/, '')
+  .replace(/^\*{1,2}([^*]+)\*{1,2}\s*[:—-]?\s*/, '$1 ')
+  .replace(/^\s*you are\b[^.\n]{0,200}([.:]|$)\s*/i, '')
+  .replace(/^\s*(your\s+)?(task|assignment|job|brief|mission|objective)\s*(is)?\s*(to|:)\s*/i, '')
+  .trim();
+
+// The name of a run: the first line of the assignment that actually says what to do.
 export function runTitle(description) {
-  let t = String(description || '').replace(/\r/g, '').trim();
-  t = t.replace(/^\s*you are\b[^.\n]{0,160}[.\n]\s*/i, '');
-  t = t.replace(/^\s*(your\s+)?(task|assignment|job|brief)\s*(is)?\s*(to|:)\s*/i, '');
-  t = t.split(/\n\s*\n/)[0].split('\n')[0].trim();
+  const lines = String(description || '').replace(/\r/g, '').trim().split('\n').map(l => l.trim()).filter(Boolean);
+  let t = '';
+  for (const line of lines) {
+    if (LABEL.test(line)) continue;
+    const said = spoken(line);
+    if (!said || /^you\b/i.test(said)) continue;
+    t = said; break;
+  }
+  if (!t) t = spoken(lines.find(l => !LABEL.test(l)) || lines[0] || '');
   const stop = t.search(/[.!?](\s|$)/);
   if (stop > 24) t = t.slice(0, stop);
   t = t.replace(/[\s:;,.-]+$/, '').trim();
