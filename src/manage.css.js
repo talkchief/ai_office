@@ -540,8 +540,8 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #spaceDialog[data-view=task] .tv-top{padding-right:84px}
 #spaceDialog[data-view=task] #spaceContent>:first-child:not(.space-audience):not(.tv-head){padding-right:84px}
 #spaceDialog[data-view=task].full[open]{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;margin:0;border-radius:0;border:0;padding:24px clamp(24px,5vw,72px) 0}
-#spaceDialog[data-view=task].full .tv-doc{max-width:84ch}
-#spaceDialog[data-view=task].full .tv-two{grid-template-columns:minmax(0,1fr) 260px;gap:36px}
+#spaceDialog[data-view=task].full .tv-doc{max-width:min(100%,116ch);margin-inline:auto}
+#spaceDialog[data-view=task].full .tv-two{grid-template-columns:minmax(0,1fr) clamp(260px,22vw,360px);gap:clamp(36px,4vw,64px)}
 #spaceDialog[data-view=task] #spaceContent{padding:2px 8px 28px 0;font:13px/1.5 var(--ui);scrollbar-width:none;scrollbar-gutter:auto}
 #spaceDialog[data-view=task] #spaceContent::-webkit-scrollbar{display:none}
 #spaceDialog[data-view=task]{scrollbar-width:none}#spaceDialog[data-view=task]::-webkit-scrollbar{display:none}
