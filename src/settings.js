@@ -578,7 +578,8 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       projectSeen.clear(); projectArt = { kind: '', q: '' };
       const data = await api('/projects');
       if (pendingProject) { const id = pendingProject; pendingProject = null; if (data.projects.some(p => p.id === id)) return editProject(id, data.teams); }
-      const newest = (a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0);
+      // Newest first: when the project was created, not when it was last touched, so the order does not move under the CEO.
+      const newest = (a, b) => (b.createdAt || b.updatedAt || 0) - (a.createdAt || a.updatedAt || 0);
       const list = data.projects.filter(p => p.status !== 'archived').sort(newest), archived = data.projects.filter(p => p.status === 'archived').sort(newest);
       setMeta(list.length ? mark(list.some(p => p.next?.dueAt && p.next.dueAt < Date.now()) ? 'warn' : 'ok', `${list.length} open`) : mark('off', 'No projects'));
       content.innerHTML = `<div class="mg-toolbar"><span class="mg-count">${list.length} open · ${archived.length} archived</span><span class="mg-spacer"></span><button id="spaceNewProject" type="button" class="mg-btn mg-btn-primary">+ New project</button></div>
@@ -707,24 +708,17 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         <div class="pw-kpi">
           <div class="pw-kpi-top"><div><span class="mg-eyebrow">Overall completion</span><div class="pw-big">${overall}%</div></div>
             <svg class="pw-dial" viewBox="0 0 36 36" aria-hidden="true"><circle class="pw-dial-bg" cx="18" cy="18" r="15.9" fill="none" stroke-width="3.4"/><circle class="pw-dial-fg" cx="18" cy="18" r="15.9" fill="none" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="${overall} ${ring}" transform="rotate(-90 18 18)"/></svg></div>
-          <div class="pw-kpi-foot"><span>${PW_ICON.check}${allDone} of ${counted} task${counted === 1 ? '' : 's'} done</span><span>${PW_ICON.flag}${ms.length} milestone${ms.length === 1 ? '' : 's'}</span></div>
+          <div class="pw-next"><span class="mg-eyebrow">${next ? 'Next milestone' : 'Milestones'}</span><b>${next ? esc(next.title) : ms.length ? 'All achieved' : 'None yet'}</b>${next?.dueAt ? `<span class="pw-next-due">due ${esc(dateShort(next.dueAt))}</span>` : ''}</div>
+          <div class="pw-kpi-foot"><span>${PW_ICON.check}${allDone} of ${counted} task${counted === 1 ? '' : 's'} done</span><span>${PW_ICON.flag}${ms.length} milestone${ms.length === 1 ? '' : 's'}</span>${p.dueAt ? `<span>${PW_ICON.clock}target ${esc(dateShort(p.dueAt))}</span>` : ''}</div>
         </div>
         <div class="pw-kpi pw-kpi-wide">
-          <div class="pw-kpi-head"><span class="mg-eyebrow">Milestone health</span><span class="pw-kpi-note">${ms.length} tracked</span></div>
+          <div class="pw-kpi-head"><span class="mg-eyebrow">Milestone health</span><span class="pw-kpi-note">${ms.length} tracked${[...new Set(tasks.map(t => t.teamName).filter(Boolean))].length ? ' · ' + esc([...new Set(tasks.map(t => t.teamName).filter(Boolean))].join(', ')) : ''}</span></div>
           <div class="pw-tiles">
             <div class="pw-tile ok"><span>Achieved</span><b>${health.done}</b></div>
             <div class="pw-tile busy"><span>Under way</span><b>${health.track}</b></div>
             <div class="pw-tile ${health.risk ? 'fail' : 'off'}"><span>Needs attention</span><b>${health.risk}</b></div>
           </div>
           <div class="pw-spread"><div class="pw-spread-head"><span>Task distribution</span><em>${spread.done} done · ${spread.going} under way · ${spread.you} for you · ${spread.stuck} blocked · ${spread.todo} to come</em></div><div class="pw-spread-bar">${bar || '<i class="todo" style="width:100%"></i>'}</div></div>
-        </div>
-        <div class="pw-kpi">
-          <div class="pw-kpi-head"><span class="mg-eyebrow">Cadence</span></div>
-          <dl class="pw-facts">
-            <div><dt>Target</dt><dd>${p.dueAt ? esc(dateShort(p.dueAt)) : 'not set'}</dd></div>
-            <div><dt>Next milestone</dt><dd>${next ? esc(next.title.slice(0, 38)) : 'all achieved'}</dd></div>
-            <div><dt>Teams on it</dt><dd>${esc([...new Set(tasks.map(t => t.teamName).filter(Boolean))].join(', ') || 'none yet')}</dd></div>
-          </dl>
         </div>
       </div>
       <div class="pw-table">

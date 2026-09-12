@@ -313,22 +313,25 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #settingsPage.mg .pw-seg button{border:0;background:transparent;border-radius:7px;padding:5px 11px;font:500 11.5px var(--ui);color:var(--grey);cursor:pointer;height:auto}
 #settingsPage.mg .pw-seg button[aria-pressed=true]{background:var(--ink);color:var(--cream)}
 /* The figures */
-#settingsPage.mg .pw-kpis{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,1fr);gap:12px;margin:0 0 16px}
+#settingsPage.mg .pw-kpis{display:grid;grid-template-columns:minmax(280px,1fr) minmax(0,1.9fr);gap:12px;margin:0 0 16px}
 #settingsPage.mg .pw-kpi{background:var(--mg-card);border:1px solid var(--hairline);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
 #settingsPage.mg .pw-kpi-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-#settingsPage.mg .pw-big{font:400 34px/1 var(--serif);color:var(--ink);margin-top:6px}
-#settingsPage.mg .pw-dial{width:52px;height:52px;flex:none}
+#settingsPage.mg .pw-big{font:400 46px/1 var(--serif);color:var(--ink);margin-top:8px}
+#settingsPage.mg .pw-dial{width:68px;height:68px;flex:none}
+#settingsPage.mg .pw-next{display:flex;flex-direction:column;gap:3px;padding:12px 0 0;border-top:1px solid var(--hairline)}
+#settingsPage.mg .pw-next b{font:600 13px/1.4 var(--ui);color:var(--ink)}
+#settingsPage.mg .pw-next-due{font:11px var(--mg-mono);color:var(--grey)}
 #settingsPage.mg .pw-dial-bg{stroke:color-mix(in srgb,var(--ink) 10%,transparent)}
 #settingsPage.mg .pw-dial-fg{stroke:var(--mg-gold)}
-#settingsPage.mg .pw-kpi-foot{display:flex;flex-wrap:wrap;gap:6px 16px;padding-top:11px;border-top:1px solid var(--hairline);font:11.5px var(--ui);color:var(--grey)}
+#settingsPage.mg .pw-kpi-foot{display:flex;flex-wrap:wrap;gap:6px 14px;padding-top:11px;border-top:1px solid var(--hairline);font:11.5px var(--ui);color:var(--grey);margin-top:auto}
 #settingsPage.mg .pw-kpi-foot span{display:inline-flex;align-items:center;gap:6px}
 #settingsPage.mg .pw-kpi-foot .pw-i{width:13px;height:13px;color:var(--mg-ok)}
 #settingsPage.mg .pw-kpi-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
 #settingsPage.mg .pw-kpi-note{font:11.5px var(--mg-mono);color:var(--grey)}
 #settingsPage.mg .pw-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-#settingsPage.mg .pw-tile{border:1px solid var(--hairline);border-radius:10px;padding:9px 11px;display:flex;flex-direction:column;gap:3px}
+#settingsPage.mg .pw-tile{border:1px solid var(--hairline);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
 #settingsPage.mg .pw-tile span{font:500 11px var(--ui);color:var(--grey)}
-#settingsPage.mg .pw-tile b{font:400 21px/1 var(--serif);color:var(--ink)}
+#settingsPage.mg .pw-tile b{font:400 27px/1 var(--serif);color:var(--ink)}
 #settingsPage.mg .pw-tile.ok{background:var(--mg-ok-bg);border-color:transparent}#settingsPage.mg .pw-tile.ok span{color:var(--mg-ok)}
 #settingsPage.mg .pw-tile.busy{background:var(--mg-busy-bg);border-color:transparent}#settingsPage.mg .pw-tile.busy span{color:var(--mg-busy)}
 #settingsPage.mg .pw-tile.fail{background:var(--mg-fail-bg);border-color:transparent}#settingsPage.mg .pw-tile.fail span{color:var(--mg-fail)}
@@ -339,10 +342,6 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #settingsPage.mg .pw-spread-bar .done{background:var(--mg-ok)}#settingsPage.mg .pw-spread-bar .going{background:var(--mg-busy)}
 #settingsPage.mg .pw-spread-bar .you{background:var(--mg-warn)}#settingsPage.mg .pw-spread-bar .stuck{background:var(--mg-fail)}
 #settingsPage.mg .pw-spread-bar .todo{background:color-mix(in srgb,var(--ink) 18%,transparent)}
-#settingsPage.mg .pw-facts{margin:0;display:grid;gap:9px}
-#settingsPage.mg .pw-facts div{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
-#settingsPage.mg .pw-facts dt{font:11.5px var(--ui);color:var(--grey)}
-#settingsPage.mg .pw-facts dd{margin:0;font:500 12px var(--ui);color:var(--ink);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* The tree */
 #settingsPage.mg .pw-table{background:var(--mg-card);border:1px solid var(--hairline);border-radius:14px;overflow:hidden}
 #settingsPage.mg .pw-row{display:grid;grid-template-columns:minmax(0,1fr) 150px 150px 128px;align-items:center;gap:16px;padding:11px 18px}
@@ -407,7 +406,7 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 @keyframes pwSpin{to{transform:rotate(360deg)}}
 #settingsPage.mg .pw-spin{animation:pwSpin 1.1s linear infinite;transform-origin:50% 50%}
 @media (prefers-reduced-motion:reduce){#settingsPage.mg .pw-spin{animation:none}}
-@media (max-width:1100px){#settingsPage.mg .pw-kpis{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}#settingsPage.mg .pw-kpi-wide{grid-column:1 / -1;order:-1}}
+@media (max-width:960px){#settingsPage.mg .pw-kpis{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:860px){#settingsPage.mg .pw-kpis{grid-template-columns:minmax(0,1fr)}#settingsPage.mg .pw-row{grid-template-columns:minmax(0,1fr) 120px;row-gap:6px}#settingsPage.mg .pw-progress,#settingsPage.mg .pw-when{display:none}}
 /* Adding a task: one dialog, the milestone chosen from the ones the project has. */
 #settingsPage.mg .pw-modal{width:min(680px,100%);max-height:88vh;display:flex;flex-direction:column}
