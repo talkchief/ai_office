@@ -310,5 +310,5 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
     scheduler.stop(); bus.close(); index.close(); await connecting.catch(() => {}); await engine.close(); await hub.close();
   }
 
-  return { dataDir: DATA, brainDir: BRAIN, tenant, managedModels, router, office, settings, models, knowledge, index, projects, toolStore, hub, vault, engine, audit, scheduler, bus, chat, assist, routines: routineApi, routineRecords, loadRoutines, tickRoutines, syncProject, writeProjectSummary, graph: () => graph, get name() { return officeName(); }, boot, start, close };
+  return { dataDir: DATA, brainDir: BRAIN, tenant, managedModels, router, office, settings, models, knowledge, index, projects, agency, toolStore, hub, vault, engine, audit, scheduler, bus, chat, assist, routines: routineApi, routineRecords, loadRoutines, tickRoutines, syncProject, writeProjectSummary, graph: () => graph, get name() { return officeName(); }, boot, start, close };
 }

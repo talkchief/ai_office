@@ -130,3 +130,34 @@ test('mail aliases resolve only with the right suffix; senders must be verified;
     assert.deepEqual(accounts.findThread(['<nope>', '<abc@office>']), { tenantId: tenant.id, jobId: 'job-1' });
   } finally { done(dir, accounts); }
 });
+
+test('the platform can invite a whole office: the invitation carries its name, accepting it builds the office with that person as owner', () => {
+  const { dir, accounts } = open();
+  try {
+    const admin = accounts.createUser({ email: 'admin@platform.test', name: 'Admin', password: 'a long enough password' });
+    const inv = accounts.inviteOffice({ officeName: 'Northwind Trading', email: 'Owner@Northwind.test', invitedBy: admin.id });
+    assert.equal(inv.email, 'owner@northwind.test'); assert.equal(inv.officeName, 'Northwind Trading'); assert.equal(inv.role, 'owner'); assert.equal(inv.existing, false);
+    assert.throws(() => accounts.inviteOffice({ officeName: 'x', email: 'owner@northwind.test' }), /Give the office a name/);
+    // It is listed for the panel, and never among an existing office's own invitations.
+    assert.deepEqual(accounts.officeInvites().map(i => [i.officeName, i.email]), [['Northwind Trading', 'owner@northwind.test']]);
+    const seen = accounts.inviteByToken(inv.token);
+    assert.equal(seen.tenantId, '', 'no office exists yet'); assert.equal(seen.officeName, 'Northwind Trading'); assert.equal(seen.tenantName, 'Northwind Trading');
+    // Accepting creates the account, the office and the ownership in one go; the caller is told to build it.
+    const { user, tenant, created } = accounts.acceptInvite(inv.token, { name: 'Nora', password: 'another long password' });
+    assert.equal(created, true); assert.equal(user.email, 'owner@northwind.test');
+    assert.equal(tenant.name, 'Northwind Trading'); assert.equal(tenant.slug, 'northwind-trading'); assert.equal(tenant.ownerId, user.id);
+    assert.equal(accounts.membership(user.id, tenant.id).role, 'owner');
+    assert.deepEqual(accounts.officeInvites(), [], 'used invitations leave the waiting list');
+    assert.throws(() => accounts.acceptInvite(inv.token, { name: 'Nora', password: 'another long password' }), /expired or was already used/, 'single use');
+    // Someone who already has an office is refused: they are invited into that one instead.
+    assert.throws(() => accounts.inviteOffice({ officeName: 'Second Office', email: 'owner@northwind.test' }), /already owns or belongs to an office/);
+    // An invitation into an existing office still behaves as before.
+    const member = accounts.invite({ tenantId: tenant.id, email: 'sam@northwind.test', role: 'member' });
+    assert.equal(accounts.acceptInvite(member.token, { name: 'Sam', password: 'yet another password' }).created, false);
+    assert.deepEqual(accounts.invites(tenant.id), [], 'an office invitation and an office-creating one do not mix');
+    // Revoking takes the link out of use.
+    const dropped = accounts.inviteOffice({ officeName: 'Later Office', email: 'later@northwind.test' });
+    assert.equal(accounts.revokeOfficeInvite(accounts.officeInvites()[0].tokenHash), true);
+    assert.throws(() => accounts.acceptInvite(dropped.token, { name: 'L', password: 'a long enough password' }), /expired or was already used/);
+  } finally { done(dir, accounts); }
+});

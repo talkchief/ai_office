@@ -33,6 +33,40 @@ export function registerAdminApi(router, { accounts, platform, registry, mail = 
       loaded: status.loaded, running: status.running || 0, openTasks: jobs ? jobs.filter(j => !['done', 'cancelled', 'backlog'].includes(j.state)).length : null, tasks: jobs ? jobs.length : null,
       tokens: jobs ? jobs.reduce((n, j) => n + (j.tokens || 0), 0) : null, teams: instance ? instance.office.get().teams.length : null };
   }) }));
+  // A new office when registration is closed: the administrator names it and its owner. An address that
+  // already has an account becomes the owner at once; a new one gets an invitation link (mailed too, if
+  // the platform can send), and the office is built when they accept.
+  router.on('POST', '/api/admin/tenants', async ({ req, user }) => {
+    const input = await body(req);
+    const name = String(input.name ?? input.officeName ?? '').trim(), email = String(input.ownerEmail ?? input.email ?? '').trim();
+    if (name.length < 2) throw httpError('Name the office you are creating.');
+    if (!email) throw httpError('Give the address of the person who will own it.');
+    const existing = accounts.userByEmail(email);
+    if (existing) {
+      if (accounts.tenantsOf(existing.id).length) throw httpError(`${existing.email} already owns or belongs to an office. Invite them into it from that office instead.`, 409);
+      const tenant = accounts.createTenant({ name, ownerId: existing.id });
+      await registry.provision(tenant);
+      log(user, `Created office ${tenant.name} (${tenant.slug}) for ${existing.email}, who already had an account`);
+      return { $status: 201, body: { tenant, owner: { id: existing.id, email: existing.email, name: existing.name }, ready: true, invite: null } };
+    }
+    const inv = accounts.inviteOffice({ officeName: name, email, invitedBy: user?.id || null });
+    const link = `${publicOrigin()}/#invite=${inv.token}`;
+    let sent = false;
+    if (mail.mailer?.enabled) {
+      try {
+        await mail.mailer.send({ to: inv.email, subject: `Your office “${inv.officeName}” is ready to open`,
+          text: `You have been invited to open ${inv.officeName}.\n\nOpen this link, choose a password, and the office is built for you:\n${link}\n\nThe link works once and expires in seven days.`, tag: 'office-invite' });
+        sent = true;
+      } catch (error) { log(user, `Could not mail the office invitation to ${inv.email}: ${error.message}`); }
+    }
+    log(user, `Invited ${inv.email} to open office “${inv.officeName}”${sent ? ' (mailed)' : ''}`);
+    return { $status: 201, body: { tenant: null, ready: false, invite: { email: inv.email, officeName: inv.officeName, expiresAt: inv.expiresAt, link, sent } } };
+  });
+  router.on('GET', '/api/admin/office-invites', () => ({ invites: accounts.officeInvites() }));
+  router.on('POST', '/api/admin/office-invites/revoke', async ({ req, user }) => {
+    const input = await body(req); if (!accounts.revokeOfficeInvite(input.hash)) throw httpError('That invitation is already gone.', 404);
+    log(user, 'Revoked an office invitation'); return { ok: true };
+  });
   router.on('POST', '/api/admin/tenants/:id/suspend', async ({ params, user }) => { const t = accounts.suspendTenant(params.id, true); await registry.evict(params.id).catch(() => {}); log(user, `Suspended office ${t.name} (${t.slug})`); return t; });
   router.on('POST', '/api/admin/tenants/:id/resume', ({ params, user }) => { const t = accounts.suspendTenant(params.id, false); log(user, `Resumed office ${t.name} (${t.slug})`); return t; });
   router.on('GET', '/api/admin/users', ({ url }) => ({ users: accounts.users({ q: url.searchParams.get('q') || '' }).map(u => ({ id: u.id, email: u.email, name: u.name, platformAdmin: platform.isAdmin(u), createdAt: u.createdAt, lastLoginAt: u.lastLoginAt, offices: accounts.tenantsOf(u.id).map(t => ({ id: t.id, name: t.name, role: t.role })) })) }));

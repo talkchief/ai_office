@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS groups (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL,
 CREATE TABLE IF NOT EXISTS group_members (group_id TEXT NOT NULL, user_id TEXT NOT NULL, PRIMARY KEY (group_id, user_id));
 CREATE TABLE IF NOT EXISTS sessions (id_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, tenant_id TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, last_seen_at INTEGER, ua TEXT);
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
-CREATE TABLE IF NOT EXISTS invites (token_hash TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, email TEXT NOT NULL, role TEXT NOT NULL, invited_by TEXT, expires_at INTEGER NOT NULL, accepted_at INTEGER, created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS invites (token_hash TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, email TEXT NOT NULL, role TEXT NOT NULL, invited_by TEXT, expires_at INTEGER NOT NULL, accepted_at INTEGER, created_at INTEGER NOT NULL, office_name TEXT);
 CREATE TABLE IF NOT EXISTS identities (user_id TEXT NOT NULL, provider TEXT NOT NULL, provider_id TEXT NOT NULL, PRIMARY KEY (provider, provider_id));
 CREATE TABLE IF NOT EXISTS sender_whitelist (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, user_id TEXT NOT NULL, address TEXT NOT NULL, code_hash TEXT, code_expires_at INTEGER, verified_at INTEGER, created_at INTEGER NOT NULL, UNIQUE (tenant_id, user_id, address));
 CREATE TABLE IF NOT EXISTS inbound_mail (provider TEXT NOT NULL, provider_message_id TEXT NOT NULL, tenant_id TEXT, user_id TEXT, job_id TEXT, at INTEGER NOT NULL, outcome TEXT, PRIMARY KEY (provider, provider_message_id));
@@ -57,6 +57,8 @@ export class Accounts {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     this.file = file; this.now = now;
     this.db = new Database(file); this.db.pragma('journal_mode = WAL'); this.db.pragma('busy_timeout = 5000'); this.db.exec(SCHEMA);
+    // An older accounts file has invites without the office an invitation may create.
+    if (!this.db.prepare("SELECT COUNT(*) n FROM pragma_table_info('invites') WHERE name = 'office_name'").get().n) this.db.exec('ALTER TABLE invites ADD COLUMN office_name TEXT');
     try { fs.chmodSync(file, 0o600); } catch {}
     this.q = {};
   }
@@ -202,19 +204,41 @@ export class Accounts {
     return { token, email: e, role, expiresAt: now + INVITE_MS };
   }
   invites(tenantId) { return this.prep('SELECT * FROM invites WHERE tenant_id = ? AND accepted_at IS NULL AND expires_at > ? ORDER BY created_at DESC').all(tenantId, this.now()).map(r => ({ email: r.email, role: r.role, invitedBy: r.invited_by, expiresAt: r.expires_at, createdAt: r.created_at, tokenHash: r.token_hash })); }
-  inviteByToken(token) { const r = this.prep('SELECT * FROM invites WHERE token_hash = ?').get(sha(String(token || ''))); if (!r) return null; return { tenantId: r.tenant_id, email: r.email, role: r.role, expiresAt: r.expires_at, acceptedAt: r.accepted_at, tenantName: this.tenant(r.tenant_id)?.name }; }
+  inviteByToken(token) { const r = this.prep('SELECT * FROM invites WHERE token_hash = ?').get(sha(String(token || ''))); if (!r) return null; return { tenantId: r.tenant_id, email: r.email, role: r.role, expiresAt: r.expires_at, acceptedAt: r.accepted_at, officeName: r.office_name || '', tenantName: r.tenant_id ? this.tenant(r.tenant_id)?.name : r.office_name || '' }; }
+
+  /* ---------- a whole office by invitation (the platform administrator, when registration is closed) ---------- */
+  // No office exists yet, so the invitation carries its name: accepting it creates the account, the office and its owner.
+  inviteOffice({ officeName, email, invitedBy = null }) {
+    const e = normEmail(email), name = text(officeName, 80);
+    if (name.length < 2) fail('Give the office a name.');
+    const existing = this.userByEmail(e);
+    if (existing && this.tenantsOf(existing.id).length) fail(`${e} already owns or belongs to an office. Invite them into it instead, or create the office for another address.`, 409);
+    const token = crypto.randomBytes(32).toString('base64url'), now = this.now();
+    this.tx(() => {
+      this.prep("DELETE FROM invites WHERE tenant_id = '' AND email = ? AND accepted_at IS NULL").run(e);
+      this.prep("INSERT INTO invites(token_hash, tenant_id, email, role, invited_by, expires_at, created_at, office_name) VALUES (?,'',?,'owner',?,?,?,?)").run(sha(token), e, invitedBy, now + INVITE_MS, now, name);
+    });
+    return { token, email: e, officeName: name, role: 'owner', expiresAt: now + INVITE_MS, existing: !!existing };
+  }
+  /** Invitations that would create an office, for the Platform panel. */
+  officeInvites() { return this.prep("SELECT * FROM invites WHERE tenant_id = '' AND accepted_at IS NULL AND expires_at > ? ORDER BY created_at DESC").all(this.now()).map(r => ({ email: r.email, officeName: r.office_name || '', expiresAt: r.expires_at, createdAt: r.created_at, tokenHash: r.token_hash })); }
+  revokeOfficeInvite(tokenHash) { return this.prep("DELETE FROM invites WHERE tenant_id = '' AND token_hash = ?").run(String(tokenHash || '')).changes > 0; }
   revokeInvite(tenantId, tokenHash) { return this.prep('DELETE FROM invites WHERE tenant_id = ? AND token_hash = ?').run(tenantId, tokenHash).changes > 0; }
   // A new person sets a name and password; someone who already has an account joins the office with the account they have.
   acceptInvite(token, { name, password } = {}) {
     const inv = this.inviteByToken(token); if (!inv || inv.acceptedAt || inv.expiresAt <= this.now()) fail('This invitation has expired or was already used. Ask for a new one.', 410);
-    const tenant = this.tenant(inv.tenantId); if (!tenant || tenant.suspendedAt) fail('That office is not available.', 410);
+    // An invitation into an existing office needs that office; one that carries a name creates it.
+    const tenant = inv.tenantId ? this.tenant(inv.tenantId) : null;
+    if (inv.tenantId && (!tenant || tenant.suspendedAt)) fail('That office is not available.', 410);
     let user = this.userByEmail(inv.email);
     return this.tx(() => {
       if (!user) user = this.createUser({ email: inv.email, name, password });
       else if (password && !verifyPassword(password, this.prep('SELECT password_hash FROM users WHERE id = ?').get(user.id)?.password_hash)) fail('You already have an account with this email. Sign in with your existing password to accept.', 401);
-      if (!this.membership(user.id, tenant.id)) this.addMember(tenant.id, user.id, inv.role, null);
+      // The office itself: created here, with the person who accepted as its owner. The caller builds it.
+      const office = tenant || this.createTenant({ name: inv.officeName, ownerId: user.id });
+      if (!this.membership(user.id, office.id)) this.addMember(office.id, user.id, inv.role, null);
       this.prep('UPDATE invites SET accepted_at = ? WHERE token_hash = ?').run(this.now(), sha(token));
-      return { user, tenant };
+      return { user, tenant: office, created: !tenant };
     });
   }
 

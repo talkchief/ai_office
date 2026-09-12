@@ -148,6 +148,23 @@ export function applyPlan({ plan, projects, engine, ownerId = null, audience = {
 // Every milestone that can be worked now (nothing it waits for is open) is under way: its backlog tasks are queued, and one with
 // no tasks at all is handed to the Program Manager as one task to plan and deliver (once: that task carries the milestone).
 // Milestones that do not wait for each other run in parallel. Returns the tasks started.
+/**
+ * One brief becomes a project: the planning methods, the model call, the project with its first milestone's tasks,
+ * and the documents filed in the project's Brain folder. The Projects form and the mail intake both come through
+ * here, so a project planned from an email is planned exactly like one planned in the office.
+ * `root` is the repository root, used only when the engine carries no pm-skills folder of its own.
+ */
+export async function planProjectFrom({ brief, documents = [], office, models, projects, engine, knowledge, agency = null, ownerId = null, audience = {}, root = '', log = () => {} }) {
+  const dirs = [engine?.pmSkillsDir || (root ? path.join(root, 'agency', 'pm-skills') : ''), engine?.knowledgeDir ? path.join(engine.knowledgeDir, 'Agents Office', 'pm-skills') : ''].filter(Boolean);
+  const skills = loadPlanningSkills({ dirs });
+  const catalogue = loadCatalogueMethods({ agency, brief });
+  const plan = await planProject({ brief, documents: documents.map(d => ({ name: d.name, content: d.content })), skills, catalogue, office: office.get(), models });
+  const { project, tasks } = applyPlan({ plan, projects, engine, ownerId, audience });
+  // A document that will not file is worth a line in the log, never the loss of the project that was just planned.
+  for (const doc of documents) { try { await knowledge.upload({ folder: projects.folder(project), name: doc.name, content: doc.content }); } catch (error) { log(`project document: ${error.message}`); } }
+  return { project, tasks, methods: { builtIn: skills.map(s => s.name), catalogue: catalogue.map(s => s.name) } };
+}
+
 export function startNextMilestone({ project, projects, engine }) {
   if (!project || project.status !== 'active') return [];
   const started = [];

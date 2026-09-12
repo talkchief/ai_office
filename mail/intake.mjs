@@ -6,6 +6,8 @@
 import { RateLimiter } from '../server/ratelimit.mjs';
 import { bodyText } from './inbound.mjs';
 import { mailParts } from './format.mjs';
+import { planProjectFrom } from '../project-planner.mjs';
+import { ROOT } from '../config.mjs';
 import { attachmentProblem, safeFileName, extensionOf, TEXT_EXTENSIONS } from '../channels/channel.mjs';
 import { isQuestion } from '../engine/deep-agents.mjs';
 import { extractDocument } from '../documents.mjs';

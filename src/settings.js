@@ -1361,10 +1361,30 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         return;
       }
       if (adminTab === 'tenants') {
-        const t = await api('/admin/tenants' + (adminQ ? '?q=' + encodeURIComponent(adminQ) : ''));
-        body.innerHTML = `<div class="mg-toolbar">${search('tenantQ', 'Search offices', adminQ)}<span class="mg-spacer"></span><span class="mg-muted">${t.tenants.length} office${t.tenants.length === 1 ? '' : 's'}</span></div>
+        const [t, oi] = await Promise.all([api('/admin/tenants' + (adminQ ? '?q=' + encodeURIComponent(adminQ) : '')), api('/admin/office-invites').catch(() => ({ invites: [] }))]);
+        // With registration closed, a new office starts here: name it and name its owner.
+        const newOffice = `<div class="mg-card"><div class="mg-card-head"><h3>New office</h3><span class="mg-count">${cfg.registration === 'open' ? 'anyone may also register one themselves' : 'registration is invitation-only, so offices start here'}</span></div>
+          <form id="newOfficeForm" class="mg-grid">
+          ${field('Office name', '<input name="name" required maxlength="80" placeholder="Northwind Trading">')}
+          ${field('Owner’s email', '<input name="ownerEmail" type="email" required placeholder="owner@company.com">', 'An address with an account here becomes the owner at once. A new address gets a one-time link — mailed to them if this platform can send — and the office is built the moment they choose a password.')}
+          <div class="mg-toolbar" style="margin:0;grid-column:1/-1"><button type="submit" class="mg-btn mg-btn-primary">Create the office</button></div></form>
+          <div id="newOfficeInvite"></div>
+          ${oi.invites.length ? `<h4 style="margin:14px 0 6px">Offices waiting to be opened</h4><div class="mg-ledger-wrap"><table class="mg-ledger"><tbody>${oi.invites.map(i => `<tr><td><span class="mg-name">${esc(i.officeName)}</span></td><td>${esc(i.email)}</td><td class="k">expires ${esc(when(i.expiresAt))}</td><td class="r"><button type="button" class="mg-btn mg-btn-sm mg-btn-danger" data-revoke-office="${esc(i.tokenHash)}">Revoke</button></td></tr>`).join('')}</tbody></table></div><p class="mg-intro">A link is shown once, when the office is created. To hand over a new one, revoke the invitation and create the office again.</p>` : ''}</div>`;
+        body.innerHTML = `${newOffice}<div class="mg-toolbar">${search('tenantQ', 'Search offices', adminQ)}<span class="mg-spacer"></span><span class="mg-muted">${t.tenants.length} office${t.tenants.length === 1 ? '' : 's'}</span></div>
           <div class="mg-ledger-wrap"><table class="mg-ledger"><thead><tr><th>Office</th><th>Owner</th><th>People</th><th>Teams</th><th>Tasks</th><th>Tokens</th><th>State</th><th class="r"></th></tr></thead><tbody>${t.tenants.map(x => `<tr><td><span class="mg-name">${esc(x.name)}</span><span class="mg-sub">${esc(x.slug)} · since ${esc(when(x.createdAt))}</span></td><td>${esc(x.owner?.email || '—')}</td><td class="k">${x.users}</td><td class="k">${x.teams ?? '—'}</td><td class="k">${x.tasks == null ? '—' : `${x.openTasks} open · ${x.tasks}`}</td><td class="k">${x.tokens == null ? '—' : Number(x.tokens).toLocaleString()}</td><td>${x.suspendedAt ? mark('fail', 'Suspended') : x.loaded ? mark('ok', x.running ? `Working · ${x.running}` : 'Loaded') : mark('off', 'Put away')}</td><td class="r"><button type="button" class="mg-btn mg-btn-sm ${x.suspendedAt ? '' : 'mg-btn-danger'}" data-tenant="${esc(x.id)}" data-act="${x.suspendedAt ? 'resume' : 'suspend'}">${x.suspendedAt ? 'Resume' : 'Suspend'}</button></td></tr>`).join('') || '<tr><td colspan="8" class="mg-muted">No offices yet.</td></tr>'}</tbody></table></div>`;
         $('tenantQ').oninput = () => { adminQ = $('tenantQ').value; clearTimeout(statusPoll); statusPoll = setTimeout(showAdmin, 300); };
+        $('newOfficeForm').onsubmit = async event => {
+          event.preventDefault(); const f = event.target, button = f.querySelector('button[type=submit]'); button.disabled = true;
+          try {
+            const r = await api('/admin/tenants', 'POST', { name: f.elements.name.value.trim(), ownerEmail: f.elements.ownerEmail.value.trim() });
+            if (r.ready) { toast(`${r.tenant.name} is open`, { kind: 'ok', detail: `${r.owner.email} owns it` }); f.reset(); await showAdmin(); return; }
+            // The link is shown once, here, whether or not the invitation could also be mailed.
+            $('newOfficeInvite').innerHTML = banner('ok', `<b>${esc(r.invite.officeName)} is waiting for ${esc(r.invite.email)}.</b> ${r.invite.sent ? 'The invitation was mailed to them. ' : ''}This link works once and expires ${esc(when(r.invite.expiresAt))}; the office is built when they choose a password.<br><code style="user-select:all;word-break:break-all">${esc(r.invite.link)}</code>`, '<button type="button" class="mg-btn mg-btn-sm" id="copyOfficeInvite">Copy link</button>');
+            $('copyOfficeInvite').onclick = () => navigator.clipboard?.writeText(r.invite.link).then(() => toast('Link copied', { kind: 'ok' })).catch(() => {});
+            f.reset();
+          } catch (error) { feedback(error.message, true); } finally { button.disabled = false; }
+        };
+        body.querySelectorAll('[data-revoke-office]').forEach(b => b.onclick = async () => { if (!confirm('Revoke this invitation? Its link stops working.')) return; try { await api('/admin/office-invites/revoke', 'POST', { hash: b.dataset.revokeOffice }); await showAdmin(); } catch (error) { feedback(error.message, true); } });
         body.querySelectorAll('[data-tenant]').forEach(b => b.onclick = async () => { if (b.dataset.act === 'suspend' && !confirm('Suspend this office? Its people are signed out and nothing runs until it is resumed.')) return; try { await api(`/admin/tenants/${b.dataset.tenant}/${b.dataset.act}`, 'POST', {}); await showAdmin(); } catch (error) { feedback(error.message, true); } });
         return;
       }

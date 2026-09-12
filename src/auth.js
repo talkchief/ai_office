@@ -125,7 +125,10 @@ export const officeReady = new Promise(resolve => {
         try {
           const inv = await api('invite/' + encodeURIComponent(inviteToken));
           show('accept');
-          $('acceptWho').textContent = `${inv.email} is invited to ${inv.office} as ${inv.role}.${inv.existing ? ' You already have an account: sign in with your password to join.' : ''}`;
+          $('authTitle').textContent = inv.newOffice ? 'Open your office' : 'You are invited';
+          $('acceptWho').textContent = inv.newOffice
+            ? `${inv.email} is invited to open ${inv.office}. Choose a password and the office is built for you, with you as its owner.${inv.existing ? ' You already have an account: sign in with your password instead.' : ''}`
+            : `${inv.email} is invited to ${inv.office} as ${inv.role}.${inv.existing ? ' You already have an account: sign in with your password to join.' : ''}`;
           $('accName').hidden = $('accNameLabel').hidden = !!inv.existing; $('accPasswordLabel').textContent = inv.existing ? 'Your password' : 'Choose a password';
         } catch (error) {
           // A used or expired link while signed in (the reload after accepting): carry on into the office.

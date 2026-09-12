@@ -281,10 +281,32 @@ await step('tests: the full suite passes', async () => {
       if (ts.json.turnstile.secretKey !== undefined || JSON.stringify(ts.json).includes('check-turnstile-secret')) throw new Error('the Turnstile secret came back from the panel');
       const page = await fetch(base + '/').then(r => r.text()); if (!page.includes('0xCHECKSITE')) throw new Error('the sign-in page did not get the Turnstile site key');
       if (page.includes('check-turnstile-secret')) throw new Error('the Turnstile secret key reached the page');
-      const noChallenge = await call('/api/auth/login', 'POST', { email: 'owner@check.test', password: 'owner-password-1' }, 'nobody'); if (noChallenge.status !== 403 || !/sign-in check/.test(noChallenge.json?.error || '')) throw new Error('a sign-in passed without the challenge: ' + noChallenge.status + ' ' + JSON.stringify(noChallenge.json));
+      // A visitor (anything with a forwarding header, as nginx adds) must pass the challenge…
+      const asVisitor = (body) => fetch(base + '/api/auth/login', { method: 'POST', headers: { origin: base, 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.7', 'x-forwarded-proto': 'https' }, body: JSON.stringify(body) }).then(async r => ({ status: r.status, ok: r.ok, json: await r.json().catch(() => null) }));
+      const noChallenge = await asVisitor({ email: 'owner@check.test', password: 'owner-password-1' }); if (noChallenge.status !== 403 || !/sign-in check/.test(noChallenge.json?.error || '')) throw new Error('a sign-in passed without the challenge: ' + noChallenge.status + ' ' + JSON.stringify(noChallenge.json));
+      // …while a sign-in from the server itself is the break-glass, so a broken widget cannot lock the panel away.
+      const breakGlass = await call('/api/auth/login', 'POST', { email: 'owner@check.test', password: 'owner-password-1' }, 'breakglass'); if (!breakGlass.ok) throw new Error('the local break-glass sign-in was refused: ' + breakGlass.status + ' ' + JSON.stringify(breakGlass.json));
       const off = await call('/api/admin/config', 'PUT', { turnstile: { clearKeys: true } }, 'admin'); if (!off.ok || off.json.turnstile.enabled) throw new Error('turnstile could not be turned off');
       const again = await call('/api/auth/login', 'POST', { email: 'owner@check.test', password: 'owner-password-1' }, 'nobody'); if (!again.ok) throw new Error('sign-in broken after turning Turnstile off: ' + again.status + ' ' + JSON.stringify(again.json));
-      return `${saved.json.error} · ${tenants.json.tenants.length} offices listed · mail set up in the panel, secrets masked · Turnstile gates the sign-in, then off again`;
+      return `${saved.json.error} · ${tenants.json.tenants.length} offices listed · mail set up in the panel, secrets masked · Turnstile gates a visitor's sign-in, lets the server's own through, then off again`;
+    });
+    await step('hosted: with registration closed the platform still opens an office — by invitation, built when its owner accepts', async () => {
+      const back = await call('/api/admin/config', 'PUT', { limits: { maxTeams: 10 }, registration: 'invite' }, 'admin'); if (!back.ok || back.json.registration !== 'invite') throw new Error('config: ' + JSON.stringify(back.json));
+      const shut = await call('/api/auth/register', 'POST', { officeName: 'Walk In', name: 'Walk In', email: 'walkin@check.test', password: 'walkin-password-1' }, 'walkin'); if (shut.status !== 403) throw new Error('registration is closed but a stranger registered: ' + shut.status);
+      const made = await call('/api/admin/tenants', 'POST', { name: 'Second Office', ownerEmail: 'newowner@check.test' }, 'admin');
+      if (made.status !== 201 || made.json.ready !== false || !made.json.invite?.link.includes('#invite=')) throw new Error('create office: ' + made.status + ' ' + JSON.stringify(made.json));
+      const waiting = await call('/api/admin/office-invites', 'GET', undefined, 'admin'); if (!waiting.json.invites.some(i => i.email === 'newowner@check.test' && i.officeName === 'Second Office')) throw new Error('waiting list: ' + JSON.stringify(waiting.json));
+      const token = made.json.invite.link.split('#invite=')[1];
+      const what = await call('/api/auth/invite/' + encodeURIComponent(token), 'GET', undefined, 'newowner'); if (!what.ok || what.json.newOffice !== true || what.json.office !== 'Second Office') throw new Error('invitation: ' + JSON.stringify(what.json));
+      const taken = await call('/api/auth/accept', 'POST', { token, name: 'New Owner', password: 'new-owner-password-1' }, 'newowner');
+      if (!taken.ok || taken.json.tenant?.name !== 'Second Office' || taken.json.user?.role !== 'owner') throw new Error('accept: ' + taken.status + ' ' + JSON.stringify(taken.json));
+      const fresh = await call('/api/health', 'GET', undefined, 'newowner'); if (!fresh.ok || !fresh.json.teams?.length) throw new Error('the new office was not built: ' + JSON.stringify(fresh.json).slice(0, 200));
+      const twice = await call('/api/admin/tenants', 'POST', { name: 'Third Office', ownerEmail: 'newowner@check.test' }, 'admin'); if (twice.status !== 409) throw new Error('an owner was given a second office: ' + twice.status);
+      const later = await call('/api/admin/tenants', 'POST', { name: 'Later Office', ownerEmail: 'later@check.test' }, 'admin'); if (later.status !== 201) throw new Error('second invitation: ' + later.status);
+      const hash = (await call('/api/admin/office-invites', 'GET', undefined, 'admin')).json.invites.find(i => i.email === 'later@check.test')?.tokenHash;
+      const gone = await call('/api/admin/office-invites/revoke', 'POST', { hash }, 'admin'); if (!gone.ok) throw new Error('revoke: ' + gone.status);
+      const dead = await call('/api/auth/accept', 'POST', { token: later.json.invite.link.split('#invite=')[1], name: 'L', password: 'later-password-1' }, 'later'); if (dead.status !== 410) throw new Error('a revoked invitation still worked: ' + dead.status);
+      return `${taken.json.tenant.slug} built on accept · ${fresh.json.teams.length} teams · a second office for the same owner refused · revoked link dead`;
     });
     await step('hosted: mail — a verified sender’s message becomes a task with its file; a repeat is one task; a stranger is dropped and audited', async () => {
       const profile = await call('/api/mail/profile'); if (!profile.ok || !profile.json.address) throw new Error('profile: ' + JSON.stringify(profile.json));

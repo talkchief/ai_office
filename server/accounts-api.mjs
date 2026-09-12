@@ -13,13 +13,16 @@ const text = (value, max = 200) => String(value ?? '').trim().slice(0, max);
 /** The routes that run before the gate: register, login, accept an invitation, logout. serve.mjs guards them (HTTPS or local, rate limit). */
 export function registerAuthRoutes(router, { accounts, platform, registry, turnstile = null, log = () => {} }) {
   // Cloudflare Turnstile, when the platform has its keys: the challenge is checked before a password is looked at.
-  const challenge = async input => { if (turnstile) await turnstile.check(input?.turnstile); };
+  // The break-glass is a sign-in from the server itself (`local`: a loopback socket, no forwarding header and a
+  // localhost Host — never a proxied visitor), so a widget that will not load, or a key typed wrong, cannot lock
+  // the administrator out of the panel that turns Turnstile off. Reach it with an SSH tunnel to the office's port.
+  const challenge = async (input, { local = false } = {}) => { if (turnstile && !local) await turnstile.check(input?.turnstile); };
   const signIn = (res, user, tenant, { secure, ua }) => { const s = accounts.createSession(user.id, tenant.id, { ua }); res.setHeader('Set-Cookie', sessionCookie(s.id, { secure })); return { user: publicUser({ ...user, tenantId: tenant.id, role: accounts.membership(user.id, tenant.id)?.role }, platform), tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name } }; };
   // A company registers its office: the person becomes its owner and the office is built at once.
-  router.on('POST', '/api/auth/register', async ({ req, res, secure, ua }) => {
+  router.on('POST', '/api/auth/register', async ({ req, res, secure, ua, local }) => {
     if (!platform.registrationOpen()) throw httpError('This platform is invitation-only. Ask an office owner for an invitation.', 403);
     const input = await body(req);
-    await challenge(input);
+    await challenge(input, { local });
     if (!text(input.officeName, 80)) throw httpError('Name the office you are creating.');
     const user = accounts.createUser({ email: input.email, name: input.name, password: input.password });
     const tenant = accounts.createTenant({ name: input.officeName, ownerId: user.id });
@@ -27,9 +30,9 @@ export function registerAuthRoutes(router, { accounts, platform, registry, turns
     log(`  registered: ${user.email} → ${tenant.name} (${tenant.slug})`);
     return { $status: 201, body: signIn(res, user, tenant, { secure, ua }) };
   });
-  router.on('POST', '/api/auth/login', async ({ req, res, secure, ua }) => {
+  router.on('POST', '/api/auth/login', async ({ req, res, secure, ua, local }) => {
     const input = await body(req);
-    await challenge(input);
+    await challenge(input, { local });
     const user = accounts.verifyLogin(input.email, input.password);
     if (!user) throw httpError('That email and password do not match.', 401);
     const tenants = accounts.tenantsOf(user.id).filter(t => !t.suspendedAt);
@@ -39,15 +42,17 @@ export function registerAuthRoutes(router, { accounts, platform, registry, turns
     if (!wanted) throw httpError(tenants.length ? 'You are not a member of that office.' : 'You are not a member of any office yet. Create one, or ask for an invitation.', 403);
     return signIn(res, user, wanted, { secure, ua });
   });
-  router.on('POST', '/api/auth/accept', async ({ req, res, secure, ua }) => {
+  router.on('POST', '/api/auth/accept', async ({ req, res, secure, ua, local }) => {
     const input = await body(req);
-    await challenge(input);
-    const { user, tenant } = accounts.acceptInvite(input.token, { name: input.name, password: input.password });
+    await challenge(input, { local });
+    const { user, tenant, created } = accounts.acceptInvite(input.token, { name: input.name, password: input.password });
+    // An invitation from the Platform panel carries an office that does not exist yet: it is built here, once.
+    if (created) { await registry.provision(tenant); log(`  office opened by invitation: ${user.email} → ${tenant.name} (${tenant.slug})`); }
     return signIn(res, user, tenant, { secure, ua });
   });
   router.on('POST', '/api/auth/logout', ({ res, cookie, secure }) => { accounts.logout(cookie); res.setHeader('Set-Cookie', clearCookie({ secure })); return { ok: true }; });
   // What an invitation is for, so the accept form can say which office and whether an account already exists.
-  router.on('GET', '/api/auth/invite/:token', ({ params }) => { const inv = accounts.inviteByToken(params.token); if (!inv || inv.acceptedAt || inv.expiresAt <= Date.now()) throw httpError('This invitation has expired or was already used.', 410); return { email: inv.email, role: inv.role, office: inv.tenantName, existing: !!accounts.userByEmail(inv.email) }; });
+  router.on('GET', '/api/auth/invite/:token', ({ params }) => { const inv = accounts.inviteByToken(params.token); if (!inv || inv.acceptedAt || inv.expiresAt <= Date.now()) throw httpError('This invitation has expired or was already used.', 410); return { email: inv.email, role: inv.role, office: inv.tenantName, newOffice: !inv.tenantId, existing: !!accounts.userByEmail(inv.email) }; });
 }
 
 /** The routes past the gate: who am I, the people of the office, member groups, the profile. */
