@@ -300,6 +300,61 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #settingsPage.mg .mg-upload input::file-selector-button{border:1px solid var(--mg-line2);border-radius:6px;padding:6px 10px;margin-right:10px;background:transparent;color:var(--ink);font:500 12px var(--ui);cursor:pointer}
 #settingsPage.mg .mg-upload small{color:var(--grey);font:11px var(--ui);width:100%}
 #settingsPage.mg .mg-doc{background:var(--mg-card);border:1px solid var(--hairline);border-radius:12px;padding:28px 32px;max-width:820px}
+
+/* ---- a project's Results: the address the CEO opens is the hero, then the summary as a document, then what it is made of ---- */
+#settingsPage.mg .mg-result-head{display:flex;flex-direction:column;gap:8px;margin:0 0 20px}
+#settingsPage.mg .mg-result-head h2{margin:0;font:400 27px/1.25 var(--serif);color:var(--ink);letter-spacing:.01em;max-width:32ch}
+#settingsPage.mg .mg-result-meta{font:500 11px/1.4 var(--mg-mono);letter-spacing:.04em;text-transform:uppercase;color:var(--mg-mute)}
+/* The plates: what was built, ready to open. The first is the one the CEO wants. */
+#settingsPage.mg .mg-opens{display:grid;gap:10px;margin:0 0 22px}
+#settingsPage.mg .mg-open{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:16px;padding:15px 18px;border:1px solid var(--hairline);border-radius:14px;background:var(--mg-card);color:var(--ink);text-decoration:none;transition:transform .14s var(--ease,ease),border-color .14s,box-shadow .14s}
+#settingsPage.mg .mg-open:hover{transform:translateY(-1px);border-color:var(--mg-gold);box-shadow:var(--mg-shadow)}
+#settingsPage.mg .mg-open-go{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:var(--mg-hover);color:var(--ink);font:16px/1 var(--ui)}
+#settingsPage.mg .mg-open-text{display:flex;flex-direction:column;gap:3px;min-width:0}
+#settingsPage.mg .mg-open-text b{font:600 14.5px/1.3 var(--ui);letter-spacing:.005em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#settingsPage.mg .mg-open-host{font:11.5px/1.3 var(--mg-mono);color:var(--grey);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#settingsPage.mg .mg-open-cta{font:600 10.5px/1 var(--mg-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--grey);white-space:nowrap}
+#settingsPage.mg .mg-open.primary{background:var(--ink);border-color:var(--ink);color:var(--cream)}
+#settingsPage.mg .mg-open.primary .mg-open-go{background:var(--mg-gold);color:#1B1A18}
+#settingsPage.mg .mg-open.primary .mg-open-host,#settingsPage.mg .mg-open.primary .mg-open-cta{color:color-mix(in srgb,var(--cream) 66%,var(--ink))}
+#settingsPage.mg .mg-open.primary:hover{border-color:var(--mg-gold)}
+/* The summary: a document that uses the width it has. */
+#settingsPage.mg .mg-doc.mg-summary{max-width:none;padding:34px 40px;font:14.5px/1.75 var(--ui);color:var(--ink)}
+#settingsPage.mg .mg-summary :is(p,li){font:inherit;overflow-wrap:anywhere}
+#settingsPage.mg .mg-summary p{margin:0 0 1.05em}
+#settingsPage.mg .mg-summary :is(h1,h2,h3){color:var(--ink);font-family:var(--serif);font-weight:400;line-height:1.25;letter-spacing:.01em}
+#settingsPage.mg .mg-summary h1{font-size:25px;margin:32px 0 12px}
+#settingsPage.mg .mg-summary h2{font-size:22px;margin:30px 0 11px}
+#settingsPage.mg .mg-summary h3{font-size:18px;margin:26px 0 9px}
+#settingsPage.mg .mg-summary>:first-child{margin-top:0}
+#settingsPage.mg .mg-summary ul{margin:0 0 1.05em;padding-left:0;list-style:none}
+#settingsPage.mg .mg-summary ul li{position:relative;padding:0 0 0 22px;margin:0 0 .85em}
+#settingsPage.mg .mg-summary ul li::before{content:"";position:absolute;left:4px;top:.72em;width:7px;height:7px;border-radius:2px;background:var(--mg-gold)}
+#settingsPage.mg .mg-summary ol{margin:0 0 1.05em;padding-left:22px}
+/* A bullet that opens with its own name reads as a title for what follows. */
+#settingsPage.mg .mg-summary li>strong:first-child,#settingsPage.mg .mg-summary li>p:first-child>strong:first-child{display:block;font:400 17px/1.35 var(--serif);letter-spacing:.01em;color:var(--ink);margin:0 0 3px}
+#settingsPage.mg .mg-summary strong{font-weight:600}
+#settingsPage.mg .mg-summary a{font-weight:600;color:var(--ink);text-decoration:underline;text-decoration-color:var(--mg-gold);text-decoration-thickness:2px;text-underline-offset:3px}
+#settingsPage.mg .mg-summary a:hover{background:var(--mg-hover);text-decoration-color:var(--ink)}
+#settingsPage.mg .mg-summary code{font:13px var(--mg-mono);background:var(--mg-hover);border-radius:5px;padding:1px 5px}
+#settingsPage.mg .mg-summary em{font-style:italic;color:var(--grey)}
+/* A file named in the prose is the file: its tile, its name, and it downloads. */
+#settingsPage.mg .mg-filelink{display:inline-flex;align-items:center;gap:6px;vertical-align:baseline;padding:1px 7px 1px 4px;border:1px solid var(--hairline);border-radius:7px;background:var(--mg-card);font:600 12.5px var(--mg-mono);color:var(--ink);text-decoration:none}
+#settingsPage.mg .mg-filelink:hover{border-color:var(--mg-gold);background:var(--mg-hover)}
+#settingsPage.mg .mg-filelink .file-icon{width:15px;height:19px;font-size:6px;flex:none}
+#settingsPage.mg .mg-urllink{font:600 13px var(--mg-mono);color:var(--ink);text-decoration:underline;text-decoration-color:var(--mg-gold);text-decoration-thickness:2px;text-underline-offset:3px;overflow-wrap:anywhere}
+#settingsPage.mg .mg-urllink:hover{background:var(--mg-hover)}
+/* What was delivered: one row per thing, its name as a title, and the file or address it is. */
+#settingsPage.mg .mg-deliv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 24px;align-items:start;padding:14px 0;border-top:1px solid var(--hairline)}
+#settingsPage.mg .mg-deliv:first-of-type{border-top:0}
+#settingsPage.mg .mg-deliv b{display:block;font:400 18px/1.3 var(--serif);letter-spacing:.01em;color:var(--ink)}
+#settingsPage.mg .mg-deliv span{display:block;margin-top:3px;font:13px/1.55 var(--ui);color:var(--grey)}
+#settingsPage.mg .mg-deliv-where{text-align:right;white-space:nowrap}
+#settingsPage.mg .mg-note-list{margin:0;padding:0;list-style:none;display:grid;gap:9px}
+#settingsPage.mg .mg-note-list li{position:relative;padding-left:16px;font:13.5px/1.6 var(--ui);color:var(--ink)}
+#settingsPage.mg .mg-note-list li::before{content:"";position:absolute;left:0;top:.62em;width:6px;height:6px;border-radius:50%;background:var(--mg-gold)}
+#settingsPage.mg .mg-results-section{margin-top:26px}
+@media (max-width:820px){#settingsPage.mg .mg-deliv{grid-template-columns:minmax(0,1fr)}#settingsPage.mg .mg-deliv-where{text-align:left}#settingsPage.mg .mg-doc.mg-summary{padding:24px 20px}#settingsPage.mg .mg-open{grid-template-columns:32px minmax(0,1fr)}#settingsPage.mg .mg-open-cta{display:none}}
 #settingsPage.mg .mg-snippet{color:var(--grey);font:12px/1.5 var(--ui);margin-top:4px;display:block}
 @media (max-width:900px){#settingsPage.mg .mg-brain{grid-template-columns:1fr}#settingsPage.mg .mg-folders{flex-direction:row;flex-wrap:wrap;position:static}#settingsPage.mg .mg-folders button{width:auto}}
 

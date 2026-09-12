@@ -624,23 +624,63 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     return `<div class="mg-ledger-wrap" style="margin:0"><table class="mg-ledger"><tbody>${rows.map(a => `<tr><td>${fileIcon(a.name)} <span class="mg-name">${esc(String(a.name).split('/').pop())}</span><span class="mg-sub">from “${esc(a.taskTitle)}”</span></td><td>${esc(size(a.bytes))}</td><td>${a.modifiedAt ? esc(dateShort(a.modifiedAt)) : ''}</td><td class="r"><a class="mg-btn mg-btn-sm" href="${esc(a.url)}" download>Download</a></td></tr>`).join('')}</tbody></table></div>`;
   };
   // The project's Results: the Program Manager's closing summary, the addresses it names, and every file the tasks produced.
+  const hostOf = url => { try { const u = new URL(url); return (u.host + (u.pathname === '/' ? '' : u.pathname)).replace(/\/$/, ''); } catch { return url; } };
+  const fileNames = arts => { const map = new Map(); for (const a of arts) { const name = String(a.name || ''); map.set(name.toLowerCase(), a); map.set(name.split('/').pop().toLowerCase(), a); } return map; };
+  const fileLink = a => `<a class="mg-filelink" href="${esc(a.url)}" download title="Download ${esc(a.name)}">${fileIcon(a.name)}<span>${esc(String(a.name).split('/').pop())}</span></a>`;
+  // Where a delivered thing lives: an address to open, a file to download, or, failing both, what the Program Manager wrote.
+  const whereLink = (where, byName) => {
+    const value = String(where || '').trim(); if (!value) return '';
+    if (/^https?:\/\//i.test(value)) return `<a class="mg-urllink" href="${esc(value)}" target="_blank" rel="noreferrer noopener">${esc(hostOf(value))} ↗</a>`;
+    const file = byName.get(value.toLowerCase()) || byName.get(value.split('/').pop().toLowerCase());
+    return file ? fileLink(file) : `<span class="mg-sub" style="margin:0">${esc(value)}</span>`;
+  };
+  // In the summary's prose, a file name becomes the file and an address becomes a link: the CEO clicks what they read.
+  const enrichSummary = (host, arts) => {
+    if (!host) return;
+    const byName = fileNames(arts);
+    // A bullet that opens with its own name becomes a title; the colon that joined it to the sentence has nothing left to join.
+    host.querySelectorAll('li > strong:first-child, li > p:first-child > strong:first-child').forEach(title => {
+      const next = title.nextSibling;
+      if (next && next.nodeType === 3) next.nodeValue = next.nodeValue.replace(/^s*[:—-]s*/, '');
+    });
+    host.querySelectorAll('code').forEach(code => {
+      const raw = code.textContent.trim(), key = raw.replace(/^[('"`]+|[)'"`.,;:]+$/g, '');
+      const file = byName.get(key.toLowerCase()) || byName.get(key.split('/').pop().toLowerCase());
+      if (file) { const el = document.createElement('span'); el.innerHTML = fileLink(file); code.replaceWith(el.firstChild); return; }
+      if (/^https?:\/\/\S+$/i.test(key)) { const a = document.createElement('a'); a.className = 'mg-urllink'; a.href = key; a.target = '_blank'; a.rel = 'noreferrer noopener'; a.textContent = key; code.replaceWith(a); }
+    });
+    // An address written as plain prose is still an address.
+    const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT, { acceptNode: node => node.parentElement.closest('a,code') || !/https?:\/\//.test(node.nodeValue) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    const texts = []; while (walker.nextNode()) texts.push(walker.currentNode);
+    for (const node of texts) {
+      const frag = document.createDocumentFragment(); let last = 0;
+      for (const m of node.nodeValue.matchAll(/https?:\/\/[^\s<>"')\]]+/g)) {
+        const url = m[0].replace(/[.,;:!?)\]}'"]+$/, '');
+        frag.append(node.nodeValue.slice(last, m.index));
+        const a = document.createElement('a'); a.className = 'mg-urllink'; a.href = url; a.target = '_blank'; a.rel = 'noreferrer noopener'; a.textContent = url; frag.append(a);
+        last = m.index + url.length;
+      }
+      frag.append(node.nodeValue.slice(last)); node.replaceWith(frag);
+    }
+  };
   const resultsCard = detail => {
-    const s = detail.project.summary || null, arts = detail.artifacts || [], bytes = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : b >= 1024 ? Math.round(b / 1024) + ' KB' : (b || 0) + ' B';
-    const links = (s?.links || []).map(l => `<a class="mg-btn mg-btn-sm" href="${esc(l.url)}" target="_blank" rel="noreferrer noopener">${esc(l.label || l.url)} ↗</a>`).join(' ');
-    const delivered = (s?.delivered || []).map(d => `<tr><td><span class="mg-name">${esc(d.what)}</span>${d.note ? `<span class="mg-sub">${esc(d.note)}</span>` : ''}</td><td>${esc(d.where || '')}</td></tr>`).join('');
-    const lines = (list, title) => list?.length ? `<h4 class="mg-eyebrow" style="margin:16px 0 6px">${title}</h4><ul class="mg-rules">${list.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
+    const s = detail.project.summary || null, arts = detail.artifacts || [], byName = fileNames(arts);
     const kinds = [...new Set(arts.map(artKind))], present = ART_KINDS.filter(([id]) => kinds.includes(id));
-    const filters = arts.length ? `<div class="mg-toolbar" style="margin:0 0 10px"><div class="mg-filters" id="spaceArtKinds">${[['', 'Everything'], ...(present.some(([id]) => DOC_KINDS.includes(id)) ? [['documents', 'Documents']] : []), ...present.map(([id, label]) => [id, label]), ...(kinds.includes('other') ? [['other', 'Other']] : [])].map(([id, label]) => `<button type="button" data-art-kind="${esc(id)}" aria-pressed="${projectArt.kind === id}">${esc(label)}</button>`).join('')}</div><span class="mg-spacer"></span><div class="mg-search">${SEARCH_ICON}<input id="spaceArtQ" placeholder="Search the files" value="${esc(projectArt.q)}"></div></div>` : '';
-    return `<div class="mg-card" style="margin-top:16px"><div class="mg-card-head"><h3>Results</h3><span class="mg-count">${arts.length} file${arts.length === 1 ? '' : 's'}</span></div>
-      ${s ? `<div class="mg-lead"><b>${esc(s.headline)}</b></div><div class="mg-sub">Written by the Program Manager${s.at ? ' · ' + esc(dateShort(s.at)) : ''}${s.tasks ? ` · from ${s.tasks} finished task${s.tasks === 1 ? '' : 's'}` : ''}</div>
-        ${links ? `<div class="mg-toolbar" style="margin:12px 0 4px">${links}</div>` : ''}
-        <div class="mg-doc" style="margin-top:12px">${renderDocument(s.text, 'summary').html}</div>
-        ${delivered ? `<h4 class="mg-eyebrow" style="margin:16px 0 6px">What was delivered</h4><div class="mg-ledger-wrap" style="margin:0"><table class="mg-ledger"><tbody>${delivered}</tbody></table></div>` : ''}
-        ${lines(s.open, 'Still open')}${lines(s.next, 'Next')}`
-        : `<p>The Program Manager writes this when every milestone is achieved and no task is open: what you asked for, what exists now, and where to open it.</p>`}
-      <h4 class="mg-eyebrow" style="margin:18px 0 6px">Artifacts</h4>
-      ${arts.length ? filters + `<div id="spaceArtList">${artRows(arts.filter(a => artMatches(a, projectArt)))}</div>` : '<p class="mg-sub">The project\'s tasks have produced no files yet.</p>'}
-      <div class="mg-toolbar" style="margin-top:14px"><button type="button" class="mg-btn mg-btn-sm" id="spaceWriteSummary">${s ? 'Write the summary again' : 'Write the summary now'}</button><span class="mg-count" id="spaceSummaryHint"></span></div></div>`;
+    // The plates: what exists, ready to open. The first address is the one the project was for.
+    const opens = (s?.links || []).map((l, i) => `<a class="mg-open${i ? '' : ' primary'}" href="${esc(l.url)}" target="_blank" rel="noreferrer noopener"><span class="mg-open-go" aria-hidden="true">↗</span><span class="mg-open-text"><b>${esc(l.label || hostOf(l.url))}</b><span class="mg-open-host">${esc(hostOf(l.url))}</span></span><span class="mg-open-cta">Open</span></a>`).join('');
+    const delivered = (s?.delivered || []).map(d => `<div class="mg-deliv"><div><b>${esc(d.what)}</b>${d.note ? `<span>${esc(d.note)}</span>` : ''}</div><div class="mg-deliv-where">${whereLink(d.where, byName)}</div></div>`).join('');
+    const notes = (list, title) => list?.length ? `<div class="mg-results-section"><h4 class="mg-eyebrow" style="margin:0 0 10px">${title}</h4><ul class="mg-note-list">${list.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '';
+    const filters = arts.length ? `<div class="mg-toolbar" style="margin:0 0 12px"><div class="mg-filters" id="spaceArtKinds">${[['', 'Everything'], ...(present.some(([id]) => DOC_KINDS.includes(id)) ? [['documents', 'Documents']] : []), ...present.map(([id, label]) => [id, label]), ...(kinds.includes('other') ? [['other', 'Other']] : [])].map(([id, label]) => `<button type="button" data-art-kind="${esc(id)}" aria-pressed="${projectArt.kind === id}">${esc(label)}</button>`).join('')}</div><span class="mg-spacer"></span><div class="mg-search">${SEARCH_ICON}<input id="spaceArtQ" placeholder="Search the files" value="${esc(projectArt.q)}"></div></div>` : '';
+    return `<div class="mg-card">
+      ${s ? `<div class="mg-result-head"><span class="mg-result-meta">The Program Manager${s.at ? ' · ' + esc(dateShort(s.at)) : ''}${s.tasks ? ` · ${s.tasks} finished task${s.tasks === 1 ? '' : 's'}` : ''}</span><h2>${esc(s.headline)}</h2></div>
+        ${opens ? `<div class="mg-opens">${opens}</div>` : ''}
+        <div class="mg-doc mg-summary" id="spaceSummaryDoc">${renderDocument(s.text, 'summary').html}</div>
+        ${delivered ? `<div class="mg-results-section"><h4 class="mg-eyebrow" style="margin:0 0 4px">What was delivered</h4>${delivered}</div>` : ''}
+        ${notes(s.open, 'Still open')}${notes(s.next, 'Next')}`
+        : `<div class="mg-result-head"><span class="mg-result-meta">Results</span><h2>Nothing to show yet</h2></div><p class="mg-intro">The Program Manager writes this when every milestone is achieved and no task is open: what you asked for, what exists now, and where to open it.</p>`}
+      <div class="mg-results-section"><div class="mg-card-head" style="margin-bottom:12px"><h3>Artifacts</h3><span class="mg-count">${arts.length} file${arts.length === 1 ? '' : 's'}</span></div>
+      ${arts.length ? filters + `<div id="spaceArtList">${artRows(arts.filter(a => artMatches(a, projectArt)))}</div>` : '<p class="mg-sub" style="margin:0">The project\'s tasks have produced no files yet.</p>'}</div>
+      <div class="mg-toolbar" style="margin-top:18px"><button type="button" class="mg-btn mg-btn-sm" id="spaceWriteSummary">${s ? 'Write the summary again' : 'Write the summary now'}</button><span class="mg-count" id="spaceSummaryHint"></span></div></div>`;
   };
   async function editProject(id, teams) {
     try {
@@ -677,6 +717,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       showPage();
       content.querySelectorAll('[data-project-tab]').forEach(b => b.onclick = () => { projectTab = b.dataset.projectTab; showPage(); });
       // The artifacts are filtered where they are: by kind, and by words in the file name or the task that made it.
+      enrichSummary($('spaceSummaryDoc'), detail.artifacts || []);
       const drawArts = () => { const list = $('spaceArtList'); if (list) list.innerHTML = artRows((detail.artifacts || []).filter(a => artMatches(a, projectArt))); };
       content.querySelectorAll('[data-art-kind]').forEach(b => b.onclick = () => { projectArt.kind = b.dataset.artKind; content.querySelectorAll('[data-art-kind]').forEach(x => x.setAttribute('aria-pressed', x.dataset.artKind === projectArt.kind)); drawArts(); });
       if ($('spaceArtQ')) { let timer = null; $('spaceArtQ').oninput = event => { projectArt.q = event.target.value.trim(); clearTimeout(timer); timer = setTimeout(drawArts, 250); }; }
