@@ -5,6 +5,7 @@
 import { DEPTS } from './data.js';
 import { renderDocument } from './task-output.js';
 import { flowSVG } from './milestone-flow.js';
+import { readyMilestones, tasksOf, milestoneState } from '../milestones.mjs';
 import { stateLabel } from './labels.js';
 import { fileIcon } from './fileicon.js';
 import { toast } from './toast.js';
@@ -623,6 +624,62 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     if (!rows.length) return '<p class="mg-sub" style="margin:0">No file matches.</p>';
     return `<div class="mg-ledger-wrap" style="margin:0"><table class="mg-ledger"><tbody>${rows.map(a => `<tr><td>${fileIcon(a.name)} <span class="mg-name">${esc(String(a.name).split('/').pop())}</span><span class="mg-sub">from “${esc(a.taskTitle)}”</span></td><td>${esc(size(a.bytes))}</td><td>${a.modifiedAt ? esc(dateShort(a.modifiedAt)) : ''}</td><td class="r"><a class="mg-btn mg-btn-sm" href="${esc(a.url)}" download>Download</a></td></tr>`).join('')}</tbody></table></div>`;
   };
+  // The Work: every milestone with its tasks under it. A milestone's state and the tasks that count for it follow the same rules
+  // as the board (milestones.mjs), so the two never disagree.
+  const MS_STATE = { done: ['ok', 'Achieved'], blocked: ['fail', 'Blocked'], waiting: ['warn', 'Waits for you'], active: ['busy', 'In progress'], idle: ['off', 'Queued'], unplanned: ['warn', 'To plan'], later: ['off', 'To come'] };
+  const taskMark = state => mark(state === 'done' ? 'ok' : ['blocked', 'escalated', 'failed'].includes(state) ? 'fail' : ['waiting', 'awaiting_ceo'].includes(state) ? 'warn' : ['working', 'planning', 'reviewing', 'saving', 'queued'].includes(state) ? 'busy' : 'off', stateLabel(state));
+  const taskWhen = t => t.dueAt ? 'due ' + dateShort(t.dueAt) : t.doneAt ? dateShort(t.doneAt) : t.createdAt ? dateShort(t.createdAt) : '';
+  const teamsOf = list => [...new Set(list.map(t => t.teamName).filter(Boolean))].join(', ');
+  const taskRow = (t, msId) => `<tr class="pw-task" data-ms-child="${esc(msId)}" data-open-task="${esc(t.id)}" tabindex="0" role="button" title="Open the task">
+    <td><span class="pw-tree" aria-hidden="true"></span><span class="mg-name">${esc(t.title)}</span>${t.resultPreview ? `<span class="mg-sub" style="font-family:var(--ui)">${esc(String(t.resultPreview).slice(0, 110))}</span>` : ''}</td>
+    <td>${taskMark(t.state)}</td><td class="pw-team">${esc(t.teamName || '')}</td><td class="r k">${esc(taskWhen(t))}</td></tr>`;
+  const projectWork = (detail, teams) => {
+    const p = detail.project, tasks = detail.tasks || [], ms = p.milestones || [];
+    const ready = readyMilestones(ms), readyIds = new Set(ready.map(m => m.id)), first = ready[0] || null, shown = new Set();
+    const groups = ms.map((m, i) => {
+      const own = tasksOf(ms, m, tasks, { first }); own.forEach(t => shown.add(t.id));
+      const state = milestoneState(m, own, readyIds.has(m.id)), [kind, label] = MS_STATE[state] || MS_STATE.later;
+      const done = own.filter(t => t.state === 'done').length, percent = own.length ? Math.round(done / own.length * 100) : m.done ? 100 : 0;
+      return `<tr class="pw-ms ${state}" data-ms="${esc(m.id)}">
+        <td><button type="button" class="pw-x" data-ms-toggle="${esc(m.id)}" aria-expanded="true" aria-label="Show or hide this milestone's tasks">⌄</button><b>Milestone ${i + 1} — ${esc(m.title)}</b><span class="pw-count">${own.length} task${own.length === 1 ? '' : 's'}</span></td>
+        <td><span class="pw-bar" title="${done} of ${own.length} done"><i style="width:${percent}%"></i></span>${mark(kind, label)}</td>
+        <td class="pw-team">${esc(teamsOf(own) || (p.teams || []).map(id => (teams || []).find(x => x.id === id)?.name || id).join(', '))}</td>
+        <td class="r k">${m.dueAt ? esc('due ' + dateShort(m.dueAt)) : ''}</td></tr>`
+        + own.map(t => taskRow(t, m.id)).join('')
+        + `<tr class="pw-add" data-ms-child="${esc(m.id)}"><td colspan="4"><button type="button" class="mg-btn mg-btn-sm" data-add-task="${esc(m.id)}">+ Add a task to this milestone</button></td></tr>`;
+    }).join('');
+    const loose = tasks.filter(t => !shown.has(t.id));
+    const rest = loose.length ? `<tr class="pw-ms later" data-ms="none"><td><button type="button" class="pw-x" data-ms-toggle="none" aria-expanded="true" aria-label="Show or hide">⌄</button><b>Not in a milestone</b><span class="pw-count">${loose.length} task${loose.length === 1 ? '' : 's'}</span></td><td></td><td class="pw-team">${esc(teamsOf(loose))}</td><td></td></tr>` + loose.map(t => taskRow(t, 'none')).join('') : '';
+    return `<div class="mg-card">
+      <div class="mg-card-head"><h3>The work</h3><span class="mg-count">${ms.length} milestone${ms.length === 1 ? '' : 's'} · ${tasks.length} task${tasks.length === 1 ? '' : 's'}</span><span class="mg-spacer"></span><button type="button" class="mg-btn mg-btn-primary mg-btn-sm" data-add-task="">+ New task</button></div>
+      <p class="mg-intro">Every milestone with the tasks that count for it. The Program Manager plans a milestone that has none; add one yourself when you want something specific. Open a task to follow it.</p>
+      ${ms.length || tasks.length ? `<div class="mg-ledger-wrap" style="margin:0"><table class="mg-ledger pw"><thead><tr><th>Task / milestone</th><th>Status</th><th>Team</th><th class="r">When</th></tr></thead><tbody>${groups}${rest}</tbody></table></div>`
+        : '<p class="mg-sub" style="margin:0">No milestones and no tasks yet. Add a milestone in the charter, or a task here.</p>'}
+      </div>` + newTaskModal(detail, teams);
+  };
+  // Adding a task: the title, which milestone it belongs to, who does it, how it is ranked, and when it is due.
+  const newTaskModal = (detail, teams) => {
+    const p = detail.project, ms = p.milestones || [], tasks = detail.tasks || [];
+    const ready = new Set(readyMilestones(ms).map(m => m.id));
+    const pick = ms.map((m, i) => { const own = tasks.filter(t => t.milestoneId === m.id && t.state !== 'cancelled'), done = own.filter(t => t.state === 'done').length;
+      return `<label class="pw-pick"><input type="radio" name="milestoneId" value="${esc(m.id)}"><span><b>Milestone ${i + 1} — ${esc(m.title)}</b><small>${own.length ? `${done} of ${own.length} done` : 'nothing planned'}${m.dueAt ? ' · due ' + esc(dateShort(m.dueAt)) : ''}${m.done ? ' · achieved' : ready.has(m.id) ? ' · can start now' : ' · waits for an earlier milestone'}</small></span></label>`; }).join('');
+    const prio = [[2, 'High', 'Ahead of the rest'], [1, 'Normal', 'The usual order'], [0, 'Low', 'When there is room']].map(([value, label, hint]) =>
+      `<label class="pw-prio"><input type="radio" name="priority" value="${value}" ${value === 1 ? 'checked' : ''}><span><b>${label}</b><small>${hint}</small></span></label>`).join('');
+    return `<div class="mg-modal" id="spaceTaskModal" hidden role="dialog" aria-modal="true" aria-label="New task"><div class="mg-modal-box pw-modal">
+      <div class="mg-modal-head"><h3>New task</h3><button type="button" class="mg-modal-x" data-task-close aria-label="Close">✕</button></div>
+      <form id="spaceNewTask" class="pw-form">
+        ${field('What needs to get done', '<input name="title" required maxlength="120" placeholder="Name the deliverable, not the activity">')}
+        <div class="pw-field"><span class="mg-eyebrow">Which milestone</span><div class="pw-picks">${pick}<label class="pw-pick"><input type="radio" name="milestoneId" value="" ${ms.length ? '' : 'checked'}><span><b>No milestone</b><small>It belongs to the project, not to a milestone</small></span></label></div></div>
+        ${field('The brief', '<textarea name="text" rows="4" placeholder="What it must contain, what to read first, what done looks like."></textarea>', 'Left empty, the team gets the title.')}
+        <div class="pw-field"><span class="mg-eyebrow">Priority</span><div class="pw-prios">${prio}</div></div>
+        <div class="mg-grid">
+          ${field('Team', `<select name="dept"><option value="">Program Manager chooses</option>${(teams || []).map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select>`)}
+          ${field('Due', '<input type="date" name="dueAt">')}
+          ${field('Start', '<select name="start"><option value="now">Start it now</option><option value="later">Save it for later</option></select>')}
+        </div>
+        <div class="mg-savebar"><span class="mg-savemsg" id="spaceNewTaskHint">The Program Manager plans it and brings in the teams it needs.</span><span class="mg-spacer"></span><button type="button" class="mg-btn" data-task-close>Cancel</button><button type="submit" class="mg-btn mg-btn-primary">Create task</button></div>
+      </form></div></div>`;
+  };
   // The project's Results: the Program Manager's closing summary, the addresses it names, and every file the tasks produced.
   const hostOf = url => { try { const u = new URL(url); return (u.host + (u.pathname === '/' ? '' : u.pathname)).replace(/\/$/, ''); } catch { return url; } };
   const fileNames = arts => { const map = new Map(); for (const a of arts) { const name = String(a.name || ''); map.set(name.toLowerCase(), a); map.set(name.split('/').pop().toLowerCase(), a); } return map; };
@@ -695,8 +752,8 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       const milestoneRow = (m = {}, i = p.milestones.length) => `<div class="mg-toolbar" data-milestone style="margin:0 0 8px;flex-wrap:nowrap"><span class="mg-count" style="width:22px;flex:none;text-align:right">${i + 1}.</span><input type="checkbox" class="mg-switch" name="mdone" ${m.done ? 'checked' : ''} title="Done" aria-label="Reached"><input name="mtitle" value="${esc(m.title || '')}" placeholder="Milestone" required style="flex:1;min-width:0;width:auto"><input name="mafter" value="${esc(afterText(m))}" placeholder="after #" title="The numbers of the milestones this one waits for. Blank: the one before it. – : none, it can start at once." style="width:72px;flex:none"><input type="date" name="mdue" value="${dayOf(m.dueAt)}" style="width:170px;flex:none"><input type="hidden" name="mid" value="${esc(m.id || '')}"><button type="button" class="space-text-action" data-remove-milestone>Remove</button></div>`;
       setMeta(p.id ? projectMark(p) : mark('off', 'Not saved yet'));
       content.innerHTML = `<div class="mg-toolbar"><button type="button" class="mg-btn mg-btn-sm" id="spaceBackProjects">← All projects</button><span class="mg-spacer"></span>${p.id ? `<label>State <select id="spaceProjectStatus">${['active', 'paused', 'done', 'archived'].map(st => `<option value="${st}" ${st === p.status ? 'selected' : ''}>${st}</option>`).join('')}</select></label><button type="button" class="mg-btn mg-btn-sm mg-btn-danger" id="spaceDeleteProject">Delete project</button>` : ''}</div>
-        ${p.id ? `<nav class="mg-subnav" role="tablist" aria-label="Project pages">${[['work', 'The work', detail.tasks.length], ['results', 'Results', (detail.artifacts || []).length]].map(([id, label, n]) => `<button type="button" class="mg-tab" data-project-tab="${id}" aria-pressed="${projectTab === id}">${label}${n ? `<span class="mg-n">${n}</span>` : ''}</button>`).join('')}</nav>` : ''}
-        <div data-project-page="work">
+        ${p.id ? `<nav class="mg-subnav" role="tablist" aria-label="Project pages">${[['charter', 'Project charter', ''], ['tasks', 'Project work', detail.tasks.length], ['results', 'Results', (detail.artifacts || []).length]].map(([id, label, n]) => `<button type="button" class="mg-tab" data-project-tab="${id}" aria-pressed="${projectTab === id}">${label}${n ? `<span class="mg-n">${n}</span>` : ''}</button>`).join('')}</nav>` : ''}
+        <div data-project-page="charter">
         <form id="spaceProjectForm" data-dirty novalidate><div class="mg-card"><div class="mg-card-head"><h3>${p.id ? esc(p.name) : 'New project'}</h3><span class="mg-count">${p.id ? `${esc(detail.project.page)} · ${detail.tasks.length} task${detail.tasks.length === 1 ? '' : 's'} · ${detail.files.length} file${detail.files.length === 1 ? '' : 's'}` : 'write the charter the way you would brief a new hire'}</span></div>
           <div class="mg-grid">${field('Name', `<input name="name" value="${esc(p.name)}" required maxlength="80">`)}${field('Start', `<input type="date" name="startAt" value="${dayOf(p.startAt)}">`)}${field('Target date', `<input type="date" name="dueAt" value="${dayOf(p.dueAt)}">`)}</div>
           <div style="margin-top:14px">${field('Purpose', `<textarea name="description" rows="2" required placeholder="What this project is for and what done looks like.">${esc(p.description)}</textarea>`)}${field('Charter', `<textarea name="charter" rows="8" placeholder="Scope and what is out of scope, objectives and how success is measured, constraints, stakeholders, the standards to follow, the decisions already made.">${esc(p.charter)}</textarea>`, 'Every task of this project starts from this.')}</div></div>
@@ -707,12 +764,13 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         </form>
         ${p.id ? `<div class="mg-card" style="margin-top:16px"><div class="mg-card-head"><h3>Files</h3><span class="mg-count">${detail.files.length}</span></div><p>Uploads land in the project's Brain folder, where every task of this project can read them.</p><div class="mg-upload"><input type="file" id="spaceProjectFiles" multiple accept=".pdf,.docx,.txt,.md,.csv"><button type="button" class="mg-btn mg-btn-sm" id="spaceProjectUpload">Upload</button><small>PDF, Word, text, Markdown or CSV · up to 25 MB each.</small></div>
           ${detail.files.length ? `<div class="mg-ledger-wrap" style="margin:0"><table class="mg-ledger"><tbody>${detail.files.map(f => `<tr><td>${fileIcon(f.id)} <span class="mg-name">${esc(f.title || f.id.split('/').pop())}</span><span class="mg-sub">${esc(f.id)}</span></td><td class="k r">${f.updatedAt ? esc(when(f.updatedAt)) : ''}</td></tr>`).join('')}</tbody></table></div>` : ''}</div>
-          <div class="mg-card"><div class="mg-card-head"><h3>Tasks</h3><span class="mg-count">${detail.tasks.length}</span></div><form id="spaceProjectTask" class="mg-toolbar"><div class="mg-search" style="flex:1">${SEARCH_ICON}<input name="text" placeholder="Add a task to this project" required></div><button type="submit" class="mg-btn mg-btn-primary">Add task</button></form>
-          ${detail.tasks.length ? `<div class="mg-ledger-wrap" style="margin:0"><table class="mg-ledger"><thead><tr><th>Task</th><th>Team</th><th>State</th><th class="r"></th></tr></thead><tbody>${detail.tasks.map(t => `<tr><td><span class="mg-name">${esc(t.title)}</span>${t.resultPreview ? `<span class="mg-sub" style="font-family:var(--ui)">${esc(String(t.resultPreview).slice(0, 120))}</span>` : ''}</td><td>${esc(t.teamName)}</td><td>${mark(t.state === 'done' ? 'ok' : ['blocked', 'failed'].includes(t.state) ? 'fail' : t.state === 'waiting' ? 'warn' : ['working', 'planning', 'reviewing'].includes(t.state) ? 'busy' : 'off', stateLabel(t.state))}</td><td class="r"><button type="button" class="mg-btn mg-btn-sm" data-open-task="${esc(t.id)}">Open</button> ${!['done', 'cancelled'].includes(t.state) ? `<button type="button" class="space-text-action" data-cancel-task="${esc(t.id)}">Cancel</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<p class="mg-intro" style="margin:0">No tasks yet. Add the first one above, or pick this project on the task form.</p>'}</div>` : ''}
+        ` : ''}
         </div>
+        <div data-project-page="tasks">${p.id ? projectWork(detail, teams) : ''}</div>
         <div data-project-page="results">${p.id ? resultsCard(detail) : ''}</div>`;
       // The work and the Results are two pages of the same project: a finished project opens on its Results.
-      if (p.id && !projectSeen.has(p.id)) { projectSeen.add(p.id); projectTab = detail.project.summary?.text ? 'results' : 'work'; }
+      if (!p.id) projectTab = 'charter';
+      else if (!projectSeen.has(p.id)) { projectSeen.add(p.id); projectTab = detail.project.summary?.text ? 'results' : 'tasks'; }
       const showPage = () => { content.querySelectorAll('[data-project-page]').forEach(el => el.hidden = el.dataset.projectPage !== projectTab); content.querySelectorAll('[data-project-tab]').forEach(b => b.setAttribute('aria-pressed', b.dataset.projectTab === projectTab)); };
       showPage();
       content.querySelectorAll('[data-project-tab]').forEach(b => b.onclick = () => { projectTab = b.dataset.projectTab; showPage(); });
@@ -735,7 +793,37 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       if (p.id) {
         $('spaceProjectStatus').onchange = async event => { try { await api(`/projects/${p.id}/status`, 'POST', { status: event.target.value }); toast(`Project is now ${event.target.value}`, { kind: 'ok' }); dropSummary(); await editProject(p.id, teams); } catch (error) { feedback(error.message, true); } };
         $('spaceProjectUpload').onclick = async () => { const files = [...($('spaceProjectFiles').files || [])]; if (!files.length) return feedback('Choose a file first.', true); try { for (const file of files) { if (file.size > 25 * 1024 * 1024) throw new Error(`${file.name} is larger than 25 MB.`); toast(`Adding ${file.name}…`, { kind: 'info', ms: 2500 }); await api(`/projects/${p.id}/upload`, 'POST', { name: file.name, data: await readFile(file) }); } toast(`${files.length} file${files.length === 1 ? '' : 's'} added to the project`, { kind: 'ok' }); await editProject(p.id, teams); } catch (error) { feedback(error.message, true); } };
-        $('spaceProjectTask').onsubmit = async event => { event.preventDefault(); const text = event.target.elements.text.value.trim(); if (!text) return; try { await api('/tasks', 'POST', { dept: 'auto', depts: 'auto', text, projectId: p.id }); toast('Task added to the project', { kind: 'ok', detail: 'The Program Manager has it.' }); await editProject(p.id, teams); } catch (error) { feedback(error.message, true); } };
+        // A milestone folds its tasks away; the rows under it carry its id.
+        const foldMilestone = (id, open) => content.querySelectorAll(`[data-ms-child="${CSS.escape(id)}"]`).forEach(row => { row.hidden = !open; });
+        content.querySelectorAll('[data-ms-toggle]').forEach(b => b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); foldMilestone(b.dataset.msToggle, open); });
+        // Adding a task: the dialog opens on the milestone the CEO pressed.
+        const taskModal = $('spaceTaskModal');
+        const closeTaskModal = () => { if (taskModal) { taskModal.hidden = true; $('spaceNewTask')?.reset(); } };
+        content.querySelectorAll('[data-add-task]').forEach(b => b.onclick = () => {
+          if (!taskModal) return;
+          const wanted = b.dataset.addTask, radios = [...taskModal.querySelectorAll('[name=milestoneId]')];
+          const pick = (wanted && radios.find(r => r.value === wanted)) || radios.find(r => r.value) || radios[0];
+          if (pick) pick.checked = true;
+          taskModal.hidden = false; taskModal.querySelector('[name=title]').focus();
+        });
+        if (taskModal) {
+          taskModal.onclick = event => { if (event.target === taskModal || event.target.closest('[data-task-close]')) closeTaskModal(); };
+          taskModal.onkeydown = event => { if (event.key === 'Escape') closeTaskModal(); };
+          $('spaceNewTask').onsubmit = async event => {
+            event.preventDefault();
+            const form = event.target, title = form.elements.title.value.trim(); if (!title) return;
+            const dept = form.elements.dept.value, brief = form.elements.text.value.trim();
+            const button = form.querySelector('button[type=submit]'); button.disabled = true; $('spaceNewTaskHint').textContent = 'Creating…';
+            try {
+              await api('/tasks', 'POST', { title, text: brief || title, projectId: p.id, milestoneId: form.elements.milestoneId.value || undefined,
+                priority: Number(form.elements.priority.value), dueAt: form.elements.dueAt.value || undefined, backlog: form.elements.start.value === 'later',
+                ...(dept ? { dept } : { dept: 'auto', depts: 'auto' }) });
+              closeTaskModal(); projectTab = 'tasks';
+              toast('Task added', { kind: 'ok', detail: form.elements.start.value === 'later' ? 'Saved for later; start it when you want it.' : 'The team has it.' });
+              await editProject(p.id, teams);
+            } catch (error) { button.disabled = false; $('spaceNewTaskHint').textContent = ''; feedback(error.message, true); }
+          };
+        }
         $('spaceWriteSummary').onclick = async event => {
           const button = event.currentTarget; button.disabled = true; $('spaceSummaryHint').textContent = 'The Program Manager is reading the project…';
           try { await api(`/projects/${p.id}/summary`, 'POST', {}); await editProject(p.id, teams); toast('Summary written', { kind: 'ok' }); }

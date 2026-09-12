@@ -301,6 +301,44 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #settingsPage.mg .mg-upload small{color:var(--grey);font:11px var(--ui);width:100%}
 #settingsPage.mg .mg-doc{background:var(--mg-card);border:1px solid var(--hairline);border-radius:12px;padding:28px 32px;max-width:820px}
 
+/* ---- a project's Work: milestones with their tasks under them ---- */
+#settingsPage.mg .mg-ledger.pw td{vertical-align:middle}
+#settingsPage.mg .pw .pw-ms>td{background:var(--mg-rail);border-top:1px solid var(--hairline);padding-top:13px;padding-bottom:13px}
+#settingsPage.mg .pw .pw-ms:first-child>td{border-top:0}
+#settingsPage.mg .pw .pw-ms b{font:600 13.5px/1.4 var(--ui);color:var(--ink)}
+#settingsPage.mg .pw .pw-count{margin-left:10px;font:500 11px var(--mg-mono);color:var(--grey);white-space:nowrap}
+#settingsPage.mg .pw .pw-x{border:0;background:transparent;color:var(--grey);font:13px/1 var(--ui);cursor:pointer;padding:0 9px 0 0;height:auto}
+#settingsPage.mg .pw .pw-x[aria-expanded=false]{transform:rotate(-90deg);display:inline-block}
+#settingsPage.mg .pw .pw-bar{display:inline-block;width:78px;height:4px;border-radius:2px;background:color-mix(in srgb,var(--ink) 12%,transparent);overflow:hidden;margin-right:10px;vertical-align:middle}
+#settingsPage.mg .pw .pw-bar i{display:block;height:100%;width:0;border-radius:2px;background:var(--mg-ok)}
+#settingsPage.mg .pw .pw-ms.blocked .pw-bar i{background:var(--mg-fail)}
+#settingsPage.mg .pw .pw-ms.waiting .pw-bar i,#settingsPage.mg .pw .pw-ms.unplanned .pw-bar i{background:var(--mg-warn)}
+#settingsPage.mg .pw .pw-ms.active .pw-bar i{background:var(--mg-busy)}
+#settingsPage.mg .pw .pw-task{cursor:pointer}
+#settingsPage.mg .pw .pw-task:hover>td{background:var(--mg-hover)}
+#settingsPage.mg .pw .pw-task:focus-visible>td{background:var(--mg-hover);outline:2px solid var(--mg-busy);outline-offset:-2px}
+#settingsPage.mg .pw .pw-tree{display:inline-block;width:26px;height:11px;margin:0 6px 2px 10px;border-left:2px solid color-mix(in srgb,var(--ink) 18%,transparent);border-bottom:2px solid color-mix(in srgb,var(--ink) 18%,transparent);border-bottom-left-radius:5px;vertical-align:middle}
+#settingsPage.mg .pw .pw-team{color:var(--grey);font:12px var(--ui);white-space:nowrap}
+#settingsPage.mg .pw .pw-add>td{padding-top:6px;padding-bottom:12px}
+#settingsPage.mg .pw .pw-add .mg-btn{margin-left:42px;color:var(--grey)}
+#settingsPage.mg .pw .pw-add .mg-btn:hover{color:var(--ink)}
+/* Adding a task: one dialog, the milestone chosen from the ones the project has. */
+#settingsPage.mg .pw-modal{width:min(680px,100%);max-height:88vh;display:flex;flex-direction:column}
+#settingsPage.mg .pw-form{overflow:auto;padding:20px 22px 0}
+#settingsPage.mg .pw-field{margin:16px 0 0}
+#settingsPage.mg .pw-picks{display:grid;gap:8px;margin-top:8px}
+#settingsPage.mg .pw-pick,#settingsPage.mg .pw-prio{display:flex;align-items:flex-start;gap:10px;padding:10px 13px;border:1px solid var(--hairline);border-radius:10px;cursor:pointer}
+#settingsPage.mg .pw-pick:hover,#settingsPage.mg .pw-prio:hover{border-color:var(--mg-line2)}
+#settingsPage.mg .pw-pick:has(input:checked),#settingsPage.mg .pw-prio:has(input:checked){border-color:var(--ink);background:var(--mg-hover)}
+#settingsPage.mg .pw-pick input,#settingsPage.mg .pw-prio input{margin:2px 0 0;width:auto;flex:none;accent-color:var(--ink)}
+#settingsPage.mg .pw-pick>span,#settingsPage.mg .pw-prio>span{flex:1;min-width:0}
+#settingsPage.mg .pw-picks{max-height:246px;overflow:auto}
+#settingsPage.mg .pw-pick b,#settingsPage.mg .pw-prio b{display:block;font:600 12.5px/1.4 var(--ui);color:var(--ink)}
+#settingsPage.mg .pw-pick small,#settingsPage.mg .pw-prio small{display:block;margin-top:2px;font:11.5px/1.4 var(--mg-mono);color:var(--grey)}
+#settingsPage.mg .pw-prios{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+#settingsPage.mg .pw-form .mg-savebar{position:sticky;bottom:0;margin:18px -22px 0;border-radius:0}
+@media (max-width:640px){#settingsPage.mg .pw-prios{grid-template-columns:1fr}}
+
 /* ---- a project's Results: the address the CEO opens is the hero, then the summary as a document, then what it is made of ---- */
 #settingsPage.mg .mg-result-head{display:flex;flex-direction:column;gap:8px;margin:0 0 20px}
 #settingsPage.mg .mg-result-head h2{margin:0;font:400 27px/1.25 var(--serif);color:var(--ink);letter-spacing:.01em;max-width:32ch}
