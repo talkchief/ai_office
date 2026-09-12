@@ -341,7 +341,7 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 /* A file named in the prose is the file: its tile, its name, and it downloads. */
 #settingsPage.mg .mg-filelink{display:inline-flex;align-items:center;gap:6px;vertical-align:baseline;padding:1px 7px 1px 4px;border:1px solid var(--hairline);border-radius:7px;background:var(--mg-card);font:600 12.5px var(--mg-mono);color:var(--ink);text-decoration:none}
 #settingsPage.mg .mg-filelink:hover{border-color:var(--mg-gold);background:var(--mg-hover)}
-#settingsPage.mg .mg-filelink .file-icon{width:15px;height:19px;font-size:6px;flex:none}
+#settingsPage.mg .mg-filelink .file-icon{margin-right:0;vertical-align:-8px}
 #settingsPage.mg .mg-urllink{font:600 13px var(--mg-mono);color:var(--ink);text-decoration:underline;text-decoration-color:var(--mg-gold);text-decoration-thickness:2px;text-underline-offset:3px;overflow-wrap:anywhere}
 #settingsPage.mg .mg-urllink:hover{background:var(--mg-hover)}
 /* What was delivered: one row per thing, its name as a title, and the file or address it is. */
