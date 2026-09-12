@@ -690,6 +690,8 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     const p = detail.project, all = detail.tasks || [], ms = p.milestones || [];
     // Who is on it: the office's own names, so a row says the team and the person, not an id.
     const nameOf = id => (roster?.agents || []).find(a => a.id === id)?.name || '';
+    // The teams a set of tasks is spread across, named once each.
+    const teamsOf = list => [...new Set(list.map(x => x.teamName).filter(Boolean))].join(', ');
     const leadOf = t => nameOf((t.runs || []).filter(r => r.role === 'lead' && r.agent).at(-1)?.agent) || nameOf(t.agent);
     const tasks = all.filter(t => t.state !== 'cancelled'), ready = readyMilestones(ms), readyIds = new Set(ready.map(m => m.id)), first = ready[0] || null, seen = new Set();
     const rows = ms.map((m, i) => {
@@ -714,6 +716,8 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       <div class="pw-row pw-ms">
         <div class="pw-name"><button type="button" class="pw-x" data-ms-toggle="${esc(m.id)}" aria-expanded="true" aria-label="Show or hide the tasks of this milestone"><svg viewBox="0 0 16 16" class="pw-i"><path d="M4 6.2l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         ${pwRing(chip[0])}<span class="pw-title"><b>Milestone ${i + 1} — ${esc(m.title)}</b><span class="pw-kids">${PW_ICON.fork}${own.length}</span></span></div>
+        <div class="pw-teamcol">${esc(teamsOf(own) || (p.teams || []).map(id => (teams || []).find(x => x.id === id)?.name || id).join(', '))}</div>
+        <div class="pw-who"></div>
         <div class="pw-progress"><span class="pw-bar ${chip[0]}"><i style="width:${percent}%"></i></span><em>${percent}%</em></div>
         <div class="pw-status">${pwChip(chip)}</div>
         <div class="pw-when">${pwWhen(m.doneAt || m.dueAt) || '<b>—</b>'}${m.dueAt && !m.doneAt ? '<span class="pw-due">due</span>' : ''}</div>
@@ -721,22 +725,24 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       <div class="pw-kidrows" data-ms-child="${esc(m.id)}">
         ${own.length ? own.map(t => task(t)).join('') : (() => {
           const by = m.done && m.taskId ? all.find(t => t.id === m.taskId) : null;
-          if (by) return `<div class="pw-row pw-task" data-open-task="${esc(by.id)}" role="button" tabindex="0" title="Open the task that achieved this"><div class="pw-name"><span class="pw-tree" aria-hidden="true"></span><span class="pw-nox" aria-hidden="true"></span>${pwRing('ok')}<span class="pw-tt">${esc(by.title)}<span class="pw-team">achieved it${by.teamName ? ' · ' + esc(by.teamName) : ''}</span></span></div><div class="pw-progress pw-progress-task ok">achieved</div><div class="pw-status">${pwChip(TASK_CHIP(by.state))}</div><div class="pw-when">${pwWhen(m.doneAt || by.doneAt)}</div></div>`;
-          return `<div class="pw-row pw-empty"><div class="pw-name"><span class="pw-tree" aria-hidden="true"></span>${m.done ? 'Achieved before the office tracked tasks against milestones.' : readyIds.has(m.id) ? 'Nothing planned yet — the Program Manager takes this milestone, or add a task yourself.' : 'Nothing planned yet; it waits for the milestone before it.'}</div><div></div><div></div><div></div></div>`;
+          if (by) return `<div class="pw-row pw-task" data-open-task="${esc(by.id)}" role="button" tabindex="0" title="Open the task that achieved this"><div class="pw-name"><span class="pw-tree" aria-hidden="true"></span><span class="pw-nox" aria-hidden="true"></span>${pwRing('ok')}<span class="pw-tt">${esc(by.title)}<span class="pw-team">achieved it</span></span></div><div class="pw-teamcol">${esc(by.teamName || '')}</div><div class="pw-who">${esc([...new Set((by.subtasks || []).map(s => nameOf(s.agent)).filter(Boolean))].slice(0, 2).join(', '))}</div><div class="pw-progress pw-progress-task ok">achieved</div><div class="pw-status">${pwChip(TASK_CHIP(by.state))}</div><div class="pw-when">${pwWhen(m.doneAt || by.doneAt)}</div></div>`;
+          return `<div class="pw-row pw-empty"><div class="pw-name"><span class="pw-tree" aria-hidden="true"></span>${m.done ? 'Achieved before the office tracked tasks against milestones.' : readyIds.has(m.id) ? 'Nothing planned yet — the Program Manager takes this milestone, or add a task yourself.' : 'Nothing planned yet; it waits for the milestone before it.'}</div></div>`;
         })()}
-        <div class="pw-row pw-addrow"><div class="pw-name"><button type="button" class="pw-add" data-add-task="${esc(m.id)}">${PW_ICON.plus}Add a task to this milestone</button></div><div></div><div></div><div></div></div>
+        <div class="pw-row pw-addrow"><div class="pw-name"><button type="button" class="pw-add" data-add-task="${esc(m.id)}">${PW_ICON.plus}Add a task to this milestone</button></div></div>
       </div></div>`;
     const task = t => { const c = TASK_CHIP(t.state), steps = t.subtasks || [];
       // Who is on it: the specialists the work was given to, and the lead when nothing has been handed out yet.
       const people = [...new Set(steps.map(s => nameOf(s.agent)).filter(Boolean))];
       const who = people.length ? people.slice(0, 2).join(", ") + (people.length > 2 ? ` +${people.length - 2} more` : "") : leadOf(t);
       return `<div class="pw-row pw-task" data-open-task="${esc(t.id)}" role="button" tabindex="0" title="Open this task">
-      <div class="pw-name"><span class="pw-tree" aria-hidden="true"></span>${steps.length ? `<button type="button" class="pw-x pw-x-step" data-steps-toggle="${esc(t.id)}" aria-expanded="false" aria-label="Show what this task was broken into"><svg viewBox="0 0 16 16" class="pw-i"><path d="M4 6.2l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>` : '<span class="pw-nox" aria-hidden="true"></span>'}${pwRing(c[0])}<span class="pw-tt">${esc(t.title)}<span class="pw-team">${esc(t.teamName || '')}${who ? ` · ${esc(who)}` : ''}${steps.length ? ` · ${steps.filter(s => s.state === 'done').length} of ${steps.length} assignment${steps.length === 1 ? '' : 's'}` : ''}</span></span></div>
+      <div class="pw-name"><span class="pw-tree" aria-hidden="true"></span>${steps.length ? `<button type="button" class="pw-x pw-x-step" data-steps-toggle="${esc(t.id)}" aria-expanded="false" aria-label="Show what this task was broken into"><svg viewBox="0 0 16 16" class="pw-i"><path d="M4 6.2l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>` : '<span class="pw-nox" aria-hidden="true"></span>'}${pwRing(c[0])}<span class="pw-tt">${esc(t.title)}${steps.length ? `<span class="pw-team">${steps.filter(s => s.state === 'done').length} of ${steps.length} assignment${steps.length === 1 ? '' : 's'}</span>` : ''}</span></div>
+      <div class="pw-teamcol">${esc(t.teamName || '')}</div>
+      <div class="pw-who">${who ? esc(who) : '<span class="pw-none">not handed out</span>'}</div>
       <div class="pw-progress pw-progress-task ${c[0]}">${esc(pwTaskProgress(t))}</div>
       <div class="pw-status">${pwChip(c)}</div>
       <div class="pw-when">${pwWhen(t.doneAt || t.dueAt || t.createdAt)}</div></div>`
       + (steps.length ? `<div class="pw-steps" data-steps="${esc(t.id)}" hidden>${steps.map(s => { const sc = STEP_CHIP(s.state);
-        return `<div class="pw-row pw-step" data-open-task="${esc(t.id)}" role="button" tabindex="0" title="Open the task this belongs to"><div class="pw-name"><span class="pw-tree pw-tree-2" aria-hidden="true"></span>${pwRing(sc[0])}<span class="pw-tt">${esc(String(s.title).slice(0, 120))}${nameOf(s.agent) ? `<span class="pw-team">${esc(nameOf(s.agent))}</span>` : ''}</span></div><div class="pw-progress"></div><div class="pw-status">${pwChip(sc)}</div><div class="pw-when"></div></div>`; }).join('')}</div>` : ''); };
+        return `<div class="pw-row pw-step" data-open-task="${esc(t.id)}" role="button" tabindex="0" title="Open the task this belongs to"><div class="pw-name"><span class="pw-tree pw-tree-2" aria-hidden="true"></span>${pwRing(sc[0])}<span class="pw-tt">${esc(String(s.title).slice(0, 120))}</span></div><div class="pw-teamcol"></div><div class="pw-who">${esc(nameOf(s.agent) || '')}</div><div class="pw-progress"></div><div class="pw-status">${pwChip(sc)}</div><div class="pw-when"></div></div>`; }).join('')}</div>` : ''); };
 
     return `<section class="pw">
       <div class="pw-head">
@@ -765,10 +771,10 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         </div>
       </div>
       <div class="pw-table">
-        <div class="pw-row pw-headrow"><div class="pw-name"><button type="button" class="pw-x" id="spacePwFold" aria-expanded="true" aria-label="Fold every milestone"><svg viewBox="0 0 16 16" class="pw-i"><path d="M4 6.2l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>Task / milestone</div><div class="pw-progress">Progress</div><div class="pw-status">Status</div><div class="pw-when">When</div></div>
+        <div class="pw-row pw-headrow"><div class="pw-name"><button type="button" class="pw-x" id="spacePwFold" aria-expanded="true" aria-label="Fold every milestone"><svg viewBox="0 0 16 16" class="pw-i"><path d="M4 6.2l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>Task / milestone</div><div class="pw-teamcol">Team</div><div class="pw-who">Assignee</div><div class="pw-progress">Progress</div><div class="pw-status">Status</div><div class="pw-when">When</div></div>
         ${rows.map(group).join('')}
-        ${loose.length ? `<div class="pw-group" data-ms-group="none" data-ms-state="later"><div class="pw-row pw-ms"><div class="pw-name"><button type="button" class="pw-x" data-ms-toggle="none" aria-expanded="true" aria-label="Show or hide"><svg viewBox="0 0 16 16" class="pw-i"><path d="M4 6.2l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>${pwRing('off')}<span class="pw-title"><b>Not in a milestone</b><span class="pw-kids">${PW_ICON.fork}${loose.length}</span></span></div><div class="pw-progress"></div><div class="pw-status"></div><div class="pw-when"></div></div><div class="pw-kidrows" data-ms-child="none">${loose.map(t => task(t)).join('')}</div></div>` : ''}
-        ${!ms.length && !tasks.length ? '<div class="pw-row pw-empty"><div class="pw-name">No milestones and no tasks yet. Add a milestone, or a task.</div><div></div><div></div><div></div></div>' : ''}
+        ${loose.length ? `<div class="pw-group" data-ms-group="none" data-ms-state="later"><div class="pw-row pw-ms"><div class="pw-name"><button type="button" class="pw-x" data-ms-toggle="none" aria-expanded="true" aria-label="Show or hide"><svg viewBox="0 0 16 16" class="pw-i"><path d="M4 6.2l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button>${pwRing('off')}<span class="pw-title"><b>Not in a milestone</b><span class="pw-kids">${PW_ICON.fork}${loose.length}</span></span></div><div class="pw-teamcol">${esc(teamsOf(loose))}</div><div class="pw-who"></div><div class="pw-progress"></div><div class="pw-status"></div><div class="pw-when"></div></div><div class="pw-kidrows" data-ms-child="none">${loose.map(t => task(t)).join('')}</div></div>` : ''}
+        ${!ms.length && !tasks.length ? '<div class="pw-row pw-empty"><div class="pw-name">No milestones and no tasks yet. Add a milestone, or a task.</div></div>' : ''}
         <div class="pw-foot">
           <div class="pw-foot-actions"><button type="button" class="pw-link" data-add-task="">${PW_ICON.plus}Add task</button><span class="pw-sep"></span><button type="button" class="pw-link" id="spaceNewMilestone2">${PW_ICON.plus}Add milestone</button></div>
           <div class="pw-keys"><span><kbd>c</kbd> new task</span><span><kbd>m</kbd> new milestone</span></div>

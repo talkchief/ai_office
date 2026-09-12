@@ -378,8 +378,16 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #settingsPage.mg .pw-spread-bar .you{background:var(--mg-warn)}#settingsPage.mg .pw-spread-bar .stuck{background:var(--mg-fail)}
 #settingsPage.mg .pw-spread-bar .todo{background:color-mix(in srgb,var(--ink) 18%,transparent)}
 /* The tree */
-#settingsPage.mg .pw-table{background:var(--mg-card);border:1px solid var(--hairline);border-radius:14px;overflow:hidden}
-#settingsPage.mg .pw-row{display:grid;grid-template-columns:minmax(0,1fr) 150px 150px 128px;align-items:center;gap:16px;padding:11px 18px}
+#settingsPage.mg .pw-table{background:var(--mg-card);border:1px solid var(--hairline);border-radius:14px;overflow-x:auto}
+#settingsPage.mg .pw-row{display:grid;grid-template-columns:minmax(240px,1.7fr) minmax(92px,.6fr) minmax(124px,.9fr) 112px 118px 104px;align-items:center;gap:14px;padding:11px 18px}
+#settingsPage.mg .pw-teamcol{font:600 10px var(--mg-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--grey);overflow:hidden;text-overflow:ellipsis}
+#settingsPage.mg .pw-who{font:11.5px/1.35 var(--ui);color:var(--ink);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+#settingsPage.mg .pw-headrow .pw-who,#settingsPage.mg .pw-headrow .pw-teamcol{font:600 10px var(--mg-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--grey);display:block}
+#settingsPage.mg .pw-none{color:var(--mg-mute)}
+#settingsPage.mg .pw-ms .pw-teamcol{color:var(--ink)}
+#settingsPage.mg .pw-step .pw-who{color:var(--grey);font-size:11px}
+#settingsPage.mg :is(.pw-empty,.pw-addrow) .pw-name{grid-column:1 / -1}
+#settingsPage.mg :is(.pw-empty,.pw-addrow,.pw-headrow){min-width:0}
 #settingsPage.mg .pw-headrow{background:var(--mg-rail);border-bottom:1px solid var(--hairline);font:600 10px var(--mg-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--grey)}
 #settingsPage.mg .pw-headrow .pw-name{display:flex;align-items:center;gap:8px}
 #settingsPage.mg .pw-group{border-bottom:1px solid var(--hairline)}
@@ -454,7 +462,9 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #settingsPage.mg .pw-spin{animation:pwSpin 1.1s linear infinite;transform-origin:50% 50%}
 @media (prefers-reduced-motion:reduce){#settingsPage.mg .pw-spin{animation:none}}
 @media (max-width:960px){#settingsPage.mg .pw-kpis{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:860px){#settingsPage.mg .pw-kpis{grid-template-columns:minmax(0,1fr)}#settingsPage.mg .pw-row{grid-template-columns:minmax(0,1fr) 120px;row-gap:6px}#settingsPage.mg .pw-progress,#settingsPage.mg .pw-when{display:none}}
+@media (max-width:1180px){#settingsPage.mg .pw-row{grid-template-columns:minmax(220px,1.7fr) minmax(88px,.6fr) minmax(120px,.9fr) 108px 114px}#settingsPage.mg .pw-when{display:none}}
+@media (max-width:980px){#settingsPage.mg .pw-row{grid-template-columns:minmax(220px,1fr) minmax(120px,.9fr) 114px}#settingsPage.mg .pw-teamcol,#settingsPage.mg .pw-progress{display:none}}
+@media (max-width:860px){#settingsPage.mg .pw-kpis{grid-template-columns:minmax(0,1fr)}#settingsPage.mg .pw-row{grid-template-columns:minmax(0,1fr) 118px;row-gap:6px}#settingsPage.mg .pw-who{display:none}}
 /* Adding a task: one dialog, the milestone chosen from the ones the project has. */
 #settingsPage.mg .pw-modal{width:min(680px,100%);max-height:88vh;display:flex;flex-direction:column}
 #settingsPage.mg .pw-form{overflow:auto;padding:20px 22px 0}
