@@ -143,11 +143,21 @@ export class RunTracker {
   }
   modelEnd(event) {
     const output = event.data?.output, usage = output?.usage_metadata || output?.kwargs?.usage_metadata || output?.generations?.[0]?.[0]?.message?.usage_metadata;
-    const agent = this.agentOf(event), model = this.models[agent] || 'unknown', used = (usage?.input_tokens || 0) + (usage?.output_tokens || 0);
+    // Input and output are priced differently, and a cached input token costs a fraction of a fresh one, so the three
+    // are kept apart: this is what a bill is made of. `cached` is the part of `input` the provider served from its
+    // cache, not an extra amount, so the total stays input + output.
+    const agent = this.agentOf(event), model = this.models[agent] || 'unknown';
+    const inTok = usage?.input_tokens || 0, outTok = usage?.output_tokens || 0;
+    const details = usage?.input_token_details || {};
+    const cached = details.cache_read || details.cache_read_input_tokens || details.cached_tokens || 0;
+    const used = inTok + outTok;
     // The planning tool runs inside the agent's middleware and emits no tool events, so the plan is read from the model's own reply.
     const calls = output?.tool_calls || output?.kwargs?.tool_calls || [];
     for (const c of calls) if (c?.name === 'write_todos' && agent === 'pm' && Array.isArray(c.args?.todos)) { const todos = c.args.todos.slice(0, 30).map(t => ({ content: String(t.content || '').slice(0, 300), status: String(t.status || 'pending') })); this.engine.update(this.id, j => { j.todos = todos; }); this.engine.event(this.id, 'todos_updated', 'pm', `${todos.filter(t => t.status === 'completed').length}/${todos.length} planned steps done.`); }
-    this.engine.update(this.id, j => { if (used) { j.tokens = (j.tokens || 0) + used; (j.tokensByModel ||= {})[model] = (j.tokensByModel[model] || 0) + used; const own = j.runs.find(r => r.agent === agent && r.state === 'working'); if (own) own.tokens = (own.tokens || 0) + used; } if (j.liveCalls?.[agent]) { j.liveCalls[agent].state = 'returned'; j.liveCalls[agent].lastEventAt = Date.now(); j.liveCalls[agent].preview = this.previews.get(agent) || j.liveCalls[agent].preview; } });
+    const add = u => ({ input: (u?.input || 0) + inTok, output: (u?.output || 0) + outTok, cached: (u?.cached || 0) + cached, total: (u?.total || 0) + used });
+    this.engine.update(this.id, j => { if (used) { j.tokens = (j.tokens || 0) + used; (j.tokensByModel ||= {})[model] = (j.tokensByModel[model] || 0) + used;
+      j.usage = add(j.usage); (j.usageByModel ||= {})[model] = add(j.usageByModel[model]);
+      const own = j.runs.find(r => r.agent === agent && r.state === 'working'); if (own) { own.tokens = (own.tokens || 0) + used; own.usage = add(own.usage); } } if (j.liveCalls?.[agent]) { j.liveCalls[agent].state = 'returned'; j.liveCalls[agent].lastEventAt = Date.now(); j.liveCalls[agent].preview = this.previews.get(agent) || j.liveCalls[agent].preview; } });
   }
   flush() {
     this.lastWrite = Date.now(); if (!this.previews.size) return;

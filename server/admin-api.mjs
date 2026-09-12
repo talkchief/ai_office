@@ -1,11 +1,29 @@
 // The platform admin panel: what every hosted office inherits (models, keys, limits, registration) and the offices themselves.
 // Mounted for platform administrators only; serve.mjs refuses everyone else before a handler runs.
+import fs from 'node:fs';
+import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { readJsonBody as body } from '../http-body.mjs';
 import { httpError } from './routes.mjs';
 import { registerProviderRoutes } from './providers-api.mjs';
 
 export function registerAdminApi(router, { accounts, platform, registry, mail = { mailer: null }, publicOrigin = () => '' }) {
   const log = (user, summary) => { try { accounts.adminLog(user?.email || 'platform', summary); } catch {} };
+  // What an office has spent, for billing. Input, output and cached are priced apart, so they are counted apart; a task
+  // from before the office recorded the split carries a total and no breakdown. An idle office is read straight from its
+  // own database rather than loaded: a bill that only counts the offices that happen to be awake is not a bill.
+  const ZERO = () => ({ input: 0, output: 0, cached: 0, total: 0, tasks: 0 });
+  const addJob = (into, j) => { const u = j.usage || { total: j.tokens || 0 }; into.input += u.input || 0; into.output += u.output || 0; into.cached += u.cached || 0; into.total += u.total || 0; into.tasks += 1; return into; };
+  const usageOf = (tenantId, jobs) => {
+    if (jobs) return jobs.reduce(addJob, ZERO());
+    try {
+      const file = path.join(registry.dirs(tenantId).data, 'workflows.sqlite');
+      if (!fs.existsSync(file)) return ZERO();
+      const db = new DatabaseSync(file, { readOnly: true });
+      try { return db.prepare('SELECT body FROM office_jobs').all().reduce((acc, r) => { try { return addJob(acc, JSON.parse(r.body)); } catch { return acc; } }, ZERO()); }
+      finally { db.close(); }
+    } catch { return ZERO(); }
+  };
   // The configuration without its secrets, plus what the administrator needs to copy into the mail provider.
   const configOut = () => { const c = platform.summary(); return { ...c, admins: accounts.platformAdmins().map(u => u.email), webhooks: { postmark: `${publicOrigin()}/api/mail/inbound/postmark`, mailgun: `${publicOrigin()}/api/mail/inbound/mailgun` }, secretSuggestion: platform.newWebhookSecret() }; };
   router.on('GET', '/api/admin/config', () => configOut());
@@ -28,10 +46,10 @@ export function registerAdminApi(router, { accounts, platform, registry, mail = 
   });
   router.on('GET', '/api/admin/tenants', ({ url }) => ({ tenants: accounts.tenants({ q: url.searchParams.get('q') || '' }).map(t => {
     const owner = accounts.user(t.ownerId), stats = accounts.tenantStats(t.id), status = registry.status(t.id), instance = registry.peek(t.id);
-    const jobs = instance ? instance.engine.list() : null;
+    const jobs = instance ? instance.engine.list() : null, usage = usageOf(t.id, jobs);
     return { id: t.id, name: t.name, slug: t.slug, owner: owner ? { id: owner.id, email: owner.email, name: owner.name } : null, users: stats.users, groups: stats.groups, createdAt: t.createdAt, suspendedAt: t.suspendedAt,
       loaded: status.loaded, running: status.running || 0, openTasks: jobs ? jobs.filter(j => !['done', 'cancelled', 'backlog'].includes(j.state)).length : null, tasks: jobs ? jobs.length : null,
-      tokens: jobs ? jobs.reduce((n, j) => n + (j.tokens || 0), 0) : null, teams: instance ? instance.office.get().teams.length : null };
+      tokens: usage.total, usage, teams: instance ? instance.office.get().teams.length : null };
   }) }));
   // A new office when registration is closed: the administrator names it and its owner. An address that
   // already has an account becomes the owner at once; a new one gets an invitation link (mailed too, if
