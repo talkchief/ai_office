@@ -83,7 +83,11 @@ test('mail becomes work: a verified sender gets a task with its file and a threa
     assert.equal(tagged.outcome, 'attached'); assert.deepEqual(instance.engine.get(job.id).attachments.map(a => a.name), ['brief.pdf', 'notes.txt', 'numbers.csv']);
     // A question with nothing attached is answered by the Program Manager on the thread (here: no model, so the office says so), not turned into a task.
     const q = await intake.handle(await fixture({ ...to(alias), MessageID: 'pm-4', Subject: 'Question', TextBody: 'What did we deliver last week?', Attachments: [], Headers: [{ Name: 'Message-ID', Value: '<q@acme.test>' }] }));
-    assert.equal(q.outcome, 'answered'); assert.match(JSON.parse(fs.readFileSync(outbox, 'utf8')).at(-1).text, /could not answer right now/);
+    assert.equal(q.outcome, 'answered');
+    const answered = JSON.parse(fs.readFileSync(outbox, 'utf8')).at(-1);
+    assert.match(answered.text, /could not answer right now/);
+    // Every outbound message carries both parts: plain prose and an HTML alternative.
+    assert.match(answered.text, /— /); assert.match(answered.html, /<div style=/); assert.match(answered.html, /could not answer right now/);
     assert.equal(instance.engine.list().filter(j => j.origin?.channel === 'email').length, 1);
     // Idempotency lives at the webhook: the provider id is recorded once.
     assert.equal(accounts.recordInbound({ provider: 'postmark', providerMessageId: '73e6d360' }), true); assert.equal(accounts.recordInbound({ provider: 'postmark', providerMessageId: '73e6d360' }), false);

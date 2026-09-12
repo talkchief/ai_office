@@ -17,7 +17,7 @@ import { SettingsStore } from './settings.mjs';
 import { EventBus } from './sse.mjs';
 import { ToolHub } from './engine/tools.mjs';
 import { OfficeEngine } from './engine/deep-agents.mjs';
-import { chatPrompt, pmChatPrompt } from './engine/prompts.mjs';
+import { chatPrompt, pmChatPrompt, EMAIL_VOICE } from './engine/prompts.mjs';
 import { runMigrations } from './migrations.mjs';
 import { OfficeMemory } from './office-memory.mjs';
 import { ProjectStore } from './projects.mjs';
@@ -164,11 +164,11 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
   /* ---------- chat ---------- */
   async function chatModel(agent, team) { const spec = models.resolve({ agent, team, role: 'chat' }); return models.instance({ model: spec.model, effort: spec.effort, streaming: false, maxTokens: 2000 }); }
   // A question about a task is answered from its record and filed in the task's thread; the work is not reopened.
-  async function answerAbout(a, team, job, question) {
+  async function answerAbout(a, team, job, question, channel = '') {
     const context = [`Task: ${job.title} (${job.state}).`, `Brief: ${job.text.slice(0, 2000)}`, job.progressLine ? `Latest progress: ${job.progressLine}` : '', job.review?.summary ? `Lead review: ${job.review.summary.slice(0, 800)}` : '',
       (job.runs || []).length ? `Assignments: ${job.runs.map(r => `${r.title} — ${r.state}`).join('; ').slice(0, 1500)}` : '', job.result ? `Latest result (excerpt):\n${job.result.slice(0, 6000)}` : ''].filter(Boolean).join('\n');
     const model = await chatModel(a, team);
-    const answer = await model.invoke([new SystemMessage(`You are ${a.name}, ${a.role}. The CEO is asking about one task. Answer briefly and concretely from this record; say what you do not know. Do not start new work.\n\n${context}`), new HumanMessage(question)], { signal: AbortSignal.timeout(120000) });
+    const answer = await model.invoke([new SystemMessage(`You are ${a.name}, ${a.role}. The CEO is asking about one task. Answer briefly and concretely from this record; say what you do not know. Do not start new work.${channel === 'email' ? `\n\n${EMAIL_VOICE}` : ''}\n\n${context}`), new HumanMessage(question)], { signal: AbortSignal.timeout(120000) });
     return flat(answer.content).trim() || 'I do not have an answer to that yet.';
   }
   // A message about a task is kept in the task's thread and also in the person's chat, so the chat shows it when reopened.
@@ -178,7 +178,7 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
     engine.threads.append(thread, { role: 'agent', agent: agentId, text: reply, jobId });
   }
   // `user` is who is chatting; the single office has one owner and passes nothing.
-  async function chat({ agent: agentId, text, taskId, kind, refs = [], remember = null }, user = null) {
+  async function chat({ agent: agentId, text, taskId, kind, refs = [], remember = null, channel = '' }, user = null) {
     const message = String(text || '').trim(); if (!message) throw httpError('Write a message first.');
     const o = office.get(), isPm = agentId === 'pm', a = isPm ? PM : o.agents.find(x => x.id === agentId); if (!a) throw httpError('Unknown agent.');
     const team = isPm ? null : o.teams.find(t => t.id === a.department), isLead = !isPm && team?.lead === a.id;
@@ -187,7 +187,7 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
       const job = engine.get(taskId); if (!job) throw httpError('No such task.', 404);
       if (kind === 'question') {
         engine.message(taskId, { text: message, kind: 'question', agent: a.id, refs });
-        const reply = await answerAbout(a, team, job, message);
+        const reply = await answerAbout(a, team, job, message, channel);
         engine.threads.append(taskId, { role: 'agent', agent: a.id, kind: 'answer', text: reply, jobId: taskId });
         keepInChat(a.id, message, reply, taskId, user);
         return { reply, taskId };
@@ -208,7 +208,7 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
     const model = await chatModel(a, team);
     const hits = index.search(message, { k: settings.get().knowledgeSeedNotes || 6 }), memory = { notes: hits.map(h => h.path), text: hits.map(h => `--- ${h.path}${h.heading ? ' › ' + h.heading : ''} ---\n${h.snippet}`).join('\n\n') };
     const recent = engine.list().filter(j => isPm ? !['cancelled'].includes(j.state) : (j.runs || []).some(r => r.agent === a.id) || j.agent === a.id).slice(0, isPm ? 10 : 6).map(j => `- [${j.state}] ${j.title}`).join('\n');
-    const system = (isPm ? pmChatPrompt({ office: o, name: officeName(), recentTasks: recent }) : chatPrompt({ office: o, team, agent: { ...a, lead: isLead }, name: officeName(), recentTasks: recent })) + `\n\nBrain notes that may help (cite their paths):\n${memory.text || '—'}`;
+    const system = (isPm ? pmChatPrompt({ office: o, name: officeName(), recentTasks: recent, channel }) : chatPrompt({ office: o, team, agent: { ...a, lead: isLead }, name: officeName(), recentTasks: recent })) + `\n\nBrain notes that may help (cite their paths):\n${memory.text || '—'}`;
     const history = engine.threads.list(thread).slice(-12).map(m => m.role === 'ceo' ? new HumanMessage(m.text) : new AIMessage(m.text));
     const answer = await model.invoke([new SystemMessage(system), ...history], { signal: AbortSignal.timeout(120000) });
     const reply = flat(answer.content).trim() || 'I do not have an answer to that yet.';

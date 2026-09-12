@@ -5,6 +5,7 @@
 // dropped and logged, never bounced.
 import { RateLimiter } from '../server/ratelimit.mjs';
 import { bodyText } from './inbound.mjs';
+import { mailParts } from './format.mjs';
 import { attachmentProblem, safeFileName, extensionOf, TEXT_EXTENSIONS } from '../channels/channel.mjs';
 import { isQuestion } from '../engine/deep-agents.mjs';
 import { extractDocument } from '../documents.mjs';
@@ -39,7 +40,9 @@ export function createIntake({ accounts, registry, mail = { mailer: null, domain
   async function sendOnThread(instance, tenant, viewer, jobId, { to, subject, text, inReplyTo = null, references = [], attachments = [] }) {
     if (!mailer()?.enabled) return null;
     const known = jobId ? accounts.threadMessageIds(jobId) : [];
-    const result = await mailer().send({ to, subject, text: `${text}\n\n— ${instance.name}${jobId ? `\nReply to this email to add a note to the task.` : ''}`, replyTo: aliasFor(tenant, viewer.id, jobId), inReplyTo: inReplyTo || known.at(-1) || null, references: [...known, ...references], attachments, tag: jobId ? tagOf(jobId) : '' });
+    // Agents write Markdown; a mail client shows that literally. Both parts are built from the same text.
+    const parts = mailParts(text, { signature: instance.name, footer: jobId ? 'Reply to this email to add a note to the task.' : '' });
+    const result = await mailer().send({ to, subject, text: parts.text, html: parts.html, replyTo: aliasFor(tenant, viewer.id, jobId), inReplyTo: inReplyTo || known.at(-1) || null, references: [...known, ...references], attachments, tag: jobId ? tagOf(jobId) : '' });
     accounts.recordMailMessage({ tenantId: tenant.id, jobId, direction: 'out', messageId: result.messageId, providerId: result.id });
     return result;
   }
@@ -68,7 +71,7 @@ export function createIntake({ accounts, registry, mail = { mailer: null, domain
     if (!text && !good.length) return drop(m, 'empty message');
     // A plain question with nothing attached: the Program Manager answers from the Brain on the same thread, no task.
     if (text && isQuestion(text) && !good.length && text.length < 1200) {
-      let answer; try { answer = (await instance.chat({ agent: 'pm', text }, viewer)).reply; } catch (error) { answer = `The office could not answer right now: ${error.message}`; }
+      let answer; try { answer = (await instance.chat({ agent: 'pm', text, channel: 'email' }, viewer)).reply; } catch (error) { answer = `The office could not answer right now: ${error.message}`; }
       await sendOnThread(instance, tenant, viewer, null, { to: m.from.address, subject: `Re: ${m.subject || 'Your question'}`, text: answer, inReplyTo: m.messageId, references: m.references });
       instance.audit.record({ area: 'mail', actor: viewer.email, summary: `Answered a question by email from ${m.from.address}` });
       return { outcome: 'answered' };
@@ -100,7 +103,7 @@ export function createIntake({ accounts, registry, mail = { mailer: null, domain
     if (m.messageId) accounts.recordMailMessage({ tenantId: tenant.id, jobId, direction: 'in', messageId: m.messageId, providerId: m.providerMessageId });
     const mail = (subject, body) => sendOnThread(instance, tenant, viewer, jobId, { to: m.from.address, subject: `Re: ${job.title} [AO-${tagOf(jobId)}]`, inReplyTo: m.messageId, references: m.references, text: body });
     if (!text) { if (attached.length) await mail(null, `Files added to “${job.title}”: ${attached.join(', ')}.\n${link(jobId)}`); return { outcome: attached.length ? 'attached' : 'ignored', jobId }; }
-    if (isQuestion(text)) { const r = await instance.chat({ agent: 'pm', text, taskId: jobId, kind: 'question' }, viewer); await mail(null, r.reply); return { outcome: 'answered', jobId }; }
+    if (isQuestion(text)) { const r = await instance.chat({ agent: 'pm', text, taskId: jobId, kind: 'question', channel: 'email' }, viewer); await mail(null, r.reply); return { outcome: 'answered', jobId }; }
     let note;
     if (job.state === 'escalated') { engine.answer(jobId, text); note = 'Your answer reached the team; the task continues.'; }
     else if (job.state === 'awaiting_ceo') { note = `This task waits for your approval, which happens in the office, not by email: ${link(jobId)}`; }
