@@ -68,6 +68,13 @@ export class ProjectStore {
     Object.assign(project, this.validate({ ...project, ...input }, project), { updatedAt: Date.now() });
     this.changed(project); return structuredClone(project);
   }
+  // The Program Manager's closing summary, written when the project completes and kept with the project.
+  recordSummary(id, summary) {
+    const project = this.items.find(p => p.id === id); if (!project) fail('There is no such project.', 404);
+    if (!summary?.text) fail('A summary needs its text.');
+    project.summary = structuredClone(summary); project.updatedAt = Date.now(); this.changed(project);
+    return structuredClone(project.summary);
+  }
   setStatus(id, status) { const out = this.update(id, { status }); const item = this.items.find(p => p.id === id); if (item) { if (status === 'done') item.doneAt ||= Date.now(); else if (item.doneAt) item.doneAt = null; this.changed(item); } return this.get(id) || out; }
   // A project is complete when it has milestones, every one is achieved, and none of its tasks is open: then its status is done.
   settle(id, { tasks = [] } = {}) {
@@ -92,6 +99,9 @@ export class ProjectStore {
       '## Owners', project.teams.length ? project.teams.map(teamName).join(', ') : 'The Program Manager brings in the teams it needs.', '',
       '## Timeline', `Start: ${day(project.startAt) || 'not set'} · Target: ${day(project.dueAt) || 'not set'}${next ? ` · Next milestone: ${next.title}${next.dueAt ? ' by ' + day(next.dueAt) : ''}` : ''}`,
       ...(project.milestones.length ? ['', ...project.milestones.map(m => { const waits = dependsOn(project.milestones, m).map(id => project.milestones.find(x => x.id === id)?.title).filter(Boolean); return `- [${m.done ? 'x' : ' '}] ${m.title}${m.dueAt ? ' — due ' + day(m.dueAt) : ''}${m.done && m.doneAt ? ' — done ' + day(m.doneAt) : ''}${waits.length ? ' — after ' + waits.join(', ') : ' — can start at once'}`; }), '', 'Milestones that do not wait for each other are worked in parallel.'] : ['', 'No milestones yet.']), '',
+      ...(project.summary?.text ? ['## What the CEO got', project.summary.headline || '', '', project.summary.text,
+        ...(project.summary.links?.length ? ['', 'Addresses: ' + project.summary.links.map(l => `${l.label || l.url} — ${l.url}`).join('; ')] : []),
+        ...(project.summary.open?.length ? ['', 'Still open: ' + project.summary.open.join('; ')] : []), ''] : []),
       '## Files', files.length ? files.map(f => `- /knowledge/${f.id}${f.title ? ' — ' + f.title : ''}`).join('\n') : 'No files yet.', '',
       '## Tasks', tasks.length ? tasks.map(t => `- ${t.state === 'done' ? '✓' : '·'} ${t.title} (${t.state}${t.doneAt ? ', done ' + day(t.doneAt) : ''})${t.resultPreview ? '\n  ' + String(t.resultPreview).replace(/\s+/g, ' ').slice(0, 240) : ''}`).join('\n') : 'No tasks yet.', ''];
     return lines.filter(l => l !== undefined && l !== null).join('\n').replace(/\n{3,}/g, '\n\n');

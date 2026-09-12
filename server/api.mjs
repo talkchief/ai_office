@@ -196,7 +196,20 @@ export function registerApi(router, ctx) {
     ctx.syncProject?.(p.id); bus.publish('office.updated', { area: 'projects' });
     return { project: projectOut(p, user), tasks: tasks.map(t => ({ id: t.id, title: t.title, state: t.state, milestoneId: t.milestoneId })), milestones: p.milestones.length, methods: { builtIn: skills.map(s => s.name), catalogue: catalogue.map(s => s.name) } };
   });
-  router.on('GET', '/api/projects/:id', ({ params, user }) => { const p = project(params.id, user); const o = office.get(); return { project: projectOut(p, user), tasks: mine(user).filter(j => j.projectId === p.id).map(j => listShape(j, o)), files: knowledge.list().filter(n => n.id.startsWith(projects.folder(p) + '/') && n.id !== projects.pageId(p)) }; });
+  // The project page: its tasks, the files uploaded to its Brain folder, and every artifact its tasks produced, newest first.
+  router.on('GET', '/api/projects/:id', ({ params, user }) => {
+    const p = project(params.id, user), o = office.get(), tasks = mine(user).filter(j => j.projectId === p.id);
+    const artifacts = collectArtifacts({ jobs: tasks, filesFor: id => engine.files(id), office: o });
+    return { project: projectOut(p, user), tasks: tasks.map(j => listShape(j, o)), artifacts, files: knowledge.list().filter(n => n.id.startsWith(projects.folder(p) + '/') && n.id !== projects.pageId(p)) };
+  });
+  // The Program Manager writes the closing summary again, on the CEO's word.
+  router.on('POST', '/api/projects/:id/summary', async ({ params, user }) => {
+    const p = project(params.id, user); projectEditor(p, user);
+    if (!ctx.writeProjectSummary) throw httpError('This office cannot write project summaries.', 501);
+    const summary = await ctx.writeProjectSummary(p.id, { reason: 'the CEO asked' });
+    record({ area: 'projects', summary: `Summary written again for “${p.name}”` });
+    return { project: projectOut(projects.get(p.id), user), summary };
+  });
   router.on('PUT', '/api/projects/:id', async ({ req, params, user }) => {
     const before = project(params.id, user); projectEditor(before, user); const input = await body(req, 256 * 1024);
     const p = projects.update(params.id, { ...input, ...(input.visibility !== undefined || input.sharedWith !== undefined ? audience(user, input, before) : {}) });

@@ -52,7 +52,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     <div class="settings-main"><div class="mg-area-head"><div><span class="mg-eyebrow" id="settingsGroup"></span><h1 id="settingsTitle"></h1><p id="settingsIntro"></p></div><div class="mg-area-meta" id="settingsMeta"></div></div><p id="settingsMessage" role="status"></p><div id="settingsContent"></div></div>`;
   document.body.appendChild(page);
   const $ = id => document.getElementById(id), content = $('settingsContent'), main = page.querySelector('.settings-main');
-  let section = null, dirty = false, config = null, tools = [], providers = { models: [] }, draft = null, team = null, teamSection = 'overview', reportDays = 7, pendingNote = null, pendingProject = null, toolPoll = null, statusPoll = null, statusTries = 0, metaStatus = '';
+  let section = null, dirty = false, config = null, tools = [], providers = { models: [] }, draft = null, team = null, teamSection = 'overview', reportDays = 7, pendingNote = null, pendingProject = null, projectTab = 'work', projectArt = { kind: '', q: '' }, toolPoll = null, statusPoll = null, statusTries = 0, metaStatus = '';
 
   /* ---------- feedback: a failure stays on the page and in a toast; a success is a toast ---------- */
   const feedback = (text, error = false, extra = {}) => {
@@ -567,11 +567,13 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
 
   /* ---------- Projects ---------- */
   let projectOpen = null;
+  const projectSeen = new Set();
   const dayOf = ms => ms ? new Date(ms).toISOString().slice(0, 10) : '';
   const dateShort = ms => ms ? new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
   const projectMark = p => p.status === 'archived' ? mark('off', 'Archived') : p.status === 'paused' ? mark('off', 'Paused') : p.status === 'done' ? mark('ok', 'Done') : p.milestones?.length && p.milestones.every(m => m.done) ? mark('ok', 'Milestones achieved') : p.next?.dueAt && p.next.dueAt < Date.now() ? mark('warn', 'Milestone overdue') : mark('ok', 'On track');
   async function showProjects() {
     try {
+      projectSeen.clear(); projectArt = { kind: '', q: '' };
       const data = await api('/projects');
       if (pendingProject) { const id = pendingProject; pendingProject = null; if (data.projects.some(p => p.id === id)) return editProject(id, data.teams); }
       const list = data.projects.filter(p => p.status !== 'archived'), archived = data.projects.filter(p => p.status === 'archived');
@@ -610,6 +612,36 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       } catch (error) { button.disabled = false; button.textContent = 'Let the Program Manager plan it'; $('spacePlanHint').textContent = ''; feedback(error.message, true); }
     };
   }
+  // Artifacts: what kind each file is, so the Results page can offer only the kinds this project actually produced.
+  const ART_KINDS = [['pdf', 'PDF', /\.pdf$/i], ['deck', 'PowerPoint', /\.pptx?$/i], ['doc', 'Word', /\.docx?$/i], ['data', 'Excel / CSV', /\.(xlsx?|csv|tsv)$/i], ['json', 'JSON', /\.json$/i], ['markdown', 'Markdown', /\.(md|markdown)$/i], ['html', 'HTML', /\.html?$/i], ['image', 'Image', /\.(png|jpe?g|gif|svg|webp)$/i], ['text', 'Text', /\.(txt|log)$/i]];
+  const DOC_KINDS = ['pdf', 'deck', 'doc', 'data'];
+  const artKind = row => row.kind || (ART_KINDS.find(([, , re]) => re.test(String(row.name || ''))) || ['other'])[0];
+  const artMatches = (row, { kind, q }) => (!kind || (kind === 'documents' ? DOC_KINDS.includes(artKind(row)) : artKind(row) === kind))
+    && String(q || '').toLowerCase().split(/\s+/).filter(Boolean).every(w => `${row.name} ${row.taskTitle}`.toLowerCase().includes(w));
+  const artRows = rows => {
+    const size = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : b >= 1024 ? Math.round(b / 1024) + ' KB' : (b || 0) + ' B';
+    if (!rows.length) return '<p class="mg-sub" style="margin:0">No file matches.</p>';
+    return `<div class="mg-ledger-wrap" style="margin:0"><table class="mg-ledger"><tbody>${rows.map(a => `<tr><td>${fileIcon(a.name)} <span class="mg-name">${esc(String(a.name).split('/').pop())}</span><span class="mg-sub">from “${esc(a.taskTitle)}”</span></td><td>${esc(size(a.bytes))}</td><td>${a.modifiedAt ? esc(dateShort(a.modifiedAt)) : ''}</td><td class="r"><a class="mg-btn mg-btn-sm" href="${esc(a.url)}" download>Download</a></td></tr>`).join('')}</tbody></table></div>`;
+  };
+  // The project's Results: the Program Manager's closing summary, the addresses it names, and every file the tasks produced.
+  const resultsCard = detail => {
+    const s = detail.project.summary || null, arts = detail.artifacts || [], bytes = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : b >= 1024 ? Math.round(b / 1024) + ' KB' : (b || 0) + ' B';
+    const links = (s?.links || []).map(l => `<a class="mg-btn mg-btn-sm" href="${esc(l.url)}" target="_blank" rel="noreferrer noopener">${esc(l.label || l.url)} ↗</a>`).join(' ');
+    const delivered = (s?.delivered || []).map(d => `<tr><td><span class="mg-name">${esc(d.what)}</span>${d.note ? `<span class="mg-sub">${esc(d.note)}</span>` : ''}</td><td>${esc(d.where || '')}</td></tr>`).join('');
+    const lines = (list, title) => list?.length ? `<h4 class="mg-eyebrow" style="margin:16px 0 6px">${title}</h4><ul class="mg-rules">${list.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
+    const kinds = [...new Set(arts.map(artKind))], present = ART_KINDS.filter(([id]) => kinds.includes(id));
+    const filters = arts.length ? `<div class="mg-toolbar" style="margin:0 0 10px"><div class="mg-filters" id="spaceArtKinds">${[['', 'Everything'], ...(present.some(([id]) => DOC_KINDS.includes(id)) ? [['documents', 'Documents']] : []), ...present.map(([id, label]) => [id, label]), ...(kinds.includes('other') ? [['other', 'Other']] : [])].map(([id, label]) => `<button type="button" data-art-kind="${esc(id)}" aria-pressed="${projectArt.kind === id}">${esc(label)}</button>`).join('')}</div><span class="mg-spacer"></span><div class="mg-search">${SEARCH_ICON}<input id="spaceArtQ" placeholder="Search the files" value="${esc(projectArt.q)}"></div></div>` : '';
+    return `<div class="mg-card" style="margin-top:16px"><div class="mg-card-head"><h3>Results</h3><span class="mg-count">${arts.length} file${arts.length === 1 ? '' : 's'}</span></div>
+      ${s ? `<div class="mg-lead"><b>${esc(s.headline)}</b></div><div class="mg-sub">Written by the Program Manager${s.at ? ' · ' + esc(dateShort(s.at)) : ''}${s.tasks ? ` · from ${s.tasks} finished task${s.tasks === 1 ? '' : 's'}` : ''}</div>
+        ${links ? `<div class="mg-toolbar" style="margin:12px 0 4px">${links}</div>` : ''}
+        <div class="mg-doc" style="margin-top:12px">${renderDocument(s.text, 'summary').html}</div>
+        ${delivered ? `<h4 class="mg-eyebrow" style="margin:16px 0 6px">What was delivered</h4><div class="mg-ledger-wrap" style="margin:0"><table class="mg-ledger"><tbody>${delivered}</tbody></table></div>` : ''}
+        ${lines(s.open, 'Still open')}${lines(s.next, 'Next')}`
+        : `<p>The Program Manager writes this when every milestone is achieved and no task is open: what you asked for, what exists now, and where to open it.</p>`}
+      <h4 class="mg-eyebrow" style="margin:18px 0 6px">Artifacts</h4>
+      ${arts.length ? filters + `<div id="spaceArtList">${artRows(arts.filter(a => artMatches(a, projectArt)))}</div>` : '<p class="mg-sub">The project\'s tasks have produced no files yet.</p>'}
+      <div class="mg-toolbar" style="margin-top:14px"><button type="button" class="mg-btn mg-btn-sm" id="spaceWriteSummary">${s ? 'Write the summary again' : 'Write the summary now'}</button><span class="mg-count" id="spaceSummaryHint"></span></div></div>`;
+  };
   async function editProject(id, teams) {
     try {
       const detail = id ? await api(`/projects/${id}`) : null;
@@ -623,6 +655,8 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       const milestoneRow = (m = {}, i = p.milestones.length) => `<div class="mg-toolbar" data-milestone style="margin:0 0 8px;flex-wrap:nowrap"><span class="mg-count" style="width:22px;flex:none;text-align:right">${i + 1}.</span><input type="checkbox" class="mg-switch" name="mdone" ${m.done ? 'checked' : ''} title="Done" aria-label="Reached"><input name="mtitle" value="${esc(m.title || '')}" placeholder="Milestone" required style="flex:1;min-width:0;width:auto"><input name="mafter" value="${esc(afterText(m))}" placeholder="after #" title="The numbers of the milestones this one waits for. Blank: the one before it. – : none, it can start at once." style="width:72px;flex:none"><input type="date" name="mdue" value="${dayOf(m.dueAt)}" style="width:170px;flex:none"><input type="hidden" name="mid" value="${esc(m.id || '')}"><button type="button" class="space-text-action" data-remove-milestone>Remove</button></div>`;
       setMeta(p.id ? projectMark(p) : mark('off', 'Not saved yet'));
       content.innerHTML = `<div class="mg-toolbar"><button type="button" class="mg-btn mg-btn-sm" id="spaceBackProjects">← All projects</button><span class="mg-spacer"></span>${p.id ? `<label>State <select id="spaceProjectStatus">${['active', 'paused', 'done', 'archived'].map(st => `<option value="${st}" ${st === p.status ? 'selected' : ''}>${st}</option>`).join('')}</select></label><button type="button" class="mg-btn mg-btn-sm mg-btn-danger" id="spaceDeleteProject">Delete project</button>` : ''}</div>
+        ${p.id ? `<nav class="mg-subnav" role="tablist" aria-label="Project pages">${[['work', 'The work', detail.tasks.length], ['results', 'Results', (detail.artifacts || []).length]].map(([id, label, n]) => `<button type="button" class="mg-tab" data-project-tab="${id}" aria-pressed="${projectTab === id}">${label}${n ? `<span class="mg-n">${n}</span>` : ''}</button>`).join('')}</nav>` : ''}
+        <div data-project-page="work">
         <form id="spaceProjectForm" data-dirty novalidate><div class="mg-card"><div class="mg-card-head"><h3>${p.id ? esc(p.name) : 'New project'}</h3><span class="mg-count">${p.id ? `${esc(detail.project.page)} · ${detail.tasks.length} task${detail.tasks.length === 1 ? '' : 's'} · ${detail.files.length} file${detail.files.length === 1 ? '' : 's'}` : 'write the charter the way you would brief a new hire'}</span></div>
           <div class="mg-grid">${field('Name', `<input name="name" value="${esc(p.name)}" required maxlength="80">`)}${field('Start', `<input type="date" name="startAt" value="${dayOf(p.startAt)}">`)}${field('Target date', `<input type="date" name="dueAt" value="${dayOf(p.dueAt)}">`)}</div>
           <div style="margin-top:14px">${field('Purpose', `<textarea name="description" rows="2" required placeholder="What this project is for and what done looks like.">${esc(p.description)}</textarea>`)}${field('Charter', `<textarea name="charter" rows="8" placeholder="Scope and what is out of scope, objectives and how success is measured, constraints, stakeholders, the standards to follow, the decisions already made.">${esc(p.charter)}</textarea>`, 'Every task of this project starts from this.')}</div></div>
@@ -634,7 +668,18 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         ${p.id ? `<div class="mg-card" style="margin-top:16px"><div class="mg-card-head"><h3>Files</h3><span class="mg-count">${detail.files.length}</span></div><p>Uploads land in the project's Brain folder, where every task of this project can read them.</p><div class="mg-upload"><input type="file" id="spaceProjectFiles" multiple accept=".pdf,.docx,.txt,.md,.csv"><button type="button" class="mg-btn mg-btn-sm" id="spaceProjectUpload">Upload</button><small>PDF, Word, text, Markdown or CSV · up to 25 MB each.</small></div>
           ${detail.files.length ? `<div class="mg-ledger-wrap" style="margin:0"><table class="mg-ledger"><tbody>${detail.files.map(f => `<tr><td>${fileIcon(f.id)} <span class="mg-name">${esc(f.title || f.id.split('/').pop())}</span><span class="mg-sub">${esc(f.id)}</span></td><td class="k r">${f.updatedAt ? esc(when(f.updatedAt)) : ''}</td></tr>`).join('')}</tbody></table></div>` : ''}</div>
           <div class="mg-card"><div class="mg-card-head"><h3>Tasks</h3><span class="mg-count">${detail.tasks.length}</span></div><form id="spaceProjectTask" class="mg-toolbar"><div class="mg-search" style="flex:1">${SEARCH_ICON}<input name="text" placeholder="Add a task to this project" required></div><button type="submit" class="mg-btn mg-btn-primary">Add task</button></form>
-          ${detail.tasks.length ? `<div class="mg-ledger-wrap" style="margin:0"><table class="mg-ledger"><thead><tr><th>Task</th><th>Team</th><th>State</th><th class="r"></th></tr></thead><tbody>${detail.tasks.map(t => `<tr><td><span class="mg-name">${esc(t.title)}</span>${t.resultPreview ? `<span class="mg-sub" style="font-family:var(--ui)">${esc(String(t.resultPreview).slice(0, 120))}</span>` : ''}</td><td>${esc(t.teamName)}</td><td>${mark(t.state === 'done' ? 'ok' : ['blocked', 'failed'].includes(t.state) ? 'fail' : t.state === 'waiting' ? 'warn' : ['working', 'planning', 'reviewing'].includes(t.state) ? 'busy' : 'off', stateLabel(t.state))}</td><td class="r"><button type="button" class="mg-btn mg-btn-sm" data-open-task="${esc(t.id)}">Open</button> ${!['done', 'cancelled'].includes(t.state) ? `<button type="button" class="space-text-action" data-cancel-task="${esc(t.id)}">Cancel</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<p class="mg-intro" style="margin:0">No tasks yet. Add the first one above, or pick this project on the task form.</p>'}</div>` : ''}`;
+          ${detail.tasks.length ? `<div class="mg-ledger-wrap" style="margin:0"><table class="mg-ledger"><thead><tr><th>Task</th><th>Team</th><th>State</th><th class="r"></th></tr></thead><tbody>${detail.tasks.map(t => `<tr><td><span class="mg-name">${esc(t.title)}</span>${t.resultPreview ? `<span class="mg-sub" style="font-family:var(--ui)">${esc(String(t.resultPreview).slice(0, 120))}</span>` : ''}</td><td>${esc(t.teamName)}</td><td>${mark(t.state === 'done' ? 'ok' : ['blocked', 'failed'].includes(t.state) ? 'fail' : t.state === 'waiting' ? 'warn' : ['working', 'planning', 'reviewing'].includes(t.state) ? 'busy' : 'off', stateLabel(t.state))}</td><td class="r"><button type="button" class="mg-btn mg-btn-sm" data-open-task="${esc(t.id)}">Open</button> ${!['done', 'cancelled'].includes(t.state) ? `<button type="button" class="space-text-action" data-cancel-task="${esc(t.id)}">Cancel</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<p class="mg-intro" style="margin:0">No tasks yet. Add the first one above, or pick this project on the task form.</p>'}</div>` : ''}
+        </div>
+        <div data-project-page="results">${p.id ? resultsCard(detail) : ''}</div>`;
+      // The work and the Results are two pages of the same project: a finished project opens on its Results.
+      if (p.id && !projectSeen.has(p.id)) { projectSeen.add(p.id); projectTab = detail.project.summary?.text ? 'results' : 'work'; }
+      const showPage = () => { content.querySelectorAll('[data-project-page]').forEach(el => el.hidden = el.dataset.projectPage !== projectTab); content.querySelectorAll('[data-project-tab]').forEach(b => b.setAttribute('aria-pressed', b.dataset.projectTab === projectTab)); };
+      showPage();
+      content.querySelectorAll('[data-project-tab]').forEach(b => b.onclick = () => { projectTab = b.dataset.projectTab; showPage(); });
+      // The artifacts are filtered where they are: by kind, and by words in the file name or the task that made it.
+      const drawArts = () => { const list = $('spaceArtList'); if (list) list.innerHTML = artRows((detail.artifacts || []).filter(a => artMatches(a, projectArt))); };
+      content.querySelectorAll('[data-art-kind]').forEach(b => b.onclick = () => { projectArt.kind = b.dataset.artKind; content.querySelectorAll('[data-art-kind]').forEach(x => x.setAttribute('aria-pressed', x.dataset.artKind === projectArt.kind)); drawArts(); });
+      if ($('spaceArtQ')) { let timer = null; $('spaceArtQ').oninput = event => { projectArt.q = event.target.value.trim(); clearTimeout(timer); timer = setTimeout(drawArts, 250); }; }
       $('spaceBackProjects').onclick = () => showProjects();
       const form = $('spaceProjectForm'), rows = $('spaceMilestones');
       $('spaceAddMilestone').onclick = () => { rows.insertAdjacentHTML('beforeend', milestoneRow()); rows.lastElementChild.querySelector('[name=mtitle]').focus(); wireRows(); dirty = true; setBar(barOf(form), 'dirty', 'Changes not saved'); };
@@ -650,6 +695,11 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         $('spaceProjectStatus').onchange = async event => { try { await api(`/projects/${p.id}/status`, 'POST', { status: event.target.value }); toast(`Project is now ${event.target.value}`, { kind: 'ok' }); dropSummary(); await editProject(p.id, teams); } catch (error) { feedback(error.message, true); } };
         $('spaceProjectUpload').onclick = async () => { const files = [...($('spaceProjectFiles').files || [])]; if (!files.length) return feedback('Choose a file first.', true); try { for (const file of files) { if (file.size > 25 * 1024 * 1024) throw new Error(`${file.name} is larger than 25 MB.`); toast(`Adding ${file.name}…`, { kind: 'info', ms: 2500 }); await api(`/projects/${p.id}/upload`, 'POST', { name: file.name, data: await readFile(file) }); } toast(`${files.length} file${files.length === 1 ? '' : 's'} added to the project`, { kind: 'ok' }); await editProject(p.id, teams); } catch (error) { feedback(error.message, true); } };
         $('spaceProjectTask').onsubmit = async event => { event.preventDefault(); const text = event.target.elements.text.value.trim(); if (!text) return; try { await api('/tasks', 'POST', { dept: 'auto', depts: 'auto', text, projectId: p.id }); toast('Task added to the project', { kind: 'ok', detail: 'The Program Manager has it.' }); await editProject(p.id, teams); } catch (error) { feedback(error.message, true); } };
+        $('spaceWriteSummary').onclick = async event => {
+          const button = event.currentTarget; button.disabled = true; $('spaceSummaryHint').textContent = 'The Program Manager is reading the project…';
+          try { await api(`/projects/${p.id}/summary`, 'POST', {}); await editProject(p.id, teams); toast('Summary written', { kind: 'ok' }); }
+          catch (error) { button.disabled = false; $('spaceSummaryHint').textContent = ''; feedback(error.message, true); }
+        };
         content.querySelectorAll('[data-open-task]').forEach(b => b.onclick = () => openTask(b.dataset.openTask));
         content.querySelectorAll('[data-cancel-task]').forEach(b => b.onclick = async () => { if (!confirm('Cancel this task? Work in progress stops; nothing is filed.')) return; try { await api(`/tasks/${b.dataset.cancelTask}/cancel`, 'POST', {}); toast('Task cancelled', { kind: 'ok' }); await editProject(p.id, teams); } catch (error) { feedback(error.message, true); } });
         $('spaceDeleteProject').onclick = async () => { if (!confirm(`Delete “${p.name}”? Finished tasks are kept without the project; its files stay in the Brain under Projects/${p.id}/.`)) return; try { await api(`/projects/${p.id}`, 'DELETE'); dirty = false; toast(`Deleted “${p.name}”`, { kind: 'ok', detail: 'Its files are still in the Brain.' }); dropSummary(); await showProjects(); } catch (error) { feedback(error.message, true); } };

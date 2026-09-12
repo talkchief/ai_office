@@ -15,7 +15,7 @@ export const PLANNING_SKILLS = ['planning-a-project', 'project-shepherd', 'senio
 const PLANNING_WORDS = /project|plan|charter|milestone|roadmap|programme|program management|scope/i;
 
 // The skills the planner reads: from the shipped folder the built-in set, from the CEO's own folder any skill about planning.
-export function loadPlanningSkills({ dirs = [], names = PLANNING_SKILLS } = {}) {
+export function loadPlanningSkills({ dirs = [], names = PLANNING_SKILLS, words = PLANNING_WORDS } = {}) {
   const out = []; let budget = LIMITS.skillsChars;
   dirs.forEach((dir, index) => {
     let entries = []; try { entries = fs.readdirSync(dir, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name); } catch { return; }
@@ -25,7 +25,7 @@ export function loadPlanningSkills({ dirs = [], names = PLANNING_SKILLS } = {}) 
       const fm = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(raw), meta = {};
       if (fm) for (const line of fm[1].split(/\r?\n/)) { const m = /^([A-Za-z_-]+):\s*(.*)$/.exec(line); if (m) meta[m[1]] = m[2].trim().replace(/^["']|["']$/g, ''); }
       const description = oneLine(meta.description, 300), body = text(fm ? fm[2] : raw, Math.min(LIMITS.skillChars, budget));
-      if (index > 0 && !PLANNING_WORDS.test(name + ' ' + description)) continue;
+      if (index > 0 && !words.test(name + ' ' + description)) continue;
       if (!body || out.some(s => s.name === name)) continue;
       budget -= body.length; out.push({ name: meta.name || name, description, text: body });
       if (budget <= 0) break;

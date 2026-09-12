@@ -21,7 +21,9 @@ import { chatPrompt, pmChatPrompt } from './engine/prompts.mjs';
 import { runMigrations } from './migrations.mjs';
 import { OfficeMemory } from './office-memory.mjs';
 import { ProjectStore } from './projects.mjs';
-import { startNextMilestone } from './project-planner.mjs';
+import { startNextMilestone, loadPlanningSkills } from './project-planner.mjs';
+import { summariseProject, loadSummarySkills, SUMMARY_SKILLS } from './project-summary.mjs';
+import { ROOT } from './config.mjs';
 import { KnowledgeIndex } from './knowledge-index.mjs';
 import { Agency } from './agency.mjs';
 import { AuditLog } from './audit.mjs';
@@ -72,7 +74,14 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
       // A project task marks its milestones achieved and the project page is rewritten.
       if (job.projectId) { try { const marked = projects.recordCompletion({ ...job, state: 'done', doneAt: job.doneAt || Date.now() }, { tasks: engine.list().filter(j => j.projectId === job.projectId) }); if (marked.length) { engine.event(job.id, 'milestones_achieved', null, `Milestone${marked.length === 1 ? '' : 's'} achieved: ${marked.map(m => m.title).join(', ')}.`); audit.record({ area: 'projects', summary: `${job.projectName || job.projectId}: milestone${marked.length === 1 ? '' : 's'} achieved by “${job.title}”: ${marked.map(m => m.title).join(', ')}` }); const started = startNextMilestone({ project: projects.get(job.projectId), projects, engine }); if (started.length) engine.event(job.id, 'milestone_started', null, `The next milestone is under way: ${started.length} task${started.length === 1 ? '' : 's'}${started.some(id => engine.get(id)?.origin?.planned) ? ', the Program Manager plans it' : ''}.`); }
         const finished = projects.settle(job.projectId, { tasks: engine.list().map(j => j.id === job.id ? { ...j, state: 'done' } : j) });
-        if (finished) { engine.event(job.id, 'project_done', null, `Project “${finished.name}” is complete: every milestone achieved.`); audit.record({ area: 'projects', summary: `Project “${finished.name}” is complete: every milestone achieved` }); engine.notifications.notify({ kind: 'done', title: `Project complete: ${finished.name}`, body: 'Every milestone is achieved and no task is open.', jobId: job.id, dept: job.dept, dedupe: `project-done:${finished.id}`, action: { type: 'open' }, userId: job.ownerId || null }); bus.publish('office.updated', { area: 'projects' }); }
+        if (finished) {
+          engine.event(job.id, 'project_done', null, `Project “${finished.name}” is complete: every milestone achieved.`); audit.record({ area: 'projects', summary: `Project “${finished.name}” is complete: every milestone achieved` });
+          // The Program Manager closes it for the CEO: one summary with what was delivered and where to open it.
+          let headline = '';
+          try { headline = (await writeProjectSummary(finished.id, { reason: 'the project completed' })).headline; } catch (error) { console.warn('project summary:', error.message); }
+          engine.notifications.notify({ kind: 'done', title: `Project complete: ${finished.name}`, body: headline || 'Every milestone is achieved and no task is open.', jobId: job.id, dept: job.dept, dedupe: `project-done:${finished.id}`, action: { type: 'open' }, userId: job.ownerId || null });
+          bus.publish('office.updated', { area: 'projects' });
+        }
         syncProject(job.projectId); } catch (error) { console.warn('project milestones:', error.message); } }
     } });
 
@@ -237,7 +246,28 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
       if (reached.length) { audit.record({ area: 'projects', summary: `Milestones achieved by finished tasks: ${reached.map(r => `${r.project} — ${r.milestone.title}`).join('; ')}` }); for (const id of new Set(reached.map(r => r.projectId))) { const finished = projects.settle(id, { tasks: engine.list() }); if (finished) audit.record({ area: 'projects', summary: `Project “${finished.name}” is complete: every milestone achieved` }); syncProject(id); } }
       // Every active project has its next milestone under way: its backlog tasks queued, or the Program Manager asked to plan it.
       for (const p of projects.list().filter(p => p.status === 'active')) { const started = startNextMilestone({ project: p, projects, engine }); if (started.length) { audit.record({ area: 'projects', summary: `${p.name}: the next milestone's ${started.length} task${started.length === 1 ? '' : 's'} under way` }); syncProject(p.id); } }
+      // A project that finished while the office was down still gets its summary.
+      for (const p of projects.list().filter(p => p.status === 'done' && !p.summary?.text)) writeProjectSummary(p.id, { reason: 'the project was already complete' }).catch(error => console.warn('project summary:', error.message));
     } catch (error) { console.warn('project milestones:', error.message); }
+  }
+  // The Program Manager's closing summary: what the CEO asked for, what exists now, where to open it. Written when a project
+  // completes, and again whenever the CEO asks for it. One model call, with the office's executive-summary method.
+  const summarising = new Set();
+  async function writeProjectSummary(id, { reason = 'the project completed' } = {}) {
+    const project = projects.get(id); if (!project) throw httpError('There is no such project.', 404);
+    if (summarising.has(id)) throw httpError('The Program Manager is already writing this summary.', 409);
+    summarising.add(id);
+    try {
+      const tasks = engine.list().filter(j => j.projectId === id);
+      const artifacts = [];
+      for (const t of tasks) { let own = []; try { own = engine.files(t.id) || []; } catch { own = []; } for (const f of own) artifacts.push({ taskId: t.id, taskTitle: t.title, name: f.name, bytes: f.bytes, modifiedAt: f.modifiedAt }); }
+      const skills = loadSummarySkills({ dirs: [engine.pmSkillsDir || path.join(ROOT, 'agency', 'pm-skills'), path.join(engine.knowledgeDir, 'Agents Office', 'pm-skills')], names: SUMMARY_SKILLS });
+      const summary = await summariseProject({ project, tasks, artifacts, skills, models });
+      projects.recordSummary(id, summary);
+      audit.record({ area: 'projects', summary: `The Program Manager summarised “${project.name}” (${reason}): ${summary.headline}` });
+      syncProject(id); bus.publish('office.updated', { area: 'projects' });
+      return summary;
+    } finally { summarising.delete(id); }
   }
   const projectSyncTimers = new Map();
   function syncProject(id) {
@@ -251,7 +281,7 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
   }
   bus.on(event => { if (event.type === 'task.updated' && event.data?.projectId) syncProject(event.data.projectId); });
   for (const p of projects.list()) syncProject(p.id);
-  registerApi(router, { projects, syncProject, office, engine, models, settings, toolStore, hub, knowledge, index, bus, audit, vault, routines: routineApi, chat, assist, version, get name() { return officeName(); }, graph: () => graph, discover, agency, tenant, managedModels });
+  registerApi(router, { projects, syncProject, writeProjectSummary, office, engine, models, settings, toolStore, hub, knowledge, index, bus, audit, vault, routines: routineApi, chat, assist, version, get name() { return officeName(); }, graph: () => graph, discover, agency, tenant, managedModels });
   // The raw routine records, for the one-time owner assignment when a self-hosted office moves into a tenant.
   const routineRecords = { list: () => { loadRoutines(); return rlist.routines; }, save: list => { rlist.routines = list; routines.save(BRAIN, list); loadRoutines(); } };
 
@@ -280,5 +310,5 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
     scheduler.stop(); bus.close(); index.close(); await connecting.catch(() => {}); await engine.close(); await hub.close();
   }
 
-  return { dataDir: DATA, brainDir: BRAIN, tenant, managedModels, router, office, settings, models, knowledge, index, projects, toolStore, hub, vault, engine, audit, scheduler, bus, chat, assist, routines: routineApi, routineRecords, loadRoutines, tickRoutines, syncProject, graph: () => graph, get name() { return officeName(); }, boot, start, close };
+  return { dataDir: DATA, brainDir: BRAIN, tenant, managedModels, router, office, settings, models, knowledge, index, projects, toolStore, hub, vault, engine, audit, scheduler, bus, chat, assist, routines: routineApi, routineRecords, loadRoutines, tickRoutines, syncProject, writeProjectSummary, graph: () => graph, get name() { return officeName(); }, boot, start, close };
 }
