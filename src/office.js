@@ -771,7 +771,7 @@ export function initOfficeWork(ctx) {
   }
   function chatSent(id) { if (chat.agent === id) { chat.refs = []; chat.kind = 'question'; chat.remember = ''; renderChatBar(); } }
   async function loadHistory(id) { const rows = await api('/threads/' + encodeURIComponent('agent:' + id)); return rows.slice(-30).map(m => ({ who: m.role === 'ceo' ? 'user' : 'agent', text: m.text, taskId: m.role === 'ceo' ? undefined : m.jobId || undefined })); }
-  const rowHTML = key => { const list = jobs.filter(j => involves(j, key)); return `<div class="b-tasks"><span>ACTIVE<b data-tk="${key}-doing">${list.filter(j => ['planning','working','reviewing'].includes(j.state)).length}</b></span><span>QUEUED<b data-tk="${key}-next">${list.filter(j=>j.state==='queued').length}</b></span><span>APPROVED<b data-tk="${key}-done">${list.filter(j=>j.state==='done').length}</b></span></div>`; };
+  const rowHTML = key => { const list = jobs.filter(j => involves(j, key)); return `<div class="b-tasks"><span>ACTIVE<b data-tk="${key}-doing">${list.filter(j => ['planning','working','reviewing'].includes(j.state)).length}</b></span><span>QUEUED<b data-tk="${key}-next">${list.filter(j=>j.state==='queued').length}</b></span></div>`; };
   for(const key of DEPT_KEYS)(deptRT[key].counts||deptRT[key].apprRow).insertAdjacentHTML(deptRT[key].counts?'beforeend':'beforebegin',rowHTML(key)+(deptRT[key].counts?`<div class="b-jobs" data-tjobs="${key}"></div>`:''));
   window.addEventListener('office:open-task', event => { if (event.detail) showTask(event.detail); });
   // The gear on a team card or a person's card: their charter, their people and their instructions live in Manage.
