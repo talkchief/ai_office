@@ -27,6 +27,24 @@
   #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   #hud { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
 
+  /* The page is one file and its script is the last thing in the body, so the browser paints the bare
+     chrome — a top bar nothing has wired yet, empty panels — before a line of the office has run. This
+     cover holds that back until boot() has built the real page, and lifts by itself after ten seconds
+     so a machine that cannot start the 3D office still gets in. */
+  #booting { position: fixed; inset: 0; z-index: 200; display: grid; place-content: center; justify-items: center; gap: 16px;
+    background: radial-gradient(120% 90% at 50% 30%, #FDFFF8 55%, #F2F3EA 100%); color: #151414;
+    transition: opacity .3s var(--ease); }
+  html.night #booting, body.dark #booting { background: radial-gradient(120% 90% at 50% 30%, #1B1C20 45%, #0F1013 100%); color: #ECEAE3; }
+  #booting .bt-brand { font-family: var(--serif); font-size: 26px; letter-spacing: .04em; }
+  #booting .bt-note { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: #5A5A5A; }
+  html.night #booting .bt-note, body.dark #booting .bt-note { color: #A3A098; }
+  #booting .bt-bar { width: 132px; height: 2px; border-radius: 2px; background: rgba(21,20,20,.12); overflow: hidden; }
+  html.night #booting .bt-bar, body.dark #booting .bt-bar { background: rgba(236,234,227,.16); }
+  #booting .bt-bar i { display: block; width: 40%; height: 100%; border-radius: 2px; background: currentColor; animation: bt-slide 1.25s var(--ease) infinite; }
+  @keyframes bt-slide { from { transform: translateX(-110%); } to { transform: translateX(340%); } }
+  body.booted #booting { opacity: 0; visibility: hidden; pointer-events: none; }
+  @media (prefers-reduced-motion: reduce) { #booting { transition: none; } #booting .bt-bar i { width: 100%; animation: none; } }
+
   /* top bar */
   #topbar {
     position: fixed; top: 0; left: 0; right: 0; height: 52px;
@@ -1964,6 +1982,14 @@ body.dark #settingsPage .secondary { background: transparent; color: var(--ink);
 </style>
 </head>
 <body>
+<div id="booting" role="status" aria-live="polite">
+  <span class="bt-brand">Cloud AI Office</span>
+  <span class="bt-bar"><i></i></span>
+  <span class="bt-note">Opening your office</span>
+</div>
+<script>/* the cover: night first so a hard refresh at night does not flash white, and a way out if the office cannot start */
+(function () { var h = new Date().getHours(); if (h >= 20 || h < 6) document.documentElement.classList.add('night');
+  setTimeout(function () { document.body.classList.add('booted'); }, 10000); })();</script>
 <canvas id="scene"></canvas>
 <div id="hud"></div>
 <div id="topbar">
@@ -1972,7 +1998,7 @@ body.dark #settingsPage .secondary { background: transparent; color: var(--ink);
   <span class="sp"></span>
   <div id="topmodels"></div>
   <button id="themeBtn" type="button" title="Theme follows your clock. Click to preview morning, day, evening, night, then back to the clock (N)."><span class="tb-ico">☀</span><span class="tb-lab">DAY</span></button>
-  <button id="claudeConnect" type="button">Connect Claude</button>
+  <button id="claudeConnect" type="button">Models</button>
   <span id="topAppr" style="display:none">⚠ <span>0</span></span>
   <span id="clock">—</span>
 </div>

@@ -9,6 +9,8 @@
 //   PORT=4600 npm start  → another port
 import http from 'node:http';
 import fs from 'node:fs';
+import zlib from 'node:zlib';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { loadConfig, ROOT } from './config.mjs';
 import { createOfficeAccess, sameOrigin, cookieValue } from './auth.mjs';
@@ -26,6 +28,19 @@ const HOSTED = cfg.mode === 'hosted'; // office.config(.local).json → mode, or
 const version = (() => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version; } catch { return '?'; } })();
 const oauthPage = (title, text) => `<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font:15px system-ui;padding:40px;max-width:520px"><h1 style="font-size:20px">${title}</h1><p>${text}</p><p><a href="/">Back to the office</a></p><script>setTimeout(()=>{if(window.opener){window.opener.postMessage('connector-signed-in','*');window.close();}},1200)</script>`;
 const peerOf = (req, loopback) => (loopback && req.headers['x-real-ip']) || req.socket.remoteAddress;
+
+// The page: one self-contained file, never cached (it carries the signed-in person's boot data), so it goes
+// out gzipped — 2.2 MB becomes about 0.8 MB. Zipping it costs ~70 ms, so the last page is kept: a reload by
+// the same person, and every reload while nobody signs in or out, sends the zipped copy straight away.
+let zipped = { key: '', body: null };
+function sendPage(req, res, page) {
+  const head = { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', vary: 'Accept-Encoding' };
+  if (!/\bgzip\b/.test(String(req.headers['accept-encoding'] || ''))) { res.writeHead(200, head); return res.end(page); }
+  const key = crypto.createHash('sha1').update(page).digest('base64'); // the whole page, so one person's boot data is never sent to another
+  if (zipped.key !== key) zipped = { key, body: zlib.gzipSync(page) };
+  res.writeHead(200, { ...head, 'content-encoding': 'gzip', 'content-length': zipped.body.length });
+  return res.end(zipped.body);
+}
 
 /* ---------- single office: the access code and one instance ---------- */
 const single = HOSTED ? null : await createOfficeInstance({ dataDir: DATA, brainDir: BRAIN, cfg, version });
@@ -136,12 +151,14 @@ const server = http.createServer(async (req, res) => {
     }
     if (api && !allowed) return json(res, 401, { error: HOSTED ? 'Sign in to continue.' : 'Unlock the office to continue.' });
     if (req.method === 'GET' && ['/', '/command-centre-v2.html', '/dark'].includes(url.pathname)) {
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
       let page = fs.readFileSync(HTML, 'utf8');
       // What the page knows before its first request: the roster for the scene, the mode, and (hosted) who is signed in.
       const boot = { ...(allowed && instance ? instance.office.bootstrap() : {}), mode: HOSTED ? 'hosted' : 'single', user: HOSTED ? publicUser(user) : null, limits: instance ? instance.office.limits : null, registrationOpen: HOSTED ? platform.registrationOpen() : null, managedModels: HOSTED, mailDomain: HOSTED ? process.env.AO_MAIL_DOMAIN || '' : '' };
       page = page.replace('<head>', '<head><script>window.__OFFICE_BOOT__=' + JSON.stringify(boot).replace(/</g, '\\u003c') + ';</script>');
-      return res.end(url.pathname === '/dark' ? page.replace('<body>', '<body class="dark">') : page);
+      if (url.pathname === '/dark') page = page.replace('<body>', '<body class="dark">');
+      // The page carries the whole office in one file (over 2 MB) and may not be cached, so it is sent
+      // compressed — a third of the bytes, and the last-sent page is kept zipped for the next reload.
+      return sendPage(req, res, page);
     }
     if (!api) return json(res, 404, { error: 'not found' });
     const session = cookie.slice(-16) || req.socket.remoteAddress;

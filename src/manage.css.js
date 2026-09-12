@@ -281,6 +281,11 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #settingsPage.mg .mg-control.invalid input{border-color:var(--mg-fail);box-shadow:0 0 0 3px var(--mg-fail-bg)}
 #settingsPage.mg .mg-control .mg-err{display:none;grid-column:1/3;color:var(--mg-fail);font:12px var(--ui)}
 #settingsPage.mg .mg-control.invalid .mg-err{display:block}
+#settingsPage.mg .mg-controls>.mg-check{display:grid;grid-template-columns:1fr auto;gap:6px 24px;padding:16px 20px;border-bottom:1px solid var(--hairline);align-items:center;margin:0}
+#settingsPage.mg .mg-controls>.mg-check:last-child{border-bottom:0}
+#settingsPage.mg .mg-controls>.mg-check>span{grid-column:1;grid-row:1;font:500 13px var(--ui)}
+#settingsPage.mg .mg-controls>.mg-check small{display:block;margin-top:6px;color:var(--grey);font:11.5px/1.5 var(--ui)}
+#settingsPage.mg .mg-controls>.mg-check .mg-switch{grid-column:2;grid-row:1;justify-self:end}
 
 /* KPIs */
 #settingsPage.mg .mg-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:0 0 18px}

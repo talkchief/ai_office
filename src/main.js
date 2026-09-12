@@ -553,6 +553,7 @@ function applyRoster(agents) {
   if (tasks && tasks.syncPills) tasks.syncPills();
 }
 function boot() {
+  document.body.classList.add('booted'); // the chrome is real from here: the loading cover lifts (src/shell.html #booting)
   brain = office.brain;
   brainNotes = brain.state.notes; office.setBrainCount(brainNotes);
   if (!DEMO) document.body.classList.add('live-office');
