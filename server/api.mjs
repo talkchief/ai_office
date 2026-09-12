@@ -10,6 +10,7 @@ import { httpError } from './routes.mjs';
 import { officeReport, kpis } from '../reporting.mjs';
 import { collectArtifacts, filterArtifacts, ARTIFACT_KINDS } from './artifacts.mjs';
 import { extractDocument } from '../documents.mjs';
+import { ATTACHMENT_MAX_ENCODED } from '../channels/channel.mjs';
 import { planProject, applyPlan, loadPlanningSkills, loadCatalogueMethods, startNextMilestone } from '../project-planner.mjs';
 import { ROOT } from '../config.mjs';
 import { registerProviderRoutes } from './providers-api.mjs';
@@ -56,7 +57,7 @@ export function registerApi(router, ctx) {
   // Files for a task before it starts (the composer's documents): they land under /work/inbox/ and, when the task belongs to a project, their text is filed in the project's Brain folder.
   router.on('POST', '/api/tasks/:id/attach', async ({ req, params, user }) => {
     const job = see(params.id, user); if (job.startedAt) throw httpError('This task has started; add the file as a note with a Brain upload instead.', 409);
-    const input = await body(req, 36 * 1024 * 1024); if (!input.name || !input.data) throw httpError('Send the file name and its content.');
+    const input = await body(req, ATTACHMENT_MAX_ENCODED); if (!input.name || !input.data) throw httpError('Send the file name and its content.');
     const bytes = Buffer.from(String(input.data), 'base64'), out = engine.attach(job.id, [{ name: input.name, contentType: input.type || '', bytes }]);
     if (job.projectId) { try { const doc = await extractDocument({ name: out.saved[0].name, data: input.data }); if (doc.content?.trim()) await knowledge.upload({ folder: projects.folder(projects.get(job.projectId)), name: doc.name, content: doc.content }); } catch (error) { console.warn('attachment to Brain:', error.message); } }
     return { attachments: out.attachments };
@@ -79,7 +80,9 @@ export function registerApi(router, ctx) {
     see(params.id, user);
     let file; try { file = workspaceFile(engine.workspaceDir(params.id), url.searchParams.get('path') || ''); } catch (error) { return { $status: 400, body: { error: error.message } }; }
     if (!fs.existsSync(file.abs) || !fs.statSync(file.abs).isFile()) return { $status: 404, body: { error: 'There is no such file in this task.' } };
-    res.writeHead(200, { 'content-type': mimeOf(file.rel), 'content-length': fs.statSync(file.abs).size, 'content-disposition': `attachment; filename="${path.basename(file.rel).replace(/[^\w. -]/g, '_')}"`, 'cache-control': 'no-store' });
+    // ?inline=1 shows the file in the browser (a PDF, an image, a page); without it the browser saves it.
+    const how = url.searchParams.get('inline') === '1' ? 'inline' : 'attachment';
+    res.writeHead(200, { 'content-type': mimeOf(file.rel), 'content-length': fs.statSync(file.abs).size, 'content-disposition': `${how}; filename="${path.basename(file.rel).replace(/[^\w. -]/g, '_')}"`, 'cache-control': 'no-store' });
     fs.createReadStream(file.abs).pipe(res); return { $handled: true };
   });
   router.on('POST', '/api/tasks/:id/queue', async ({ req, params, user }) => { see(params.id, user); const input = await body(req); if (input.state === 'queued') ready(); return engine.editQueue(params.id, input); });
@@ -156,7 +159,7 @@ export function registerApi(router, ctx) {
   router.on('GET', '/api/knowledge/status', () => ctx.index.status());
   router.on('POST', '/api/knowledge/reindex', ({ user }) => { admin(user); const result = ctx.index.rebuild(); record({ area: 'brain', summary: `Rebuilt the Brain search index (${result.notes} notes)` }); return result; });
   router.on('POST', '/api/knowledge/upload', async ({ req }) => {
-    const input = await body(req, 36 * 1024 * 1024), doc = await extractDocument({ name: input.name, data: input.data });
+    const input = await body(req, ATTACHMENT_MAX_ENCODED), doc = await extractDocument({ name: input.name, data: input.data });
     const note = await knowledge.upload({ folder: input.folder, name: doc.name, content: doc.content });
     record({ area: 'brain', summary: `${note.replaced ? 'Replaced' : 'Uploaded'} ${doc.name} in ${input.folder || 'Company'}` });
     return { id: note.id, replaced: note.replaced, characters: doc.characters };
@@ -167,7 +170,8 @@ export function registerApi(router, ctx) {
   router.on('GET', '/api/knowledge/file', ({ url, res }) => {
     const id = url.searchParams.get('id') || ''; let file; try { file = knowledge.resolve(id); } catch (error) { return { $status: 400, body: { error: error.message } }; }
     if (!fs.existsSync(file) || !fs.statSync(file).isFile()) return { $status: 404, body: { error: `No note at ${id}.` } };
-    res.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8', 'content-length': fs.statSync(file).size, 'content-disposition': `attachment; filename="${path.basename(id).replace(/[^\w. -]/g, '_')}"`, 'cache-control': 'no-store' });
+    const how = url.searchParams.get('inline') === '1' ? 'inline' : 'attachment';
+    res.writeHead(200, { 'content-type': how === 'inline' ? 'text/plain; charset=utf-8' : 'text/markdown; charset=utf-8', 'content-length': fs.statSync(file).size, 'content-disposition': `${how}; filename="${path.basename(id).replace(/[^\w. -]/g, '_')}"`, 'cache-control': 'no-store' });
     fs.createReadStream(file).pipe(res); return { $handled: true };
   });
   router.on('DELETE', '/api/knowledge/note', ({ url, user }) => { admin(user); return knowledge.archive(url.searchParams.get('id')); });
@@ -184,7 +188,7 @@ export function registerApi(router, ctx) {
   // documents go to its Brain folder; the first milestone's tasks start now, later ones wait for their milestone.
   router.on('POST', '/api/projects/plan', async ({ req, user }) => {
     ready();
-    const input = await body(req, 36 * 1024 * 1024), brief = String(input.text || '').trim();
+    const input = await body(req, ATTACHMENT_MAX_ENCODED * 10), brief = String(input.text || '').trim();
     if (brief.length < 10) throw httpError('Say what the project should build or achieve, in a sentence or two at least.', 400);
     const documents = []; for (const f of (Array.isArray(input.files) ? input.files : []).slice(0, 10)) documents.push(await extractDocument({ name: f.name, data: f.data }));
     const skills = loadPlanningSkills({ dirs: [engine.pmSkillsDir || path.join(ROOT, 'agency', 'pm-skills'), path.join(engine.knowledgeDir, 'Agents Office', 'pm-skills')] });
@@ -231,7 +235,7 @@ export function registerApi(router, ctx) {
   });
   router.on('POST', '/api/projects/:id/upload', async ({ req, params, user }) => {
     const p = project(params.id, user);
-    const input = await body(req, 36 * 1024 * 1024), doc = await extractDocument({ name: input.name, data: input.data });
+    const input = await body(req, ATTACHMENT_MAX_ENCODED), doc = await extractDocument({ name: input.name, data: input.data });
     const note = await knowledge.upload({ folder: projects.folder(p), name: doc.name, content: doc.content });
     record({ area: 'projects', summary: `${note.replaced ? 'Replaced' : 'Added'} ${doc.name} in project “${p.name}”` }); ctx.syncProject?.(p.id);
     return { id: note.id, replaced: note.replaced, characters: doc.characters };

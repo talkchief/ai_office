@@ -140,6 +140,7 @@ body.dark{--mg-rail:#121316;--mg-card:#1E1F23;--mg-line2:rgba(236,234,226,.32);-
 #settingsPage.mg .mg-ledger td .mg-sub,#settingsPage.mg .mg-sub{display:block;font:11px/1.5 var(--mg-mono);color:var(--grey);margin-top:3px;white-space:normal}
 #settingsPage.mg .mg-ledger td.r{text-align:right;white-space:nowrap}
 #settingsPage.mg .mg-ledger td.r>*{vertical-align:middle}
+#settingsPage.mg .mg-ledger td.r>*+*{margin-left:8px}
 #settingsPage.mg .mg-ledger .mg-name{font-weight:500}
 #settingsPage.mg .mg-ledger td.mg-empty{padding:28px 14px;text-align:center;color:var(--grey)}
 #settingsPage.mg .mg-key{font-family:var(--mg-mono);font-size:12px;letter-spacing:.02em}
@@ -504,9 +505,10 @@ body.dark #settingsPage.mg .pw-chip.gone{background:rgba(194,105,30,.16);color:#
 #settingsPage.mg .mg-open-text b{font:600 14.5px/1.3 var(--ui);letter-spacing:.005em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #settingsPage.mg .mg-open-host{font:11.5px/1.3 var(--mg-mono);color:var(--grey);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #settingsPage.mg .mg-open-cta{font:600 10.5px/1 var(--mg-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--grey);white-space:nowrap}
-#settingsPage.mg .mg-open.primary{background:var(--ink);border-color:var(--ink);color:var(--cream)}
+#settingsPage.mg .mg-open.primary{background:var(--mg-card);border-color:var(--mg-gold);box-shadow:inset 3px 0 0 var(--mg-gold)}
 #settingsPage.mg .mg-open.primary .mg-open-go{background:var(--mg-gold);color:#1B1A18}
-#settingsPage.mg .mg-open.primary .mg-open-host,#settingsPage.mg .mg-open.primary .mg-open-cta{color:color-mix(in srgb,var(--cream) 66%,var(--ink))}
+#settingsPage.mg .mg-open.primary:hover{box-shadow:inset 3px 0 0 var(--mg-gold),var(--mg-shadow)}
+#settingsPage.mg .mg-open.primary .mg-open-cta{color:var(--ink)}
 #settingsPage.mg .mg-open.primary:hover{border-color:var(--mg-gold)}
 /* The summary: a document that uses the width it has. */
 #settingsPage.mg .mg-doc.mg-summary{max-width:none;padding:34px 40px;font:14.5px/1.75 var(--ui);color:var(--ink)}
@@ -531,6 +533,11 @@ body.dark #settingsPage.mg .pw-chip.gone{background:rgba(194,105,30,.16);color:#
 /* A file named in the prose is the file: its tile, its name, and it downloads. */
 #settingsPage.mg .mg-filelink{display:inline-flex;align-items:center;gap:6px;vertical-align:baseline;padding:1px 7px 1px 4px;border:1px solid var(--hairline);border-radius:7px;background:var(--mg-card);font:600 12.5px var(--mg-mono);color:var(--ink);text-decoration:none}
 #settingsPage.mg .mg-filelink:hover{border-color:var(--mg-gold);background:var(--mg-hover)}
+#settingsPage.mg button.mg-filelink{cursor:pointer;font:600 12.5px var(--mg-mono)}
+#settingsPage.mg .mg-fileset{display:inline-flex;align-items:stretch;gap:0;vertical-align:baseline}
+#settingsPage.mg .mg-fileset .mg-filelink{border-top-right-radius:0;border-bottom-right-radius:0}
+#settingsPage.mg .mg-filedl{display:inline-flex;align-items:center;padding:1px 8px;margin-left:-1px;border:1px solid var(--hairline);border-top-right-radius:7px;border-bottom-right-radius:7px;background:var(--mg-card);font:600 12.5px var(--mg-mono);color:var(--grey);text-decoration:none}
+#settingsPage.mg .mg-filedl:hover{border-color:var(--mg-gold);background:var(--mg-hover);color:var(--ink)}
 #settingsPage.mg .mg-filelink .file-icon{margin-right:0;vertical-align:-8px}
 #settingsPage.mg .mg-urllink{font:600 13px var(--mg-mono);color:var(--ink);text-decoration:underline;text-decoration-color:var(--mg-gold);text-decoration-thickness:2px;text-underline-offset:3px;overflow-wrap:anywhere}
 #settingsPage.mg .mg-urllink:hover{background:var(--mg-hover)}
@@ -678,6 +685,7 @@ body.dark #settingsPage.mg .pw-chip.gone{background:rgba(194,105,30,.16);color:#
 #spaceDialog[data-view=task] .tv-ledger td{padding:10px 12px;border-bottom:1px solid var(--hairline);vertical-align:middle;font-size:12.5px}
 #spaceDialog[data-view=task] .tv-ledger tr:last-child td{border-bottom:0}#spaceDialog[data-view=task] .tv-ledger td.k{font-family:var(--mg-mono);font-size:11.5px;white-space:nowrap;color:var(--grey)}#spaceDialog[data-view=task] .tv-ledger td.r{text-align:right;white-space:nowrap}
 #spaceDialog[data-view=task] .tv-ledger td .file-icon{margin-right:8px;vertical-align:middle}
+#spaceDialog[data-view=task] .tv-ledger td.r>*+*{margin-left:8px}
 #spaceDialog[data-view=task] .tv-sub2{display:block;font:11px var(--mg-mono);color:var(--grey);margin:2px 0 0 42px}
 @media (max-width:760px){#spaceDialog[data-view=task] .tv-two{grid-template-columns:1fr}#spaceDialog[data-view=task] .tv-rail{position:static;border:0;padding:0}#spaceDialog[data-view=task] .tv-title{font-size:23px}#spaceDialog[data-view=task] .tv-step .tv-in{padding-left:14px}}
 

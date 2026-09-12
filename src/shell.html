@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Cloud AI Office</title>
+<title>Cloud AI Office — Beta</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23151414'/%3E%3Cpath d='M20 44h25a9 9 0 0 0 1-17.9A12 12 0 0 0 23.2 28 8 8 0 0 0 20 44z' fill='%23F4F1EA'/%3E%3Crect x='27' y='34' width='4' height='6' rx='1' fill='%23151414'/%3E%3Crect x='34' y='31' width='4' height='9' rx='1' fill='%23151414'/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
@@ -38,6 +38,7 @@
   }
   #topbar .brand { font-family: var(--serif); font-size: 21px; letter-spacing: .04em; }
   #topbar .brand .ver { font-size: 13px; letter-spacing: .16em; color: var(--grey); vertical-align: 3px; margin-left: 2px; }
+  #topbar .brand .beta { font: 600 9.5px var(--ui); letter-spacing: .14em; text-transform: uppercase; color: var(--grey); border: 1px solid var(--hairline); border-radius: 5px; padding: 2px 5px; vertical-align: 5px; margin-left: 3px; }
   #topbar .tag {
     font-size: 11px; letter-spacing: .14em; color: var(--grey);
     border: 1px solid var(--hairline); border-radius: 99px; padding: 4px 10px;
@@ -955,6 +956,42 @@
 .space-closed-tasks { margin:18px 0 0; border-top:1px solid var(--hairline); padding-top:13px; }
 .space-closed-tasks>summary { color:var(--ink); cursor:pointer; font-family:var(--serif); font-size:19px; letter-spacing:.02em; margin:18px 2px 12px; }
 .space-closed-tasks>summary span { margin-left:8px; font:400 10px var(--ui); color:var(--grey); letter-spacing:0; }
+/* A file read here, inside the office: the deliverable opens over the page instead of in a tab of its own. */
+.fp { position:fixed; inset:0; width:100vw; height:100vh; max-width:100vw; max-height:100vh; margin:0; border:0; padding:28px; background:transparent; z-index:120; display:grid; place-items:center; overflow:hidden; }
+.fp:not([open]) { display:none; }
+.fp::backdrop { background:transparent; }
+.fp-back { position:absolute; inset:0; background:rgba(18,17,16,.52); backdrop-filter:blur(3px); }
+.fp-panel { position:relative; display:flex; flex-direction:column; width:min(1080px,100%); height:min(88vh,100%); background:var(--cream); border:1px solid var(--hairline); border-radius:16px; box-shadow:0 30px 90px rgba(18,17,16,.3); overflow:hidden; }
+.fp-head { display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--hairline); background:var(--cream); }
+.fp-name { display:flex; align-items:center; gap:9px; min-width:0; font:600 13.5px ui-monospace, Menlo, Consolas, monospace; color:var(--ink); }
+.fp-name b { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fp-sp { flex:1; }
+.fp-btn { display:inline-flex; align-items:center; border:1px solid var(--hairline); border-radius:9px; padding:7px 13px; font:600 12px var(--ui); color:var(--ink); text-decoration:none; background:transparent; cursor:pointer; }
+.fp-btn:hover { background:rgba(22,21,20,.06); }
+.fp-x { border:1px solid transparent; background:transparent; color:var(--grey); font-size:15px; line-height:1; padding:7px 10px; border-radius:9px; cursor:pointer; }
+.fp-x:hover { color:var(--ink); background:rgba(22,21,20,.06); }
+.fp-body { flex:1; min-height:0; overflow:auto; background:var(--cream); }
+.fp-frame { display:block; width:100%; height:100%; border:0; background:#fff; }
+.fp-image { display:grid; place-items:center; min-height:100%; padding:28px; }
+.fp-image img { max-width:100%; max-height:100%; border-radius:8px; }
+.fp-pre { margin:0; padding:26px 30px; font:12.5px/1.7 ui-monospace, Menlo, Consolas, monospace; color:var(--ink); white-space:pre-wrap; word-break:break-word; }
+.fp-doc { padding:30px 38px 46px; max-width:820px; margin:0 auto; font:15px/1.75 var(--ui); color:var(--ink); }
+.fp-doc h1, .fp-doc h2, .fp-doc h3 { line-height:1.25; margin:1.6em 0 .5em; }
+.fp-doc h1:first-child, .fp-doc h2:first-child { margin-top:0; }
+.fp-doc table { border-collapse:collapse; width:100%; margin:1em 0; }
+.fp-doc th, .fp-doc td { border:1px solid var(--hairline); padding:7px 10px; text-align:left; font-size:13px; }
+.fp-doc code { font:12.5px ui-monospace, Menlo, Consolas, monospace; background:rgba(22,21,20,.06); border-radius:4px; padding:1px 5px; }
+.fp-doc pre { overflow:auto; background:rgba(22,21,20,.05); border-radius:10px; padding:14px 16px; }
+.fp-sheet { padding:22px 26px 34px; }
+.fp-sheet table { border-collapse:collapse; width:100%; font:12.5px var(--ui); }
+.fp-sheet th { position:sticky; top:0; background:var(--cream); text-align:left; font:600 11px ui-monospace, Menlo, Consolas, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--grey); padding:9px 12px; border-bottom:1px solid var(--hairline); }
+.fp-sheet td { padding:8px 12px; border-bottom:1px solid var(--hairline); color:var(--ink); }
+.fp-more { margin:14px 2px 0; font:12px var(--ui); color:var(--grey); }
+.fp-note { display:grid; place-items:center; min-height:220px; padding:40px; }
+.fp-note p { margin:0; font:14px var(--ui); color:var(--grey); }
+body.fp-open { overflow:hidden; }
+@media (max-width:760px){ .fp { padding:0; } .fp-panel { width:100%; height:100%; border-radius:0; border:0; } .fp-doc { padding:22px 20px 36px; } }
+
 /* The way out of the Brain's map, for anyone who does not know Esc. */
 .bv-back { position:absolute; top:18px; left:18px; z-index:6; border:1px solid rgba(236,234,226,.28); background:rgba(20,21,24,.72); color:#ECEAE2; font:600 12px var(--ui); padding:9px 14px; border-radius:10px; cursor:pointer; backdrop-filter:blur(6px); }
 .bv-back:hover { background:rgba(40,42,48,.9); border-color:rgba(236,234,226,.5); }
@@ -962,8 +999,8 @@
 @media (max-width:760px){ .bv-back { top:12px; left:12px; padding:7px 10px; font-size:11px; } .bv-top { left:12px; top:56px; } }
 
 /* @ in the Program Manager's box: the work you mean, picked from a list. */
-.pm-box { position:relative; }
-.pm-pick { position:absolute; left:12px; right:12px; top:calc(100% + 6px); z-index:6; max-height:260px; overflow:auto; background:var(--cream); border:1px solid var(--hairline); border-radius:12px; box-shadow:0 18px 40px rgba(22,21,20,.16); padding:5px; }
+.pm-form { position:relative; }
+.pm-pick { position:absolute; left:30px; right:30px; top:calc(100% + 2px); z-index:6; max-height:260px; overflow:auto; background:var(--cream); border:1px solid var(--hairline); border-radius:12px; box-shadow:0 18px 40px rgba(22,21,20,.16); padding:5px; }
 .pm-pick[hidden] { display:none; }
 #spaceDialog .pm-pick button, .pm-pick button { display:grid !important; grid-template-columns:auto 1fr auto; align-items:baseline; gap:9px; width:100%; text-align:left; border:0 !important; background:transparent !important; color:var(--ink) !important; border-radius:9px; padding:8px 10px !important; font:12px var(--ui) !important; cursor:pointer; }
 .pm-pick button[aria-selected=true], .pm-pick button:hover { background:color-mix(in srgb,var(--ink) 6%,transparent) !important; }
@@ -972,6 +1009,13 @@
 .pm-pick b { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .pm-pick span { font:10.5px ui-monospace, Menlo, Consolas, monospace; color:var(--grey); white-space:nowrap; }
 body.dark .pm-pick { background:#1E1F23; }
+/* The clip on a correction: the document lands on the task. */
+.tv-attach { display:inline-flex; align-items:center; gap:6px; font:500 11.5px var(--ui); color:var(--grey); cursor:pointer; margin-right:auto; }
+.tv-attach:hover { color:var(--ink); }
+.tv-attach input { position:absolute; width:1px; height:1px; opacity:0; }
+.tv-attach svg { width:13px; height:13px; }
+.tv-filenote { font:11px ui-monospace, Menlo, Consolas, monospace; color:var(--grey); }
+
 /* The clip on a message to a person. */
 .m-attach { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:8px; color:var(--grey); cursor:pointer; flex:none; }
 .m-attach:hover { color:var(--ink); background:rgba(22,21,20,.06); }
@@ -1923,7 +1967,7 @@ body.dark #settingsPage .secondary { background: transparent; color: var(--ink);
 <canvas id="scene"></canvas>
 <div id="hud"></div>
 <div id="topbar">
-  <span class="brand">Cloud AI Office <span class="ver"></span></span>
+  <span class="brand">Cloud AI Office <span class="beta">Beta</span><span class="ver"></span></span>
   <div id="topconn"></div>
   <span class="sp"></span>
   <div id="topmodels"></div>

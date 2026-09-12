@@ -60,7 +60,7 @@ The thinking level (effort) is chosen per assignment: triage's effort is the bas
 
 ## The Brain
 
-The company's shared knowledge, in the folder named by `brain` in `office.config(.local).json` (default `./brain`, or `AO_BRAIN`). The Program Manager, leads and specialists search it before and during work and cite the notes they used. Owners upload documents (PDF, Word, text, Markdown, CSV; 25 MB each) into folders such as Company, Projects, Departments. Uploading a file with the same name replaces it and archives the old copy. Finished tasks land in `Agents Office/`, digests in `Digests/`. The search index lives in `data/knowledge-index/`; Settings → Brain can rebuild it.
+The company's shared knowledge, in the folder named by `brain` in `office.config(.local).json` (default `./brain`, or `AO_BRAIN`). The Program Manager, leads and specialists search it before and during work and cite the notes they used. Owners upload documents (PDF, Word, text, Markdown, CSV; 5 MB each) into folders such as Company, Projects, Departments. Uploading a file with the same name replaces it and archives the old copy. Finished tasks land in `Agents Office/`, digests in `Digests/`. The search index lives in `data/knowledge-index/`; Settings → Brain can rebuild it.
 
 ## Projects: the big pieces of work
 

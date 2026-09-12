@@ -129,7 +129,7 @@ the seeding variables are ignored.
 **Email intake.** Every member has an address of the form `<office>.<person>.<suffix>@<mail domain>` (Manage → Profile → Email
 intake, with a Copy button). Mail to it from the member's own account email, or from an address they verified with a six-digit
 code, becomes a task for the Program Manager: the subject is the title, the body the brief, attachments (PDF, Word, Excel,
-PowerPoint, CSV, text, Markdown, JSON, PNG, JPEG; 25 MB each) land under the task's `/work/inbox/` and readable ones are also
+PowerPoint, CSV, text, Markdown, JSON, PNG, JPEG; 5 MB each, and only these types: a program or an archive is refused at the door) land under the task's `/work/inbox/` and readable ones are also
 filed in the Brain under `Inbox/<person>/`. A plain question is answered by the Program Manager on the same thread instead. The
 office writes back a receipt, the finished result (with the newest PDF or the result as Markdown) and any question the team
 has; approvals stay in the app. Replying to a receipt adds a note to that task; a question in the reply is answered from it.

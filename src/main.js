@@ -560,7 +560,7 @@ function boot() {
   tasks = (DEMO ? initTasks : initOfficeWork)({
     hud, R, deptRT, RAIL_SIDE, spawnEmote, chatPush, chatHist, feedPush, zoomToApproval, enterFocus, openAgent, esc,
     brainWrite: (id, title) => brain.write(id, title), brain,
-    onLive: (h) => { const ver = document.querySelector('#topbar .brand .ver'); if (ver) ver.textContent = ''; document.title = 'Cloud AI Office'; brainNotes = h.notes; office.setBrainCount(h.notes); brain.setOwner(h.name); brain.setQuiet(true); applyRoster(h.agents); },
+    onLive: (h) => { const ver = document.querySelector('#topbar .brand .ver'); if (ver) ver.textContent = ''; document.title = 'Cloud AI Office — Beta'; brainNotes = h.notes; office.setBrainCount(h.notes); brain.setOwner(h.name); brain.setQuiet(true); applyRoster(h.agents); },
     onTools: (agentId, keys) => mcp.onToolsUsed(agentId, keys),
     requestApproval, setStuck: setStuckLive,
     onUsage: (u) => mcp.setUsage(u),

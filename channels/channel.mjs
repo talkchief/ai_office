@@ -33,7 +33,9 @@ export const ATTACHMENT_TYPES = {
   pptx: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'], csv: ['text/csv', 'text/plain', 'application/csv'], txt: ['text/plain'], md: ['text/markdown', 'text/plain', 'text/x-markdown'],
   json: ['application/json', 'text/plain'], png: ['image/png'], jpg: ['image/jpeg'], jpeg: ['image/jpeg'],
 };
-export const ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
+export const ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
+// Base64 is a third longer than the bytes it carries; a request body is allowed that much and a little for the JSON around it.
+export const ATTACHMENT_MAX_ENCODED = Math.ceil(ATTACHMENT_MAX_BYTES / 3) * 4 + 64 * 1024;
 export const TEXT_EXTENSIONS = new Set(['pdf', 'docx', 'txt', 'md', 'csv']); // what the Brain can extract text from
 
 // A file name the workspace accepts: the basename, letters, digits, dots, dashes, underscores and spaces; never a dotfile or empty.
@@ -49,6 +51,6 @@ export function attachmentProblem({ name, contentType = '', bytes }) {
   const ext = extensionOf(safe), allowed = ATTACHMENT_TYPES[ext]; if (!allowed) return `.${ext || '?'} files are not accepted`;
   const type = String(contentType || '').split(';')[0].trim().toLowerCase();
   if (type && type !== 'application/octet-stream' && !allowed.includes(type)) return `the declared type ${type} does not match .${ext}`;
-  const size = bytes?.length ?? 0; if (!size) return 'the file is empty'; if (size > ATTACHMENT_MAX_BYTES) return 'the file is larger than 25 MB';
+  const size = bytes?.length ?? 0; if (!size) return 'the file is empty'; if (size > ATTACHMENT_MAX_BYTES) return 'the file is larger than 5 MB';
   return null;
 }

@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Command } from '@langchain/langgraph';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
-import { safeFileName } from '../channels/channel.mjs';
+import { safeFileName, attachmentProblem, ATTACHMENT_MAX_BYTES } from '../channels/channel.mjs';
 import { HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { createAgent, createMiddleware, todoListMiddleware } from 'langchain';
@@ -222,7 +222,7 @@ export class OfficeEngine {
     this.bus?.publish('task.removed', { id });
     return this.update(id, j => { Object.assign(j, audience); });
   }
-  // Files handed to a task (mail attachments, uploads) land under /work/inbox/: basename only, usable names, 25 MB per file and per
+  // Files handed to a task (mail attachments, uploads) land under /work/inbox/: basename only, a document type the office can read, 5 MB per file and per
   // call, a numbered copy when a name repeats. They are recorded on the task and the team is told to read them before planning.
   attach(id, files = []) {
     const job = this.get(id); if (!job) throw httpError('No such task.', 404);
@@ -232,8 +232,11 @@ export class OfficeEngine {
     const existing = new Set(fs.readdirSync(dir)), saved = []; let total = 0;
     for (const f of files) {
       const safe = safeFileName(f?.name); if (!safe) throw httpError(`The file name “${String(f?.name || '').slice(0, 60)}” is not usable.`);
-      const bytes = Buffer.isBuffer(f.bytes) ? f.bytes : Buffer.from(f.bytes || ''); if (!bytes.length) throw httpError(`${safe} is empty.`);
-      total += bytes.length; if (bytes.length > 25 * 1024 * 1024 || total > 25 * 1024 * 1024) throw httpError('Attachments are limited to 25 MB per file and per message.');
+      const bytes = Buffer.isBuffer(f.bytes) ? f.bytes : Buffer.from(f.bytes || '');
+      // The same door the office's mail uses: a document the teams can read, nothing a machine would run.
+      const problem = attachmentProblem({ name: safe, contentType: f.contentType || '', bytes });
+      if (problem) throw httpError(`${safe} was not accepted: ${problem}.`);
+      total += bytes.length; if (total > ATTACHMENT_MAX_BYTES) throw httpError('Attachments are limited to 5 MB per file and per message.');
       let name = safe; const ext = path.extname(safe), stem = safe.slice(0, safe.length - ext.length);
       for (let n = 2; existing.has(name); n++) name = `${stem}-${n}${ext}`;
       const target = workspaceFile(this.workspaceDir(id), 'inbox/' + name); fs.writeFileSync(target.abs, bytes); existing.add(name);

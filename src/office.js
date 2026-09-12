@@ -92,7 +92,7 @@ export function initOfficeWork(ctx) {
           <div class="pm-label"><span>What needs to get done?</span><em>Esc to cancel</em></div>
           <div class="pm-box">
               <textarea name="text" rows="4" required placeholder="Describe what spans teams, needs a decision, or has to be coordinated… type @ to name a project, a milestone or a task"></textarea>
-            <div class="pm-pick" id="spacePmPick" role="listbox" aria-label="Projects, milestones and tasks" hidden></div>
+
             <div class="pm-bar">
               <label class="pm-attach" title="Attach documents the teams should read"><input type="file" id="spacePmFiles" multiple accept=".pdf,.docx,.txt,.md,.csv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.1 12.3 19.8a5 5 0 0 1-7.1-7.1l8.7-8.7a3.3 3.3 0 0 1 4.7 4.7l-8.7 8.7a1.7 1.7 0 0 1-2.4-2.4l8-8"/></svg>Attach</label>
               <span class="pm-files" id="spacePmFileNote"></span>
@@ -101,6 +101,7 @@ export function initOfficeWork(ctx) {
               <button type="submit" class="pm-send">Send to the Program Manager →</button>
             </div>
           </div>
+          <div class="pm-pick" id="spacePmPick" role="listbox" aria-label="Projects, milestones and tasks" hidden></div>
         </form>
         <section class="pm-sec">
           <div class="pm-sec-head"><h3>Projects</h3><a href="#/settings/projects" class="pm-link" data-pm-projects>Define a project: charter, timeline, files ↗</a></div>
@@ -250,7 +251,7 @@ export function initOfficeWork(ctx) {
     try {
       // Documents go with the task: it is created as an idea, the files land under its /work/inbox/ (and, for a project task, their text in the project's Brain folder), then it is queued.
       const files = [...($('spaceFiles').files || [])], wantBacklog = !!event.submitter.dataset.backlog;
-      for (const file of files) if (file.size > 25 * 1024 * 1024) throw new Error(`${file.name} is larger than 25 MB.`);
+      for (const file of files) if (file.size > 5 * 1024 * 1024) throw new Error(`${file.name} is larger than 5 MB.`);
       const assignee = $('spaceAssignee').value || undefined, forTeam = assignee ? Object.values(R).find(r => r.a.id === assignee)?.a.dept : null;
       const auto = selectedTeam === 'auto' && !forTeam, team = forTeam || selectedTeam, involve = [...$('spaceInvolve').querySelectorAll('input:checked')].map(el => el.value), due = $('spaceDue').value;
       let job = await api('/tasks', 'POST', { dept: auto ? 'auto' : team, ...(auto ? { depts: 'auto' } : involve.length ? { depts: [team, ...involve] } : {}), text: $('spaceBrief').value, assignee, dueAt: due ? new Date(due).getTime() : undefined, priority: Number($('spacePriority').value), backlog: wantBacklog || files.length > 0, projectId: $('spaceProject').value || undefined, ...audienceInput() });
@@ -426,17 +427,19 @@ export function initOfficeWork(ctx) {
     } catch (error) { connectionStale=true;activityByAgent.clear();$('spaceHint').textContent='Live updates interrupted. Showing the last recorded state; reconnecting…'; }
     finally { refreshing = false; }
   }
+  // Anywhere the CEO writes to the team, they can hand over a document too; it lands on the task itself.
+  const TASK_ATTACH = `<label class="tv-attach" title="Attach a document to this task"><input type="file" id="spaceTaskFiles" multiple accept=".pdf,.docx,.txt,.md,.csv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.1 12.3 19.8a5 5 0 0 1-7.1-7.1l8.7-8.7a3.3 3.3 0 0 1 4.7 4.7l-8.7 8.7a1.7 1.7 0 0 1-2.4-2.4l8-8"/></svg>Attach</label><span class="tv-filenote" id="spaceTaskFileNote"></span>`;
   function taskActions(job) {
     const queued = job.calls === 0 && ['backlog', 'queued'].includes(job.state);
     if (['cancelled', 'saving'].includes(job.state)) return '';
     const cancel = '<button type="button" class="tv-btn tv-btn-text tv-danger" data-action="cancel">Cancel task</button>';
     if (job.realState === 'awaiting_ceo' && (job.pendingActions || []).some(a => a.name !== 'complete_task')) return `<div class="tv-pending">${job.pendingActions.map(a => `<div class="tv-pend"><b>${esc(a.name === 'complete_task' ? 'Close the task and file the result' : 'Run ' + a.name)}</b>${a.name === 'complete_task' ? '' : `<pre>${esc(JSON.stringify(a.args, null, 2))}</pre>`}</div>`).join('')}</div><div class="tv-act"><button type="button" class="tv-btn tv-btn-p" data-action="approve">Approve · run it once</button></div><details class="tv-more" data-detail-key="revision"><summary>Reject with a note</summary><label class="tv-field">What should the team do instead?<textarea id="spaceRevision" rows="2"></textarea></label><div class="tv-act"><button type="button" class="tv-btn" data-action="reject">Reject</button></div></details>`;
-    if (job.realState === 'escalated') return `<label class="tv-field">Your answer<textarea id="spaceRevision" rows="3" placeholder="Tell the team what to do."></textarea></label><div class="tv-act"><button type="button" class="tv-btn tv-btn-p" data-action="answer">Send to the team</button><span class="tv-sp"></span>${cancel}</div>`;
-    if (job.state === 'done') return `<details class="tv-more" data-detail-key="revision"><summary>Ask for changes</summary><label class="tv-field">What should change? The lead reworks it, reviews it again, and you get a new version.<textarea id="spaceRevision" rows="3"></textarea></label><div class="tv-act"><span class="tv-sp"></span><button type="button" class="tv-btn tv-btn-p" data-action="message" data-kind="correction">Send correction</button></div></details>`;
+    if (job.realState === 'escalated') return `<label class="tv-field">Your answer<textarea id="spaceRevision" rows="3" placeholder="Tell the team what to do."></textarea></label><div class="tv-act">${TASK_ATTACH}<button type="button" class="tv-btn tv-btn-p" data-action="answer">Send to the team</button><span class="tv-sp"></span>${cancel}</div>`;
+    if (job.state === 'done') return `<details class="tv-more" data-detail-key="revision"><summary>Ask for changes</summary><label class="tv-field">What should change? The lead reworks it, reviews it again, and you get a new version.<textarea id="spaceRevision" rows="3"></textarea></label><div class="tv-act">${TASK_ATTACH}<span class="tv-sp"></span><button type="button" class="tv-btn tv-btn-p" data-action="message" data-kind="correction">Send correction</button></div></details>`;
     if (queued) return `<label class="tv-field">Task brief<textarea id="spaceQueueBrief" rows="3">${esc(job.text)}</textarea></label><div class="tv-act"><label class="tv-inline">Priority <select id="spaceQueuePriority">${[[2, 'High'], [1, 'Normal'], [0, 'Low']].map(([value, label]) => `<option value="${value}" ${value === (job.priority ?? 1) ? 'selected' : ''}>${label}</option>`).join('')}</select></label><span class="tv-sp"></span><button type="button" class="tv-btn" data-action="queue" data-queue-state="${job.state}">Save changes</button><button type="button" class="tv-btn tv-btn-p" data-action="queue" data-queue-state="${job.state === 'backlog' ? 'queued' : 'backlog'}">${job.state === 'backlog' ? 'Start task' : 'Move to ideas'}</button>${cancel}</div>`;
-    if (job.state === 'blocked') return `<label class="tv-field">Tell the team what to change, or leave it blank to retry as it was<textarea id="spaceRevision" rows="2" placeholder="Describe a correction…"></textarea></label><div class="tv-act"><button type="button" class="tv-btn tv-btn-p" data-action="retry">Retry task</button><button type="button" class="tv-btn" data-go-models>Change the model</button><span class="tv-sp"></span>${cancel}</div>`;
-    if (job.state === 'waiting') return `${job.review?.approved ? '<div class="tv-act"><button type="button" class="tv-btn tv-btn-p" data-action="approve">Approve completion</button></div>' : ''}<details class="tv-more" data-detail-key="revision"><summary>Request changes</summary><label class="tv-field">What needs to change?<textarea id="spaceRevision" rows="2"></textarea></label><div class="tv-act"><button type="button" class="tv-btn" data-action="reject">Send for revision</button><span class="tv-sp"></span>${cancel}</div></details>`;
-    if (['queued', 'planning', 'working', 'reviewing'].includes(job.state)) return `<details class="tv-more" data-detail-key="revision"><summary>Add a note for the team</summary><label class="tv-field">The team gets it at its next step.<textarea id="spaceRevision" rows="2"></textarea></label><div class="tv-act"><button type="button" class="tv-btn tv-btn-p" data-action="message" data-kind="note">Send note</button><span class="tv-sp"></span>${cancel}</div></details>`;
+    if (job.state === 'blocked') return `<label class="tv-field">Tell the team what to change, or leave it blank to retry as it was<textarea id="spaceRevision" rows="2" placeholder="Describe a correction…"></textarea></label><div class="tv-act">${TASK_ATTACH}<button type="button" class="tv-btn tv-btn-p" data-action="retry">Retry task</button><button type="button" class="tv-btn" data-go-models>Change the model</button><span class="tv-sp"></span>${cancel}</div>`;
+    if (job.state === 'waiting') return `${job.review?.approved ? '<div class="tv-act"><button type="button" class="tv-btn tv-btn-p" data-action="approve">Approve completion</button></div>' : ''}<details class="tv-more" data-detail-key="revision"><summary>Request changes</summary><label class="tv-field">What needs to change?<textarea id="spaceRevision" rows="2"></textarea></label><div class="tv-act">${TASK_ATTACH}<button type="button" class="tv-btn" data-action="reject">Send for revision</button><span class="tv-sp"></span>${cancel}</div></details>`;
+    if (['queued', 'planning', 'working', 'reviewing'].includes(job.state)) return `<details class="tv-more" data-detail-key="revision"><summary>Add a note for the team</summary><label class="tv-field">The team gets it at its next step.<textarea id="spaceRevision" rows="2"></textarea></label><div class="tv-act">${TASK_ATTACH}<button type="button" class="tv-btn tv-btn-p" data-action="message" data-kind="note">Send note</button><span class="tv-sp"></span>${cancel}</div></details>`;
     return `<div class="tv-act"><span class="tv-sp"></span>${cancel}</div>`;
   }
   function rememberTaskView() {
@@ -492,9 +495,12 @@ export function initOfficeWork(ctx) {
       const url=URL.createObjectURL(new Blob([text],{type:'text/markdown;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download=(job.state==='done'?'':'draft-')+filename+'.md';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     };
     content.querySelectorAll('[data-go-models]').forEach(b => b.onclick = () => { close(); settings.open('models'); });
+    if ($('spaceTaskFiles')) $('spaceTaskFiles').onchange = event => { const n = event.target.files.length; $('spaceTaskFileNote').textContent = n ? `${n} file${n === 1 ? '' : 's'} to attach` : ''; };
     content.querySelectorAll('[data-action]').forEach(button=>button.onclick=async()=>{
       button.disabled=true;
       try{
+        const picked=[...($('spaceTaskFiles')?.files||[])];
+        for(const file of picked){ await api(`/tasks/${job.id}/attach`,'POST',{name:file.name,data:await readFileAsBase64(file),type:file.type}); }
         await api(`/tasks/${job.id}/${button.dataset.action}`,'POST',button.dataset.action==='queue'?{text:$('spaceQueueBrief').value,priority:Number($('spaceQueuePriority').value),state:button.dataset.queueState}:(()=>{const v=$('spaceRevision')?.value||'';if(['message','answer','reject'].includes(button.dataset.action)&&!v.trim())throw new Error('Write your message first.');return {feedback:v,text:v,kind:button.dataset.kind,remember:undefined};})());
         taskDirty=false;taskInputDraft={};taskSignature='';await refresh();await showTask(job.id,false);
       }catch(error){feedback(error.message,true);button.disabled=false;}

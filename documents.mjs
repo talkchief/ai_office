@@ -5,9 +5,11 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const exec=promisify(execFile);
 export async function extractDocument({name,data}){
-  if(typeof name!=='string'||typeof data!=='string'||data.length>34*1024*1024)throw new Error('Upload a document under 25 MB.');
+  const limit=5*1024*1024;
+  if(typeof name!=='string'||typeof data!=='string'||data.length>Math.ceil(limit/3)*4+1024)throw new Error('Upload a document under 5 MB.');
   const extension=path.extname(name).toLowerCase(),buffer=Buffer.from(data,'base64');
   if(!['.txt','.md','.csv','.pdf','.docx'].includes(extension))throw new Error('Supported documents: PDF, DOCX, Markdown, text and CSV.');
+  if(buffer.length>limit)throw new Error('Upload a document under 5 MB.');
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'space-document-'));let content;
   try{
     const file=path.join(dir,'document'+extension);await fs.writeFile(file,buffer,{mode:0o600});

@@ -17,8 +17,11 @@ md.renderer.rules.link_open = (tokens, index, options, env, renderer) => {
 // (/work/…) downloads from the task the result belongs to. A folder name may hold a space ("Agents Office").
 const PATH_RE = /\/(knowledge|work)\/(?:[^\s()\]"'`,;<>]|\s(?=[^\s\/()\]"'`,;<>]+\/))+/g;
 let currentEnv = {};
+// A line break is the one piece of HTML a team writes on purpose, usually inside a table cell where markdown has no way to
+// say it. It is put back after escaping; nothing else is.
+const BREAK = /&lt;br\s*\/?\s*&gt;/gi;
 export function linkPaths(text, env = currentEnv) {
-  return escapeHTML(text).replace(PATH_RE, found => {
+  return escapeHTML(text).replace(BREAK, '<br>').replace(PATH_RE, found => {
     const shown = found.replace(/[.:]+$/, ''), tail = found.slice(shown.length);
     if (shown.startsWith('/knowledge/')) { const id = shown.slice('/knowledge/'.length), enc = encodeURIComponent(id); return `<a class="space-ref" href="/api/knowledge/file?id=${enc}" data-ref-note="${id}" title="Open this note in the Brain">${shown}</a><a class="space-ref-dl" href="/api/knowledge/file?id=${enc}" download title="Download this note">↓</a>${tail}`; }
     if (!env?.taskId) return found;
@@ -102,6 +105,8 @@ export function explainError(error) {
   return e.slice(0, 400);
 }
 
+// A file the office can draw: a PDF, an image, a page, plain text, a table. A deck or a spreadsheet is only worth saving.
+const SHOWS = /\.(pdf|png|jpe?g|gif|svg|webp|html?|md|markdown|txt|log|csv|tsv|json)$/i;
 export function renderTaskWorkspace(job, tab, actions = '') {
   currentEnv = { taskId: job.id };
   const name = id => job.agents.find(a => a.id === id)?.name || id || 'Unassigned';
@@ -183,7 +188,7 @@ export function renderTaskWorkspace(job, tab, actions = '') {
     const files = [...(job.files || [])].sort((a, b) => (exported(b.name) - exported(a.name)) || b.modifiedAt - a.modifiedAt);
     if (!files.length) return `<div class="tv-stop"><b>No files.</b>${esc(job.state === 'done' ? 'This task delivered its result as text. Ask for a PDF and the team exports one here.' : 'Files the team writes while working appear here: drafts, exports, data.')}</div>`;
     const size = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
-    return `<table class="tv-ledger"><thead><tr><th>File</th><th>Size</th><th>When</th><th></th></tr></thead><tbody>${files.map(f => `<tr><td>${fileIcon(f.name)} <b>${esc(f.name)}</b>${exported(f.name) ? '<small class="tv-sub2">exported document</small>' : ''}</td><td class="k">${size(f.bytes)}</td><td class="k">${esc(short(f.modifiedAt))}</td><td class="r"><a class="tv-btn tv-btn-sm" href="/api/tasks/${job.id}/file?path=${encodeURIComponent(f.name)}" download>Download</a></td></tr>`).join('')}</tbody></table>`;
+    return `<table class="tv-ledger"><thead><tr><th>File</th><th>Size</th><th>When</th><th></th></tr></thead><tbody>${files.map(f => `<tr><td>${fileIcon(f.name)} <b>${esc(f.name)}</b>${exported(f.name) ? '<small class="tv-sub2">exported document</small>' : ''}</td><td class="k">${size(f.bytes)}</td><td class="k">${esc(short(f.modifiedAt))}</td><td class="r">${SHOWS.test(f.name) ? `<button type="button" class="tv-btn tv-btn-sm" data-preview-url="/api/tasks/${job.id}/file?path=${encodeURIComponent(f.name)}" data-preview-name="${esc(f.name)}" data-preview-bytes="${f.bytes || 0}" title="Read it here">Preview</button>` : ''}<a class="tv-btn tv-btn-sm" href="/api/tasks/${job.id}/file?path=${encodeURIComponent(f.name)}" download>Download</a></td></tr>`).join('')}</tbody></table>`;
   };
   const tabs = [['result', 'Result', ''], ['work', 'How it was done', total ? `<span class="tv-c">${total} step${total === 1 ? '' : 's'}</span>` : ''], ['review', 'Review', last ? mark(last.approved ? 'ok' : 'warn', last.approved ? 'passed' : 'changes') : ''], ['artifacts', 'Artifacts', (job.files || []).length ? `<span class="tv-c">${job.files.length}</span>` : '']];
   return `${head}${decision()}

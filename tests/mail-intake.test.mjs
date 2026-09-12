@@ -32,7 +32,14 @@ test('engine.attach files under /work/inbox/ with safe, unique names, records th
     assert.match(engine.brief(engine.get(job.id)), /Read the attached files under \/work\/inbox\/ before planning: brief\.pdf, brief-2\.pdf, notes _v2_\.md/);
     assert.throws(() => engine.attach(job.id, [{ name: '.env', bytes: Buffer.from('x') }]), /not usable/);
     assert.throws(() => engine.attach(job.id, [{ name: 'empty.txt', bytes: Buffer.alloc(0) }]), /empty/);
-    assert.throws(() => engine.attach(job.id, [{ name: 'huge.bin', bytes: Buffer.alloc(26 * 1024 * 1024) }]), /25 MB/);
+    assert.throws(() => engine.attach(job.id, [{ name: 'huge.pdf', bytes: Buffer.alloc(6 * 1024 * 1024) }]), /5 MB/);
+    // A program or an archive is not a document, whatever it calls itself.
+    assert.throws(() => engine.attach(job.id, [{ name: 'setup.exe', bytes: Buffer.from('MZ') }]), /\.exe files are not accepted/);
+    assert.throws(() => engine.attach(job.id, [{ name: 'bundle.rar', bytes: Buffer.from('Rar!') }]), /\.rar files are not accepted/);
+    assert.throws(() => engine.attach(job.id, [{ name: 'macro.xlsm', bytes: Buffer.from('PK') }]), /\.xlsm files are not accepted/);
+    assert.throws(() => engine.attach(job.id, [{ name: 'notes.txt', contentType: 'application/x-msdownload', bytes: Buffer.from('x') }]), /does not match/);
+    // Two files that each fit but together do not.
+    assert.throws(() => engine.attach(job.id, [{ name: 'a.pdf', bytes: Buffer.alloc(3 * 1024 * 1024) }, { name: 'b.pdf', bytes: Buffer.alloc(3 * 1024 * 1024) }]), /5 MB per file and per message/);
     assert.throws(() => engine.attach(job.id, []), /at least one/);
   } finally { engine.db.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 }); }
 });
