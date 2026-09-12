@@ -79,6 +79,7 @@ body.dark{--mg-rail:#121316;--mg-card:#1E1F23;--mg-line2:rgba(236,234,226,.32);-
 #settingsPage.mg .mg-rail-office b{display:block;font:400 15px var(--serif);color:var(--ink);letter-spacing:.02em}
 #settingsPage.mg .settings-main{overflow:auto;overscroll-behavior:contain;padding:26px clamp(18px,3.4vw,40px) 120px}
 #settingsPage.mg .settings-main>*{max-width:1180px}
+#settingsPage.mg[data-section=projects] .settings-main>*{max-width:1680px}
 #settingsPage.mg .mg-area-head{display:grid;grid-template-columns:1fr auto;gap:8px 24px;align-items:end;padding-bottom:18px;border-bottom:1px solid var(--mg-line2);margin-bottom:22px}
 #settingsPage.mg .mg-area-head h1{margin:6px 0 4px;font:400 36px/1.05 var(--serif);letter-spacing:-.005em}
 #settingsPage.mg .mg-area-head p{margin:0;max-width:64ch;color:var(--grey);font:13px/1.55 var(--ui)}
@@ -328,7 +329,8 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #settingsPage.mg .pl-tasks span{font:10.5px var(--mg-mono);color:var(--grey)}
 #settingsPage.mg .pl-tasks.on b{color:var(--mg-busy)}
 #settingsPage.mg .pl-teams{display:flex;flex-wrap:wrap;gap:5px;max-width:22ch}
-#settingsPage.mg .pl-team{display:inline-block;padding:2px 8px;border:1px solid var(--hairline);border-radius:6px;background:var(--mg-hover);font:600 9.5px var(--mg-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--grey);white-space:nowrap}
+#settingsPage.mg .team-chip{display:inline-block;padding:2px 8px;border:1px solid color-mix(in srgb,var(--tc,#B9B7AE) 55%,transparent);border-radius:6px;background:color-mix(in srgb,var(--tc,#B9B7AE) 26%,transparent);font:600 9.5px var(--mg-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ti,var(--grey));white-space:nowrap}
+body.dark #settingsPage.mg .team-chip{background:color-mix(in srgb,var(--tc,#B9B7AE) 16%,transparent);color:var(--tc,var(--grey));border-color:color-mix(in srgb,var(--tc,#B9B7AE) 40%,transparent)}
 #settingsPage.mg .pl-when b{display:block;font:600 12.5px var(--ui);color:var(--ink)}
 #settingsPage.mg .pl-when span{font:10.5px var(--mg-mono);color:var(--mg-mute)}
 #settingsPage.mg .pl-dash{color:var(--mg-mute)}
@@ -380,9 +382,11 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 /* The tree */
 #settingsPage.mg .pw-table{background:var(--mg-card);border:1px solid var(--hairline);border-radius:14px;overflow-x:auto}
 #settingsPage.mg .pw-row{display:grid;grid-template-columns:minmax(240px,1.7fr) minmax(92px,.6fr) minmax(124px,.9fr) 112px 118px 104px;align-items:center;gap:14px;padding:11px 18px}
-#settingsPage.mg .pw-teamcol{font:600 10px var(--mg-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--grey);overflow:hidden;text-overflow:ellipsis}
+#settingsPage.mg .pw-teamcol{display:flex;flex-wrap:wrap;gap:4px;min-width:0;font:600 10px var(--mg-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--grey)}
+#settingsPage.mg .pw-teamcol .team-chip{font-size:9px;padding:1px 7px}
 #settingsPage.mg .pw-who{font:11.5px/1.35 var(--ui);color:var(--ink);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 #settingsPage.mg .pw-headrow .pw-who,#settingsPage.mg .pw-headrow .pw-teamcol{font:600 10px var(--mg-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--grey);display:block}
+#settingsPage.mg .pw-ms .pw-teamcol{align-items:center}
 #settingsPage.mg .pw-none{color:var(--mg-mute)}
 #settingsPage.mg .pw-ms .pw-teamcol{color:var(--ink)}
 #settingsPage.mg .pw-step .pw-who{color:var(--grey);font-size:11px}

@@ -78,7 +78,7 @@ export function initOfficeWork(ctx) {
   const inbox = initInbox({ api, openTask: id => showTask(id), openNote: id => settings.openNote(id), retryTask: id => api(`/tasks/${id}/retry`, 'POST', {}) });
   let rosterChanged = false, projectsOpen = [], providerHealth = null;
   // Open projects for the task form; refreshed with the board.
-  const fillProjects = () => { const sel = $('spaceProject'); if (!sel) return; const current = sel.value; sel.innerHTML = '<option value="">None</option>' + projectsOpen.filter(p => p.status !== 'done').map(p => `<option value="${esc(p.id)}">${esc(p.name)}${p.status === 'paused' ? ' (paused)' : ''}</option>`).join(''); if (projectsOpen.some(p => p.id === current)) sel.value = current; };
+  const fillProjects = () => { const sel = $('spaceProject'); if (!sel) return; const current = sel.value; sel.innerHTML = '<option value="">None</option>' + projectsOpen.map(p => `<option value="${esc(p.id)}">${esc(p.name)}${p.status === 'paused' ? ' · paused' : p.status === 'done' ? ' · finished' : ''}</option>`).join(''); if (projectsOpen.some(p => p.id === current)) sel.value = current; };
   const reloadForRoster = () => { if (!rosterChanged || settings.isOpen() || dialog.open || taskDirty) return; rosterChanged = false; $('spaceHint').textContent = 'The roster changed. Refreshing the office…'; setTimeout(() => location.reload(), 600); };
   const settings = initSettings({ api, openTask: id => showTask(id), brain: ctx.brain, syncBrain, onShow: () => { if (dialog.open) close(); inbox?.close(); }, onHide: () => setTimeout(reloadForRoster, 50) });
   // The Manage menu is a directory: every area with a one-line status, and what needs the owner at the top.
@@ -88,7 +88,7 @@ export function initOfficeWork(ctx) {
   // The directory follows the viewer: a member of a hosted office sees no Tools, Vault, Office settings or Audit; the models are the platform's in hosted mode; platform admins get the Platform panel.
   const DIRECTORY = [['People', [['projects', 'Projects'], ['teams', 'Teams & people'], ['routines', 'Routines']]], ['Knowledge', [['brain', 'Brain'], ['skills', 'Skills'], ['artifacts', 'Office Artifacts'], ['reports', 'Reports & KPIs']]], ['Services', [['models', 'Models & keys'], ['tools', 'Tools & connectors'], ['vault', 'Vault']]], ['Administration', [['profile', 'Profile'], ['users', 'Users & groups'], ['office', 'Office settings'], ['audit', 'Audit log'], ['admin', 'Platform']]]]
     .map(([group, items]) => [group, items.filter(([id]) => canOpenArea(id))]).filter(([, items]) => items.length);
-  const goArea = id => { if (id === 'inbox') return inbox.open(); if (id === 'projects') return projectUI.open(); settings.open(id); };
+  const goArea = id => { if (id === 'inbox') return inbox.open(); settings.open(id); };
   const renderDirectory = s => {
     const a = id => s?.areas?.[id] || {};
     const item = ([id, label]) => `<button type="button" class="mg-dir-item" data-go="${id}">${esc(label)}${a(id).line ? `<small>${esc(a(id).line)}</small>` : ''}${a(id).dot ? dot(a(id).dot) : ''}</button>`;
@@ -194,6 +194,7 @@ export function initOfficeWork(ctx) {
   function projectSummaries() {
     const dept = getFocused();
     return projectsOpen.map(p => {
+      if (p.status === 'done' && (p.doneAt || 0) < Date.now() - 3 * 86400000) return null;
       const tasks = jobs.filter(j => j.projectId === p.id), counted = tasks.filter(j => j.state !== 'cancelled');
       if (dept && dept !== 'brain' && tasks.length && !tasks.some(j => involves(j, dept))) return null;
       // Milestones that do not wait for each other are worked in parallel: the ready ones are those with nothing open before them.
@@ -254,6 +255,7 @@ export function initOfficeWork(ctx) {
     $('spaceFilters').querySelectorAll('button').forEach(b => b.onclick = () => { filter = b.dataset.filter; render(); });
     const visible = scope.filter(j => filter === 'all' || (filter === 'active' ? ['queued', 'planning', 'working', 'reviewing', 'saving'].includes(j.state) : j.state === filter));
     const historyOpen = $('spaceJobs').querySelector('[data-task-history]')?.open || false;
+    const projectsFold = $('spaceJobs').querySelector('[data-projects-fold]')?.open ?? true;
     const nameOf = id => (R[id] && R[id].a.name) || AGENT_NAMES[id] || id || 'worker';
     const chain = j => `<span class="space-chain">${jobChain(j, nameOf)}</span>`;
     const dateOf = j => new Date(j.doneAt || j.updatedAt || j.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -283,7 +285,7 @@ export function initOfficeWork(ctx) {
       return `<section class="space-feed-group" aria-label="${title}">${filter === 'all' ? `<div class="space-group-heading">${title}<span>${items.length}</span></div>` : ''}${cards}${more}</section>`;
     }).join('') || (filter === 'all' ? `<div class="space-empty"><h3>The office is quiet.</h3><p>${Object.keys(R).length} agents at their desks, nothing assigned. Three things this office is good at, to get started:</p><div class="space-starters">${[['emails', 'Triage the inbox and tell me what needs me'], ['fin', 'List overdue invoices and draft the reminders'], ['sales', 'Summarise this week’s inbound leads']].filter(([k]) => DEPTS[k]).map(([k, t]) => `<button type="button" data-starter="${k}" data-text="${esc(t)}"><b style="color:${DEPTS[k].ink}">${esc(DEPTS[k].short)}</b>${esc(t)}</button>`).join('')}</div></div>` : '<div class="space-empty"><p>Nothing here right now.</p></div>');
     const shownProjects = projectCards.filter(p => projectMatches(filter, p)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    if (shownProjects.length) { $('spaceJobs').querySelector('.space-empty')?.remove(); $('spaceJobs').insertAdjacentHTML('afterbegin', `<section class="space-feed-group" aria-label="Projects">${filter === 'all' ? `<div class="space-group-heading">Projects<span>${shownProjects.length}</span></div>` : ''}${shownProjects.map(projectCard).join('')}</section>`); }
+    if (shownProjects.length) { $('spaceJobs').querySelector('.space-empty')?.remove(); $('spaceJobs').insertAdjacentHTML('afterbegin', `<details class="space-feed-group space-projects" data-projects-fold ${projectsFold ? 'open' : ''}><summary>Projects <span>${shownProjects.length}</span></summary>${shownProjects.map(projectCard).join('')}</details>`); }
     $('spaceJobs').querySelectorAll('[data-project-card]').forEach(b => { b.onclick = e => { if (e.target.closest('[data-inline]')) return; settings.openProject(b.dataset.projectCard); }; b.onkeydown = e => { if (e.key === 'Enter') settings.openProject(b.dataset.projectCard); }; });
     $('spaceJobs').querySelectorAll('[data-starter]').forEach(b => b.onclick = () => { selectedTeam = b.dataset.starter; setTimeout(fillOptions); $('spaceDept').innerHTML = `<i style="background:${teamChip(selectedTeam).chip}"></i><span>${esc(teamChip(selectedTeam).name)}</span><span class="space-chevron">⌄</span>`; $('spaceBrief').value = b.dataset.text; $('spaceBrief').focus(); });
     $('spaceJobs').querySelectorAll('[data-more]').forEach(b => b.onclick = () => { filter = b.dataset.more; render(); });

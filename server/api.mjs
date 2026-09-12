@@ -45,8 +45,8 @@ export function registerApi(router, ctx) {
   /* ---------- tasks ---------- */
   router.on('GET', '/api/tasks', ({ user }) => { const o = office.get(); return mine(user).map(j => listShape(j, o)); });
   // The task form's project picker: open projects only.
-  // The board's projects: open ones, and those finished in the last three days (shown complete, not offered for new tasks).
-  router.on('GET', '/api/projects/open', ({ user }) => projects.list().filter(p => (['active', 'paused'].includes(p.status) || (p.status === 'done' && (p.doneAt || 0) > Date.now() - 3 * 86400000)) && canSeeProject(user, p)).map(p => ({ id: p.id, name: p.name, status: p.status, dueAt: p.dueAt || null, doneAt: p.doneAt || null, milestones: (p.milestones || []).map(m => ({ id: m.id, title: m.title, done: !!m.done, dueAt: m.dueAt || null, doneAt: m.doneAt || null, ...(Array.isArray(m.after) ? { after: m.after } : {}) })) })));
+  // Every project that can still take work: the board decides which of them to draw, the task form offers them all.
+  router.on('GET', '/api/projects/open', ({ user }) => projects.list().filter(p => p.status !== 'archived' && canSeeProject(user, p)).map(p => ({ id: p.id, name: p.name, status: p.status, dueAt: p.dueAt || null, doneAt: p.doneAt || null, milestones: (p.milestones || []).map(m => ({ id: m.id, title: m.title, done: !!m.done, dueAt: m.dueAt || null, doneAt: m.doneAt || null, ...(Array.isArray(m.after) ? { after: m.after } : {}) })) })));
   router.on('POST', '/api/tasks', async ({ req, user }) => {
     const input = await body(req); if (!String(input.text || '').trim()) throw httpError('Describe the task first.', 400); if (!input.backlog) ready();
     if (input.projectId) project(String(input.projectId), user);
