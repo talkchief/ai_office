@@ -1,6 +1,6 @@
 // Office access. A single office unlocks with its access code; a hosted office asks you to sign in, create an office,
 // or accept an invitation (#invite=<token> in the address). Model keys live in Manage → Models (or with the platform).
-import { HOSTED, USER } from './session.js';
+import { HOSTED, USER, TURNSTILE } from './session.js';
 
 export const officeReady = new Promise(resolve => {
   let released = false;
@@ -11,6 +11,7 @@ export const officeReady = new Promise(resolve => {
     <div class="auth-head"><h2 id="authTitle">Sign in to your office</h2></div>
     <div class="auth-tabs" id="authTabs" hidden><button type="button" data-auth-tab="login" aria-pressed="true">Sign in</button><button type="button" data-auth-tab="register" aria-pressed="false">Create an office</button></div>
     <p id="authMessage" role="status" aria-live="polite">Checking access…</p>
+    <div id="authTurnstile"${TURNSTILE ? '' : ' hidden'}></div>
     <form id="authLogin" hidden>
       <label for="loginEmail">Email</label><input id="loginEmail" type="email" autocomplete="username" required>
       <label for="loginPassword">Password</label><input id="loginPassword" type="password" autocomplete="current-password" required>
@@ -49,6 +50,26 @@ export const officeReady = new Promise(resolve => {
   }
   dialog.addEventListener('keydown', event => event.stopPropagation());
   dialog.addEventListener('cancel', event => event.preventDefault());
+
+  /* ---------- Cloudflare Turnstile (hosted, when the platform saved its keys) ---------- */
+  // One widget serves the sign-in, register and accept forms. Its token is single use, so every
+  // attempt takes a fresh one and the widget is reset after a failure.
+  let challengeToken = '', widget = null;
+  if (TURNSTILE) {
+    window.__aoTurnstile = () => {
+      try {
+        widget = window.turnstile.render('#authTurnstile', { sitekey: TURNSTILE, theme: 'auto', action: 'office-sign-in',
+          callback: token => { challengeToken = token; }, 'expired-callback': () => { challengeToken = ''; }, 'error-callback': () => { challengeToken = ''; } });
+      } catch { /* the forms still work; the server says if the check is required */ }
+    };
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=__aoTurnstile';
+    script.async = script.defer = true;
+    document.head.appendChild(script);
+  }
+  const resetChallenge = () => { challengeToken = ''; if (TURNSTILE && widget !== null) { try { window.turnstile.reset(widget); } catch {} } };
+  // Every sign-in call carries the challenge; without Turnstile the field is simply absent.
+  const withChallenge = data => (TURNSTILE ? { ...data, turnstile: challengeToken } : data);
 
   if (!HOSTED) {
     function render(value) {
@@ -90,11 +111,11 @@ export const officeReady = new Promise(resolve => {
   if (button) { button.textContent = USER ? USER.name : 'Sign in'; button.classList.toggle('connected', !!USER); button.addEventListener('click', () => { if (USER) window.dispatchEvent(new CustomEvent('office:open', { detail: 'profile' })); else if (!dialog.open) { dialog.showModal(); show('login'); } }); }
   const submit = (form, fn) => $(form).addEventListener('submit', async event => {
     event.preventDefault(); const b = event.target.querySelector('button[type=submit]'); b.disabled = true;
-    try { await fn(); history.replaceState(null, '', location.pathname + location.search); location.reload(); } catch (error) { message(error.message, true); b.disabled = false; }
+    try { await fn(); history.replaceState(null, '', location.pathname + location.search); location.reload(); } catch (error) { message(error.message, true); resetChallenge(); b.disabled = false; }
   });
-  submit('authLogin', () => api('login', { email: $('loginEmail').value.trim(), password: $('loginPassword').value }));
-  submit('authRegister', () => api('register', { officeName: $('regOffice').value.trim(), name: $('regName').value.trim(), email: $('regEmail').value.trim(), password: $('regPassword').value }));
-  submit('authAccept', () => api('accept', { token: inviteToken, name: $('accName').value.trim(), password: $('accPassword').value }));
+  submit('authLogin', () => api('login', withChallenge({ email: $('loginEmail').value.trim(), password: $('loginPassword').value })));
+  submit('authRegister', () => api('register', withChallenge({ officeName: $('regOffice').value.trim(), name: $('regName').value.trim(), email: $('regEmail').value.trim(), password: $('regPassword').value })));
+  submit('authAccept', () => api('accept', withChallenge({ token: inviteToken, name: $('accName').value.trim(), password: $('accPassword').value })));
   (async () => {
     try {
       const status = await api('status'); registrationOpen = !!status.registrationOpen; secure = !!status.secure;

@@ -48,7 +48,7 @@ const officeAccess = createOfficeAccess(process.env.AO_ACCESS_KEY);
 const unlockLimiter = new RateLimiter({ max: 10, windowMs: 600000, maxKeys: 2000 });
 
 /* ---------- hosted: accounts, the platform, one office per tenant ---------- */
-let platform = null, accounts = null, registry = null, authRouter = null, controlRouter = null, adminRouter = null, intake = null, inboundFromRequest = null;
+let platform = null, accounts = null, registry = null, authRouter = null, controlRouter = null, adminRouter = null, intake = null, inboundFromRequest = null, turnstile = null;
 // The mail set-up lives in the Platform panel (platform.json); the mailer is rebuilt whenever an administrator saves it.
 const mail = { mailer: null, get domain() { return platform?.get().mail.domain || ''; }, get secret() { return platform?.get().mail.webhookSecret || ''; } };
 const publicOrigin = () => platform?.publicOrigin() || process.env.AO_PUBLIC_ORIGIN || `http://localhost:${cfg.port}`;
@@ -73,7 +73,10 @@ if (HOSTED) {
   rebuildMail(); platform.onChange(rebuildMail);
   intake = createIntake({ accounts, registry, mail, publicOrigin, log: console.log });
   registry.onLoad = instance => intake.watch(instance);
-  registerAuthRoutes(authRouter, { accounts, platform, registry, log: console.log });
+  // Cloudflare Turnstile on the sign-in forms, when the platform administrator has saved its keys.
+  const { createTurnstile } = await import('./turnstile.mjs');
+  turnstile = createTurnstile({ keys: () => platform.turnstile() });
+  registerAuthRoutes(authRouter, { accounts, platform, registry, turnstile, log: console.log });
   registerAccountsApi(controlRouter, { accounts, platform, publicOrigin, mail });
   registerAdminApi(adminRouter, { accounts, platform, registry, mail, publicOrigin });
 }
@@ -153,7 +156,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && ['/', '/command-centre-v2.html', '/dark'].includes(url.pathname)) {
       let page = fs.readFileSync(HTML, 'utf8');
       // What the page knows before its first request: the roster for the scene, the mode, and (hosted) who is signed in.
-      const boot = { ...(allowed && instance ? instance.office.bootstrap() : {}), mode: HOSTED ? 'hosted' : 'single', user: HOSTED ? publicUser(user) : null, limits: instance ? instance.office.limits : null, registrationOpen: HOSTED ? platform.registrationOpen() : null, managedModels: HOSTED, mailDomain: HOSTED ? process.env.AO_MAIL_DOMAIN || '' : '' };
+      const boot = { ...(allowed && instance ? instance.office.bootstrap() : {}), mode: HOSTED ? 'hosted' : 'single', user: HOSTED ? publicUser(user) : null, limits: instance ? instance.office.limits : null, registrationOpen: HOSTED ? platform.registrationOpen() : null, managedModels: HOSTED, mailDomain: HOSTED ? process.env.AO_MAIL_DOMAIN || '' : '', turnstileKey: turnstile ? turnstile.siteKey() : '' };
       page = page.replace('<head>', '<head><script>window.__OFFICE_BOOT__=' + JSON.stringify(boot).replace(/</g, '\\u003c') + ';</script>');
       if (url.pathname === '/dark') page = page.replace('<body>', '<body class="dark">');
       // The page carries the whole office in one file (over 2 MB) and may not be cached, so it is sent

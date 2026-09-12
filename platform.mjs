@@ -53,7 +53,12 @@ export function validatePlatform(input = {}, previous = {}) {
   const from = text(im.from ?? pm.from ?? '', 254).toLowerCase();
   if (from && !emailOk(from)) fail('The From address must be a valid email address.');
   const mail = { provider, region, domain, from, apiKey: secret(im.apiKey, pm.apiKey, im.clearApiKey, 'The mail API key'), webhookSecret: secret(im.webhookSecret, pm.webhookSecret, im.clearWebhookSecret, 'The webhook secret'), dryRun: typeof im.dryRun === 'boolean' ? im.dryRun : !!pm.dryRun };
-  return { version: 2, limits, registration, adminEmails, publicOrigin, tenants, mail };
+  // Cloudflare Turnstile on the sign-in forms: the site key is public (it goes into the page), the secret key never leaves the server.
+  const pt = previous.turnstile || {}, it = input.turnstile && typeof input.turnstile === 'object' ? input.turnstile : {};
+  const siteKey = it.clearKeys ? '' : text(it.siteKey ?? pt.siteKey ?? '', 200);
+  if (/[\s]/.test(siteKey)) fail('The Turnstile site key cannot contain spaces.');
+  const turnstile = { siteKey, secretKey: secret(it.secretKey, pt.secretKey, it.clearKeys || it.clearSecretKey, 'The Turnstile secret key') };
+  return { version: 2, limits, registration, adminEmails, publicOrigin, tenants, mail, turnstile };
 }
 
 // The first platform.json takes what the deployment environment says; the panel takes over from there.
@@ -69,6 +74,9 @@ export function seedFromEnv(env = {}) {
   if (env.AO_MAIL_API_KEY) seed.mail.apiKey = env.AO_MAIL_API_KEY;
   if (env.AO_MAIL_WEBHOOK_SECRET) seed.mail.webhookSecret = env.AO_MAIL_WEBHOOK_SECRET;
   if (env.AO_MAIL_DRY_RUN === '1') seed.mail.dryRun = true;
+  seed.turnstile = {};
+  if (env.AO_TURNSTILE_SITE_KEY) seed.turnstile.siteKey = env.AO_TURNSTILE_SITE_KEY;
+  if (env.AO_TURNSTILE_SECRET_KEY) seed.turnstile.secretKey = env.AO_TURNSTILE_SECRET_KEY;
   return seed;
 }
 
@@ -92,12 +100,18 @@ export class PlatformStore {
   /** The whole configuration, secrets included: for the server only. */
   get() { return structuredClone(this.value); }
   /** What the panel may see: never a secret, only whether one is set. */
-  summary() { const { mail, ...rest } = this.get(); const { apiKey, webhookSecret, ...m } = mail; return { ...rest, mail: { ...m, hasApiKey: !!apiKey, hasWebhookSecret: !!webhookSecret, enabled: !!apiKey || !!mail.dryRun } }; }
+  summary() {
+    const { mail, turnstile, ...rest } = this.get(); const { apiKey, webhookSecret, ...m } = mail;
+    return { ...rest, mail: { ...m, hasApiKey: !!apiKey, hasWebhookSecret: !!webhookSecret, enabled: !!apiKey || !!mail.dryRun },
+      turnstile: { siteKey: turnstile.siteKey, hasSecretKey: !!turnstile.secretKey, enabled: !!(turnstile.siteKey && turnstile.secretKey) } };
+  }
   limits() { return { ...this.value.limits }; }
   update(input) { this.value = validatePlatform(input, this.value); this.persist(); for (const fn of this.listeners) { try { fn(this.get()); } catch (error) { console.warn('platform change:', error.message); } } return this.summary(); }
   onChange(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
   isAdmin(user) { return !!user && (!!user.platformAdmin || this.value.adminEmails.includes(email(user.email))); }
   registrationOpen() { return this.value.registration === 'open'; }
+  /** The Turnstile keys, for the sign-in check. The site key alone is safe to put in the page. */
+  turnstile() { return { ...this.value.turnstile }; }
   publicOrigin(fallback = '') { return this.value.publicOrigin || fallback; }
   newWebhookSecret() { return crypto.randomBytes(24).toString('base64url'); }
 }

@@ -6,6 +6,8 @@ export const USER = BOOT.user || null;
 export const ROLE = USER?.role || (HOSTED ? 'member' : 'owner');
 export const LIMITS = BOOT.limits || { maxTeams: 10, maxMembersPerTeam: 7 };
 export const MANAGED_MODELS = !!BOOT.managedModels;
+/** Cloudflare Turnstile's public site key, when the platform protects its sign-in forms with it. */
+export const TURNSTILE = BOOT.turnstileKey || '';
 /** The single owner, or a hosted office's owner or admin: may change teams, connectors, the Vault, office settings, and read the audit log. */
 export const isOfficeAdmin = () => !HOSTED || ['owner', 'admin'].includes(ROLE);
 export const canOpenAreaPlatform = id => id === 'admin';

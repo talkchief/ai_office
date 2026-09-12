@@ -11,7 +11,7 @@ export function registerAdminApi(router, { accounts, platform, registry, mail = 
   router.on('GET', '/api/admin/config', () => configOut());
   router.on('PUT', '/api/admin/config', async ({ req, user }) => {
     const before = platform.summary(), next = platform.update(await body(req, 256 * 1024));
-    log(user, `Platform config: limits ${next.limits.maxTeams} teams × ${next.limits.maxMembersPerTeam} agents, registration ${next.registration}, ${next.adminEmails.length} admin emails, mail ${next.mail.provider}${next.mail.domain ? ' @' + next.mail.domain : ''}${next.mail.hasApiKey ? ' (key set)' : ''}${next.mail.dryRun ? ' dry run' : ''}`);
+    log(user, `Platform config: limits ${next.limits.maxTeams} teams × ${next.limits.maxMembersPerTeam} agents, registration ${next.registration}, ${next.adminEmails.length} admin emails, mail ${next.mail.provider}${next.mail.domain ? ' @' + next.mail.domain : ''}${next.mail.hasApiKey ? ' (key set)' : ''}${next.mail.dryRun ? ' dry run' : ''}, sign-in check ${next.turnstile.enabled ? 'on (Turnstile)' : 'off'}`);
     // Limits apply to the next change in every loaded office; the number itself is read from the office store.
     for (const id of registry.loaded()) { const instance = registry.peek(id); if (instance) { instance.office.limits = { ...instance.office.limits, ...next.limits }; instance.bus.publish('office.updated', { area: 'limits', limits: next.limits }); } }
     return { ...configOut(), before };

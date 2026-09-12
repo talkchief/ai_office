@@ -11,12 +11,15 @@ const publicUser = (u, platform) => u && { id: u.id, email: u.email, name: u.nam
 const text = (value, max = 200) => String(value ?? '').trim().slice(0, max);
 
 /** The routes that run before the gate: register, login, accept an invitation, logout. serve.mjs guards them (HTTPS or local, rate limit). */
-export function registerAuthRoutes(router, { accounts, platform, registry, log = () => {} }) {
+export function registerAuthRoutes(router, { accounts, platform, registry, turnstile = null, log = () => {} }) {
+  // Cloudflare Turnstile, when the platform has its keys: the challenge is checked before a password is looked at.
+  const challenge = async input => { if (turnstile) await turnstile.check(input?.turnstile); };
   const signIn = (res, user, tenant, { secure, ua }) => { const s = accounts.createSession(user.id, tenant.id, { ua }); res.setHeader('Set-Cookie', sessionCookie(s.id, { secure })); return { user: publicUser({ ...user, tenantId: tenant.id, role: accounts.membership(user.id, tenant.id)?.role }, platform), tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name } }; };
   // A company registers its office: the person becomes its owner and the office is built at once.
   router.on('POST', '/api/auth/register', async ({ req, res, secure, ua }) => {
     if (!platform.registrationOpen()) throw httpError('This platform is invitation-only. Ask an office owner for an invitation.', 403);
     const input = await body(req);
+    await challenge(input);
     if (!text(input.officeName, 80)) throw httpError('Name the office you are creating.');
     const user = accounts.createUser({ email: input.email, name: input.name, password: input.password });
     const tenant = accounts.createTenant({ name: input.officeName, ownerId: user.id });
@@ -25,7 +28,9 @@ export function registerAuthRoutes(router, { accounts, platform, registry, log =
     return { $status: 201, body: signIn(res, user, tenant, { secure, ua }) };
   });
   router.on('POST', '/api/auth/login', async ({ req, res, secure, ua }) => {
-    const input = await body(req), user = accounts.verifyLogin(input.email, input.password);
+    const input = await body(req);
+    await challenge(input);
+    const user = accounts.verifyLogin(input.email, input.password);
     if (!user) throw httpError('That email and password do not match.', 401);
     const tenants = accounts.tenantsOf(user.id).filter(t => !t.suspendedAt);
     // The platform administrator signs in to the platform itself, not to an office.
@@ -35,7 +40,9 @@ export function registerAuthRoutes(router, { accounts, platform, registry, log =
     return signIn(res, user, wanted, { secure, ua });
   });
   router.on('POST', '/api/auth/accept', async ({ req, res, secure, ua }) => {
-    const input = await body(req), { user, tenant } = accounts.acceptInvite(input.token, { name: input.name, password: input.password });
+    const input = await body(req);
+    await challenge(input);
+    const { user, tenant } = accounts.acceptInvite(input.token, { name: input.name, password: input.password });
     return signIn(res, user, tenant, { secure, ua });
   });
   router.on('POST', '/api/auth/logout', ({ res, cookie, secure }) => { accounts.logout(cookie); res.setHeader('Set-Cookie', clearCookie({ secure })); return { ok: true }; });

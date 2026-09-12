@@ -67,3 +67,41 @@ test('an office store honours the platform limits: a third team is refused when 
     assert.deepEqual(loose.limits, { maxTeams: 10, maxMembersPerTeam: 7 }, 'bad limit values fall back to the defaults');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('Cloudflare Turnstile: the secret key is write-only and masked, the site key is public, and the check gates the sign-in forms', async () => {
+  const dir = temp();
+  try {
+    const platform = new PlatformStore({ dir, env: { AO_TURNSTILE_SITE_KEY: '0xSITE', AO_TURNSTILE_SECRET_KEY: '0xSECRET' } });
+    // The environment seeds the first file; the panel takes over from there.
+    assert.deepEqual(platform.turnstile(), { siteKey: '0xSITE', secretKey: '0xSECRET' });
+    const summary = platform.summary();
+    assert.equal(summary.turnstile.siteKey, '0xSITE', 'the site key is public: the page needs it');
+    assert.equal(summary.turnstile.hasSecretKey, true); assert.equal(summary.turnstile.enabled, true);
+    assert.equal('secretKey' in summary.turnstile, false, 'the secret key never reaches the panel');
+    assert.ok(!JSON.stringify(summary).includes('0xSECRET'));
+    // Saving without touching the secret keeps it; the file on disk is the only place it lives.
+    platform.update({ turnstile: { siteKey: '0xSITE2' } });
+    assert.deepEqual(platform.turnstile(), { siteKey: '0xSITE2', secretKey: '0xSECRET' });
+    assert.throws(() => platform.update({ turnstile: { siteKey: 'has space' } }), /cannot contain spaces/);
+    // The check itself: on only with both keys, one call to Cloudflare, fail closed.
+    const { createTurnstile } = await import('../turnstile.mjs');
+    const calls = [];
+    const stub = async (url, options) => { calls.push([url, options.body]); return { json: async () => ({ success: !String(options.body).includes('response=bad') }) }; };
+    let keys = { siteKey: '', secretKey: '' };
+    const check = createTurnstile({ keys: () => keys, fetchImpl: stub });
+    assert.equal(check.enabled(), false); assert.equal(check.siteKey(), '');
+    assert.deepEqual(await check.check(''), { skipped: true }, 'unconfigured: the forms work as before');
+    keys = { siteKey: '0xSITE', secretKey: '0xSECRET' };
+    assert.equal(check.enabled(), true); assert.equal(check.siteKey(), '0xSITE');
+    await assert.rejects(() => check.check(''), /did not finish/, 'enabled and no token: refused');
+    await assert.rejects(() => check.check('bad'), /did not pass/);
+    assert.deepEqual(await check.check('good'), { ok: true });
+    assert.equal(calls.length, 2); assert.ok(calls[1][1].includes('secret=0xSECRET') && calls[1][1].includes('response=good'));
+    const broken = createTurnstile({ keys: () => keys, fetchImpl: async () => { throw new Error('network'); } });
+    await assert.rejects(() => broken.check('good'), /could not be reached/, 'Cloudflare unreachable: the door stays shut');
+    // Turning it off forgets both keys.
+    platform.update({ turnstile: { clearKeys: true } });
+    assert.deepEqual(platform.turnstile(), { siteKey: '', secretKey: '' });
+    assert.equal(platform.summary().turnstile.enabled, false);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

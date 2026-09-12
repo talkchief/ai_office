@@ -276,7 +276,15 @@ await step('tests: the full suite passes', async () => {
       if (!mailCfg.json.webhooks?.postmark?.endsWith('/api/mail/inbound/postmark')) throw new Error('webhook address: ' + JSON.stringify(mailCfg.json.webhooks));
       const badMail = await call('/api/admin/config', 'PUT', { mail: { provider: 'pigeon' } }, 'admin'); if (badMail.status !== 400) throw new Error('an unknown mail provider was accepted');
       const testMail = await call('/api/admin/mail/test', 'POST', {}, 'admin'); if (!testMail.ok || !testMail.json.dryRun) throw new Error('test mail: ' + JSON.stringify(testMail.json));
-      return `${saved.json.error} · ${tenants.json.tenants.length} offices listed · mail set up in the panel, secrets masked`;
+      // Cloudflare Turnstile: with both keys saved, a sign-in without a challenge is refused before the password is looked at.
+      const ts = await call('/api/admin/config', 'PUT', { turnstile: { siteKey: '0xCHECKSITE', secretKey: 'check-turnstile-secret' } }, 'admin'); if (!ts.ok || !ts.json.turnstile.enabled) throw new Error('turnstile config: ' + JSON.stringify(ts.json.turnstile));
+      if (ts.json.turnstile.secretKey !== undefined || JSON.stringify(ts.json).includes('check-turnstile-secret')) throw new Error('the Turnstile secret came back from the panel');
+      const page = await fetch(base + '/').then(r => r.text()); if (!page.includes('0xCHECKSITE')) throw new Error('the sign-in page did not get the Turnstile site key');
+      if (page.includes('check-turnstile-secret')) throw new Error('the Turnstile secret key reached the page');
+      const noChallenge = await call('/api/auth/login', 'POST', { email: 'owner@check.test', password: 'owner-password-1' }, 'nobody'); if (noChallenge.status !== 403 || !/sign-in check/.test(noChallenge.json?.error || '')) throw new Error('a sign-in passed without the challenge: ' + noChallenge.status + ' ' + JSON.stringify(noChallenge.json));
+      const off = await call('/api/admin/config', 'PUT', { turnstile: { clearKeys: true } }, 'admin'); if (!off.ok || off.json.turnstile.enabled) throw new Error('turnstile could not be turned off');
+      const again = await call('/api/auth/login', 'POST', { email: 'owner@check.test', password: 'owner-password-1' }, 'nobody'); if (!again.ok) throw new Error('sign-in broken after turning Turnstile off: ' + again.status + ' ' + JSON.stringify(again.json));
+      return `${saved.json.error} · ${tenants.json.tenants.length} offices listed · mail set up in the panel, secrets masked · Turnstile gates the sign-in, then off again`;
     });
     await step('hosted: mail — a verified sender’s message becomes a task with its file; a repeat is one task; a stranger is dropped and audited', async () => {
       const profile = await call('/api/mail/profile'); if (!profile.ok || !profile.json.address) throw new Error('profile: ' + JSON.stringify(profile.json));

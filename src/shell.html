@@ -905,6 +905,8 @@
 #claudeDialog h2 { margin:0; font:24px var(--serif); }
 #claudeDialog p { font:14px/1.5 var(--ui); }
 #claudeDialog .auth-help { font-size:12px; opacity:.75; }
+#claudeDialog #authTurnstile { margin:14px 0 0; min-height:65px; } /* Cloudflare Turnstile, when the platform uses it */
+#claudeDialog #authTurnstile[hidden] { display:none; }
 #claudeDialog label { display:block; margin:18px 0 7px; font:600 12px var(--ui); }
 #claudeDialog input { box-sizing:border-box; width:100%; padding:12px; margin-bottom:12px; border:1px solid var(--hairline); border-radius:8px; background:#fff; color:#1a1a17; caret-color:#1a1a17; font:14px var(--ui); } /* the fields stay white in the dark theme, so the text stays dark */
 #claudeDialog input::placeholder { color:#8a8a83; }
