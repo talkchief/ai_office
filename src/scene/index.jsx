@@ -18,6 +18,7 @@ import { applySceneDim, restoreSceneDim, clearDimCache, tickDim } from './dim.js
 import { bindInput } from './input.js';
 import { canvasTexture } from './materials.js';
 import { initBrain } from '../brain.js';
+import { podCols } from '../data.js';
 import { initMcp } from '../mcp.js';
 
 extend(THREE);
@@ -45,7 +46,9 @@ function Bridge({ ctx }) {
 }
 
 function Office({ ctx, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, V1 }) {
-  const cols = useMemo(() => Object.fromEntries(DEPT_KEYS.map(k => [k, !rig.DEMO && AGENTS.filter(x => x.dept === k).length > 8 ? 3 : 2])), []);
+  // Columns and rows per team, from the grid every person already carries (src/data.js lays it out by team size).
+  const cols = useMemo(() => Object.fromEntries(DEPT_KEYS.map(k => [k, rig.DEMO ? 2 : podCols(AGENTS.filter(x => x.dept === k).length)])), []);
+  const rows = useMemo(() => Object.fromEntries(DEPT_KEYS.map(k => [k, 1 + Math.max(0, ...AGENTS.filter(x => x.dept === k).map(x => x.grid[1]))])), []);
   return (
     <>
       <Lights />
@@ -57,7 +60,7 @@ function Office({ ctx, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, V1 }) {
       ))}
       <ProgramOffice L={LAYOUT.brain} personTargets={ctx.personTargets} />
       {AGENTS.map(a => (
-        <Station key={a.id} a={a} dept={DEPTS[a.dept]} L={LAYOUT[a.dept]} cols={cols[a.dept]} personTargets={ctx.personTargets}
+        <Station key={a.id} a={a} dept={DEPTS[a.dept]} L={LAYOUT[a.dept]} cols={cols[a.dept]} rows={rows[a.dept]} personTargets={ctx.personTargets}
           v1={V1 && V1.find(x => x.id === a.id)} />
       ))}
       <Bridge ctx={ctx} />
@@ -65,15 +68,34 @@ function Office({ ctx, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, V1 }) {
   );
 }
 
+/** A building bigger than the standard six rooms is framed by its real outline: every room's corners, projected through the
+ *  camera, must sit in the part of the screen the office shows (under the top bar, left of the task panel). */
+function fitOverview(camera, pods) {
+  const corners = pods.flatMap(L => [[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([sx, sz]) => new THREE.Vector3(L.pos[0] + sx * L.w / 2, 0, L.pos[1] + sz * L.d / 2)));
+  let zoom = rig.overview.zoom;
+  for (let round = 0; round < 16; round++) {
+    rig.overview.zoom = rig.view.zoom = zoom; rig.view.target.set(...overviewPos()); applyCamera(camera);
+    const pts = corners.map(c => toScreen(c)), xs = pts.map(q => q[0]), ys = pts.map(q => q[1]);
+    const left = 12, right = rig.size.w - (rig.size.w > 900 ? rig.panelWidth() + 30 : 0) - 12, top = 64, bottom = rig.size.h - 12;
+    const fits = Math.min(...xs) >= left && Math.max(...xs) <= right && Math.min(...ys) >= top && Math.max(...ys) <= bottom;
+    if (fits) break;
+    zoom *= Math.min(0.96, (right - left) / (Math.max(...xs) - Math.min(...xs)), (bottom - top) / (Math.max(...ys) - Math.min(...ys)));
+  }
+}
+
 export function mountScene({ canvas, hud, DEMO, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, WORKLINES, V1, rnd, sample, esc, page }) {
   rig.DEMO = DEMO; rig.hud = hud;
-  rig.overview.zoom = Math.min(0.8, 0.8 * 6 / Math.max(6, DEPT_KEYS.length));
+  // The overview frames the whole building: the standard six rooms reach 63 units from the centre at 0.8, and a building
+  // that reaches further (more teams, or bigger ones pushed outward) zooms out to match.
+  const reach = Math.max(63, ...DEPT_KEYS.map(k => LAYOUT[k]).filter(Boolean).map(L => Math.max(Math.abs(L.pos[0]) + L.w / 2, Math.abs(L.pos[1]) + L.d / 2)));
+  rig.overview.zoom = Math.min(0.8, 0.8 * 63 / reach, 0.8 * 6 / Math.max(6, DEPT_KEYS.length));
   rig.size = { w: innerWidth, h: innerHeight };
   rig.panelWidth = () => (page.tasks() ? page.tasks().panelWidth() : 400);
   rig.view.target.set(...overviewPos()); rig.view.zoom = rig.overview.zoom;
 
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -400, 800);
   rig.camera = camera; applyCamera(camera);
+  if (DEPT_KEYS.length > 6 || reach > 63) fitOverview(camera, DEPT_KEYS.map(k => LAYOUT[k]).filter(Boolean));
 
   const ctx = { clickTargets: [], personTargets: [], scene: null, onReady: null, frame: null };
   const emotes = [];

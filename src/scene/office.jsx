@@ -10,6 +10,7 @@ import { mat, geo, ownMat } from './materials.js';
 import { makePlinth, makeDesk, makeChair, makePlant, makeWalkway, makeWarnSprite, makeSelectRing, makeTrail, makeFloorPlate, makeRoom, makeCorridor, makeCentreOffice, makeLobby, makeKitchen, makeMeetingRoom, makeGarden, makeWallScreen, makeMug, WALL_H } from './furniture.js';
 import { makeScreen } from './screens.js';
 import { makeLightPool } from './furniture.js';
+import { deskOffset } from '../data.js';
 import { doorOf } from './nav.js';
 import { buildPerson } from './person.js';
 
@@ -163,10 +164,10 @@ const LAYOUT_CENTRE = 16;
 /* ---------- a workstation: desk + chair + person, rotated 45° so screens face the camera ---------- */
 const ANG = Math.PI / 4;
 const rot = v => v.applyAxisAngle(new THREE.Vector3(0, 1, 0), ANG);
-export function Station({ a, dept, L, cols, personTargets, v1 }) {
+export function Station({ a, dept, L, cols, rows = 4, personTargets, v1 }) {
   const built = useMemo(() => {
-    const gx = (a.grid[0] - (cols - 1) / 2) * 8.6;
-    const gz = (a.grid[1] - 1) * 6.4 - 1;
+    // Rows centred in the room (src/data.js): a team with more rows no longer pushes its last desk through the front wall.
+    const [gx, gz] = deskOffset(a.grid, cols, rows);
     const base = new THREE.Vector3(L.pos[0] + gx, 0.12, L.pos[1] + gz);
     const station = new THREE.Group();
     station.position.copy(base); station.rotation.y = ANG;

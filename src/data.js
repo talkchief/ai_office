@@ -95,18 +95,52 @@ if (boot?.teams) {
     }
   });
 }
+// A team's desks: the lead's row at the back, then the people in two to four columns as the team grows.
+// The room is sized from the same numbers (src/scene/office.jsx centres the rows in it), so a bigger team is a bigger room.
+export const DESK_X = 8.6, DESK_Z = 6.4;
+export const podCols = count => (count > 14 ? 4 : count > 8 ? 3 : 2);
+export const podRows = (count, cols = podCols(count)) => 1 + Math.ceil(Math.max(0, count - 1) / cols);
+export const podSize = count => { const cols = podCols(count); return { w: Math.max(20, cols * DESK_X + 4), d: Math.max(26, podRows(count, cols) * DESK_Z + 7) }; };
+/** Where a desk stands in its room, from the room's centre: columns centred across, rows centred front to back and set a
+ *  little toward the front, where the back wall carries the team's screen. Four rows land exactly where desks always stood. */
+export const deskOffset = (grid, cols, rows) => [(grid[0] - (cols - 1) / 2) * DESK_X, (grid[1] - (rows - 1) / 2) * DESK_Z + 2.2];
+
 export const AGENTS = boot?.agents ? boot.agents.map(a => {
   const original = DEFAULT_AGENTS.find(x => x.id === a.id) || { hair: '#332c27', skin: '#C68B59' };
   const members = boot.agents.filter(x => x.department === a.department).sort((a,b) => Number(b.lead) - Number(a.lead));
-  const index = members.findIndex(x => x.id === a.id), cols = members.length > 8 ? 3 : 2;
+  const index = members.findIndex(x => x.id === a.id), cols = podCols(members.length);
   return { ...original, ...a, dept: a.department, grid: a.lead ? [(cols - 1) / 2, 0] : [(index - 1) % cols, 1 + Math.floor((index - 1) / cols)] };
 }) : DEFAULT_AGENTS;
-if (boot?.teams) for (const key of DEPT_KEYS) {
-  const count = AGENTS.filter(a => a.dept === key).length, cols = count > 8 ? 3 : 2;
-  LAYOUT[key].w = Math.max(20, cols * 8.6 + 4);
-  LAYOUT[key].d = Math.max(26, (1 + Math.ceil((count - 1) / cols)) * 6.4 + 7);
-  const team = boot.teams.find(t => t.id === key);
-  if (team) { DEPTS[key].name = team.name; DEPTS[key].short = team.name; }
+if (boot?.teams) {
+  for (const key of DEPT_KEYS) {
+    Object.assign(LAYOUT[key], podSize(AGENTS.filter(a => a.dept === key).length));
+    const team = boot.teams.find(t => t.id === key);
+    if (team) { DEPTS[key].name = team.name; DEPTS[key].short = team.name; }
+  }
+  spreadRooms(LAYOUT, DEPT_KEYS);
+}
+
+/** Rooms that grew must not run into each other or into the Program Manager's office at the centre: a room that would
+ *  is moved outward along its own direction, a little at a time, until every room clears every other by a corridor.
+ *  Rooms that already clear stay exactly where they are. */
+export function spreadRooms(layout, keys, { gap = 8, step = 2, rounds = 400 } = {}) {
+  const centre = layout.brain || { pos: [0, 0], w: 16, d: 16 };
+  const clash = (a, b) => Math.abs(a.pos[0] - b.pos[0]) < (a.w + b.w) / 2 + gap && Math.abs(a.pos[1] - b.pos[1]) < (a.d + b.d) / 2 + gap;
+  const out = L => { const r = Math.hypot(L.pos[0], L.pos[1]) || 1; L.pos = [L.pos[0] + (L.pos[0] / r) * step, L.pos[1] + (L.pos[1] / r) * step]; };
+  for (let round = 0; round < rounds; round++) {
+    let moved = false;
+    keys.forEach((k, i) => {
+      const L = layout[k]; if (!L) return;
+      if (clash(L, centre)) { out(L); moved = true; return; }
+      for (const other of keys.slice(i + 1).map(j => layout[j]).filter(Boolean)) {
+        if (!clash(L, other)) continue;
+        // The one further from the centre makes room, so the inner ring keeps its place.
+        out(Math.hypot(...L.pos) >= Math.hypot(...other.pos) ? L : other); moved = true;
+      }
+    });
+    if (!moved) return layout;
+  }
+  return layout;
 }
 
 // Department billboard metrics (v1 rule #5: live metrics float above each dept,
