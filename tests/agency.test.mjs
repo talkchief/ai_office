@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { Agency, DIVISIONS, parsePersona } from '../agency.mjs';
 import { OfficeStore } from '../office-store.mjs';
 import { loadRoster } from '../roster.mjs';
@@ -62,5 +63,32 @@ test('hiring a persona adds a person and its method as a skill; full teams and t
     const skillOnly = agency.addSkill(office, 'sales-outbound-strategist', { teams: [team.id] });
     assert.deepEqual(skillOnly.teams, [team.id]); assert.ok(office.get().teams.find(t => t.id === team.id).skills.includes(skillOnly.skill.id));
     assert.throws(() => agency.get('nobody'), /No such persona/);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('every persona the index lists has its file in the repository, and no ignore rule keeps one out of it', () => {
+  // A bare "data/" in .gitignore once kept the whole Data & Analytics division out of every commit: listed, never hireable.
+  const index = JSON.parse(fs.readFileSync(path.join('agency', 'index.json'), 'utf8'));
+  const missing = index.personas.filter(p => !fs.existsSync(path.join('agency', 'personas', p.division, p.id + '.md'))).map(p => p.id);
+  assert.deepEqual(missing, [], `${missing.length} listed personas have no file`);
+  for (const division of new Set(index.personas.map(p => p.division))) {
+    let ignored = '';
+    try { ignored = execFileSync('git', ['check-ignore', path.join('agency', 'personas', division, 'probe.md')], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch {} // exit 1: not ignored (or no git)
+    assert.equal(ignored, '', `.gitignore keeps agency/personas/${division}/ out of the repository`);
+  }
+});
+
+test('a persona the index lists without a file is left out of the list, and asking for it is a sentence, not a crash', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'talkchief-agency-'));
+  try {
+    fs.mkdirSync(path.join(dir, 'personas', 'data'), { recursive: true });
+    const real = fs.readFileSync(path.join('agency', 'personas', 'data', 'data-snowflake-data-engineer.md'), 'utf8');
+    fs.writeFileSync(path.join(dir, 'personas', 'data', 'data-snowflake-data-engineer.md'), real);
+    const listed = id => ({ id, division: 'data', label: 'Data & Analytics', name: id === 'data-gone' ? 'Gone Engineer' : 'Snowflake Data Engineer', description: 'x'.repeat(40), emoji: '❄️', role: 'engineer', tags: ['engineer'] });
+    fs.writeFileSync(path.join(dir, 'index.json'), JSON.stringify({ divisions: { data: 'Data & Analytics' }, personas: [listed('data-snowflake-data-engineer'), listed('data-gone')] }));
+    const agency = new Agency({ dir });
+    assert.deepEqual(agency.list().map(p => p.id), ['data-snowflake-data-engineer'], 'only a persona that can be hired is offered');
+    assert.equal(agency.get('data-snowflake-data-engineer').name, 'Snowflake Data Engineer');
+    assert.throws(() => agency.get('data-gone'), e => e.status === 404, 'not a raw ENOENT');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

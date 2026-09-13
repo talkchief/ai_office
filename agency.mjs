@@ -46,15 +46,22 @@ export class Agency {
   load() {
     if (this.index) return this.index;
     try { this.index = JSON.parse(fs.readFileSync(path.join(this.dir, 'index.json'), 'utf8')); } catch { this.index = { divisions: {}, personas: [] }; }
+    // Only a persona whose file is here can be hired: one the index names but this copy lacks is left out of the list,
+    // rather than offered and then failing (a whole division once went missing from a checkout this way).
+    const all = this.index.personas || [], present = all.filter(p => fs.existsSync(this.fileOf(p)));
+    if (present.length < all.length) { this.missing = all.filter(p => !present.includes(p)).map(p => p.id); console.warn(`agency: ${this.missing.length} persona${this.missing.length === 1 ? '' : 's'} in the index without a file, left out (${this.missing.slice(0, 5).join(', ')}${this.missing.length > 5 ? ', …' : ''})`); }
+    this.index = { ...this.index, personas: present };
     return this.index;
   }
   divisions() { return this.load().divisions; }
   // Best match first: see src/agency-search.js (the hire picker ranks with the same function).
   list({ q = '', division = '' } = {}) { return searchAgency(this.load().personas, { q, division }).map(({ bytes, ...p }) => p); }
+  fileOf(entry) { return path.join(this.dir, 'personas', entry.division, entry.id + '.md'); }
   get(id) {
     const entry = this.load().personas.find(p => p.id === id); if (!entry) fail('No such persona.', 404);
-    const file = path.join(this.dir, 'personas', entry.division, entry.id + '.md');
-    const persona = parsePersona(fs.readFileSync(file, 'utf8'), { division: entry.division, file: entry.id + '.md' });
+    let text; try { text = fs.readFileSync(this.fileOf(entry), 'utf8'); } catch { fail(`${entry.name} is listed but this copy of the Agency does not have the persona's file. Choose another, or ask the administrator to update the catalogue.`, 404); }
+    const persona = parsePersona(text, { division: entry.division, file: entry.id + '.md' });
+    if (!persona) fail(`${entry.name} could not be read from the catalogue. Choose another persona.`, 422);
     return { ...persona, label: entry.label };
   }
   // The full method as an office skill (instructions are capped; the cut lands on a heading when it can).
