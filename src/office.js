@@ -492,6 +492,7 @@ export function initOfficeWork(ctx) {
       const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+(event.key==='ArrowRight'?1:tabs.length-1))%tabs.length;
       content.querySelector(`[data-task-tab="${tabs[next]}"]`).click();
     };
+    content.querySelectorAll('[data-open-result]').forEach(button=>button.onclick=()=>{rememberTaskView();taskTab='result';taskTabTouched=true;renderTaskView();$('spaceTaskTab-result')?.focus({preventScroll:true});});
     content.querySelectorAll('[data-output-anchor]').forEach(link=>link.onclick=event=>{event.preventDefault();$(link.dataset.outputAnchor)?.scrollIntoView({behavior:'smooth',block:'start'});});
     if($('spaceCopyResult'))$('spaceCopyResult').onclick=async event=>{
       const button=event.currentTarget,article=content.querySelector('.space-deliverable');
@@ -514,9 +515,20 @@ export function initOfficeWork(ctx) {
         const picked=[...($('spaceTaskFiles')?.files||[])];
         for(const file of picked){ await api(`/tasks/${job.id}/attach`,'POST',{name:file.name,data:await readFileAsBase64(file),type:file.type}); }
         const written=button.dataset.action!=='queue'&&($('spaceRevision')?.value||'').trim();
-        await api(`/tasks/${job.id}/${button.dataset.action}`,'POST',button.dataset.action==='queue'?{text:$('spaceQueueBrief').value,priority:Number($('spaceQueuePriority').value),state:button.dataset.queueState}:(()=>{const v=$('spaceRevision')?.value||'';if(['message','answer','reject'].includes(button.dataset.action)&&!v.trim())throw new Error('Write your message first.');return {feedback:v,text:v,kind:button.dataset.kind,remember:undefined};})());
+        const response=await api(`/tasks/${job.id}/${button.dataset.action}`,'POST',button.dataset.action==='queue'?{text:$('spaceQueueBrief').value,priority:Number($('spaceQueuePriority').value),state:button.dataset.queueState}:(()=>{const v=$('spaceRevision')?.value||'';if(['message','answer','reject'].includes(button.dataset.action)&&!v.trim())throw new Error('Write your message first.');return {feedback:v,text:v,kind:button.dataset.kind,remember:undefined};})());
         // Whatever you wrote is now part of the task's conversation: show it there, as the latest message.
-        if(written&&['message','answer','reject','retry'].includes(button.dataset.action)){taskTab='conversation';taskTabTouched=true;taskScrollToLatest=true;content.querySelector('[data-detail-key="revision"]')?.removeAttribute('open');feedback(`Sent to ${job.autoRoute?'the Program Manager':'the team'}.`);}
+        if(written&&['message','answer','reject','retry'].includes(button.dataset.action)){
+          taskTab='conversation';taskTabTouched=true;taskScrollToLatest=true;
+          // Shown now, from the office's own answer to the send, not whenever a later reload wins its race with the live updates.
+          if(taskCurrent&&taskCurrent.id===job.id){
+            const list=taskCurrent.messages||(taskCurrent.messages=[]),sent=response&&response.message;
+            if(sent&&sent.seq){if(!list.some(m=>m.seq===sent.seq))list.push(sent);}
+            else list.push({seq:'sending-'+Date.now(),at:Date.now(),role:'ceo',kind:button.dataset.kind||(button.dataset.action==='answer'?'answer':'correction'),text:written,deliveredAt:Date.now()});
+            if(dialog.contains(document.activeElement))document.activeElement.blur();
+            taskDirty=false;taskInputDraft={};taskExpanded.set('revision',false);renderTaskView();
+          }
+          feedback(`Sent to ${job.autoRoute?'the Program Manager':'the team'}.`);
+        }
         taskDirty=false;taskInputDraft={};taskSignature='';await refresh();await showTask(job.id,false);
       }catch(error){feedback(error.message,true);button.disabled=false;}
     });
@@ -527,7 +539,7 @@ export function initOfficeWork(ctx) {
     try{
       const job=uiJob(await api('/tasks/'+id));
       if((!reveal&&taskDirty)||request!==taskFetchCounter||!dialog.open||modalKind!=='task'||modalTask!==id)return;
-      const signature=String(job.updatedAt)+':'+job.state+':'+job.events.length;
+      const signature=String(job.updatedAt)+':'+job.state+':'+job.events.length+':'+(job.messages||[]).length+':'+(job.resultVersions||[]).length;
       // Do not replace a finished document every poll: preserve reading position,
       // text selections, focused controls, and any open verification details.
       if(!reveal&&signature===taskSignature)return;

@@ -204,8 +204,13 @@ export function renderTaskWorkspace(job, tab, actions = '') {
     const YOURS = { message: 'Message', correction: 'Correction', note: 'Note for the team', answer: 'Your answer', question: 'Question' };
     const row = item => {
       if (item.v) {
-        const v = item.v, current = v.n === latest;
-        return `<li class="tv-version"><span>${esc(v.n > 1 ? `Version ${v.n} delivered` : 'Result delivered')}${current && job.state === 'done' ? ' · approved' : current ? '' : ' · replaced later'}<time>${esc(short(v.at))}</time>${v.summary ? `<small>${esc(v.summary)}</small>` : ''}</span></li>`;
+        // What the team sent back is a reply in the conversation: a short answer in full, a long deliverable as its summary with a way to it.
+        const v = item.v, current = v.n === latest, result = String(v.result || ''), long = result.length > 2600;
+        const status = current ? (job.state === 'done' ? 'approved' : job.state === 'waiting' ? 'waits for your approval' : '') : 'replaced by a later version';
+        const body = long ? `${v.summary ? `<p class="tv-msg-summary">${esc(v.summary)}</p>` : ''}${current ? `<button type="button" class="tv-btn tv-btn-sm" data-open-result>Read the result</button>` : ''}`
+          : result.length > 900 ? `<details class="tv-msg-fold" data-detail-key="convo-v${v.n}"${current ? ' open' : ''}><summary>${esc(outputExcerpt(result, 220))}<span>Show the whole answer</span></summary>${prose(result, 'convo-v' + v.n)}</details>`
+          : prose(result || v.summary || 'Delivered.', 'convo-v' + v.n);
+        return `<li class="tv-msg team tv-reply${current ? '' : ' tv-replaced'}" data-version="${v.n}"><div class="tv-msg-who"><b>${esc(team)}</b><span class="tv-msg-tag">${esc(v.n > 1 ? `Version ${v.n}` : 'Result')}</span>${status ? `<span class="tv-msg-status">${esc(status)}</span>` : ''}<time>${esc(short(v.at))}</time></div><div class="tv-bubble">${body}</div></li>`;
       }
       const m = item.m;
       if (m.role === 'system') return `<li class="tv-event">${esc(m.text)}<time>${esc(short(m.at))}</time></li>`;

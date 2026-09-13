@@ -669,11 +669,18 @@ body.dark #settingsPage.mg .pw-chip.gone{background:rgba(194,105,30,.16);color:#
 #spaceDialog[data-view=task] .tv-bubble .space-document>:last-child,#spaceDialog[data-view=task] .tv-bubble .space-document p:last-child{margin-bottom:0}
 #spaceDialog[data-view=task] .tv-bubble .space-document :is(h1,h2){font:600 15px/1.4 var(--ui);margin:10px 0 6px}
 #spaceDialog[data-view=task] .tv-msg.you .tv-bubble,#spaceDialog[data-view=task] .tv-msg.you .tv-bubble .space-document,#spaceDialog[data-view=task] .tv-msg.you .tv-bubble .space-document *{color:var(--cream)}
+#spaceDialog[data-view=task] .tv-bubble details.tv-msg-fold{border:0;border-radius:0;padding:0;margin:0;background:transparent}
 #spaceDialog[data-view=task] .tv-msg-fold summary{cursor:pointer;list-style:none;font:13.5px/1.6 var(--ui)}
 #spaceDialog[data-view=task] .tv-msg-fold summary::-webkit-details-marker{display:none}
 #spaceDialog[data-view=task] .tv-msg-fold summary span{display:block;margin-top:6px;font:600 11px var(--ui);opacity:.75;text-decoration:underline;text-underline-offset:3px}
 #spaceDialog[data-view=task] .tv-msg-fold[open] summary{display:none}
 #spaceDialog[data-view=task] .tv-msg-state{margin:5px 8px 0;font:11px var(--ui);color:var(--mg-warn,#8F6407)}
+#spaceDialog[data-view=task] .tv-reply .tv-bubble{border-color:rgba(36,130,103,.35);background:color-mix(in srgb,#3DB782 6%,var(--mg-card))}
+#spaceDialog[data-view=task] .tv-reply.tv-replaced .tv-bubble{background:var(--mg-card);border-color:var(--hairline);opacity:.75}
+#spaceDialog[data-view=task] .tv-msg-status{font:600 9.5px var(--ui);letter-spacing:.06em;text-transform:uppercase;color:#248267}
+#spaceDialog[data-view=task] .tv-replaced .tv-msg-status{color:var(--grey)}
+#spaceDialog[data-view=task] .tv-msg-summary{margin:0 0 10px;font:13.5px/1.6 var(--ui)}
+#spaceDialog[data-view=task] .tv-msg.tv-reply{max-width:min(86%,760px)}
 #spaceDialog[data-view=task] .tv-event{align-self:center;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;justify-content:center;max-width:560px;text-align:center;font:12px/1.5 var(--ui);color:var(--grey)}
 #spaceDialog[data-view=task] .tv-event b{font-weight:600;color:var(--ink)}
 #spaceDialog[data-view=task] .tv-stopped{color:#B2382C}
