@@ -170,7 +170,13 @@ export function createSim({ DEMO, tasks, overlays, DEPTS, DEPT_KEYS, AGENTS, LAY
       const live = !DEMO && tasks;
       const pa = live ? tasks.projectActivity?.() : null;
       pm.busy = !!pa || (live && Object.values(rig.R).some(r => ['planning', 'reviewing', 'verifying'].includes(r.livePhase)));
-      if (pm.state === 'working') {
+      // A finished task you have not opened: he is your point of contact, so he stays at his desk and waves until you open it.
+      pm.delivered = live ? (tasks.deliveredUnseen?.() || []) : [];
+      const announcing = pm.delivered.length > 0;
+      if (pm.state === 'working' && announcing) {
+        poseWork(pm.person, 'wave', now + pm.bob * 500, dt);
+        applyStandAndFacing(pm, 'wave', now, dt);
+      } else if (pm.state === 'working') {
         // LIVE: a lead planning or verifying somewhere → the PM walks over to coordinate
         if (live) {
           const lead = Object.values(rig.R).find(r => r.a.lead && ['planning', 'reviewing', 'verifying'].includes(r.livePhase));
@@ -185,7 +191,10 @@ export function createSim({ DEMO, tasks, overlays, DEPTS, DEPT_KEYS, AGENTS, LAY
         }
         const busyMode = pm.busy ? 'read' : idleLifeFor(pm, now);
         poseWork(pm.person, busyMode, now + pm.bob * 500, dt);
-        pm.person.position.x = pm.seat.x; pm.person.position.z = pm.seat.z;
+        // Back from waving: he eases into the chair rather than jumping to it.
+        const risen = pm.stand && (pm.person.userData.cur?.standK || 0) > 0.01;
+        if (risen) applyStandAndFacing(pm, busyMode === 'spin' ? 'read' : busyMode, now, dt);
+        else { pm.person.position.x = pm.seat.x; pm.person.position.z = pm.seat.z; }
         let d = pm.seatRot - pm.person.rotation.y; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; pm.person.rotation.y += d * (1 - Math.exp(-dt * 6));
         if (pm.chair) pm.chair.position.z += (1.75 - pm.chair.position.z) * (1 - Math.exp(-dt * 5));
       } else if (pm.state === 'walking' || pm.state === 'returning') {

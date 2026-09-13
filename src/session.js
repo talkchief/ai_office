@@ -4,7 +4,9 @@ export const BOOT = (typeof window !== 'undefined' && window.__OFFICE_BOOT__) ||
 export const HOSTED = BOOT.mode === 'hosted';
 export const USER = BOOT.user || null;
 export const ROLE = USER?.role || (HOSTED ? 'member' : 'owner');
-export const LIMITS = BOOT.limits || { maxTeams: 10, maxMembersPerTeam: 7 };
+export const LIMITS = { maxTeams: 10, maxMembersPerTeam: 7, ...(BOOT.limits || {}) };
+/** The platform administrator can change the limits while the page is open: the office's latest answer replaces them. */
+export const updateLimits = next => { for (const key of ['maxTeams', 'maxMembersPerTeam']) if (Number.isInteger(next?.[key]) && next[key] > 0) LIMITS[key] = next[key]; return LIMITS; };
 export const MANAGED_MODELS = !!BOOT.managedModels;
 /** Cloudflare Turnstile's public site key, when the platform protects its sign-in forms with it. */
 export const TURNSTILE = BOOT.turnstileKey || '';

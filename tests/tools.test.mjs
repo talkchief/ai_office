@@ -84,7 +84,8 @@ test('agents get only their team’s connectors, outbound ones pause, and tests 
   const set = hub.toolsFor({ agent: { inheritTools: true }, team, provider: 'anthropic' });
   assert.deepEqual(set.tools.map(t => t.name), ['mcp__claude_ai_Gmail__search_threads', 'mcp__claude_ai_Gmail__send_message', 'web_fetch', 'web_search']);
   assert.deepEqual(Object.keys(set.interruptOn), ['mcp__claude_ai_Gmail__send_message']);
-  assert.deepEqual(hub.toolsFor({ agent: { inheritTools: true }, team, provider: 'openai' }).tools.map(t => t.name).slice(-1), ['web_fetch']);
+  assert.deepEqual(hub.toolsFor({ agent: { inheritTools: true }, team, provider: 'openai' }).tools.map(t => t.name).slice(-2), ['web_fetch', 'web_search'], 'every provider can search: natively on Anthropic, through the office elsewhere');
+  assert.equal(typeof hub.toolsFor({ agent: { inheritTools: true }, team, provider: 'openai' }).tools.at(-1).invoke, 'function', 'off Anthropic, web_search is the office’s own tool');
   assert.ok(!hub.toolsFor({ agent: { inheritTools: true }, team, evaluation: true }).tools.some(t => t.name.includes('send_message')));
   assert.deepEqual(hub.toolsFor({ agent: { inheritTools: false, tools: [] }, team }).tools, []);
   assert.deepEqual(hub.status, { claude_ai_Gmail: 'connected', claude_ai_Sentry: 'connected' });
@@ -163,5 +164,27 @@ test('a tool given to one person counts, even when the team does not have it', (
   assert.deepEqual(extraToolIds(team, { tools: ['web', 'Google_Calendar'] }), ['web']);
   const hub = new ToolHub({ clientFactory: async () => ({ getTools: async () => [], close: async () => {} }), items: () => [] });
   const { tools } = hub.toolsFor({ agent: { inheritTools: true, tools: ['web'] }, team, provider: 'openai' });
-  assert.deepEqual(tools.map(t => t.name), ['web_fetch'], 'the person gets web fetch although the team has no web access');
+  assert.deepEqual(tools.map(t => t.name), ['web_fetch', 'web_search'], 'the person gets the web although the team has no web access');
+});
+
+
+test('web search reads DuckDuckGo results into titles, addresses and snippets, falls back to the lite page, and never throws', async () => {
+  const { parseSearchResults, webSearchTool } = await import('../engine/tools.mjs');
+  const html = `<div class="result results_links"><h2><a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Ffinance.yahoo.com%2Fquote%2FSPCX%2F&amp;rut=x">Space Exploration Technologies (SPCX) &amp; news</a></h2><a class="result__snippet" href="#">Find the latest <b>SPCX</b> quote.</a></div>
+    <div class="result"><a class="result__a" href="https://duckduckgo.com/y.js?ad=1">An advert</a></div>
+    <div class="result"><a class="result__a" href="https://www.sec.gov/edgar/browse/?CIK=0001181412">EDGAR filings</a><a class="result__snippet">Form S-1.</a></div>`;
+  assert.deepEqual(parseSearchResults(html), [
+    { title: 'Space Exploration Technologies (SPCX) & news', url: 'https://finance.yahoo.com/quote/SPCX/', snippet: 'Find the latest SPCX quote.' },
+    { title: 'EDGAR filings', url: 'https://www.sec.gov/edgar/browse/?CIK=0001181412', snippet: 'Form S-1.' },
+  ], 'the redirect is unwrapped, entities decoded, adverts left out, each snippet stays with its own result');
+  const lite = `<a rel="nofollow" href="https://www.nasdaq.com/market-activity/stocks/spcx" class='result-link'>SPCX quote</a><td class='result-snippet'>Real-time price.</td>`;
+  const asked = [];
+  const search = webSearchTool({ fetchImpl: async url => { asked.push(url); return url.includes('lite.') ? { ok: true, status: 200, text: async () => lite } : { ok: true, status: 202, text: async () => '<form action="//duckduckgo.com/anomaly.js">' }; } });
+  const out = await search.invoke({ query: 'SpaceX stock price' });
+  assert.equal(asked.length, 2, 'the bot check on the html page sends the query to the lite page');
+  assert.match(asked[0], /html\.duckduckgo\.com\/html\/\?q=SpaceX%20stock%20price/);
+  assert.match(out, /1\. SPCX quote\n {3}https:\/\/www\.nasdaq\.com\/market-activity\/stocks\/spcx\n {3}Real-time price\./);
+  assert.match(out, /Fetch the best sources with web_fetch/);
+  const down = webSearchTool({ fetchImpl: async () => { throw Object.assign(new Error('fetch failed'), { cause: { code: 'ENOTFOUND' } }); } });
+  assert.match(await down.invoke({ query: 'anything' }), /^No results for "anything" \(ENOTFOUND\)/, 'a network failure is a sentence the agent works around');
 });

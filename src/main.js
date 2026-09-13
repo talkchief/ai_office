@@ -250,6 +250,10 @@ function openAgentRail(id, tab = 'chat', fly = true) {
 }
 /* the rail's NOW card (design 1h): the step, who is sitting with them, the live draft, where this sits */
 let nowCardAt = 0;
+document.getElementById('mNowCard')?.addEventListener('click', event => {
+  const id = event.currentTarget.dataset.task;
+  if (id && !window.getSelection()?.toString()) window.dispatchEvent(new CustomEvent('office:open-task', { detail: id }));
+});
 function renderNowCard(id) {
   const el = document.getElementById('mNowCard'); if (!el) return;
   const r = R[id]; if (!r) { el.hidden = true; return; }
@@ -272,7 +276,8 @@ function renderNowCard(id) {
   } else if (r.assistTarget && R[r.assistTarget]) { step = 'HELPING'; title = `Sitting with ${R[r.assistTarget].a.name}${R[r.assistTarget].liveTitle ? ' on ' + R[r.assistTarget].liveTitle : ''}`; }
   else if (DEMO) { step = phase === 'needs you' ? 'WAITING FOR YOU' : 'NOW'; title = title || (r.demoLine ? `${r.workMode === 'read' ? 'Reading through' : 'Working on'} ${r.demoLine}` : rnd(r.v1?.tasks || ['Working through the queue']).replace(/\{[a-z]+\}/g, 'a client')); meta = 'demo'; }
   el.hidden = false;
-  el.innerHTML = `<div class="nc-eye"><span>${esc(step || 'NOW')}</span>${phase === 'needs you' ? '<b style="color:#B4830B">NEEDS YOU</b>' : busy ? '<b>' + esc(phase.toUpperCase()) + '</b>' : ''}</div>
+  el.dataset.task = job ? job.id : ''; // the card is the task: a click opens it (its one listener sits above this function)
+  el.innerHTML = `<div class="nc-eye"><span>${esc(step || 'NOW')}</span>${phase === 'needs you' ? '<b style="color:#B4830B">NEEDS YOU</b>' : busy ? `<b data-phase="${esc(phase)}">${esc(phase.toUpperCase())}</b>` : ''}</div>
     <div class="nc-title">${esc(title || 'On it')}</div>${meta ? `<div class="nc-meta">${esc(meta)}</div>` : ''}
     ${helper ? `<div class="nc-with"><span class="rn-a" style="border-color:#C8A438">★</span>${esc(helper.a.name)} is sitting with them</div>` : ''}
     ${draft ? `<div class="nc-draft-lab"><i></i>LIVE DRAFT · UNREVIEWED</div><div class="nc-draft">${esc(draft.slice(0, 420))}</div>` : ''}

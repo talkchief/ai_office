@@ -231,7 +231,8 @@ export function ProgramOffice({ L, personTargets }) {
     const { station, desk, chair, person, trail, ring } = built;
     desk.screenSet.draw(['Coordinating teams'], 'idle'); desk.screenSet.tex.needsUpdate = true;
     rig.pm = { person, chair, ring, trail, desk: desk.group, screenSet: desk.screenSet, activity: desk.activity, glow: desk.glow, lampBulb: desk.lampBulb,
-      seat: person.position.clone(), seatRot: ANG + Math.PI, state: 'working', path: null, pathI: 0, speed: 11, target: null, pill: null, bob: 3 };
+      seat: person.position.clone(), seatRot: ANG + Math.PI, stand: person.position.clone().add(rot(new THREE.Vector3(1.5, 0, 0.15))), // where he stands to wave
+      state: 'working', path: null, pathI: 0, speed: 11, target: null, pill: null, bob: 3, delivered: [] };
     return () => { rig.pm = null; };
   }, []);
   return (

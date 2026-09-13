@@ -302,6 +302,8 @@ body.dark #settingsPage.mg .mg-assist{color:#E4C97A}
 #settingsPage.mg .mg-folders button:hover{background:var(--mg-hover);color:var(--ink)}
 #settingsPage.mg .mg-folders button[aria-pressed=true]{background:var(--mg-card);color:var(--ink);font-weight:500;box-shadow:0 0 0 1px var(--hairline)}
 #settingsPage.mg .mg-folders button .mg-n{margin-left:auto;font:11px var(--mg-mono);color:var(--mg-mute)}
+#settingsPage.mg .mg-folders .mg-fname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:calc(var(--depth,0) * 12px)}
+#settingsPage.mg .mg-folders .mg-fname[style*="--depth:1"]::before,#settingsPage.mg .mg-folders .mg-fname[style*="--depth:2"]::before{content:'↳ ';color:var(--mg-mute)}
 #settingsPage.mg .mg-upload{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px dashed var(--mg-line2);border-radius:10px;padding:12px 14px;margin:0 0 16px;background:var(--mg-card)}
 #settingsPage.mg .mg-upload input[type=file]{width:auto;margin:0;padding:0;border:0;background:transparent;font:12px var(--ui);color:var(--grey)}
 #settingsPage.mg .mg-upload input::file-selector-button{border:1px solid var(--mg-line2);border-radius:6px;padding:6px 10px;margin-right:10px;background:transparent;color:var(--ink);font:500 12px var(--ui);cursor:pointer}
@@ -558,7 +560,7 @@ body.dark #settingsPage.mg .pw-chip.gone{background:rgba(194,105,30,.16);color:#
 #settingsPage.mg .mg-results-section{margin-top:26px}
 @media (max-width:820px){#settingsPage.mg .mg-deliv{grid-template-columns:minmax(0,1fr)}#settingsPage.mg .mg-deliv-where{text-align:left}#settingsPage.mg .mg-doc.mg-summary{padding:24px 20px}#settingsPage.mg .mg-open{grid-template-columns:32px minmax(0,1fr)}#settingsPage.mg .mg-open-cta{display:none}}
 #settingsPage.mg .mg-snippet{color:var(--grey);font:12px/1.5 var(--ui);margin-top:4px;display:block}
-@media (max-width:900px){#settingsPage.mg .mg-brain{grid-template-columns:1fr}#settingsPage.mg .mg-folders{flex-direction:row;flex-wrap:wrap;position:static}#settingsPage.mg .mg-folders button{width:auto}}
+@media (max-width:900px){#settingsPage.mg .mg-brain{grid-template-columns:1fr}#settingsPage.mg .mg-folders{flex-direction:row;flex-wrap:wrap;position:static}#settingsPage.mg .mg-folders button{width:auto;max-width:100%}#settingsPage.mg .mg-folders .mg-fname{padding-left:0}}
 
 /* ---- the task view (in the task dialog): the decision first, then the four tabs ---- */
 #spaceDialog[data-view=task]>header{padding:0;height:0;overflow:visible}
@@ -653,6 +655,38 @@ body.dark #settingsPage.mg .pw-chip.gone{background:rgba(194,105,30,.16);color:#
 #spaceDialog[data-view=task] .tv-stop{border:1px dashed var(--mg-line2);border-radius:12px;padding:18px 20px;color:var(--grey);font-size:12.5px}
 #spaceDialog[data-view=task] .tv-stop b{display:block;font:400 20px var(--serif);color:var(--ink);margin-bottom:6px}
 #spaceDialog[data-view=task] .tv-card{background:var(--mg-card);border:1px solid var(--hairline);border-radius:12px;padding:18px 20px;margin:0 0 12px}
+/* The conversation on a task: your messages on the right, the team's on the left, each delivered version as a line across. */
+#spaceDialog[data-view=task] .tv-convo{list-style:none;margin:0;padding:6px 0 12px;display:flex;flex-direction:column;gap:16px}
+#spaceDialog[data-view=task] .tv-msg{display:flex;flex-direction:column;align-items:flex-start;max-width:min(78%,660px);align-self:flex-start}
+#spaceDialog[data-view=task] .tv-msg.you{align-self:flex-end;align-items:flex-end}
+#spaceDialog[data-view=task] .tv-msg-who{display:flex;align-items:baseline;gap:7px;margin:0 6px 5px;font:12px var(--ui);color:var(--grey)}
+#spaceDialog[data-view=task] .tv-msg-who b{font-weight:600;color:var(--ink)}
+#spaceDialog[data-view=task] .tv-msg-who time,#spaceDialog[data-view=task] .tv-convo time{font:11px var(--mg-mono);color:var(--mg-mute)}
+#spaceDialog[data-view=task] .tv-msg-tag{font:600 9.5px var(--ui);letter-spacing:.08em;text-transform:uppercase;color:var(--grey);border:1px solid var(--hairline);border-radius:99px;padding:1px 7px}
+#spaceDialog[data-view=task] .tv-bubble{border:1px solid var(--hairline);background:var(--mg-card);border-radius:16px 16px 16px 5px;padding:10px 15px}
+#spaceDialog[data-view=task] .tv-msg.you .tv-bubble{background:var(--ink);border-color:var(--ink);border-radius:16px 16px 5px 16px}
+#spaceDialog[data-view=task] .tv-bubble .space-document{font:13.5px/1.6 var(--ui)}
+#spaceDialog[data-view=task] .tv-bubble .space-document>:last-child,#spaceDialog[data-view=task] .tv-bubble .space-document p:last-child{margin-bottom:0}
+#spaceDialog[data-view=task] .tv-bubble .space-document :is(h1,h2){font:600 15px/1.4 var(--ui);margin:10px 0 6px}
+#spaceDialog[data-view=task] .tv-msg.you .tv-bubble,#spaceDialog[data-view=task] .tv-msg.you .tv-bubble .space-document,#spaceDialog[data-view=task] .tv-msg.you .tv-bubble .space-document *{color:var(--cream)}
+#spaceDialog[data-view=task] .tv-msg-fold summary{cursor:pointer;list-style:none;font:13.5px/1.6 var(--ui)}
+#spaceDialog[data-view=task] .tv-msg-fold summary::-webkit-details-marker{display:none}
+#spaceDialog[data-view=task] .tv-msg-fold summary span{display:block;margin-top:6px;font:600 11px var(--ui);opacity:.75;text-decoration:underline;text-underline-offset:3px}
+#spaceDialog[data-view=task] .tv-msg-fold[open] summary{display:none}
+#spaceDialog[data-view=task] .tv-msg-state{margin:5px 8px 0;font:11px var(--ui);color:var(--mg-warn,#8F6407)}
+#spaceDialog[data-view=task] .tv-event{align-self:center;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;justify-content:center;max-width:560px;text-align:center;font:12px/1.5 var(--ui);color:var(--grey)}
+#spaceDialog[data-view=task] .tv-event b{font-weight:600;color:var(--ink)}
+#spaceDialog[data-view=task] .tv-stopped{color:#B2382C}
+#spaceDialog[data-view=task] .tv-typing i{display:inline-block;width:5px;height:5px;margin-right:2px;border-radius:50%;background:#2A6DB5;animation:tvTyping 1.2s ease-in-out infinite}
+#spaceDialog[data-view=task] .tv-typing i:nth-child(2){animation-delay:.15s}#spaceDialog[data-view=task] .tv-typing i:nth-child(3){animation-delay:.3s}
+@keyframes tvTyping{0%,80%,100%{opacity:.25}40%{opacity:1}}
+@media (prefers-reduced-motion:reduce){#spaceDialog[data-view=task] .tv-typing i{animation:none;opacity:.7}}
+#spaceDialog[data-view=task] .tv-version{align-self:stretch;display:flex;align-items:center;gap:12px;font:12px/1.5 var(--ui);color:var(--grey)}
+#spaceDialog[data-view=task] .tv-version::before,#spaceDialog[data-view=task] .tv-version::after{content:'';flex:1;height:1px;background:var(--hairline)}
+#spaceDialog[data-view=task] .tv-version span{display:flex;flex-direction:column;align-items:center;gap:2px;max-width:70%;text-align:center;color:#248267;font-weight:600}
+#spaceDialog[data-view=task] .tv-version small{font:12px/1.45 var(--ui);color:var(--grey);font-weight:400}
+body.dark #spaceDialog[data-view=task] .tv-version span{color:#5CC292}
+@media (max-width:600px){#spaceDialog[data-view=task] .tv-msg{max-width:92%}}
 #spaceDialog[data-view=task] .tv-card h3{margin:0 0 4px;font:400 20px var(--serif);letter-spacing:0;text-transform:none}
 #spaceDialog[data-view=task] .tv-plan-text{margin:0 0 10px;font:12.5px/1.5 var(--ui);color:var(--grey)}
 #spaceDialog[data-view=task] .tv-plan{display:flex;align-items:center;gap:12px;margin:0 0 14px;font:12.5px var(--ui);color:var(--grey)}

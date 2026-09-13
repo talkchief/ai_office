@@ -71,6 +71,46 @@ export function webFetchTool({ fetchImpl = globalThis.fetch, lookup } = {}) {
 }
 export const anthropicWebSearch = { type: 'web_search_20260209', name: 'web_search', max_uses: 8 };
 
+// Web search for every other provider: DuckDuckGo's HTML results, no key. Only Anthropic's API searches natively, so an
+// agent on OpenRouter, Google or an OpenAI-compatible endpoint could fetch a page only when it already knew the address.
+// Results come back as title, address and snippet; the agent fetches the best sources with web_fetch and cites them.
+const SEARCH_PAGES = ['https://html.duckduckgo.com/html/?q=', 'https://lite.duckduckgo.com/lite/?q='];
+const decodeEntities = t => String(t || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+const resultUrl = href => { const h = decodeEntities(href); try { const u = new URL(h.startsWith('//') ? 'https:' + h : h); const real = u.searchParams.get('uddg'); return real ? decodeURIComponent(real) : u.href; } catch { return ''; } };
+/** Titles, addresses and snippets from either DuckDuckGo results page (html: result__a / result__snippet; lite: result-link / result-snippet). */
+export function parseSearchResults(html, max = 8) {
+  const page = String(html || ''), out = [], seen = new Set();
+  const links = [...page.matchAll(/<a\b[^>]*class=["'](?:result__a|result-link)["'][^>]*>[\s\S]*?<\/a>/g)];
+  const snippets = [...page.matchAll(/class=["'](?:result__snippet|result-snippet)["'][^>]*>([\s\S]*?)<\/(?:a|div|td)>/g)];
+  links.forEach((a, i) => {
+    if (out.length >= max) return;
+    const url = resultUrl((a[0].match(/href=["']([^"']+)["']/) || [])[1] || '');
+    if (!/^https?:\/\//.test(url) || seen.has(url) || /duckduckgo\.com\//.test(url)) return;
+    // A result's snippet is the first one after its link and before the next link.
+    const next = links[i + 1]?.index ?? Infinity, snippet = snippets.find(m => m.index > a.index && m.index < next);
+    seen.add(url); out.push({ title: decodeEntities(a[0]) || url, url, snippet: snippet ? decodeEntities(snippet[1]).slice(0, 300) : '' });
+  });
+  return out;
+}
+export function webSearchTool({ fetchImpl = globalThis.fetch } = {}) {
+  return tool(async ({ query }) => {
+    const q = String(query || '').trim().slice(0, 300); if (!q) return 'Give a search query.';
+    let results = [], trouble = '';
+    // The html page first; when it answers with its bot check or nothing, the lite page.
+    for (const base of SEARCH_PAGES) {
+      try {
+        const res = await fetchImpl(base + encodeURIComponent(q), { signal: AbortSignal.timeout(20000), headers: { 'user-agent': 'Mozilla/5.0 (compatible; TalkchiefAISpace/1.0)', accept: 'text/html' } });
+        if (!res.ok) { trouble = `HTTP ${res.status}`; continue; }
+        results = parseSearchResults(await res.text()); if (results.length) break; trouble = 'no results';
+      } catch (error) { trouble = fetchReason(error); }
+    }
+    if (!results.length) return `No results for "${q}" (${trouble}). Try other words, or fetch a source you know with web_fetch.`;
+    return `Search results for "${q}" (searched ${new Date().toISOString().slice(0, 10)}). Fetch the best sources with web_fetch before relying on them, and cite the addresses:\n\n` + results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}${r.snippet ? '\n   ' + r.snippet : ''}`).join('\n\n');
+  }, { name: 'web_search', description: 'Search the public web and get back titles, addresses and snippets. Use it to find current sources (prices, listings, news, releases, anything that changes), then read the best ones with web_fetch and cite them. A snippet alone is not a source.', schema: z.object({ query: z.string().describe('What to search for, in plain words') }) });
+}
+/** An agent's web tools on its provider: fetch everywhere, search natively on Anthropic and through DuckDuckGo elsewhere. */
+export const webTools = provider => [webFetchTool(), provider === 'anthropic' ? anthropicWebSearch : webSearchTool()];
+
 // The adapter that hands MCP tools to the model flattens each schema and keeps only unions of objects, so a server's
 // "one of these strings" or "boolean or null" reaches the model with no type at all and the model guesses. Rebuild what the
 // server declared: constants become an enum, "X or null" becomes X, unions of objects merge, anything else stays a union.
@@ -156,7 +196,7 @@ export class ToolHub {
       if (outbound && (evaluation || readOnly)) continue;
       out.push(t); if (outbound) interruptOn[t.name] = { allowedDecisions: ['approve', 'edit', 'reject'] };
     }
-    if (assigned.includes('web')) { out.push(webFetchTool()); if (provider === 'anthropic') out.push(anthropicWebSearch); }
+    if (assigned.includes('web')) out.push(...webTools(provider));
     return { tools: out, interruptOn };
   }
   catalog() { return this.tools.map(t => ({ name: t.name, description: String(t.description || '').slice(0, 300), outbound: isOutbound(t, this.settings()) })); }

@@ -15,7 +15,7 @@ const ST = {
 const PRIO = ['stuck', 'blocked', 'coordinating', 'planning', 'verifying', 'together', 'working', 'submitted'];
 const PM_COL = '#B9A775';
 
-// rows: [{ a1, c1, a2, c2, link, line, team, teamInk, meta, st, stColor, agent }]
+// rows: [{ a1, c1, a2, c2, link, line, team, teamInk, meta, st, stColor, agent, job }] — job: the task the row is about, when there is one
 export function rightNowRows({ R, pm, DEPTS, jobs = null, live = false, rnd = null, max = 5 }) {
   const rows = [];
   const leadOf = dept => Object.values(R).find(r => r.a.dept === dept && r.a.lead);
@@ -38,7 +38,7 @@ export function rightNowRows({ R, pm, DEPTS, jobs = null, live = false, rnd = nu
       const w = R[r.assistTarget];
       rows.push({ a1: '★', c1: chip(r), a2: ini(w.a.name), c2: chip(w), link: ink(r), team: team(r), teamInk: ink(r), t1: leadTitle(r), t2: who(w),
         line: r.state === 'walking' ? `${r.a.name} is walking over to ${w.a.name}` : `${r.a.name} is sitting with ${w.a.name}${w.liveTitle ? ' on ' + w.liveTitle : ''}`,
-        meta: w.liveTitle ? (stepOf(w) || 'draft, unreviewed') : 'helping', st: 'together', agent: r.a.id });
+        meta: w.liveTitle ? (stepOf(w) || 'draft, unreviewed') : 'helping', st: 'together', agent: r.a.id, job: w.liveJobId || r.liveJobId || null });
       continue;
     }
     if (ph === 'idle' || ph === 'done' || ph === 'helping') continue;
@@ -53,7 +53,7 @@ export function rightNowRows({ R, pm, DEPTS, jobs = null, live = false, rnd = nu
       else { if (!r.demoLine && rnd) r.demoLine = rnd(r.v1?.tasks || ['the queue']).replace(/\{co\}/g, 'a client').replace(/\{person\}/g, 'a lead').replace(/\{count\}/g, '6').replace(/\{n\}/g, '12').replace(/\{segment\}/g, 'roofing'); line = `${r.a.name} is ${r.workMode === 'read' ? 'reading through' : r.workMode === 'phone' ? 'on a call about' : 'typing up'} ${r.demoLine || 'the queue'}`; meta = 'demo'; }
       if (lead && lead !== r && Math.random() < 2) { a2 = null; }
     } else continue;
-    rows.push({ a1, c1: chip(r), a2, c2, link, team: team(r), teamInk: ink(r), line, meta, st: ph === 'reviewing' ? 'verifying' : ph, agent: r.a.id, t1, t2 });
+    rows.push({ a1, c1: chip(r), a2, c2, link, team: team(r), teamInk: ink(r), line, meta, st: ph === 'reviewing' ? 'verifying' : ph, agent: r.a.id, job: r.liveJobId || null, t1, t2 });
   }
   rows.sort((a, b) => PRIO.indexOf(a.st) - PRIO.indexOf(b.st));
   return rows.slice(0, max);
@@ -63,7 +63,8 @@ export function rightNowHTML(rows, { updated = 'just now' } = {}) {
   if (!rows.length) return `<div class="rn-quiet">Quiet. Everyone is at their desk.</div>`;
   return rows.map(n => {
     const [word, col] = ST[n.st] || ST.working;
-    return `<div class="rn-row" data-agent="${esc(n.agent)}">
+    // A row about a task opens that task; the faces at its start open the person.
+    return `<div class="rn-row" data-agent="${esc(n.agent)}"${n.job ? ` data-task="${esc(n.job)}" title="Open the task"` : ''}>
       <span class="rn-av"><span class="rn-a" style="border-color:${n.c1}" title="${esc(n.t1 || '')}">${esc(n.a1)}</span>${n.a2 ? `<span class="rn-link" style="background:${n.link}"></span><span class="rn-a" style="border-color:${n.c2}" title="${esc(n.t2 || '')}">${esc(n.a2)}</span>` : ''}</span>
       <span class="rn-body"><span class="rn-line">${esc(n.line)}</span><span class="rn-meta"><b style="color:${n.teamInk}">${esc(n.team)}</b>${n.meta ? ' · ' + esc(n.meta) : ''}</span></span>
       <span class="rn-st" style="color:${col};border-color:${col}">${word}</span></div>`;

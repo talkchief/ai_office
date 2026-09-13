@@ -1,6 +1,6 @@
 import { DEPTS, DEPT_KEYS } from './data.js';
 import { officeReady } from './auth.js';
-import { HOSTED, USER, PLATFORM_ONLY, isOfficeAdmin, isPlatformAdmin, MANAGED_MODELS, canOpenArea } from './session.js';
+import { HOSTED, USER, PLATFORM_ONLY, LIMITS, updateLimits, isOfficeAdmin, isPlatformAdmin, MANAGED_MODELS, canOpenArea } from './session.js';
 import { initSettings } from './settings.js';
 import { unseenResult } from './activity.js';
 import { readyMilestones } from '../milestones.mjs';
@@ -30,7 +30,7 @@ export function initOfficeWork(ctx) {
   let jobs = [], config = null, tools = [], selectedTeam = 'auto', filter = 'all', refreshing = false, agentOpen = null, modalKind = '', modalTask = null;
   let reportDays = 7, reportFetchCounter = 0, taskFetchCounter = 0, taskDirty = false, connectionStale = false;
   let taskCurrent = null, taskTab = 'work', taskTabTouched = false, taskSignature = '';
-  let taskExpanded = new Map(), taskScroll = {}, taskInputDraft = {};
+  let taskExpanded = new Map(), taskScroll = {}, taskInputDraft = {}, taskScrollToLatest = false, taskAtLatest = false;
   const activityByAgent = new Map();
   let settingsDraft = null, settingsTeam = DEPT_KEYS[0], settingsSection = 'overview', toolPoll = null;
   const panel = document.getElementById('tpanel');
@@ -206,7 +206,11 @@ export function initOfficeWork(ctx) {
     const d = $('spaceManageDot'); if (s) { d.hidden = !s.attention.length; d.className = 'mg-dot mg-dot-' + (s.attention.some(x => x.kind === 'fail') ? 'fail' : 'warn'); d.title = s.attention.length + ' need you'; }
   };
   renderDirectory(null);
-  const toggleMenu = (button, menu, visible) => { $(menu).hidden = !visible; $(button).setAttribute('aria-expanded', String(visible)); };
+  const toggleMenu = (button, menu, visible) => {
+    $(menu).hidden = !visible; $(button).setAttribute('aria-expanded', String(visible));
+    // The menu lives in the top bar, which sits under a Manage page (a project, the Brain…): while it is open the bar comes forward.
+    if (menu === 'spaceManageMenu') document.body.classList.toggle('manage-menu-open', visible);
+  };
   $('spaceManage').onclick = async () => { const open = $('spaceManageMenu').hidden; toggleMenu('spaceManage', 'spaceManageMenu', open); if (open) { try { renderDirectory(await officeSummary(api)); } catch {} } };
   $('spaceManageMenu').addEventListener('click', event => { const b = event.target.closest('[data-go]'); if (!b) return; toggleMenu('spaceManage', 'spaceManageMenu', false); goArea(b.dataset.go); });
   officeSummary(api).then(renderDirectory).catch(() => {}); setInterval(() => { if (document.hidden) return; officeSummary(api, { force: true }).then(s => { if ($('spaceManageMenu').hidden) renderDirectory(s); }).catch(() => {}); }, 60000);
@@ -274,7 +278,12 @@ export function initOfficeWork(ctx) {
     for (const r of Object.values(R)) { const a = activityByAgent.get(r.a.id); r.liveJobId = a?.jobId || null; }
     const rows = rightNowRows({ R, pm: ctx.pm ? ctx.pm() : null, DEPTS, jobs, live: true });
     const html = rightNowHTML(rows);
-    if (el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; el.querySelectorAll('[data-agent]').forEach(row => row.onclick = () => { const id = row.dataset.agent; if (id === 'program-manager') projectUI.open(); else ctx.openAgent && ctx.openAgent(id, 'activity'); }); }
+    if (el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; el.querySelectorAll('[data-agent]').forEach(row => row.onclick = event => {
+      // The row is about a task: open it. The faces open the person, as does a row with no task behind it.
+      const id = row.dataset.agent, task = row.dataset.task;
+      if (task && !event.target.closest('.rn-av')) return showTask(task);
+      if (id === 'program-manager') projectUI.open(); else ctx.openAgent && ctx.openAgent(id, 'activity');
+    }); }
     const ago = lastRefreshAt ? Math.max(0, Math.round((Date.now() - lastRefreshAt) / 1000)) : null;
     // The provider notice can be dismissed; it stays away until a newer failure than the one dismissed comes in.
     const prov = $('spaceProvider'); if (prov) {
@@ -419,7 +428,7 @@ export function initOfficeWork(ctx) {
   async function refresh() {
     if (refreshing) return; refreshing = true;
     try {
-      const before = jobs.filter(j => j.state === 'done').length; jobs = (await api('/tasks')).map(uiJob); try { projectsOpen = await api('/projects/open'); fillProjects(); } catch {} try { providerHealth = (await api('/health')).provider || null; } catch {} lastRefreshAt = Date.now(); if(connectionStale){$('spaceHint').textContent='Connection restored.';connectionStale=false;} for (const j of jobs) for (const a of (j.agents || [])) AGENT_NAMES[a.id] = a.name; render(); if (jobs.filter(j => j.state === 'done').length !== before) await syncBrain();
+      const before = jobs.filter(j => j.state === 'done').length; jobs = (await api('/tasks')).map(uiJob); try { projectsOpen = await api('/projects/open'); fillProjects(); } catch {} try { const health = await api('/health'); providerHealth = health.provider || null; updateLimits(health.limits); } catch {} lastRefreshAt = Date.now(); if(connectionStale){$('spaceHint').textContent='Connection restored.';connectionStale=false;} for (const j of jobs) for (const a of (j.agents || [])) AGENT_NAMES[a.id] = a.name; render(); if (jobs.filter(j => j.state === 'done').length !== before) await syncBrain();
       await projectUI.refresh();
       if (agentOpen) renderAgent(agentOpen);
       if (dialog.open && modalKind === 'reports' && document.activeElement?.id !== 'spaceReportPeriod') await showReports(false);
@@ -445,6 +454,8 @@ export function initOfficeWork(ctx) {
   function rememberTaskView() {
     content.querySelectorAll('[data-detail-key]').forEach(el=>taskExpanded.set(el.dataset.detailKey,el.open));
     taskScroll[taskTab]=content.scrollTop;
+    // Reading the latest of a conversation: a refresh keeps you there, as a chat does.
+    taskAtLatest=taskTab==='conversation'&&content.scrollTop+content.clientHeight>=content.scrollHeight-48;
   }
   // Hosted offices: who sees this task, and where it came from; the owner or an office admin can change the audience.
   function audienceBar(job) {
@@ -471,12 +482,13 @@ export function initOfficeWork(ctx) {
     content.querySelectorAll('[data-detail-key]').forEach(el=>{if(taskExpanded.has(el.dataset.detailKey))el.open=taskExpanded.get(el.dataset.detailKey);});
     for(const [id,value] of Object.entries(taskInputDraft)){const field=$(id);if(field)field.value=value;}
     content.scrollTop=taskScroll[taskTab] || 0;
+    if(taskTab==='conversation'&&(taskScrollToLatest||taskAtLatest)){taskScrollToLatest=false;content.scrollTop=content.scrollHeight;}
     content.querySelectorAll('[data-task-tab]').forEach(button=>button.onclick=()=>{
       rememberTaskView();taskTab=button.dataset.taskTab;taskTabTouched=true;renderTaskView();$('spaceTaskTab-'+taskTab)?.focus({preventScroll:true});
     });
     content.querySelector('[role=tablist]').onkeydown=event=>{
       if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
-      event.preventDefault();const tabs=['result','work','review','artifacts'];const index=tabs.indexOf(taskTab);
+      event.preventDefault();const tabs=['result','conversation','work','review','artifacts'];const index=tabs.indexOf(taskTab);
       const next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+(event.key==='ArrowRight'?1:tabs.length-1))%tabs.length;
       content.querySelector(`[data-task-tab="${tabs[next]}"]`).click();
     };
@@ -501,14 +513,17 @@ export function initOfficeWork(ctx) {
       try{
         const picked=[...($('spaceTaskFiles')?.files||[])];
         for(const file of picked){ await api(`/tasks/${job.id}/attach`,'POST',{name:file.name,data:await readFileAsBase64(file),type:file.type}); }
+        const written=button.dataset.action!=='queue'&&($('spaceRevision')?.value||'').trim();
         await api(`/tasks/${job.id}/${button.dataset.action}`,'POST',button.dataset.action==='queue'?{text:$('spaceQueueBrief').value,priority:Number($('spaceQueuePriority').value),state:button.dataset.queueState}:(()=>{const v=$('spaceRevision')?.value||'';if(['message','answer','reject'].includes(button.dataset.action)&&!v.trim())throw new Error('Write your message first.');return {feedback:v,text:v,kind:button.dataset.kind,remember:undefined};})());
+        // Whatever you wrote is now part of the task's conversation: show it there, as the latest message.
+        if(written&&['message','answer','reject','retry'].includes(button.dataset.action)){taskTab='conversation';taskTabTouched=true;taskScrollToLatest=true;content.querySelector('[data-detail-key="revision"]')?.removeAttribute('open');feedback(`Sent to ${job.autoRoute?'the Program Manager':'the team'}.`);}
         taskDirty=false;taskInputDraft={};taskSignature='';await refresh();await showTask(job.id,false);
       }catch(error){feedback(error.message,true);button.disabled=false;}
     });
   }
   async function showTask(id,reveal=true) {
     const request=++taskFetchCounter;
-    if(reveal){taskDirty=false;modalTask=id;taskCurrent=null;taskTabTouched=false;taskSignature='';taskExpanded=new Map();taskScroll={};taskInputDraft={};open('task','Task');content.innerHTML='<p>Loading task…</p>';}
+    if(reveal){taskDirty=false;modalTask=id;taskCurrent=null;taskTabTouched=false;taskAtLatest=false;taskScrollToLatest=false;taskSignature='';taskExpanded=new Map();taskScroll={};taskInputDraft={};open('task','Task');content.innerHTML='<p>Loading task…</p>';}
     try{
       const job=uiJob(await api('/tasks/'+id));
       if((!reveal&&taskDirty)||request!==taskFetchCounter||!dialog.open||modalKind!=='task'||modalTask!==id)return;
@@ -598,7 +613,7 @@ export function initOfficeWork(ctx) {
     content.querySelectorAll('[data-settings-section]').forEach(b=>b.onclick=()=>{collectTeam();settingsSection=b.dataset.settingsSection;renderTeam();});
     content.querySelectorAll('[data-agent-editor]').forEach(el=>el.addEventListener('toggle',()=>{if(el.open)content.querySelectorAll('[data-agent-editor]').forEach(other=>{if(other!==el)other.open=false;});}));
     $('spaceTeamForm').oninput=()=>{$('spaceSaveState').textContent='Unsaved changes';};
-    $('spaceAddTeam').onclick=()=>{collectTeam();if(settingsDraft.teams.length>=10)return feedback('An office supports up to 10 teams.',true);const id='team-'+crypto.randomUUID().slice(0,8),lead=id+'-lead';const template=structuredClone(config.teams[0]);settingsDraft.teams.push({...template,id,name:'New team',lead,purpose:'',instructions:'',guardrails:[],tools:[],skills:[],tests:[],checks:[]});settingsDraft.agents.push({id:lead,department:id,name:'Team lead',role:'Team coordinator',does:'Plan, delegate and verify the work of the current specialists.',brief:'',model:'sonnet',effort:'',tools:[],skills:[],inheritTools:true},{id:id+'-specialist',department:id,name:'Specialist',role:'Specialist',does:'',brief:'',model:'sonnet',effort:'',tools:[],skills:[],inheritTools:true});settingsTeam=id;settingsSection='overview';renderTeam();feedback('Name your team and define its purpose, then configure People and save.');};
+    $('spaceAddTeam').onclick=()=>{collectTeam();if(settingsDraft.teams.length>=LIMITS.maxTeams)return feedback(`This office is at its limit of ${LIMITS.maxTeams} team${LIMITS.maxTeams===1?'':'s'}.`,true);const id='team-'+crypto.randomUUID().slice(0,8),lead=id+'-lead';const template=structuredClone(config.teams[0]);settingsDraft.teams.push({...template,id,name:'New team',lead,purpose:'',instructions:'',guardrails:[],tools:[],skills:[],tests:[],checks:[]});settingsDraft.agents.push({id:lead,department:id,name:'Team lead',role:'Team coordinator',does:'Plan, delegate and verify the work of the current specialists.',brief:'',model:'sonnet',effort:'',tools:[],skills:[],inheritTools:true},{id:id+'-specialist',department:id,name:'Specialist',role:'Specialist',does:'',brief:'',model:'sonnet',effort:'',tools:[],skills:[],inheritTools:true});settingsTeam=id;settingsSection='overview';renderTeam();feedback('Name your team and define its purpose, then configure People and save.');};
     $('spaceRemoveTeam').onclick=()=>{collectTeam();if(settingsDraft.teams.length<=1)return feedback('Keep at least one team.',true);if(!confirm('Remove '+team.name+' and its roster when you save? Past tasks and shared memory are retained. Unfinished work must first be finished or cancelled.'))return;settingsDraft.teams=settingsDraft.teams.filter(t=>t.id!==team.id);settingsDraft.agents=settingsDraft.agents.filter(a=>a.department!==team.id);settingsTeam=settingsDraft.teams[0].id;renderTeam();feedback('Team removal is staged. Save to apply it, or close to discard.');};
     content.querySelectorAll('[data-team]').forEach(b => b.onclick = () => { collectTeam(); settingsTeam = b.dataset.team; renderTeam(); });
     $('spaceAddCheck').onclick = () => { collectTeam(); if(team.checks.length >= 20)return feedback('A team supports up to 20 automated checks.',true); team.checks.push({type:'contains',label:'New acceptance check',value:''});renderTeam();$('spaceCheckEditors').lastElementChild.open=true; };
@@ -607,7 +622,7 @@ export function initOfficeWork(ctx) {
       const input=select.closest('[data-check-editor]').querySelector('[data-check-value]');
       input.type=select.value.includes('length')?'number':'text';input.min='1';input.max='100000';input.step='1';input.maxLength=1000;
     });
-    $('spaceAddAgent').onclick = () => { collectTeam(); if (agents.length >= 7) return feedback('A team is a lead and up to six specialists.', true); settingsDraft.agents.push({ id: 'agent-' + crypto.randomUUID().slice(0,8), department: team.id, name: 'New agent', role: 'Specialist', does: '', brief: '', model: 'sonnet', tools: [], inheritTools: true, skills:[] }); renderTeam();content.querySelector('.space-agent-editors').lastElementChild.open=true; };
+    $('spaceAddAgent').onclick = () => { collectTeam(); if (agents.length >= LIMITS.maxMembersPerTeam) return feedback(`This team is full: a team is a lead and up to ${LIMITS.maxMembersPerTeam - 1} specialists on this platform.`, true); settingsDraft.agents.push({ id: 'agent-' + crypto.randomUUID().slice(0,8), department: team.id, name: 'New agent', role: 'Specialist', does: '', brief: '', model: 'sonnet', tools: [], inheritTools: true, skills:[] }); renderTeam();content.querySelector('.space-agent-editors').lastElementChild.open=true; };
     content.querySelectorAll('[data-remove-agent]').forEach(b => b.onclick = () => {
       collectTeam(); if (agents.length <= 2) return feedback('Keep a lead and at least one worker.', true);
       settingsDraft.agents = settingsDraft.agents.filter(a => a.id !== b.dataset.removeAgent);
@@ -799,7 +814,7 @@ export function initOfficeWork(ctx) {
   officeReady.then(async()=>{if(PLATFORM_ONLY){settings.open('admin');return;}connectLive({ onEvent, onStatus: status => { const was = liveStatus; liveStatus = status; if (status === 'live' && was !== 'live') refresh(); } });poll();try{const health=await api('/health');onLive?.(health);await syncBrain();await refresh();const wanted=new URLSearchParams(location.hash.slice(1)).get('task');if(wanted)showTask(wanted).catch(()=>{});const usage=await api('/usage');onUsage?.(usage);}catch(error){$('spaceHint').textContent=error.message;}});
   const noop=()=>{};
   return { chatContext, chatInput, chatPickerKey, chatSent, loadHistory, openInbox: () => inbox.open(), needsYouCount: () => inbox.counts.needsYou, settings, get tasks(){return jobs.flatMap(j=>[...j.subtasks.filter(s=>s.agent).map(s=>({...s,agent:s.agent,state:s.state==='working'?'doing':s.state})),...(['planning','reviewing'].includes(j.state)?[{agent:j.agent,state:'doing'}]:[]),...(j.state==='working'?(j.runs||[]).filter(r=>r.role==='lead'&&r.state==='working'&&r.agent&&!(j.runs||[]).some(x=>x.role==='specialist'&&x.state==='working'&&x.dept===r.dept)).map(r=>({agent:r.agent,state:'doing'})):[])]);},
-    projectActivity:()=>projectUI.activity(),openProjects:()=>projectUI.open(),agentActivity:id=>activityByAgent.get(id),job:id=>jobs.find(j=>j.id===id),jobs:()=>jobs,tick:noop,panelWidth:()=>panel.offsetWidth,onFocusChange:key=>{ /* the composer keeps the Program Manager until the owner picks a team */ },rowHTML,
+    projectActivity:()=>projectUI.activity(),openProjects:()=>projectUI.open(),agentActivity:id=>activityByAgent.get(id),deliveredUnseen:()=>jobs.filter(j=>unseenResult(j)&&j.kind!=='evaluation').sort((a,b)=>(b.doneAt||0)-(a.doneAt||0)).map(j=>({id:j.id,title:j.title,doneAt:j.doneAt||0})),job:id=>jobs.find(j=>j.id===id),jobs:()=>jobs,tick:noop,panelWidth:()=>panel.offsetWidth,onFocusChange:key=>{ /* the composer keeps the Program Manager until the owner picks a team */ },rowHTML,
     isLive:()=>true,isOpen:()=>dialog.open,open:()=>{open('board','Office work');content.innerHTML=jobs.map(j=>`<button class="space-note" data-job="${j.id}"><b>${esc(j.title)}</b><span>${labels[j.state]} · ${esc(DEPTS[j.dept]?.name || j.teamName || j.dept)}</span></button>`).join('')||'<p>No tasks yet.</p>';content.querySelectorAll('[data-job]').forEach(b=>b.onclick=()=>showTask(b.dataset.job));},
     toggle(){dialog.open?close():this.open();},close,openFor(){this.open();},openTask:showTask,refresh,renderAgent,railFor:id=>{agentOpen=id;acknowledgeAgent(id);const el=$('mRt');if(el)el.hidden=true;if(chat.agent!==id){chat.agent=id;chat.refs=[];chat.kind='question';chat.remember='';}closePicker();renderChatBar();},syncPills:noop,
     onStuck:noop,onResolve:noop,pendingReject:()=>false,rejectLive:noop,resolveLive:noop,revise:()=>false,addTask:()=>null,routines:[],

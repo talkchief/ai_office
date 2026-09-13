@@ -84,6 +84,55 @@ test('a rate-limited provider blocks the task quietly, the office retries it by 
   } finally { await f.close(); }
 });
 
+test('a question about something that changes is checked on the web before the Program Manager answers it, and the answer names the pages it read', async () => {
+  let id = null, refused = '', f = null;
+  const PAGE = 'https://finance.yahoo.com/quote/SPCX/';
+  const pm = ({ last }) => {
+    if (last.type === 'human') return { calls: [call('complete_task', { summary: 'Answered from the Brain.', answer: 'SpaceX has no stock price: it is private (see /knowledge/Agents Office/spacex.md).' })] };
+    if (last.type === 'tool' && /^Refused: this question is about something that changes over time/.test(last.text)) {
+      refused = last.text;
+      // What web_fetch records when the Program Manager reads a page on this task.
+      f.engine.event(id, 'tool_started', 'pm', `Using web_fetch: ${PAGE}`, { tool: 'web_fetch', target: PAGE });
+      return { calls: [call('complete_task', { summary: 'Checked on the web.', answer: `SpaceX trades on Nasdaq as SPCX, last $151.21 (${PAGE}, checked 13 Sep 2026). The note /knowledge/Agents Office/spacex.md is out of date.` })] };
+    }
+    return { text: 'Done.' };
+  };
+  f = fixture({ pm });
+  try {
+    id = start(f, { text: 'What is the current stock price of SpaceX?' });
+    const done = await until(f.engine, id, ['done']);
+    assert.match(refused, /Check it on the web first: web_search, then web_fetch/, 'a market question answered from a Brain note alone is refused');
+    assert.ok(done.events.some(e => e.type === 'completion_refused' && /not checked on the web/.test(e.message)));
+    assert.equal(done.runs.length, 0, 'still no team: the Program Manager checked it alone'); assert.equal(done.review.direct, true);
+    assert.deepEqual(done.review.sources, ['/knowledge/Agents Office/spacex.md', PAGE], 'the record names the note and the page');
+    assert.match(done.review.summary, /from the Brain and the web/);
+    assert.match(done.result, /SPCX, last \$151\.21/);
+  } finally { await f.close(); }
+});
+
+test('a page counts as a source only when the Program Manager fetched it on the task, and the office’s own history needs no web', async () => {
+  const { isTimeSensitive, citedUrls } = await import('../engine/deep-agents.mjs');
+  assert.equal(isTimeSensitive('What is the current stock price of SpaceX?'), true);
+  assert.equal(isTimeSensitive('Is Nokia a good idea to invest in now? What is NOK trading at?'), true);
+  assert.equal(isTimeSensitive('What was the latest project we delivered today?'), false, 'the office’s own records are the Brain’s');
+  assert.equal(isTimeSensitive('What are the last 2 projects we delivered this month?'), false);
+  assert.deepEqual(citedUrls('See https://a.example/x, and (https://b.example/y).'), ['https://a.example/x', 'https://b.example/y']);
+  let tried = 0;
+  const pm = ({ last }) => {
+    if (last.type === 'human') { tried++; return { calls: [call('complete_task', { summary: 'Answered.', answer: 'Our portal launched in June (https://news.example/portal).' })] }; }
+    if (last.type === 'tool' && /^Refused: no department lead/.test(last.text)) return { calls: [plan(), call('task', { subagent_type: 'lead-marketing', description: 'Find when the portal launched' })] };
+    if (last.type === 'tool' && COMPLETE.test(last.text)) return { text: 'Done.' };
+    if (last.type === 'tool') return { calls: [call('complete_task', { summary: 'Delivered.' })] };
+    return { text: 'Done.' };
+  };
+  const f = fixture({ pm });
+  try {
+    const id = start(f, { text: 'When did the client portal launch?' }); const done = await until(f.engine, id, ['done']);
+    assert.equal(tried, 1); assert.notEqual(done.review.direct, true, 'an address it never read is not a source: the question went to a team');
+    assert.ok(done.runs.length >= 1);
+  } finally { await f.close(); }
+});
+
 test('a plain question the Brain answers is answered by the Program Manager alone and filed without a team; the shortcut is refused for a piece of work', async () => {
   const pm = ({ last }) => last.type === 'human' ? { calls: [call('complete_task', { summary: 'Answered from the Brain.', answer: 'The last task was the November price change pack (see /knowledge/Agents Office/task-0c3b.md).' })] } : { text: 'Done.' };
   const f = fixture({ pm });

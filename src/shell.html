@@ -54,6 +54,10 @@
     border-bottom: 1px solid var(--hairline);
     z-index: 24; /* V3: stays crisp above the company-board dim */
   }
+  /* The Manage menu is inside the top bar; a Manage page (z 30) would cover it, so the bar comes forward while the menu is open. */
+  body.manage-menu-open #topbar {
+    z-index: 45;
+  }
   #topbar .brand { font-family: var(--serif); font-size: 21px; letter-spacing: .04em; }
   #topbar .brand .ver { font-size: 13px; letter-spacing: .16em; color: var(--grey); vertical-align: 3px; margin-left: 2px; }
   #topbar .brand .beta { font: 600 9.5px var(--ui); letter-spacing: .14em; text-transform: uppercase; color: var(--grey); border: 1px solid var(--hairline); border-radius: 5px; padding: 2px 5px; vertical-align: 5px; margin-left: 3px; }
@@ -1034,16 +1038,22 @@ body.fp-open { overflow:hidden; }
 .pm-pick span { font:10.5px ui-monospace, Menlo, Consolas, monospace; color:var(--grey); white-space:nowrap; }
 body.dark .pm-pick { background:#1E1F23; }
 /* The clip on a correction: the document lands on the task. */
+/* An attach control is a label around a hidden file input. The input must stay a 1px, clipped, click-through point: a broader
+   rule such as #spaceDialog input { width:100% } once stretched it invisibly across the Send button beside it, so a click on
+   Send opened the file picker. The label still opens the picker; the input stays reachable by keyboard. */
+.tv-attach, .m-attach, .pm-attach { position:relative; }
+.tv-attach input[type=file], .m-attach input[type=file], .pm-attach input[type=file] { position:absolute !important; left:0 !important; top:0 !important; width:1px !important; height:1px !important; min-width:0 !important; margin:-1px !important; padding:0 !important; border:0 !important; overflow:hidden !important; clip-path:inset(50%) !important; opacity:0 !important; pointer-events:none !important; }
+.tv-attach:has(input:focus-visible), .m-attach:has(input:focus-visible), .pm-attach:has(input:focus-visible) { outline:2px solid var(--ink); outline-offset:2px; border-radius:6px; }
 .tv-attach { display:inline-flex; align-items:center; gap:6px; font:500 11.5px var(--ui); color:var(--grey); cursor:pointer; margin-right:auto; }
 .tv-attach:hover { color:var(--ink); }
-.tv-attach input { position:absolute; width:1px; height:1px; opacity:0; }
+
 .tv-attach svg { width:13px; height:13px; }
 .tv-filenote { font:11px ui-monospace, Menlo, Consolas, monospace; color:var(--grey); }
 
 /* The clip on a message to a person. */
 .m-attach { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:8px; color:var(--grey); cursor:pointer; flex:none; }
 .m-attach:hover { color:var(--ink); background:rgba(22,21,20,.06); }
-.m-attach input { position:absolute; width:1px; height:1px; opacity:0; }
+
 .m-attach svg { width:14px; height:14px; }
 
 /* The way into Manage from a team card or a person's card. */
@@ -1059,6 +1069,8 @@ body.dark .b-gear:hover, body.dark .mh-gear:hover { background:rgba(255,255,255,
 .st-ok { color:#1E7A55; } .st-busy { color:#2A6DB5; } .st-warn { color:#8F6407; } .st-fail { color:#B2382C; } .st-off { color:var(--grey); } .st-gone { color:#C2691E; }
 body.dark .st-gone { color:#E8A166; }
 body.dark .st-ok { color:#5CC292; } body.dark .st-busy { color:#7FB3F0; } body.dark .st-warn { color:#E4B75B; } body.dark .st-fail { color:#F0857A; }
+/* A state the work is in is blue unless its phase has its own colour; green is only for done. */
+#rail .mh-state.on { color:#2A6DB5; border-color:rgba(42,109,181,.45); }
 #rail .mh-state[data-phase=working] { color:#2A6DB5; border-color:rgba(42,109,181,.45); }
 #rail .mh-state[data-phase=planning] { color:#B4830B; border-color:rgba(180,131,11,.45); }
 #rail .mh-state[data-phase=verifying],#rail .mh-state[data-phase=reviewing] { color:#684C91; border-color:rgba(104,76,145,.45); }
@@ -1066,7 +1078,7 @@ body.dark .st-ok { color:#5CC292; } body.dark .st-busy { color:#7FB3F0; } body.d
 #rail .mh-state[data-phase=helping] { color:#A08A1E; border-color:rgba(160,138,30,.45); }
 #rail .mh-state[data-phase="needs you"] { color:#b14236; border-color:rgba(177,66,54,.5); background:#FCEBE9; }
 #rail .mh-state[data-phase=done] { color:#248267; border-color:rgba(36,130,103,.45); }
-body.dark #rail .mh-state[data-phase=working] { color:#7FB3F0; } body.dark #rail .mh-state[data-phase="needs you"] { color:#F0857A; background:rgba(177,66,54,.16); }
+body.dark #rail .mh-state.on, body.dark #rail .mh-state[data-phase=working] { color:#7FB3F0; } body.dark #rail .mh-state[data-phase="needs you"] { color:#F0857A; background:rgba(177,66,54,.16); }
 /* The team card's own state: idle is quiet, the rest are not. */
 :is(.badge,#railHeader) .b-state.idle { color:var(--grey); }
 :is(.badge,#railHeader) .b-state.idle i { background:#C3C2BA; }
@@ -1095,7 +1107,7 @@ body.dark #rail .mh-state[data-phase=working] { color:#7FB3F0; } body.dark #rail
 .pm-attach { display:inline-flex; align-items:center; gap:6px; font:500 11.5px var(--ui); color:var(--grey); cursor:pointer; }
 .pm-attach svg { width:13px; height:13px; }
 .pm-attach:hover { color:var(--ink); }
-.pm-attach input { position:absolute; width:1px; height:1px; opacity:0; }
+
 .pm-files { font:11px ui-monospace, Menlo, Consolas, monospace; color:var(--grey); }
 .pm-kbd, .pm-foot kbd { font:10.5px ui-monospace, Menlo, Consolas, monospace; color:var(--grey); border:1px solid var(--hairline); border-radius:5px; padding:2px 6px; }
 #spaceDialog .pm-send, .pm-send { border:0; border-radius:10px; background:var(--ink); color:var(--cream); font:600 12px var(--ui); padding:9px 15px; cursor:pointer; }
@@ -1378,7 +1390,7 @@ body.dark :is(.badge,#railHeader) { --label: #B7B4AC; }
 :is(.badge,#railHeader) .b-now { margin: 0; font: 12px/1.45 var(--ui); color: var(--ink); letter-spacing: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 :is(.badge,#railHeader) .b-now.quiet { color: var(--grey); }
 :is(.badge,#railHeader) .b-bar { height: 3px; border-radius: 2px; background: var(--hairline); margin-top: 9px; overflow: hidden; }
-:is(.badge,#railHeader) .b-bar i { display: block; height: 100%; width: 0; background: #1E7A55; border-radius: 2px; transition: width .6s var(--ease); }
+:is(.badge,#railHeader) .b-bar i { display: block; height: 100%; width: 0; background: #2A6DB5; border-radius: 2px; transition: width .6s var(--ease); }
 :is(.badge,#railHeader) .b-more { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .28s var(--ease); }
 :is(.badge:hover, .badge.open, #railHeader) .b-more { grid-template-rows: 1fr; }
 :is(.badge,#railHeader) .b-more-in { overflow: hidden; min-height: 0; }
@@ -1406,7 +1418,7 @@ body.dark :is(.badge,#railHeader) .seat.on { background: #7FB3F0; box-shadow: 0 
 body.dark :is(.badge,#railHeader) .seat.stuck { background: #E4B75B; box-shadow: 0 0 0 3px rgba(228,183,91,.16); } body.dark .badge .seat.stuck.lead { box-shadow: 0 0 0 2px #1E1F24, 0 0 0 3.5px #CDBB86; }
 body.dark :is(.badge,#railHeader) .seat.lead { box-shadow: inset 0 0 0 2px #CDBB86; }
 body.dark :is(.badge,#railHeader) .b-state.working { color: #7FB3F0; } body.dark .badge .b-state.blocked { color: #E4B75B; }
-body.dark :is(.badge,#railHeader) .b-bar i { background: #5CC292; }
+body.dark :is(.badge,#railHeader) .b-bar i { background: #7FB3F0; }
 body.dark :is(.badge,#railHeader) .b-appr { background: rgba(228,183,91,.14); border-top-color: rgba(228,183,91,.3); } body.dark .badge .b-appr .k { color: #E4B75B; }
 body.dark :is(.badge,#railHeader) .b-foot button { border-color: rgba(236,234,226,.32); }
 :is(.badge,#railHeader) .b-jobs { padding: 8px 0 0; }
@@ -1417,6 +1429,17 @@ body.dark :is(.badge,#railHeader) .b-foot button { border-color: rgba(236,234,22
 :is(.badge,#railHeader) .b-jobs .seat { width: 9px; height: 9px; box-shadow: none; flex: none; }
 :is(.badge,#railHeader) .b-jobs .what { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 :is(.badge,#railHeader) .b-jobs .st { flex: none; font: 500 10.5px ui-monospace, Menlo, Consolas, monospace; color: var(--label); max-width: 40%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The Program Manager's delivery card: finished work you have not opened, announced over him, glowing until you open it. */
+#hud .badge.pm-delivered { width: 248px; min-width: 248px; max-width: 248px; z-index: 4; border-color: rgba(36,130,103,.55); animation: pmDelivered 2.2s ease-in-out infinite; }
+#hud .badge.pm-delivered .b-name { justify-content: flex-start; white-space: nowrap; font-size: 10.5px; letter-spacing: .12em; gap: 6px; }
+#hud .badge.pm-delivered .b-state { margin-left: auto; color: #248267; font-weight: 700; text-shadow: 0 0 10px rgba(61,183,130,.55); }
+#hud .badge.pm-delivered .b-state i { background: #3DB782; box-shadow: 0 0 8px 2px rgba(61,183,130,.7); }
+#hud .badge.pm-delivered .b-now { margin: 6px 0 0; font: 12px/1.4 var(--ui); color: var(--ink); text-align: left; }
+#hud .badge.pm-delivered .b-jobs .seat.done { background: #3DB782; box-shadow: 0 0 6px 2px rgba(61,183,130,.65); }
+#hud .badge.pm-delivered .b-jobs .st { color: #248267; font-weight: 700; text-shadow: 0 0 8px rgba(61,183,130,.6); }
+@keyframes pmDelivered { 0%, 100% { box-shadow: 0 0 0 1.5px rgba(61,183,130,.45), 0 0 18px 2px rgba(61,183,130,.28), 0 12px 30px rgba(21,20,20,.10); } 50% { box-shadow: 0 0 0 2px rgba(61,183,130,.75), 0 0 34px 8px rgba(61,183,130,.45), 0 12px 30px rgba(21,20,20,.10); } }
+body.dark #hud .badge.pm-delivered .b-state, body.dark #hud .badge.pm-delivered .b-jobs .st { color: #5CC292; }
+@media (prefers-reduced-motion: reduce) { #hud .badge.pm-delivered { animation: none; box-shadow: 0 0 0 2px rgba(61,183,130,.7), 0 0 26px 6px rgba(61,183,130,.4); } }
 #railHeader { padding: 13px 16px 13px; }
 #railHeader .b-more { grid-template-rows: 1fr; }
 #railHeader .b-foot [data-act="open"] { display: none; }
@@ -1488,7 +1511,7 @@ body.dark .rn-row, body.dark .rn-a { background: #1E1F24; }
 .chain .ch { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border: 1px solid var(--hairline); border-radius: 99px; background: #fff; white-space: nowrap; }
 .chain .ch i { width: 6px; height: 6px; border-radius: 50%; background: rgba(21,20,20,.18); display: block; }
 .chain .ch-done { color: #1E7A5C; border-color: rgba(30,144,112,.45); background: #E9F6EF; } .chain .ch-done i { background: #1E9070; }
-.chain .ch-current { color: #151414; border-color: #151414; font-weight: 700; } .chain .ch-current i { background: #3D9575; animation: liveBlink 1.2s steps(1) infinite; }
+.chain .ch-current { color: #151414; border-color: #151414; font-weight: 700; } .chain .ch-current i { background: #2A6DB5; animation: liveBlink 1.2s steps(1) infinite; }
 .chain .ch-blocked { color: #B4830B; border-color: #B4830B; background: #FFF8E6; font-weight: 700; } .chain .ch-blocked i { background: #B4830B; }
 .chain .ch-failed { color: #b14236; border-color: #b14236; } .chain .ch-failed i { background: #b14236; }
 .chain .ch-l { width: 8px; height: 1px; background: var(--hairline); display: inline-block; }
@@ -1583,19 +1606,20 @@ body.dark .space-project.blocked .space-state { color: var(--red); }
 .tp-row.sched .tp-act { margin-top: 8px; }
 /* the agent rail (design 1h): now → live draft → where this sits → chat */
 #rail .mh-state { margin-left: auto; font: 700 8.5px var(--ui); letter-spacing: .12em; border: 1px solid var(--hairline); border-radius: 99px; padding: 3px 8px; color: var(--grey); white-space: nowrap; flex: none; }
-#rail .mh-state.on { color: #287657; border-color: rgba(40,118,87,.5); }
 .now-card { margin: 10px 18px 0; border: 1px solid var(--hairline); border-radius: 14px; background: #fff; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.now-card[data-task]:not([data-task='']) { cursor: pointer; transition: border-color .2s var(--ease); } .now-card[data-task]:not([data-task='']):hover { border-color: var(--ink); } /* the card is the task: a click opens it */
 .now-card[hidden] { display: none; }
 .now-card .nc-eye { font: 700 8.5px var(--ui); letter-spacing: .14em; color: var(--grey); display: flex; justify-content: space-between; gap: 8px; }
-.now-card .nc-eye b { color: #287657; }
+.now-card .nc-eye b { color: #2A6DB5; }
+.now-card .nc-eye b[data-phase=planning] { color: #B4830B; } .now-card .nc-eye b[data-phase=verifying], .now-card .nc-eye b[data-phase=reviewing] { color: #684C91; } .now-card .nc-eye b[data-phase=submitted] { color: #A8408A; } .now-card .nc-eye b[data-phase=helping] { color: #A08A1E; } .now-card .nc-eye b[data-phase=done] { color: #248267; }
 .now-card .nc-title { font: 500 13px/1.35 var(--ui); color: var(--ink); }
 .now-card .nc-meta { font: 9.5px var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--grey); }
 .now-card .nc-with { display: flex; align-items: center; gap: 6px; font: 11px var(--ui); color: var(--ink); }
 .now-card .nc-with .rn-a { width: 18px; height: 18px; font-size: 10px; }
-.now-card .nc-draft { border-left: 2px solid #83a492; padding: 2px 0 2px 10px; font: 11.5px/1.5 var(--ui); color: var(--ink); max-height: 84px; overflow: hidden; position: relative; }
+.now-card .nc-draft { border-left: 2px solid #8FB2DA; padding: 2px 0 2px 10px; font: 11.5px/1.5 var(--ui); color: var(--ink); max-height: 84px; overflow: hidden; position: relative; }
 .now-card .nc-draft::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 26px; background: linear-gradient(transparent, #fff); }
-.now-card .nc-draft-lab { font: 700 8px var(--ui); letter-spacing: .14em; color: #287657; display: flex; align-items: center; gap: 6px; }
-.now-card .nc-draft-lab i { width: 6px; height: 6px; border-radius: 50%; background: #3D9575; animation: liveBlink 1.2s steps(1) infinite; }
+.now-card .nc-draft-lab { font: 700 8px var(--ui); letter-spacing: .14em; color: #2A6DB5; display: flex; align-items: center; gap: 6px; }
+.now-card .nc-draft-lab i { width: 6px; height: 6px; border-radius: 50%; background: #2A6DB5; animation: liveBlink 1.2s steps(1) infinite; }
 .now-card .nc-sits { font: 700 8px var(--ui); letter-spacing: .14em; color: var(--grey); margin-top: 2px; }
 .now-card .nc-foot { font: 10px/1.5 var(--ui); color: var(--grey); }
 body.dark .now-card { background: #1E1F24; } body.dark .now-card .nc-draft::after { background: linear-gradient(transparent, #1E1F24); }

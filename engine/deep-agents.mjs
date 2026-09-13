@@ -16,6 +16,7 @@ import { officeBackend, FILE_PERMISSIONS, PM_FILE_PERMISSIONS, SKILL_SOURCES } f
 import { ROOT } from '../config.mjs';
 import { programManagerPrompt, leadPrompt, specialistPrompt, quickLeadPrompt, leadName } from './prompts.mjs';
 import { exportPdfTool, exportPptxTool, assembleFilesTool, listWorkspaceFiles, workspaceFile, mimeOf, closeBrowser } from './documents.mjs';
+import { webTools } from './tools.mjs';
 import { fetchWithRetries } from '../models.mjs';
 import { DatabasePool, validateQuery, markdownTable, schemaText } from '../connectors/database.mjs';
 import { SshRunner, validateCommand } from '../connectors/ssh.mjs';
@@ -70,6 +71,13 @@ const PROVIDER_STATUS = new Set([401, 402, 403, 408, 429, 500, 502, 503, 504, 52
 // Worth one automatic retry: the provider or the network failed, not the key, the credit or the model name.
 // A task that reads as a question, and the Brain notes an answer names.
 export const isQuestion = text => { const t = String(text || '').trim(); return /\?\s*$/.test(t) || /^(what|when|who|whom|whose|which|where|why|how|is|are|was|were|did|does|do|has|have|had|can|could|should|will|would)\b/i.test(t); };
+// A question about the outside world that moves: prices and markets, listings, the news, the weather. The Brain may hold an
+// answer that was true when it was written, so the Program Manager checks the web before answering one. (The office's own
+// history — "the latest project we delivered" — is the Brain's to answer, so words like "latest" or "today" do not count.)
+export const isTimeSensitive = text => /\b(stock|stocks|share price|shares|ticker|market ?cap(italization)?|valuation|ipo|listed|listing|publicly traded|go(ing|ne)? public|exchange rate|interest rates?|inflation|crypto|bitcoin|ethereum|price of|prices? (of|for)|trading at|nasdaq|nyse|s&p|dow jones|weather|forecast|headlines?|breaking news|news about|election|poll(s|ing)?)\b/i.test(String(text || ''));
+// The web addresses an answer names, as written.
+export const citedUrls = text => [...new Set([...String(text || '').matchAll(/https?:\/\/[^\s)\]"'`<>]+/g)].map(m => m[0].replace(/[.,;:]+$/, '')))];
+const sameAddress = (a, b) => String(a).replace(/\/+$/, '').toLowerCase() === String(b).replace(/\/+$/, '').toLowerCase();
 export const citedNotes = text => [...new Set([...String(text || '').matchAll(/\/knowledge\/(?:[^\s)\]"'`,;]|\s(?=[^\s\/)\]"'`,;]+\/))+/g)].map(m => m[0].replace(/[.:]+$/, '')))];
 export function isTransientProviderError(error) {
   const status = Number(error?.status ?? error?.statusCode ?? error?.response?.status ?? error?.error?.status);
@@ -543,9 +551,9 @@ export class OfficeEngine {
         tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), this.brainTool(job.id, lead.id), ...this.vaultTools(job.id, team, lead.id), ...this.connectorTools(job.id, team, lead.id), ...spotChecks], interruptOn: this.asksApproval() ? { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...VAULT_APPROVALS } : {}, subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [this.stepGuard(job.id, lead.id, 'lead'), this.binaryReadGuard(job.id, lead.id), this.effortSwitch(job.id, lead.id, spec), this.effortTag(job.id, lead.id), todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
       leads.push({ name: leadName(team.id), description: `${team.name} team, led by ${lead.name}.${team.purpose ? ' ' + team.purpose : ''}`.slice(0, 600), runnable: graph });
     }
-    const { model } = await make('pm', null, null);
+    const { model, provider: pmProvider } = await make('pm', null, null);
     const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams, toolLabels }),
-      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm'), this.brainTool(job.id, 'pm'), ...this.exportTools(job.id, 'pm')], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.binaryReadGuard(job.id, 'pm'), this.effortTag(job.id, 'pm'), this.subagentGuard(job.id, 'pm', leads.map(l => l.name), 'lead'), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm'), this.pmReadGuard(job.id)],
+      tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm'), this.brainTool(job.id, 'pm'), ...this.exportTools(job.id, 'pm'), ...webTools(pmProvider)], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.binaryReadGuard(job.id, 'pm'), this.effortTag(job.id, 'pm'), this.subagentGuard(job.id, 'pm', leads.map(l => l.name), 'lead'), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm'), this.pmReadGuard(job.id)],
       checkpointer: this.saver, interruptOn: { ...(this.asksApproval() ? { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] } } : {}), ...(job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {}) } });
     return { pm, models };
   }
@@ -977,16 +985,17 @@ export class OfficeEngine {
   }
   // Filing a result: the approved deliverable becomes the task's result, the Brain is written, the CEO is told. Used by
   // complete_task and by the quick lane.
-  async finish(id, { summary, result, agent = 'pm', direct = false, cited = [], lane = null, milestones = [] }) {
+  async finish(id, { summary, result, agent = 'pm', direct = false, cited = [], web = [], lane = null, milestones = [] }) {
     const job = this.get(id);
     this.setState(id, 'saving');
     const version = { n: (job.resultVersions?.length || 0) + 1, at: Date.now(), summary: clean(summary).slice(0, 2000), correction: job.correction || null, result };
+    const from = cited.length && web.length ? 'from the Brain and the web' : web.length ? 'from the web' : 'from the Brain';
     this.update(id, j => {
       j.result = result; j.resultSummary = version.summary; j.resultVersions = [...(j.resultVersions || []), version]; j.correction = null;
       if (Array.isArray(milestones) && milestones.length) j.milestonesDone = [...new Set(milestones.map(m => clean(m).slice(0, 40)).filter(Boolean))].slice(0, 40);
-      if (direct) { j.review = { approved: true, direct: true, lead: 'pm', by: 'pm', at: Date.now(), criteria: [], summary: `Answered by the Program Manager from the Brain, no team engaged: ${cited.join(', ')}.`, sources: cited }; j.sources = [...new Set([...(j.sources || []), ...cited])].slice(0, 60); }
+      if (direct) { j.review = { approved: true, direct: true, lead: 'pm', by: 'pm', at: Date.now(), criteria: [], summary: `Answered by the Program Manager ${from}, no team engaged: ${[...cited, ...web].join(', ')}.`, sources: [...cited, ...web] }; j.sources = [...new Set([...(j.sources || []), ...cited, ...web])].slice(0, 60); }
     });
-    if (direct) this.event(id, 'answered_from_brain', 'pm', `Answered from the Brain: ${cited.join(', ')}.`);
+    if (direct) this.event(id, 'answered_from_brain', 'pm', `Answered ${from}: ${[...cited, ...web].join(', ')}.`);
     try { await this.onComplete(this.get(id)); }
     catch (error) { this.setState(id, 'working'); return { ok: false, error: clean(error.message).slice(0, 300) }; }
     this.setState(id, 'done', { doneAt: Date.now(), pendingActions: [], error: null });
@@ -1126,15 +1135,24 @@ export class OfficeEngine {
       const stale = this.staleDepts(job);
       // A plain question the Brain answers is answered by the Program Manager alone: no team engaged, the task reads as a
       // question, and the answer names the Brain notes it rests on. It is filed as answered from the Brain, without a review.
-      const cited = citedNotes(answer + ' ' + summary), direct = !job.runs.length && !!clean(answer) && isQuestion(job.text) && cited.length > 0;
-      if (!direct && (stale[0] === '(none yet)' || !job.runs.length)) { this.event(id, 'completion_refused', 'pm', 'No team has worked on it yet.'); return isQuestion(job.text) ? 'Refused: no department lead has worked on this yet. If the Brain answers this question, call complete_task again with the full answer in "answer", naming the /knowledge/ notes you read; otherwise delegate it to the right lead first.' : 'Refused: no department lead has worked on this yet. Delegate it to the right lead first.'; }
+      // A question is answered by the Program Manager alone from the Brain, the web, or both: the answer names the notes and the
+      // pages it rests on, and a page counts only when the Program Manager fetched it on this task.
+      const read = this.events(id).filter(e => e.agent === 'pm' && e.type === 'tool_started' && ['web_fetch', 'web_search'].includes(e.tool));
+      const fetched = read.filter(e => e.tool === 'web_fetch' && e.target).map(e => e.target);
+      const cited = citedNotes(answer + ' ' + summary), web = citedUrls(answer + ' ' + summary).filter(u => fetched.some(f => sameAddress(f, u)));
+      const direct = !job.runs.length && !!clean(answer) && isQuestion(job.text) && (cited.length > 0 || web.length > 0);
+      if (direct && isTimeSensitive(job.text) && !fetched.length) {
+        this.event(id, 'completion_refused', 'pm', 'A question about something that changes: not checked on the web.');
+        return 'Refused: this question is about something that changes over time (a price, a listing, the news), and a Brain note can be out of date. Check it on the web first: web_search, then web_fetch the best sources. Then call complete_task again with the answer, the addresses you read and the date you checked. Never answer it from memory.';
+      }
+      if (!direct && (stale[0] === '(none yet)' || !job.runs.length)) { this.event(id, 'completion_refused', 'pm', 'No team has worked on it yet.'); return isQuestion(job.text) ? 'Refused: no department lead has worked on this yet. If the Brain or the web answers this question, call complete_task again with the full answer in "answer", naming the /knowledge/ notes and the web addresses you read (fetched with web_fetch); otherwise delegate it to the right lead first.' : 'Refused: no department lead has worked on this yet. Delegate it to the right lead first.'; }
       if (!direct && stale.length) { this.event(id, 'completion_refused', 'pm', `No approved review from ${stale.map(leadName).join(', ')}.`); return `Refused: ${stale.map(leadName).join(', ')} has no approved review of the latest work. Ask the lead to review, then call complete_task again.`; }
       const office = this.office.get(), used = job.autoRoute ? involved(job) : job.depts, parts = used.map(d => job.deliverables?.[d]).filter(Boolean);
       const result = direct ? clean(answer) : parts.length === 1 ? parts[0] : used.map(d => `## ${office.teams.find(t => t.id === d)?.name || d}\n\n${job.deliverables?.[d] || ''}`).join('\n\n');
-      const out = await this.finish(id, { summary, result, agent: 'pm', direct, cited, milestones });
+      const out = await this.finish(id, { summary, result, agent: 'pm', direct, cited, web, milestones });
       if (!out.ok) return `Saving the result failed (${out.error}). Call complete_task again.`;
       return `Task completed and filed as version ${out.version}. End your turn with a one-line confirmation.`;
-    }, { name: 'complete_task', description: 'Complete the task once every involved lead has recorded an approved review of the latest work; or, for a plain question the Brain answers with no team engaged, file the answer directly. Files the result for the CEO.', schema: z.object({ summary: z.string().describe('One paragraph: what was delivered'), answer: z.string().optional().describe('Only for a question answered from the Brain with no team engaged: the full answer, naming the /knowledge/ notes it rests on'), milestones: z.array(z.string()).optional().describe('For a project task: the ids of the project milestones this task achieved, from the PROJECT block (m-…)') }) });
+    }, { name: 'complete_task', description: 'Complete the task once every involved lead has recorded an approved review of the latest work; or, for a plain question the Brain or the web answers with no team engaged, file the answer directly. Files the result for the CEO.', schema: z.object({ summary: z.string().describe('One paragraph: what was delivered'), answer: z.string().optional().describe('Only for a question you answer yourself with no team engaged: the full answer, naming the /knowledge/ notes and the web addresses (read with web_fetch) it rests on, with the date for anything that changes'), milestones: z.array(z.string()).optional().describe('For a project task: the ids of the project milestones this task achieved, from the PROJECT block (m-…)') }) });
   }
   askTool(id) {
     return tool(async ({ question }) => {

@@ -13,7 +13,7 @@ import { toast } from './toast.js';
 import { mark, dot, clock, ago, toolState, officeSummary, dropSummary } from './status.js';
 import { MANAGE_CSS } from './manage.css.js';
 import { searchAgency } from './agency-search.js';
-import { HOSTED, USER, LIMITS, MANAGED_MODELS, PLATFORM_ONLY, isOfficeAdmin, canOpenArea } from './session.js';
+import { HOSTED, USER, LIMITS, updateLimits, MANAGED_MODELS, PLATFORM_ONLY, isOfficeAdmin, canOpenArea } from './session.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const when = value => value ? new Date(value).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
@@ -23,7 +23,7 @@ const initials = name => String(name || '?').split(/\s+/).filter(Boolean).slice(
 const SECTIONS = [
   ['profile', 'Profile', 'Administration', 'The company the office works for: its name, and the purpose every planner reads before work.', 'settings'],
   ['office', 'Office settings', 'Administration', 'How the whole office runs. Choices for one team live under Teams & people.', 'settings'],
-  ['teams', 'Teams & people', 'People', 'Who is on each team, what they do, and the standing instructions they start every task from. A team is a lead and up to six specialists.', 'office'],
+  ['teams', 'Teams & people', 'People', 'Who is on each team, what they do, and the standing instructions they start every task from. A team is a lead and its specialists.', 'office'],
   ['models', 'Models & keys', 'Services', 'Save a provider key, activate the models the office may use, and pick who runs on what. Keys stay on the server and are never shown again.', 'providers'],
   ['tools', 'Tools & connectors', 'Services', 'The outside services the office connects to itself. A connection is separate from permission: sign in here, then choose which teams may use it.', 'tools'],
   ['vault', 'Vault', 'Services', 'Outside-service keys, database connections and SSH targets. Agents never see a secret: the office injects it and the audit log records every use.', 'vault'],
@@ -228,7 +228,8 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
   /* ---------- Teams & people ---------- */
   async function showTeams() {
     try {
-      [config, tools, providers] = await Promise.all([api('/office'), api('/tools').catch(() => []), MANAGED_MODELS ? Promise.resolve({ models: [] }) : api('/providers').catch(() => ({ models: [] }))]); draft = structuredClone(config);
+      // The team size comes with the office's latest answer: a platform administrator may have changed it since the page loaded.
+      [config, tools, providers] = await Promise.all([api('/office'), api('/tools').catch(() => []), MANAGED_MODELS ? Promise.resolve({ models: [] }) : api('/providers').catch(() => ({ models: [] })), api('/health').then(h => updateLimits(h.limits)).catch(() => null)]); draft = structuredClone(config);
       let resume = null; try { resume = JSON.parse(sessionStorage.getItem(RESUME) || 'null'); sessionStorage.removeItem(RESUME); } catch {}
       if (resume?.team && draft.teams.some(t => t.id === resume.team)) { team = resume.team; teamSection = resume.section || teamSection; }
       // Arriving from a team card or a person's card on the office floor.
@@ -316,7 +317,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     content.querySelectorAll('[data-settings-page]').forEach(el => el.hidden = el.dataset.settingsPage !== teamSection);
     content.querySelectorAll('[data-settings-section]').forEach(b => b.onclick = () => { collectTeam(); teamSection = b.dataset.settingsSection; renderTeam(); });
     $('spaceAddTeam').onclick = () => {
-      collectTeam(); if (draft.teams.length >= 10) return feedback('An office supports up to 10 teams.', true);
+      collectTeam(); if (draft.teams.length >= LIMITS.maxTeams) return feedback(`This office is at its limit of ${LIMITS.maxTeams} team${LIMITS.maxTeams === 1 ? '' : 's'}.`, true);
       const id = 'team-' + crypto.randomUUID().slice(0, 8), lead = id + '-lead', template = structuredClone(config.teams[0]);
       draft.teams.push({ ...template, id, name: 'New team', lead, purpose: '', instructions: '', guardrails: [], tools: [], skills: [], tests: [], checks: [], rules: [], models: {} });
       draft.agents.push({ id: lead, department: id, name: 'Team lead', role: 'Team lead', does: 'Plans the team’s work, delegates each part to the right specialist and reviews every result against the team’s criteria before it is filed.', brief: 'Read the Brain before planning. Delegate only to people on this team; hand anything outside its field to the Program Manager. Approve nothing that lacks a source.', model: '', effort: '', tools: [], skills: [], rules: [], inheritTools: true }, { id: id + '-specialist', department: id, name: 'Specialist', role: 'Specialist', does: 'Carries out the assignments the lead hands over in this team’s field and returns finished, checkable work.', brief: 'Follow the team’s working instructions. Cite the Brain notes you use. Stop and ask the lead rather than guess.', model: '', effort: '', tools: [], skills: [], rules: [], inheritTools: true });
@@ -343,7 +344,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
         try { sessionStorage.setItem(RESUME, JSON.stringify({ team: t.id, section: 'people', hire: true })); await runSave(barOf($('spaceTeamForm')), async () => { config = await api('/office', 'PUT', draft); draft = structuredClone(config); }, { ok: 'Team saved', sub: 'The office is adding its pod. The Agency opens when it is back.' }); setTimeout(() => location.reload(), 600); } catch { sessionStorage.removeItem(RESUME); }
         return;
       }
-      agencyPicker($('spaceAgencyPicker'), { mode: 'hire', dept: t.id, full: agents.length >= 7, onDone: async () => { dirty = false; await showTeams(); teamSection = 'people'; renderTeam(); } });
+      agencyPicker($('spaceAgencyPicker'), { mode: 'hire', dept: t.id, full: agents.length >= LIMITS.maxMembersPerTeam, onDone: async () => { dirty = false; await showTeams(); teamSection = 'people'; renderTeam(); } });
       $('spaceAgencyPicker').scrollIntoView({ block: 'start', behavior: 'smooth' });
     }
     content.querySelectorAll('[data-assist]').forEach(b => b.onclick = async () => {
@@ -364,7 +365,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       finally { b.disabled = false; b.textContent = was; }
     });
     const addModal = $('spaceAddAgentModal'), closeAdd = () => { addModal.hidden = true; $('spaceAddAgent')?.focus(); };
-    $('spaceAddAgent').onclick = () => { collectTeam(); if (agents.length >= 7) return feedback('A team is a lead and up to six specialists.', true); addModal.hidden = false; addModal.querySelector('.mg-choice:not(:disabled)').focus(); };
+    $('spaceAddAgent').onclick = () => { collectTeam(); if (agents.length >= LIMITS.maxMembersPerTeam) return feedback(`This team is full: a team is a lead and up to ${LIMITS.maxMembersPerTeam - 1} specialists on this platform.`, true); addModal.hidden = false; addModal.querySelector('.mg-choice:not(:disabled)').focus(); };
     addModal.addEventListener('click', event => {
       if (event.target === addModal || event.target.closest('[data-add-close]')) return closeAdd();
       const choice = event.target.closest('[data-add]'); if (!choice) return;
@@ -553,7 +554,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
     host.innerHTML = `<div class="agency-picker" role="region" aria-label="${mode === 'hire' ? 'Hire from the Agency' : 'Add a method from the Agency'}">
       <div class="agency-head"><div><b>${mode === 'hire' ? 'Hire from the Agency' : 'Add a method from the Agency'}</b><p>${mode === 'hire' ? 'A ready-made specialist joins this team with a role, standing instructions and their full method as a skill.' : 'A method becomes a skill you can give to teams and people.'} <small>Open-source Agency catalogue, MIT.</small></p></div><button type="button" class="secondary agency-close" id="agencyClose" aria-label="Close">✕</button></div>
       <div class="agency-search"><input type="search" id="agencyQ" placeholder="Search ${agencyIndex.personas.length.toLocaleString('en')} personas by job, skill or tool" aria-label="Search personas"><select id="agencyDivision" aria-label="Division"><option value="">All divisions</option>${divisions.map(([id, text]) => `<option value="${esc(id)}">${esc(text)} (${counts[id] || 0})</option>`).join('')}</select>${mode === 'skill' ? `<select id="agencyTeam" aria-label="Give it to"><option value="">Give it to nobody yet</option>${teams.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select>` : ''}</div>
-      ${mode === 'hire' && full ? '<p class="error">This team is full: a lead and six specialists. Remove someone first, or give the lead a new role with “as the lead”.</p>' : ''}
+      ${mode === 'hire' && full ? `<p class="error">This team is full: a lead and ${LIMITS.maxMembersPerTeam - 1} specialists. Remove someone first, or give the lead a new role with “as the lead”.</p>` : ''}
       <p class="agency-count" id="agencyCount" aria-live="polite"></p>
       <div id="agencyList" class="agency-list"></div></div>`;
     $('agencyClose').onclick = () => { host.hidden = true; host.closest('form')?.classList.remove('picker-open'); };
@@ -1214,7 +1215,7 @@ export function initSettings({ api, openTask, brain, syncBrain, onShow, onHide }
       const indexMark = status ? mark('ok', `Index fresh · ${Number(status.notes ?? notes.length).toLocaleString()} notes${status.passages != null ? ' · ' + Number(status.passages).toLocaleString() + ' passages' : ''}`) : mark('warn', 'Index status unknown');
       setMeta(indexMark, status?.builtAt || status?.updatedAt ? `updated ${esc(when(status.builtAt || status.updatedAt))}` : `${esc(status?.backend || '')}`); refreshMeta('brain', indexMark);
       content.innerHTML = `<div class="mg-toolbar"><form id="spaceSearchForm" class="mg-search" style="flex:1;max-width:520px">${SEARCH_ICON}<input name="q" type="search" placeholder="What do we know about…" value="${esc(brainQuery)}" aria-label="Search the Brain"></form><span class="mg-spacer"></span><button type="button" class="mg-btn" id="spacePurpose">Office purpose</button><button type="button" class="mg-btn" id="spaceGraph">View the map</button><button type="button" class="mg-btn" id="spaceReindex">Rebuild index</button><button type="button" class="mg-btn mg-btn-primary" id="spaceNewNote">+ Add note</button></div>
-        <div class="mg-brain"><div class="mg-folders"><button type="button" data-folder="" aria-pressed="${!brainFolder}">All notes<span class="mg-n">${notes.length}</span></button>${folders.map(f => `<button type="button" data-folder="${esc(f)}" aria-pressed="${f === brainFolder}">${esc(f)}<span class="mg-n">${count(f)}</span></button>`).join('')}</div>
+        <div class="mg-brain"><div class="mg-folders"><button type="button" data-folder="" aria-pressed="${!brainFolder}">All notes<span class="mg-n">${notes.length}</span></button>${folders.map(f => `<button type="button" data-folder="${esc(f)}" aria-pressed="${f === brainFolder}" title="${esc(f)}"><span class="mg-fname" style="--depth:${f.split('/').length - 1}">${esc(f.split('/').pop())}</span><span class="mg-n">${count(f)}</span></button>`).join('')}</div>
         <div><form id="spaceUploadForm" class="mg-upload"><select name="folder" aria-label="Folder" style="border:1px solid var(--mg-line2);border-radius:6px;padding:6px 8px;background:var(--mg-card);color:var(--ink);font:12px var(--ui)">${folders.map(f => `<option ${f === (brainFolder || 'Company') ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select><input type="file" name="files" multiple accept=".pdf,.docx,.txt,.md,.csv"><button type="submit" class="mg-btn mg-btn-sm">Upload</button><small>PDF, Word, text, Markdown or CSV · up to 5 MB each. A file with the same name replaces the old one and archives it.</small></form>
         <div id="spaceSearchResults"></div><div class="mg-toolbar" style="margin-bottom:10px"><span class="mg-count" id="spaceNoteCount"></span><span class="mg-spacer"></span>${search('spaceFindNote', 'Filter by title or text')}</div><div id="spaceKnowledgeList"></div></div></div>`;
       const list = () => { const query = $('spaceFindNote').value.toLowerCase(); const rows = notes.filter(n => (!brainFolder || n.id.startsWith(brainFolder + '/')) && (n.title + ' ' + n.preview).toLowerCase().includes(query)); $('spaceNoteCount').textContent = `${rows.length} note${rows.length === 1 ? '' : 's'}${brainFolder ? ' in ' + brainFolder : ''}`; $('spaceKnowledgeList').innerHTML = rows.length ? `<div class="mg-ledger-wrap"><table class="mg-ledger"><thead><tr><th>Note</th><th>Folder</th><th>Updated</th></tr></thead><tbody>${rows.slice(0, 200).map(n => `<tr class="mg-row" data-note="${esc(n.id)}"><td><span class="mg-name">${esc(n.title)}</span><span class="mg-snippet">${esc(n.preview.slice(0, 160))}</span></td><td><span class="mg-chip">${esc(n.id.split('/').slice(0, -1).join('/') || 'Brain')}</span></td><td class="k">${esc(when(n.updatedAt))}</td></tr>`).join('')}</tbody></table></div>${rows.length > 200 ? '<p class="mg-intro">Showing the first 200. Narrow the filter to see the rest.</p>' : ''}` : empty('No notes here yet.', 'Upload a document, or add a note.'); $('spaceKnowledgeList').querySelectorAll('[data-note]').forEach(b => b.onclick = () => viewNote(b.dataset.note)); };

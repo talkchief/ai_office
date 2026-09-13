@@ -126,3 +126,21 @@ test('the planner says which milestones wait for which; two ready milestones sta
     assert.deepEqual(started.map(id => engine.get(id).milestoneId), empty.milestones.map(m => m.id), 'the Program Manager gets one planning task per ready milestone');
   } finally { await engine.close(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 });
+
+test('a milestone is broken into its separate pieces of work: each task has its own title, and checking the work is a task of its own', () => {
+  // The planner is told not to fold disciplines together; QA, launch and measurement are named as their own tasks.
+  assert.match(PLANNER_PROMPT, /one task per deliverable and per team, never several disciplines folded into one task/);
+  assert.match(PLANNER_PROMPT, /quality assurance, testing, fact-checking, review or sign-off is a separate task/);
+  assert.match(PLANNER_PROMPT, /"title":"<short name of the deliverable/);
+  const office = new OfficeStore({ dataDir: temp(), initialAgents: loadRoster().agents }).get();
+  const raw = { ...PLAN, milestones: [{ title: 'Page built', tasks: [
+    { title: 'Landing page build', team: 'delivery', text: 'Build the landing page from the approved mockups, responsive, with tracking.' },
+    { title: 'Landing page QA', team: 'delivery', text: 'Test the built page on mobile and desktop, every form and link, and write the defects found.' },
+    { team: 'marketing', text: 'Write the launch post for the page with the approved messaging and the live address.' }] }] };
+  const { plan } = parsePlan(JSON.stringify(raw), { office, today: TODAY });
+  assert.deepEqual(plan.milestones[0].tasks.map(t => t.title), ['Landing page build', 'Landing page QA', ''], 'a title is kept, a missing one stays empty');
+  const created = [];
+  const projects = { create: p => ({ id: 'p1', ...p, milestones: p.milestones.map((m, i) => ({ id: 'm' + i, ...m })) }), readyMilestones: pr => pr.milestones };
+  applyPlan({ plan, projects, engine: { create: job => (created.push(job), { id: 'j' + created.length, ...job }) } });
+  assert.deepEqual(created.map(j => j.title), ['Landing page build', 'Landing page QA', 'Write the launch post for the page with the approved messaging and the live address.'], 'the task carries its own title, or the first line of its brief when the plan gave none');
+});

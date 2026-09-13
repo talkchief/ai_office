@@ -74,6 +74,20 @@ export function makeOverlays({ hud, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, onDept, on
   pmPill.innerHTML = `<span class="star">◆</span><span class="p-n">PROGRAM MANAGER</span><span class="pm-sep"></span><span class="pm-st"><i></i><span>FREE</span></span><span class="pm-next"></span>`;
   pmPill.addEventListener('click', () => onPM());
   hud.appendChild(pmPill);
+  /* ---------- the Program Manager's delivery card: a finished task you have not opened, until you open it ---------- */
+  // He is the CEO's point of contact, so a result is announced over him, in the team card's shape, with the task marked done.
+  const pmCard = document.createElement('div');
+  pmCard.className = 'badge pm-delivered';
+  pmCard.setAttribute('role', 'status'); pmCard.setAttribute('aria-live', 'polite');
+  pmCard.innerHTML = `<div class="b-name"><span class="dot" style="background:#B9A775"></span>PROGRAM MANAGER<span class="b-state"><i></i><span>DELIVERED</span></span></div><p class="b-now"><span class="b-line"></span></p><div class="b-jobs"></div>`;
+  pmCard.style.display = 'none';
+  pmCard.addEventListener('click', e => {
+    e.stopPropagation();
+    // A row opens that task; anywhere else on the card opens the newest. Opening it is what marks it seen.
+    const row = e.target.closest('[data-task]') || pmCard.querySelector('[data-task]');
+    if (row) window.dispatchEvent(new CustomEvent('office:open-task', { detail: row.dataset.task }));
+  });
+  hud.appendChild(pmCard);
 
   /* ---------- speech: a short line over someone's head for a few seconds ---------- */
   const bubbles = [];
@@ -224,6 +238,22 @@ export function makeOverlays({ hud, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, onDept, on
     if (rig.pm) {
       const p = rig.pm.person.position;
       const [ax, ay] = toScreen(v.set(p.x, p.y + 6.6, p.z));
+      const delivered = rig.pm.delivered || [];
+      if (delivered.length) {
+        // The card takes the pill's place until every delivered task has been opened.
+        pmPill.style.display = 'none'; pmCard.style.display = 'block';
+        const s = Math.max(0.9, pillScale), at = whole(pmCard, ax, ay, s);
+        pmCard.style.visibility = at ? '' : 'hidden';
+        if (at) pmCard.style.transform = `translate(${at[0]}px,${at[1]}px) translate(-50%,-100%) scale(${s})`;
+        const shown = delivered.slice(0, 4), sig = delivered.map(d => d.id).join('|');
+        if (pmCard.dataset.sig !== sig) {
+          pmCard.dataset.sig = sig;
+          pmCard.querySelector('.b-line').textContent = delivered.length === 1 ? 'A task is done. Open it to review.' : `${delivered.length} tasks are done. Open them to review.`;
+          pmCard.querySelector('.b-jobs').innerHTML = shown.map(d => `<button type="button" data-task="${esc(d.id)}" title="${esc(d.title)}"><span class="seat done"></span><span class="what">${esc(d.title)}</span><span class="st">DONE</span></button>`).join('') + (delivered.length > shown.length ? `<div class="b-eye" style="padding-top:4px">+${delivered.length - shown.length} more</div>` : '');
+        }
+        return;
+      }
+      pmCard.style.display = 'none'; pmCard.dataset.sig = '';
       pmPill.style.display = 'block';
       const s = Math.max(0.8, pillScale), at = whole(pmPill, ax, ay, s);
       pmPill.style.visibility = at ? '' : 'hidden';
@@ -235,5 +265,5 @@ export function makeOverlays({ hud, DEPTS, DEPT_KEYS, AGENTS, LAYOUT, onDept, on
       if (pmPill.dataset.sig !== sig) { pmPill.dataset.sig = sig; pmPill.querySelector('.pm-st span').textContent = st; pmPill.querySelector('.pm-st').classList.toggle('on', !st.startsWith('FREE')); pmPill.querySelector('.pm-next').innerHTML = nx; pmPill.classList.toggle('is-working', !st.startsWith('FREE')); }
     }
   }
-  return { badges, pills, pmPill, brainTag, setPillState, tick, say, tickBubbles };
+  return { badges, pills, pmPill, pmCard, brainTag, setPillState, tick, say, tickBubbles };
 }

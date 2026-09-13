@@ -86,7 +86,7 @@ const when = date => date ? new Date(date).toLocaleString() : '—';
 const prose = (text, prefix) => `<div class="space-document">${renderDocument(text, prefix).html}</div>`;
 const empty = (title, text) => `<div class="space-output-empty"><span aria-hidden="true">○</span><h3>${esc(title)}</h3><p>${esc(text)}</p></div>`;
 
-// The task view: the decision first, then the four tabs. One status vocabulary, no model details in sight;
+// The task view: the decision first, then the tabs (result, conversation, how it was done, review, artifacts). One status vocabulary, no model details in sight;
 // the run's numbers live under a closed fold in Review.
 const initials = n => String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 const short = date => date ? new Date(date).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
@@ -190,8 +190,42 @@ export function renderTaskWorkspace(job, tab, actions = '') {
     const size = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
     return `<table class="tv-ledger"><thead><tr><th>File</th><th>Size</th><th>When</th><th></th></tr></thead><tbody>${files.map(f => `<tr><td>${fileIcon(f.name)} <b>${esc(f.name)}</b>${exported(f.name) ? '<small class="tv-sub2">exported document</small>' : ''}</td><td class="k">${size(f.bytes)}</td><td class="k">${esc(short(f.modifiedAt))}</td><td class="r">${SHOWS.test(f.name) ? `<button type="button" class="tv-btn tv-btn-sm" data-preview-url="/api/tasks/${job.id}/file?path=${encodeURIComponent(f.name)}" data-preview-name="${esc(f.name)}" data-preview-bytes="${f.bytes || 0}" title="Read it here">Preview</button>` : ''}<a class="tv-btn tv-btn-sm" href="/api/tasks/${job.id}/file?path=${encodeURIComponent(f.name)}" download>Download</a></td></tr>`).join('')}</tbody></table>`;
   };
-  const tabs = [['result', 'Result', ''], ['work', 'How it was done', total ? `<span class="tv-c">${total} step${total === 1 ? '' : 's'}</span>` : ''], ['review', 'Review', last ? mark(last.approved ? 'ok' : 'warn', last.approved ? 'passed' : 'changes') : ''], ['artifacts', 'Artifacts', (job.files || []).length ? `<span class="tv-c">${job.files.length}</span>` : '']];
+  /* ---- the conversation: what you wrote, what the team asked and answered, and each version it delivered, in time order ---- */
+  const team = job.autoRoute ? 'Program Manager' : lead;
+  const ATTACHED = /^Read the attached files under \/work\/inbox\/ before planning: /;
+  const conversationItems = () => {
+    const messages = (job.messages || []).length ? job.messages : job.text ? [{ seq: 0, at: job.createdAt, role: 'ceo', kind: 'message', text: job.text, deliveredAt: job.createdAt }] : [];
+    const items = messages.map((m, i) => ({ at: m.at, order: 0, m, brief: i === 0 && m.role === 'ceo' }));
+    for (const v of job.resultVersions || []) items.push({ at: v.at, order: 1, v });
+    return items.sort((a, b) => (a.at || 0) - (b.at || 0) || a.order - b.order);
+  };
+  const conversation = () => {
+    const items = conversationItems(), latest = (job.resultVersions || []).length;
+    const YOURS = { message: 'Message', correction: 'Correction', note: 'Note for the team', answer: 'Your answer', question: 'Question' };
+    const row = item => {
+      if (item.v) {
+        const v = item.v, current = v.n === latest;
+        return `<li class="tv-version"><span>${esc(v.n > 1 ? `Version ${v.n} delivered` : 'Result delivered')}${current && job.state === 'done' ? ' · approved' : current ? '' : ' · replaced later'}<time>${esc(short(v.at))}</time>${v.summary ? `<small>${esc(v.summary)}</small>` : ''}</span></li>`;
+      }
+      const m = item.m;
+      if (m.role === 'system') return `<li class="tv-event">${esc(m.text)}<time>${esc(short(m.at))}</time></li>`;
+      if (m.role === 'ceo' && ATTACHED.test(m.text)) return `<li class="tv-event">You attached <b>${esc(m.text.replace(ATTACHED, '').replace(/\.$/, ''))}</b><time>${esc(short(m.at))}</time></li>`;
+      const you = m.role === 'ceo';
+      const who = you ? 'You' : m.agent === 'pm' ? 'Program Manager' : m.agent ? name(m.agent) : team;
+      const tag = you ? (item.brief ? 'Brief' : YOURS[m.kind] || 'Message') : m.kind === 'question' ? 'asks' : m.kind === 'answer' ? 'answers' : '';
+      const text = String(m.text || ''), long = item.brief && text.length > 480;
+      const body = long ? `<details class="tv-msg-fold" data-detail-key="convo-brief"><summary>${esc(outputExcerpt(text, 220))}<span>Show the whole brief</span></summary>${prose(text, 'convo-' + m.seq)}</details>` : prose(text, 'convo-' + m.seq);
+      const state = you && !item.brief && !m.deliveredAt && ['queued', 'planning', 'working', 'reviewing'].includes(job.state) ? 'waits for the team’s next step' : '';
+      return `<li class="tv-msg ${you ? 'you' : 'team'}" data-seq="${esc(m.seq)}"><div class="tv-msg-who"><b>${esc(who)}</b>${tag ? `<span class="tv-msg-tag">${esc(tag)}</span>` : ''}<time>${esc(short(m.at))}</time></div><div class="tv-bubble">${body}</div>${state ? `<div class="tv-msg-state">${esc(state)}</div>` : ''}</li>`;
+    };
+    const lastItem = items[items.length - 1];
+    const tail = lastItem?.m?.role === 'ceo' && ['queued', 'planning', 'working', 'reviewing', 'saving'].includes(job.state) ? `<li class="tv-event tv-typing"><i></i><i></i><i></i> ${esc(team)} is on it</li>`
+      : job.state === 'waiting' ? `<li class="tv-event">Waits for your approval</li>` : job.state === 'blocked' ? `<li class="tv-event tv-stopped">The task stopped · retry it above</li>` : '';
+    return `<ol class="tv-convo" aria-label="The conversation on this task">${items.map(row).join('')}${tail}</ol>`;
+  };
+  const talk = conversationItems().filter(item => !item.brief).length;
+  const tabs = [['result', 'Result', ''], ['conversation', 'Conversation', talk ? `<span class="tv-c">${talk}</span>` : ''], ['work', 'How it was done', total ? `<span class="tv-c">${total} step${total === 1 ? '' : 's'}</span>` : ''], ['review', 'Review', last ? mark(last.approved ? 'ok' : 'warn', last.approved ? 'passed' : 'changes') : ''], ['artifacts', 'Artifacts', (job.files || []).length ? `<span class="tv-c">${job.files.length}</span>` : '']];
   return `${head}${decision()}
     <nav class="tv-tabs" role="tablist" aria-label="Task views">${tabs.map(([id, label, extra]) => `<button type="button" role="tab" id="spaceTaskTab-${id}" data-task-tab="${id}" aria-selected="${tab === id}" aria-controls="spaceTaskPanel-${id}" tabindex="${tab === id ? '0' : '-1'}">${label}${extra}</button>`).join('')}</nav>
-    ${['result', 'work', 'review', 'artifacts'].map(id => `<section class="tv-pane" role="tabpanel" id="spaceTaskPanel-${id}" aria-labelledby="spaceTaskTab-${id}" tabindex="0" ${tab !== id ? 'hidden' : ''}>${tab !== id ? '' : id === 'result' ? result() : id === 'work' ? work() : id === 'artifacts' ? artifacts() : review()}</section>`).join('')}`;
+    ${['result', 'conversation', 'work', 'review', 'artifacts'].map(id => `<section class="tv-pane" role="tabpanel" id="spaceTaskPanel-${id}" aria-labelledby="spaceTaskTab-${id}" tabindex="0" ${tab !== id ? 'hidden' : ''}>${tab !== id ? '' : id === 'result' ? result() : id === 'conversation' ? conversation() : id === 'work' ? work() : id === 'artifacts' ? artifacts() : review()}</section>`).join('')}`;
 }
