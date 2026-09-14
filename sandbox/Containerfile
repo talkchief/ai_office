@@ -1,0 +1,21 @@
+# The sandbox image: what a task's commands run in. The broker (sandbox/broker.mjs) runs it with no network, a read-only root,
+# every capability dropped, as user 1000, with /work and /deps as volumes of the task's own (sandbox/rules.mjs).
+# Built on the server by deploy/sandbox/setup.sh (as the ao-sandbox user): podman build -t localhost/ao-sandbox:latest sandbox/
+FROM docker.io/library/node:22-bookworm-slim AS node
+
+FROM docker.io/library/python:3.12-slim-bookworm
+ENV DEBIAN_FRONTEND=noninteractive PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONUNBUFFERED=1
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git build-essential curl ca-certificates fonts-dejavu-core procps coreutils file zip unzip jq sqlite3 \
+ && rm -rf /var/lib/apt/lists/*
+# Node 22 and npm, copied from the official image.
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx && node --version && npm --version
+# Python for data, charts, documents, simulation and tests.
+RUN pip install pandas numpy scipy matplotlib simpy python-pptx python-docx openpyxl reportlab pytest \
+ && python3 -c "import pandas, numpy, scipy, matplotlib, simpy, pptx, docx, openpyxl, reportlab, pytest; print('python packages ok')"
+RUN useradd --uid 1000 --create-home --home-dir /home/sandbox --shell /bin/bash sandbox && mkdir -p /work /deps && chown 1000:1000 /work /deps
+USER 1000:1000
+WORKDIR /work
+CMD ["sleep", "infinity"]

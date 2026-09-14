@@ -47,7 +47,7 @@ export class TenantRegistry {
     const tenant = this.accounts.tenant(id); if (!tenant) fail('No such office.', 404);
     if (this.instances.size >= this.loadedLimit()) await this.evictIdle({ force: true });
     const d = this.dirs(id); fs.mkdirSync(d.data, { recursive: true }); fs.mkdirSync(d.brain, { recursive: true });
-    const instance = await this.createInstance({ dataDir: d.data, brainDir: d.brain, cfg: { ...this.cfg, name: tenant.name }, name: tenant.name, version: this.version, models: this.platform.models, agency: this.agency, discovery: false, allowStdio: false, limits: this.platform.limits(), tenant: this.tenantContext(tenant), log: line => this.log(`  [${tenant.slug}]${line}`) });
+    const instance = await this.createInstance({ dataDir: d.data, brainDir: d.brain, cfg: { ...this.cfg, name: tenant.name }, name: tenant.name, version: this.version, models: this.platform.models, agency: this.agency, discovery: false, allowStdio: false, limits: this.platform.limits(), tenant: this.tenantContext(tenant), sandboxAllowed: () => !!this.platform.sandboxAllowed?.(), log: line => this.log(`  [${tenant.slug}]${line}`) });
     await instance.boot();
     try { assignOwners({ engine: instance.engine, projects: instance.projects, routines: instance.routineRecords, ownerId: tenant.ownerId }); } catch (error) { console.warn(`owners (${tenant.slug}):`, error.message); }
     try { await instance.scheduler.tick(); } catch (error) { console.warn(`scheduler (${tenant.slug}):`, error.message); }

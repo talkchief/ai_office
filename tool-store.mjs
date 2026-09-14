@@ -30,7 +30,7 @@ export class ToolStore {
     const found = (this.summary()?.servers || []).filter(s => s.target && !local.some(l => l.id === s.id || (l.url && l.url === s.target)));
     const candidates = found.map(s => ({ id: s.id, name: s.name, type: 'candidate', target: s.target, status: 'not-imported', managed: false, origin: 'Found in Claude Code · import it to use it here' }));
     const { teams, agents } = this.office.get();
-    return [{ id: 'web', name: 'Web search & fetch', type: 'builtin', status: 'available', managed: false, origin: 'Built into the office' }, ...local, ...candidates]
+    return [{ id: 'web', name: 'Web search & fetch', type: 'builtin', status: 'available', managed: false, origin: 'Built into the office' }, { id: 'sandbox', name: 'Sandbox (run code)', type: 'builtin', status: 'available', managed: false, origin: 'Built into the office: Python and Node in a throwaway container per task' }, ...local, ...candidates]
       .map(tool => ({ ...tool, assignedTeams: teams.filter(t => t.tools.includes(tool.id) || agents.some(a => a.department === t.id && (a.tools || []).includes(tool.id))).map(t => ({ id: t.id, name: t.name, whole: t.tools.includes(tool.id), people: agents.filter(a => a.department === t.id && !t.tools.includes(tool.id) && (a.tools || []).includes(tool.id)).map(a => a.name) })) }));
   }
   save(input) {

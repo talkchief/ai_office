@@ -2,6 +2,7 @@
 // serve.mjs builds one of these for the single office it serves; hosted mode (later) builds one per tenant.
 // `boot()` upgrades, indexes and recovers; `start()` starts the clocks; `close()` stops everything and closes the files.
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { SystemMessage, HumanMessage, AIMessage } from '@langchain/core/messages';
 import { layoutGraph } from './graph-build.mjs';
 import * as mcp from './mcp.mjs';
@@ -34,6 +35,8 @@ import { Router, httpError } from './server/routes.mjs';
 import { isAdmin } from './server/visibility.mjs';
 import { registerApi } from './server/api.mjs';
 import { VaultStore } from './vault.mjs';
+import { BrokerClient, TaskSandboxes } from './engine/sandbox.mjs';
+import { TERMINAL } from './engine/deep-agents.mjs';
 
 const flat = content => typeof content === 'string' ? content : Array.isArray(content) ? content.map(p => typeof p === 'string' ? p : p?.text || '').join('') : '';
 const PM = { id: 'pm', name: 'Program Manager', role: 'Program Manager', does: 'Plans work across the teams, delegates to the department leads and closes tasks once the leads approve.', department: null, lead: true };
@@ -45,7 +48,7 @@ const PM = { id: 'pm', name: 'Program Manager', role: 'Program Manager', does: '
  * `agency`: a shared Agency catalogue; `log`: where start-up lines go.
  * `tenant` (hosted): { id, slug, name, ownerId, viewers(), audience(sharedWith) } — the company this office belongs to; null for a single office.
  */
-export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?.name || 'My Office', version = '?', models = null, agency = new Agency(), discovery = true, allowStdio = true, limits = undefined, tenant = null, log = console.log }) {
+export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?.name || 'My Office', version = '?', models = null, agency = new Agency(), discovery = true, allowStdio = true, limits = undefined, tenant = null, log = console.log, sandboxClient = undefined, sandboxAllowed = () => true }) {
   const DATA = dataDir, BRAIN = brainDir, managedModels = !!models;
   const office = new OfficeStore({ dataDir: DATA, initialAgents: loadRoster(BRAIN).agents, limits });
   const settings = new SettingsStore({ dataDir: DATA });
@@ -85,6 +88,15 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
         }
         syncProject(job.projectId); } catch (error) { console.warn('project milestones:', error.message); } }
     } });
+
+  // The sandbox: one throwaway container per task, run by the broker service on this server (sandbox/broker.mjs). A hosted office uses
+  // it only when the platform allows it; every office decides in Settings → Office, and grants the tool to teams and people.
+  // A hosted office is its tenant; a single office is named after its data folder, so a second office on the same machine (the check's
+  // throwaway one, say) never touches the first one's sandboxes.
+  const sandboxOffice = tenant?.id ? String(tenant.id).toLowerCase() : `office-${createHash('sha256').update(path.resolve(DATA)).digest('hex').slice(0, 10)}`;
+  const sandboxBroker = sandboxClient === undefined ? new BrokerClient({ socketPath: cfg?.sandboxSocket || process.env.AO_SANDBOX_SOCKET || undefined }) : sandboxClient;
+  if (sandboxBroker) engine.sandbox = new TaskSandboxes({ client: sandboxBroker, office: sandboxOffice, workspaceDir: id => engine.workspaceDir(id), settings: () => settings.get(), allowed: () => { try { return !!sandboxAllowed(); } catch { return false; } },
+    event: (id, type, agent, message) => { if (engine.get(id)) engine.event(id, type, agent, message); }, record: (id, mutate) => { try { engine.update(id, mutate, { touch: false }); } catch {} }, exists: id => !!engine.get(id), log: line => console.warn(line) });
 
   const audit = new AuditLog({ db: engine.db, bus });
   // The minute clock: overdue notices, reminders for anything waiting on the CEO, and the daily digest (built from records, no model cost).
@@ -292,7 +304,7 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
   const routineRecords = { list: () => { loadRoutines(); return rlist.routines; }, save: list => { rlist.routines = list; routines.save(BRAIN, list); loadRoutines(); } };
 
   /* ---------- lifecycle ---------- */
-  let routineTimer = null, connecting = Promise.resolve();
+  let routineTimer = null, sandboxTimer = null, connecting = Promise.resolve();
   // Upgrades old records, indexes the Brain, recovers interrupted work and connects the connectors.
   async function boot() {
     const migrated = await runMigrations({ engine, office, knowledge, brainPath: BRAIN });
@@ -309,9 +321,11 @@ export async function createOfficeInstance({ dataDir, brainDir, cfg, name = cfg?
   function start() {
     if (routineTimer) return;
     routineTimer = setInterval(tickRoutines, 20000); routineTimer.unref?.(); tickRoutines(); scheduler.start(60000);
+    // Idle sandboxes go after the office's limit, and any whose task closed.
+    if (engine.sandbox) { sandboxTimer = setInterval(() => engine.sandbox.sweep(id => { const j = engine.get(id); return !!j && !TERMINAL.has(j.state); }).catch(() => {}), 60000); sandboxTimer.unref?.(); }
   }
   async function close() {
-    if (routineTimer) clearInterval(routineTimer); routineTimer = null;
+    if (routineTimer) clearInterval(routineTimer); routineTimer = null; if (sandboxTimer) clearInterval(sandboxTimer); sandboxTimer = null;
     for (const t of projectSyncTimers.values()) clearTimeout(t); projectSyncTimers.clear();
     scheduler.stop(); bus.close(); index.close(); await connecting.catch(() => {}); await engine.close(); await hub.close();
   }

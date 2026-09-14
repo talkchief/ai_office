@@ -81,9 +81,9 @@ export class OfficeMemory {
   // What the Program Manager reads before delegating, and what a team reads about itself. Rewritten on every change.
   async refresh() {
     const office = this.office.get(), tools = this.tools(), when = new Date().toISOString();
-    const label = id => tools.find(t => t.id === id)?.name || (id === 'web' ? 'Web search & fetch' : id);
+    const label = id => tools.find(t => t.id === id)?.name || (id === 'web' ? 'Web search & fetch' : id === 'sandbox' ? 'Sandbox (run code)' : id);
     const toolLine = ids => (ids || []).length ? ids.map(label).join(', ') : 'none besides the Brain and the task workspace';
-    const known = new Set(['web', ...tools.map(t => t.id)]), extras = (t, a) => (a.tools || []).filter(id => known.has(id) && !(t.tools || []).includes(id));
+    const known = new Set(['web', 'sandbox', ...tools.map(t => t.id)]), extras = (t, a) => (a.tools || []).filter(id => known.has(id) && !(t.tools || []).includes(id));
     const teamBlock = t => {
       const lead = office.agents.find(a => a.id === t.lead), people = office.agents.filter(a => a.department === t.id && a.id !== t.lead);
       const skills = (t.skills || []).map(id => office.skills?.find(s => s.id === id)?.name || id);

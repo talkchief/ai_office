@@ -58,7 +58,9 @@ export function validatePlatform(input = {}, previous = {}) {
   const siteKey = it.clearKeys ? '' : text(it.siteKey ?? pt.siteKey ?? '', 200);
   if (/[\s]/.test(siteKey)) fail('The Turnstile site key cannot contain spaces.');
   const turnstile = { siteKey, secretKey: secret(it.secretKey, pt.secretKey, it.clearKeys || it.clearSecretKey, 'The Turnstile secret key') };
-  return { version: 2, limits, registration, adminEmails, publicOrigin, tenants, mail, turnstile };
+  // Whether offices on this platform may run code in sandboxes at all (each office still grants the tool to its teams).
+  const sandbox = { allowed: typeof input.sandbox?.allowed === 'boolean' ? input.sandbox.allowed : !!previous.sandbox?.allowed };
+  return { version: 2, limits, registration, adminEmails, publicOrigin, tenants, mail, turnstile, sandbox };
 }
 
 // The first platform.json takes what the deployment environment says; the panel takes over from there.
@@ -112,6 +114,7 @@ export class PlatformStore {
   registrationOpen() { return this.value.registration === 'open'; }
   /** The Turnstile keys, for the sign-in check. The site key alone is safe to put in the page. */
   turnstile() { return { ...this.value.turnstile }; }
+  sandboxAllowed() { return !!this.value.sandbox?.allowed; }
   publicOrigin(fallback = '') { return this.value.publicOrigin || fallback; }
   newWebhookSecret() { return crypto.randomBytes(24).toString('base64url'); }
 }

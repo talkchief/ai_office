@@ -156,6 +156,13 @@ await step('tests: the full suite passes', async () => {
       const r = await call('/api/tasks', 'POST', { dept: team, text: 'Draft a welcome email.' }); if (r.ok) throw new Error('a task started without a key');
       if (!/key/i.test(r.json?.error || '')) throw new Error('no sentence: ' + JSON.stringify(r.json)); return r.json.error;
     });
+    await step('server: the sandbox says whether it can run here, and why not', async () => {
+      const r = await call('/api/sandbox'); if (!r.ok) throw new Error('status ' + r.status);
+      if (typeof r.json.available !== 'boolean' || (!r.json.available && !r.json.reason)) throw new Error('no availability or reason: ' + JSON.stringify(r.json).slice(0, 200));
+      if (r.json.commandMinutes !== 5 || r.json.idleMinutes !== 20 || r.json.enabled !== true) throw new Error('office limits: ' + JSON.stringify(r.json));
+      const tools = await call('/api/tools'); if (!tools.json.some(t => t.id === 'sandbox' && t.type === 'builtin')) throw new Error('Sandbox is not offered as a built-in tool');
+      return r.json.available ? `available · ${r.json.image}` : r.json.reason;
+    });
     await step('server: the Brain takes an upload and finds it', async () => {
       const content = '# Check note\n\nOur zanzibarquartz pricing tier is reviewed every quarter.';
       const r = await call('/api/knowledge/upload', 'POST', { folder: 'Company', name: 'check-note.md', data: Buffer.from(content).toString('base64') }); if (!r.ok) throw new Error('upload: ' + JSON.stringify(r.json));

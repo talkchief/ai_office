@@ -1,7 +1,7 @@
 # Implementation Plan: A disposable sandbox per task
 
 **Branch**: `003-task-sandbox` | **Date**: 2026-09-14 | **Spec**: specs/003-task-sandbox/spec.md
-**Status**: Clarified 2026-09-14; waiting for the owner's go. Q2 (package registries only) is met by the install step in section 5, with no proxy.
+**Status**: Implemented 2026-09-14. Q2 (package registries only) is met by the install step in section 5, with no proxy. Found while testing on the server: a command's background processes (a fork bomb's included) outlived it and used up the process limit; the broker now counts the sandbox's processes from its cgroup after every command and restarts the container when any are left (files kept).
 
 ## Summary
 Agents that were given the Sandbox tool can run shell commands (Python, Node, tests) inside a rootless, network-less Podman container that belongs to one task. The office never shares the live workspace with the container: files are copied in before each command and regular files are copied back after it. A small broker service under its own user owns the container runtime and accepts only a fixed profile. The office destroys the sandbox when the task is delivered, cancelled or deleted, when it sits idle, and at boot.

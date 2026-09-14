@@ -19,6 +19,14 @@ export function workspaceFile(workspaceDir, virtualPath) {
   if (!rel || rel.includes('\0')) throw new Error('Name a file inside /work/, for example /work/report.md.');
   const root = path.resolve(workspaceDir), abs = path.resolve(root, rel);
   if (abs !== root && !abs.startsWith(root + path.sep)) throw new Error('Only files inside /work/ can be used.');
+  // A link inside the workspace could point anywhere on the server (a sandbox is one place that could try to make one): no part of
+  // the path may be a link, whatever it points to.
+  let cur = root;
+  for (const part of path.relative(root, abs).split(path.sep).filter(Boolean)) {
+    cur = path.join(cur, part);
+    let st; try { st = fs.lstatSync(cur); } catch { break; }
+    if (st.isSymbolicLink()) throw new Error('Links are not allowed in /work/: use the file itself.');
+  }
   return { abs, rel: path.relative(root, abs).split(path.sep).join('/') };
 }
 export const MIME = { pdf: 'application/pdf', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', xls: 'application/vnd.ms-excel', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', md: 'text/markdown; charset=utf-8', txt: 'text/plain; charset=utf-8', csv: 'text/csv; charset=utf-8', json: 'application/json', html: 'text/html; charset=utf-8', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml' };

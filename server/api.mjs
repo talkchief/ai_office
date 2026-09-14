@@ -82,11 +82,13 @@ export function registerApi(router, ctx) {
   router.on('GET', '/api/tasks/:id/file', ({ params, url, res, user }) => {
     see(params.id, user);
     let file; try { file = workspaceFile(engine.workspaceDir(params.id), url.searchParams.get('path') || ''); } catch (error) { return { $status: 400, body: { error: error.message } }; }
-    if (!fs.existsSync(file.abs) || !fs.statSync(file.abs).isFile()) return { $status: 404, body: { error: 'There is no such file in this task.' } };
+    // A plain file only: never a link (lstat, and workspaceFile refuses a link anywhere on the path), a pipe or a device.
+    let stat = null; try { stat = fs.lstatSync(file.abs); } catch {}
+    if (!stat || !stat.isFile()) return { $status: 404, body: { error: 'There is no such file in this task.' } };
     // ?inline=1 shows the file in the browser (a PDF, an image, a page); without it the browser saves it.
     const how = url.searchParams.get('inline') === '1' ? 'inline' : 'attachment';
-    res.writeHead(200, { 'content-type': mimeOf(file.rel), 'content-length': fs.statSync(file.abs).size, 'content-disposition': `${how}; filename="${path.basename(file.rel).replace(/[^\w. -]/g, '_')}"`, 'cache-control': 'no-store' });
-    fs.createReadStream(file.abs).pipe(res); return { $handled: true };
+    res.writeHead(200, { 'content-type': mimeOf(file.rel), 'content-length': stat.size, 'content-disposition': `${how}; filename="${path.basename(file.rel).replace(/[^\w. -]/g, '_')}"`, 'cache-control': 'no-store' });
+    fs.createReadStream(file.abs, fs.constants.O_NOFOLLOW ? { flags: fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW } : {}).pipe(res); return { $handled: true };
   });
   router.on('POST', '/api/tasks/:id/queue', async ({ req, params, user }) => { see(params.id, user); const input = await body(req); if (input.state === 'queued') ready(); return engine.editQueue(params.id, input); });
   router.on('POST', '/api/tasks/:id/cancel', ({ params, user }) => { see(params.id, user); return engine.cancel(params.id); });
@@ -143,6 +145,13 @@ export function registerApi(router, ctx) {
   // In a hosted office the models are the platform's: these routes do not exist (404) and the admin panel has them.
   if (!managedModels) registerProviderRoutes(router, models, '/api/providers', { record, onChange: () => bus.publish('office.updated', { area: 'providers' }) });
   router.on('GET', '/api/settings', () => settings.get());
+  // The sandbox: whether it can run here and why not, the office's limits, and the sandboxes alive now with their tasks.
+  router.on('GET', '/api/sandbox', async ({ user, url }) => {
+    admin(user); const s = settings.get(), box = engine.sandbox;
+    const status = box ? await box.status({ fresh: url.searchParams.get('fresh') === '1' }) : { available: false, reason: 'This office has no sandbox service.' };
+    return { available: status.available, reason: status.reason || '', image: status.image || null, podman: status.podman || null, sandboxes: status.sandboxes ?? null, maxSandboxes: status.maxSandboxes ?? null, busy: status.busy ?? null, maxBusy: status.maxBusy ?? null,
+      enabled: s.sandbox !== false, commandMinutes: s.sandboxCommandMinutes, idleMinutes: s.sandboxIdleMinutes, running: box ? box.running().map(r => ({ ...r, title: engine.get(r.task)?.title || null })) : [] };
+  });
   router.on('PUT', '/api/settings', async ({ req, user }) => { admin(user); const before = settings.get(); const result = settings.update(await body(req)); record({ area: 'settings', summary: 'Updated office settings', before, after: result }); bus.publish('office.updated', { area: 'settings' }); return result; });
   router.on('GET', '/api/office', () => office.get());
   router.on('GET', '/api/agents', () => ({ agents: office.agents() }));

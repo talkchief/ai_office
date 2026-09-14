@@ -1,0 +1,31 @@
+# Agents Office sandbox broker: the one process that runs containers for the office's tasks (sandbox/broker.mjs).
+# Installed by deploy/sandbox/setup.sh, which fills in @UID@, @REPO@, @NODE@ and @IMAGE@.
+[Unit]
+Description=Agents Office sandbox broker
+After=network-online.target user@@UID@.service
+Wants=network-online.target user@@UID@.service
+
+[Service]
+Type=simple
+User=ao-sandbox
+Group=ao-sandbox
+WorkingDirectory=/var/lib/ao-sandbox
+Environment=HOME=/var/lib/ao-sandbox
+Environment=XDG_RUNTIME_DIR=/run/user/@UID@
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/@UID@/bus
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=AO_SANDBOX_SOCKET=/run/ao-sandbox/broker.sock
+Environment=AO_SANDBOX_IMAGE=@IMAGE@
+# The socket lives here: the broker's group (the office service is a member) may connect, nobody else.
+RuntimeDirectory=ao-sandbox
+RuntimeDirectoryMode=0750
+UMask=0007
+ExecStart=@NODE@ @REPO@/sandbox/broker.mjs
+Restart=on-failure
+RestartSec=5
+ProtectSystem=full
+PrivateTmp=true
+# No NoNewPrivileges here: rootless Podman maps container user ids through newuidmap and newgidmap, which need their file capabilities.
+
+[Install]
+WantedBy=multi-user.target

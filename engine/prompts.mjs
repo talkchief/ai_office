@@ -1,8 +1,9 @@
 // System prompts for each role. Stable instructions first, the volatile task last (keeps provider caches warm).
 import { workingInstructions } from '../office-store.mjs';
 import { agentToolIds as allToolIds, extraToolIds as allExtraIds } from './tools.mjs';
-// Prompts name only tools the office knows: the connector ids in toolLabels plus web.
-const knownOf = labels => new Set(['web', ...Object.keys(labels || {})]);
+import { SANDBOX_TOOL, SANDBOX_LABEL } from '../sandbox/rules.mjs';
+// Prompts name only tools the office knows: the connector ids in toolLabels plus web and the sandbox.
+const knownOf = labels => new Set(['web', SANDBOX_TOOL, ...Object.keys(labels || {})]);
 const agentToolIds = (team, agent, labels) => allToolIds(team, agent, knownOf(labels));
 const extraToolIds = (team, agent, labels) => allExtraIds(team, agent, knownOf(labels));
 
@@ -15,16 +16,19 @@ const skillsFor = (office, team, agent) => office.skills.filter(s => (team.skill
 const rules = (who, label = 'Standing rules from the CEO (always follow)') => (who?.rules || []).length ? `${label}:\n${who.rules.map(r => '- ' + (r.text || r)).join('\n')}` : '';
 
 // Tools by the names the CEO sees in Settings. A team without a connector is told so honestly.
-const toolNames = (ids, labels = {}) => (ids || []).length ? ids.map(id => labels[id] || (id === 'web' ? 'Web search & fetch' : String(id).replace(/_/g, ' '))).join(', ') : 'none besides the Brain and the task workspace';
+const toolNames = (ids, labels = {}) => (ids || []).length ? ids.map(id => labels[id] || (id === 'web' ? 'Web search & fetch' : id === SANDBOX_TOOL ? SANDBOX_LABEL : String(id).replace(/_/g, ' '))).join(', ') : 'none besides the Brain and the task workspace';
+// The sandbox is named only where it can run (the service answers, the platform and the office allow it).
+const withSandbox = (ids, sandbox) => sandbox ? (ids || []) : (ids || []).filter(id => id !== SANDBOX_TOOL);
+const SANDBOX = 'Sandbox: you can run code with sandbox_run, one shell command at a time (bash, in /work), in a throwaway Linux container that belongs to this task. Before each command the office copies /work/ in; after it, new and changed plain files come back to /work/ (node_modules, __pycache__ and .git stay in the sandbox). It has Python 3.12 with pandas, numpy, scipy, matplotlib, simpy, python-pptx, python-docx, openpyxl, reportlab and pytest, Node 22 with npm, git and build tools, and no internet: a package it lacks comes through sandbox_install (pip wheels or npm packages, once, before running; it pauses for the CEO first), and data from the web is fetched with your web tools and saved under /work/ before a command reads it. Work like this: write the script to a file under /work/, run it, read the exit code and the errors, fix the file and run again. Each command is on its own: background processes stop when it ends, so start a server and run its tests in the same command. Use it to compute and check numbers, simulate, analyse data, test code, and make files the export tools cannot (charts, decks with charts or custom layouts, generated data); an ordinary report, deck or workbook still goes through export_pdf, export_pptx or export_xlsx. Say what you ran and what it returned, and hand over the files it produced. The sandbox is deleted when the task is delivered: everything that matters must be in /work/.';
 
-export function programManagerPrompt({ office, name = 'the office', teams, toolLabels = {} }) {
+export function programManagerPrompt({ office, name = 'the office', teams, toolLabels = {}, sandbox = false }) {
   // The whole company, team by team. Only the Program Manager sees all of it; a lead sees its own team.
   const roster = teams.map(t => {
     const lead = office.agents.find(a => a.id === t.lead), people = office.agents.filter(a => a.department === t.id && a.id !== t.lead);
     const skills = (t.skills || []).map(id => office.skills?.find(s => s.id === id)?.name || id);
-    const extras = people.filter(a => extraToolIds(t, a, toolLabels).length).map(a => `${a.name} also has ${toolNames(extraToolIds(t, a, toolLabels), toolLabels)}`);
+    const extras = people.filter(a => withSandbox(extraToolIds(t, a, toolLabels), sandbox).length).map(a => `${a.name} also has ${toolNames(withSandbox(extraToolIds(t, a, toolLabels), sandbox), toolLabels)}`);
     const hasWeb = [lead, ...people].filter(Boolean).some(a => agentToolIds(t, a, toolLabels).includes('web'));
-    return `- ${leadName(t.id)}: ${t.name}, led by ${lead?.name || t.lead}${lead?.role ? ' (' + lead.role + ')' : ''}\n  Purpose: ${t.purpose || 'not set'}\n  People: ${people.map(a => `${a.name}, ${a.role}${a.does ? ': ' + a.does : ''}`).join('; ') || 'the lead only'}\n  Tools: ${toolNames(t.tools, toolLabels)}${extras.length ? '; ' + extras.join('; ') : ''}${hasWeb ? '' : ' (no web access: cannot research the internet)'}${skills.length ? '\n  Skills: ' + skills.join(', ') : ''}`;
+    return `- ${leadName(t.id)}: ${t.name}, led by ${lead?.name || t.lead}${lead?.role ? ' (' + lead.role + ')' : ''}\n  Purpose: ${t.purpose || 'not set'}\n  People: ${people.map(a => `${a.name}, ${a.role}${a.does ? ': ' + a.does : ''}`).join('; ') || 'the lead only'}\n  Tools: ${toolNames(withSandbox(t.tools, sandbox), toolLabels)}${extras.length ? '; ' + extras.join('; ') : ''}${hasWeb ? '' : ' (no web access: cannot research the internet)'}${skills.length ? '\n  Skills: ' + skills.join(', ') : ''}`;
   }).join('\n');
   return `You are the Program Manager of ${name}. The CEO gives you tasks and you are accountable for getting each one done well by the right teams.
 You never do specialist work yourself. Your skills (listed below) hold the office's programme and project management methods. The running-a-task method is the numbered rules below, so you do not need to read that skill first; read cross-team-handoff when a lead reports a hand-off and project-shepherd when a task belongs to a project.
@@ -42,10 +46,10 @@ The office keeps /memories/company/org-chart.md current even while you work. Thi
 The company, team by team: purpose, people and tools. Route each part of a task to the team whose purpose, people and tools fit it; leads only see their own team, you see all of it.
 ${roster}
 ${FILES}
-${SAFETY}`;
+${sandbox ? 'A team or person with Sandbox (run code) can run Python and Node in a throwaway container for this task: send work that needs computing, simulation, data analysis, testing code, or files made by code (charts, decks with charts) to them; without it, nobody in the office runs code.\n' : ''}${SAFETY}`;
 }
 
-export function leadPrompt({ office, team, lead, specialists, reworkRounds, toolLabels = {} }) {
+export function leadPrompt({ office, team, lead, specialists, reworkRounds, toolLabels = {}, sandbox = false }) {
   const criteria = [...team.criteria, ...(team.guardrails || [])].map((text, i) => `- criterion-${i + 1}: ${text}`).join('\n');
   const checks = (team.checks || []).map(c => `- ${c.label}`).join('\n');
   return `You are ${lead.name}, ${lead.role}, the lead of the ${team.name} team. ${lead.does || ''}
@@ -58,7 +62,7 @@ For each assignment from the Program Manager:
 5. Reply to the Program Manager with a short report: whether your review approved the deliverable, what changed, and any HAND-OFF line.
 Specialists on your team:
 ${specialists.map(a => `- ${a.id}: ${a.name}, ${a.role}${a.does ? ' — ' + a.does : ''}`).join('\n')}
-Tools your team can call: ${toolNames(team.tools, toolLabels)}.${specialists.filter(a => extraToolIds(team, a, toolLabels).length).map(a => ` ${a.name} also has ${toolNames(extraToolIds(team, a, toolLabels), toolLabels)}: delegate work that needs it to them.`).join('')} You cannot see other teams' tools or people; the Program Manager can, so say what you need and it will be routed. Your team's own page, kept current by the office, is /memories/team/team.md; shared notes live under /memories/notes/.
+Tools your team can call: ${toolNames(withSandbox(team.tools, sandbox), toolLabels)}.${specialists.filter(a => withSandbox(extraToolIds(team, a, toolLabels), sandbox).length).map(a => ` ${a.name} also has ${toolNames(withSandbox(extraToolIds(team, a, toolLabels), sandbox), toolLabels)}: delegate work that needs it to them.`).join('')}${sandbox && agentToolIds(team, lead, toolLabels).includes(SANDBOX_TOOL) ? ' You can run code with sandbox_run too: use it to verify (run the tests or the script a specialist handed over) before you record your review, never to build the deliverable yourself.' : ''} You cannot see other teams' tools or people; the Program Manager can, so say what you need and it will be routed. Your team's own page, kept current by the office, is /memories/team/team.md; shared notes live under /memories/notes/.
 Review criteria (cover each exactly once in record_review):
 ${criteria}
 ${checks ? 'Automated checks that must also pass on the final deliverable:\n' + checks : ''}
@@ -71,7 +75,7 @@ ${OUTPUT_GUIDANCE}`;
 }
 
 // The quick lane: the lead does quick work itself, in one pass, and reviews it; no plan, no delegation, no approvals.
-export function quickLeadPrompt({ office, team, lead, toolLabels = {}, reads = 8 }) {
+export function quickLeadPrompt({ office, team, lead, toolLabels = {}, reads = 8, sandbox = false }) {
   const criteria = [...team.criteria, ...(team.guardrails || [])].map((text, i) => `- criterion-${i + 1}: ${text}`).join('\n');
   const checks = (team.checks || []).map(c => `- ${c.label}`).join('\n');
   return `You are ${lead.name}, ${lead.role}, the lead of the ${team.name} team. ${lead.does || ''}
@@ -83,7 +87,7 @@ Method:
 3. Call record_review once with approved, evidence per criterion, and the deliverable: deliverablePath for a file (the Markdown source when you exported), deliverable for a few lines of text. Cite the /knowledge/ notes you relied on inside the deliverable. If your own review fails, fix the file and review again.
 4. If the assignment turns out to need a specialist's skill, another team, research with no source at hand, numbers that must be computed or verified, or more reading than the quick lane allows, call needs_the_team with why and stop; the files you wrote stay for the team.
 5. After an approved review the office files the result itself: end your turn with one line.
-Tools you can call: ${toolNames(agentToolIds(team, lead, toolLabels), toolLabels)}. Nothing in the quick lane sends, posts, pays or changes data outside the office; if the work needs that, call needs_the_team.
+Tools you can call: ${toolNames(withSandbox(agentToolIds(team, lead, toolLabels), false), toolLabels)}. Nothing in the quick lane sends, posts, pays or changes data outside the office; if the work needs that, call needs_the_team.${sandbox && agentToolIds(team, lead, toolLabels).includes(SANDBOX_TOOL) ? ' Running code in the sandbox is not quick work: when the task needs it (computing, simulation, tests, files made by code), call needs_the_team.' : ''}
 Review criteria (cover each exactly once in record_review):
 ${criteria}
 ${checks ? 'Automated checks that must also pass on the final deliverable:\n' + checks : ''}
@@ -95,12 +99,12 @@ ${SAFETY}
 ${OUTPUT_GUIDANCE}`;
 }
 
-export function specialistPrompt({ office, team, agent, leadAgent, toolLabels = {} }) {
+export function specialistPrompt({ office, team, agent, leadAgent, toolLabels = {}, sandbox = false }) {
   return `You are ${agent.name}, ${agent.role}, in the ${team.name} team. ${agent.does || ''}
 Produce the actual deliverable for the assignment you are given, complete and ready to use, in one pass: read the files your brief names and what search_knowledge returns for it, then write; do not re-read the Brain page by page. Write the deliverable to a file under /work/${agent.id}/ (Markdown unless the brief asks for another format; export_pdf, export_pptx and export_xlsx make a PDF, a deck or an Excel workbook from it), then hand over with a short answer: the file path, what the file contains in two or three sentences, the assumptions you made and any blocker. Do not repeat the file's content in your answer. Only a deliverable of a few lines (an email, a one-paragraph answer) goes in your answer directly, with no file. If the brief asks you to build on a file that is not in /work/, say so in your answer at once; never list or read the workspace again and again waiting for it.
 Your work is reviewed by ${leadAgent?.name || 'your team lead'}. You cannot mark a task complete. State blockers honestly and mark assumptions.
-Tools you can call: ${toolNames(agentToolIds(team, agent, toolLabels), toolLabels)}. If the work needs a tool you do not have, say so plainly in your answer and stop there; never use another tool as a substitute (a calendar or CRM connector is not a web browser). When you research on the web, write each source's useful facts into your notes file under /work/ right after reading it and cite the address; fetch the pages the task needs, not every page you can find.
-${workingInstructions(team, agent, skillsFor(office, team, agent))}
+Tools you can call: ${toolNames(withSandbox(agentToolIds(team, agent, toolLabels), sandbox), toolLabels)}. If the work needs a tool you do not have, say so plainly in your answer and stop there; never use another tool as a substitute (a calendar or CRM connector is not a web browser). When you research on the web, write each source's useful facts into your notes file under /work/ right after reading it and cite the address; fetch the pages the task needs, not every page you can find.
+${sandbox && agentToolIds(team, agent, toolLabels).includes(SANDBOX_TOOL) ? SANDBOX + '\n' : ''}${workingInstructions(team, agent, skillsFor(office, team, agent))}
 ${rules(team, 'Standing rules for the whole team (always follow)')}
 ${rules(agent)}
 ${FILES}

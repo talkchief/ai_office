@@ -16,7 +16,8 @@ import { officeBackend, FILE_PERMISSIONS, PM_FILE_PERMISSIONS, SKILL_SOURCES } f
 import { ROOT } from '../config.mjs';
 import { programManagerPrompt, leadPrompt, specialistPrompt, quickLeadPrompt, leadName } from './prompts.mjs';
 import { exportPdfTool, exportPptxTool, exportXlsxTool, assembleFilesTool, listWorkspaceFiles, workspaceFile, mimeOf, closeBrowser } from './documents.mjs';
-import { webTools } from './tools.mjs';
+import { webTools, agentToolIds } from './tools.mjs';
+import { sandboxTools, SANDBOX_APPROVALS, SANDBOX_TOOL } from './sandbox.mjs';
 import { readDocument } from '../documents.mjs';
 import { fetchWithRetries } from '../models.mjs';
 import { DatabasePool, validateQuery, markdownTable, schemaText } from '../connectors/database.mjs';
@@ -122,7 +123,7 @@ export const effortFor = (spec, wanted) => PINNED_EFFORTS.has(spec?.effortFrom) 
 const normEffortWord = value => ['low', 'medium', 'high'].includes(String(value || '').toLowerCase()) ? String(value).toLowerCase() : '';
 const EFFORT_LINE = /^\s*effort\s*:\s*(low|medium|high)\b[^\n]*\n?/i;
 export class OfficeEngine {
-  constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent, pmSkillsDir = null, toolLabels = () => ({}), memoryFactory = null, projectFor = () => null, brain = null, vault = null, connectors = {}, providerRetryDelays = [30000, 90000, 180000, 300000] }) {
+  constructor({ dataDir, office, models, toolHub = null, knowledgeDir, knowledgeIndex = null, bus = null, settings = () => ({}), onComplete = async () => {}, onChange = () => {}, name = 'the office', agentFactory = createDeepAgent, pmSkillsDir = null, toolLabels = () => ({}), memoryFactory = null, projectFor = () => null, brain = null, vault = null, connectors = {}, providerRetryDelays = [30000, 90000, 180000, 300000], sandbox = null }) {
     fs.mkdirSync(dataDir, { recursive: true });
     this.workspaces = path.join(dataDir, 'workspaces'); this.knowledgeDir = knowledgeDir || path.join(dataDir, 'knowledge');
     this.saver = SqliteSaver.fromConnString(path.join(dataDir, 'workflows.sqlite')); this.db = this.saver.db;
@@ -149,6 +150,8 @@ export class OfficeEngine {
     if (models) models.onWait = info => this.noteProviderWait(info);
     // The database and SSH connectors behind the Vault's entries; tests inject fakes, the office uses the real ones.
     this.connectors = { pool: connectors.pool || new DatabasePool(), ssh: connectors.ssh || new SshRunner() };
+    // One throwaway container per task for the people granted the Sandbox tool (engine/sandbox.mjs); null where there is none.
+    this.sandbox = sandbox;
   }
   settings() { return { ...DEFAULT_SETTINGS, ...(this.settingsFn() || {}) }; }
   /* ---------- records ---------- */
@@ -588,23 +591,27 @@ export class OfficeEngine {
     // Same workspace and Brain for everyone; the memory mounts differ by role (the company for the Program Manager, one page per team).
     const backendFor = who => officeBackend({ workspaceDir: path.join(this.workspaces, job.id), knowledgeDir: this.knowledgeDir, skillDirs: pmSkills, memoryRoutes: this.memory?.routesFor(who) || {} });
     const evaluation = job.kind === 'evaluation', leads = [], toolLabels = this.toolLabels();
+    // The sandbox is offered only when it can run: the service answers, the platform allows it, the office has it on. A team test gets none.
+    const sandboxReady = !evaluation && !!this.sandbox && await this.sandbox.ready().catch(() => false);
+    const sandboxFor = (team, agent) => sandboxReady && agentToolIds(team, agent, new Set(['web', SANDBOX_TOOL, ...Object.keys(toolLabels)])).includes(SANDBOX_TOOL);
+    const sandboxToolsFor = (team, agent) => sandboxFor(team, agent) ? sandboxTools({ sandboxes: this.sandbox, jobId: job.id, agentId: agent.id, commandMinutes: Number(this.settings().sandboxCommandMinutes) || 5 }) : [];
     for (const team of teams) {
       const lead = office.agents.find(a => a.id === team.lead), specialists = office.agents.filter(a => a.department === team.id && a.id !== team.lead);
       const subagents = [];
       for (const agent of specialists) {
         const { model, provider, spec } = await make('specialist', agent, team);
         const set = this.toolHub ? this.toolHub.toolsFor({ agent, team, provider, evaluation }) : { tools: [], interruptOn: {} };
-        subagents.push({ name: agent.id, description: `${agent.name}, ${agent.role}. ${agent.does || ''}`.slice(0, 600), systemPrompt: specialistPrompt({ office, team, agent, leadAgent: lead, toolLabels }),
-          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id), ...this.vaultTools(job.id, team, agent.id), ...this.connectorTools(job.id, team, agent.id)], interruptOn: this.asksApproval() ? { ...set.interruptOn, ...VAULT_APPROVALS } : {}, middleware: [this.stepGuard(job.id, agent.id, 'specialist'), this.binaryReadGuard(job.id, agent.id), this.effortSwitch(job.id, agent.id, spec), this.pace(job.id, team, agent.id, signal), this.loopGuard(job.id, agent.id), this.specialistReadGuard(job.id, agent.id)] });
+        subagents.push({ name: agent.id, description: `${agent.name}, ${agent.role}. ${agent.does || ''}`.slice(0, 600), systemPrompt: specialistPrompt({ office, team, agent, leadAgent: lead, toolLabels, sandbox: sandboxReady }),
+          model, tools: [...set.tools, this.progressTool(job.id, agent.id), this.searchTool(job.id, agent.id), ...this.exportTools(job.id, agent.id), ...this.vaultTools(job.id, team, agent.id), ...this.connectorTools(job.id, team, agent.id), ...sandboxToolsFor(team, agent)], interruptOn: this.asksApproval() ? { ...set.interruptOn, ...VAULT_APPROVALS, ...SANDBOX_APPROVALS } : {}, middleware: [this.stepGuard(job.id, agent.id, 'specialist'), this.binaryReadGuard(job.id, agent.id), this.effortSwitch(job.id, agent.id, spec), this.pace(job.id, team, agent.id, signal), this.loopGuard(job.id, agent.id), this.specialistReadGuard(job.id, agent.id)] });
       }
       const { model, provider, spec } = await make('lead', lead, team);
       const spotChecks = this.toolHub ? this.toolHub.toolsFor({ agent: lead, team, provider, evaluation, readOnly: true }).tools : [];
-      const graph = this.agentFactory({ name: leadName(team.id), model, systemPrompt: leadPrompt({ office, team, lead, specialists, reworkRounds: reworkRounds(team), toolLabels }),
-        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), this.brainTool(job.id, lead.id), ...this.vaultTools(job.id, team, lead.id), ...this.connectorTools(job.id, team, lead.id), ...spotChecks], interruptOn: this.asksApproval() ? { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...VAULT_APPROVALS } : {}, subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [this.stepGuard(job.id, lead.id, 'lead'), this.binaryReadGuard(job.id, lead.id), this.effortSwitch(job.id, lead.id, spec), this.effortTag(job.id, lead.id), todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
+      const graph = this.agentFactory({ name: leadName(team.id), model, systemPrompt: leadPrompt({ office, team, lead, specialists, reworkRounds: reworkRounds(team), toolLabels, sandbox: sandboxReady }),
+        tools: [this.reviewTool(job.id, team), this.handoffTool(job.id, team, office), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id), this.brainTool(job.id, lead.id), ...this.vaultTools(job.id, team, lead.id), ...this.connectorTools(job.id, team, lead.id), ...sandboxToolsFor(team, lead), ...spotChecks], interruptOn: this.asksApproval() ? { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] }, ...VAULT_APPROVALS, ...SANDBOX_APPROVALS } : {}, subagents, backend: backendFor({ role: 'lead', teamId: team.id }), store: this.memory?.store, permissions: FILE_PERMISSIONS, checkpointer: true, middleware: [this.stepGuard(job.id, lead.id, 'lead'), this.binaryReadGuard(job.id, lead.id), this.effortSwitch(job.id, lead.id, spec), this.effortTag(job.id, lead.id), todoListMiddleware(), this.subagentGuard(job.id, lead.id, specialists.map(a => a.id), 'specialist'), this.loopGuard(job.id, lead.id), this.emptyReplyGuard(job.id, lead.id), this.readGuard(job.id, team, lead.id)] });
       leads.push({ name: leadName(team.id), description: `${team.name} team, led by ${lead.name}.${team.purpose ? ' ' + team.purpose : ''}`.slice(0, 600), runnable: graph });
     }
     const { model, provider: pmProvider } = await make('pm', null, null);
-    const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams, toolLabels }),
+    const pm = this.agentFactory({ name: 'program-manager', model, systemPrompt: programManagerPrompt({ office, name: this.name, teams, toolLabels, sandbox: sandboxReady }),
       tools: [this.completeTool(job.id), this.askTool(job.id), this.progressTool(job.id, 'pm'), this.searchTool(job.id, 'pm'), this.brainTool(job.id, 'pm'), ...this.exportTools(job.id, 'pm'), ...webTools(pmProvider)], subagents: leads, backend: backendFor({ role: 'pm' }), store: this.memory?.store, permissions: PM_FILE_PERMISSIONS, skills: SKILL_SOURCES(pmSkills), middleware: [todoListMiddleware(), this.planFirst(job.id), this.binaryReadGuard(job.id, 'pm'), this.effortTag(job.id, 'pm'), this.subagentGuard(job.id, 'pm', leads.map(l => l.name), 'lead'), this.resumeGuard(job.id), this.loopGuard(job.id, 'pm'), this.emptyReplyGuard(job.id, 'pm'), this.pmReadGuard(job.id)],
       checkpointer: this.saver, interruptOn: { ...(this.asksApproval() ? { update_brain_note: { allowedDecisions: ['approve', 'edit', 'reject'] } } : {}), ...(job.completionApproval ? { complete_task: { allowedDecisions: ['approve', 'reject'] } } : {}) } });
     return { pm, models };
@@ -985,6 +992,8 @@ export class OfficeEngine {
   async buildQuick(job, team, lead, signal, onPromote) {
     const office = this.office.get(), toolLabels = this.toolLabels();
     await this.toolHub?.ensure?.();
+    // Running code is standard-lane work: the quick lead is told to call needs_the_team for it.
+    const sandbox = !!this.sandbox && await this.sandbox.ready().catch(() => false);
     const spec = this.models.resolve({ task: job, routine: job.routine, agent: lead, team, role: 'lead' });
     if (!spec.model) throw httpError('No model is configured for this role. Choose one in Settings → Models.', 409);
     // The CEO's own effort settings win; otherwise the lane's (low for quick work).
@@ -995,7 +1004,7 @@ export class OfficeEngine {
     const tools = [this.reviewTool(job.id, team), this.needsTeamTool(job.id, lead.id, onPromote), this.progressTool(job.id, lead.id), this.searchTool(job.id, lead.id), ...this.exportTools(job.id, lead.id),
       ...this.vaultTools(job.id, team, lead.id).filter(t => QUICK_READ_TOOLS.has(t.name)), ...this.connectorTools(job.id, team, lead.id).filter(t => QUICK_READ_TOOLS.has(t.name)), ...spotChecks];
     const backend = officeBackend({ workspaceDir: path.join(this.workspaces, job.id), knowledgeDir: this.knowledgeDir, memoryRoutes: this.memory?.routesFor({ role: 'lead', teamId: team.id }) || {} });
-    const graph = createAgent({ name: leadName(team.id), model, systemPrompt: quickLeadPrompt({ office, team, lead, toolLabels }), tools, checkpointer: this.saver,
+    const graph = createAgent({ name: leadName(team.id), model, systemPrompt: quickLeadPrompt({ office, team, lead, toolLabels, sandbox }), tools, checkpointer: this.saver,
       middleware: [createFilesystemMiddleware({ backend, permissions: FILE_PERMISSIONS, tools: ['ls', 'read_file', 'write_file', 'edit_file', 'glob', 'grep'] }), this.binaryReadGuard(job.id, lead.id), this.quickBudget(job.id, lead.id, onPromote), this.loopGuard(job.id, lead.id), this.pace(job.id, team, lead.id, signal)] });
     return { graph, models: { [lead.id]: spec.model }, effort };
   }
@@ -1076,6 +1085,8 @@ export class OfficeEngine {
     try { await this.onComplete(this.get(id)); }
     catch (error) { this.setState(id, 'working'); return { ok: false, error: clean(error.message).slice(0, 300) }; }
     this.setState(id, 'done', { doneAt: Date.now(), pendingActions: [], error: null });
+    // Delivered: the task's sandbox goes, with everything it installed; what it made is already in /work/.
+    this.sandbox?.destroy(id, 'the task was delivered').catch(() => {});
     this.event(id, 'completed', agent, `Result version ${version.n} saved.${lane === 'quick' ? ' Quick lane: the lead delivered and reviewed it.' : ''}`);
     if (job.kind !== 'evaluation') this.notifications.notify({ kind: 'done', title: `Done: ${job.title}`, body: version.summary, jobId: id, dept: job.dept, action: { type: 'open' }, userId: job.ownerId || null });
     return { ok: true, version: version.n };
@@ -1340,6 +1351,7 @@ export class OfficeEngine {
     this.waiting = this.waiting.filter(w => w !== id); this.followUps.delete(id);
     this.running.get(id)?.controller.abort(new Error('Cancelled by the CEO.'));
     this.event(id, 'cancelled', null, 'CEO cancelled this task.');
+    this.sandbox?.destroy(id, 'the task was cancelled').catch(() => {});
     this.notifications.ackForJob(id);
     return this.get(id);
   }
@@ -1387,12 +1399,15 @@ export class OfficeEngine {
     fs.rmSync(this.workspaceDir(id), { recursive: true, force: true });
     this.waiting = this.waiting.filter(w => w !== id); this.followUps.delete(id);
     for (const key of [...this.askedEfforts.keys()]) if (key.startsWith(id + ':')) this.askedEfforts.delete(key);
+    this.sandbox?.destroy(id, 'the task was deleted', { quiet: true }).catch(() => {});
     if (notices.length) this.bus?.publish('notification.removed', { ids: notices });
     this.bus?.publish('task.removed', { id });
     return job;
   }
   // After a restart: continuations resume; anything that was mid-run waits for the CEO to retry.
   recover() {
+    // Sandboxes left by tasks that closed while the office was down are removed.
+    this.sandbox?.reap(id => { const j = this.get(id); return !!j && !TERMINAL.has(j.state); }).catch(() => {});
     for (const job of this.list()) {
       if (TERMINAL.has(job.state)) continue;
       if (job.next && !['backlog'].includes(job.state)) { if (!this.waiting.includes(job.id)) this.waiting.push(job.id); continue; }

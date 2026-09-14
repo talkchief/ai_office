@@ -2,7 +2,7 @@
 
 **Feature Branch**: `003-task-sandbox` (artifacts on `main`, as for 001 and 002)
 **Created**: 2026-09-14
-**Status**: Clarified 2026-09-14 (Q1, Q3, Q4 took the recommended answers; Q2 chose package registries only). Waiting for the owner's go before implementation; the server set-up (Phase 3) needs that go explicitly.
+**Status**: Implemented and deployed 2026-09-14 on the owner's go ("go ahead, finalize, deploy and commit and push to main"). Clarifications: Q1, Q3, Q4 took the recommended answers; Q2 chose package registries only.
 **Input**: Owner request (14 Sep 2026): "we need to be able to spin sandbox to support agent work and testing where needed for simulation, running python code to generate pptx, development and testing.... this spawned sandbox should be destroyed when the task is delivered"
 
 ## Context
