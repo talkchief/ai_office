@@ -58,9 +58,10 @@ export function validatePlatform(input = {}, previous = {}) {
   const siteKey = it.clearKeys ? '' : text(it.siteKey ?? pt.siteKey ?? '', 200);
   if (/[\s]/.test(siteKey)) fail('The Turnstile site key cannot contain spaces.');
   const turnstile = { siteKey, secretKey: secret(it.secretKey, pt.secretKey, it.clearKeys || it.clearSecretKey, 'The Turnstile secret key') };
-  // Whether offices on this platform may run code in sandboxes at all (each office still grants the tool to its teams).
-  const sandbox = { allowed: typeof input.sandbox?.allowed === 'boolean' ? input.sandbox.allowed : !!previous.sandbox?.allowed };
-  return { version: 2, limits, registration, adminEmails, publicOrigin, tenants, mail, turnstile, sandbox };
+  // Whether offices on this platform may run code in sandboxes: on unless the administrator turns it off. It is off per team, not
+  // here: an office gives the tool to the teams and people that need it.
+  const sandbox = { allowed: typeof input.sandbox?.allowed === 'boolean' ? input.sandbox.allowed : previous.sandbox?.allowed !== false };
+  return { version: 3, limits, registration, adminEmails, publicOrigin, tenants, mail, turnstile, sandbox };
 }
 
 // The first platform.json takes what the deployment environment says; the panel takes over from there.
@@ -88,6 +89,9 @@ export class PlatformStore {
     this.dir = dir; this.file = path.join(dir, 'platform.json');
     let stored = null; try { stored = JSON.parse(fs.readFileSync(this.file, 'utf8')); } catch {}
     if (stored) {
+      // Version 3 made sandboxes allowed by default. A file written before took "not allowed" as the default the day the switch arrived,
+      // not as the administrator's choice, so it takes the new default once; from version 3 the stored value is the choice.
+      if ((Number(stored.version) || 0) < 3) delete stored.sandbox;
       // An existing file is the truth; the administrator emails named in the environment are always allowed in.
       this.value = validatePlatform({ adminEmails: [...(stored.adminEmails || []), ...adminEmails], ...(registration ? { registration } : {}) }, stored);
     } else {

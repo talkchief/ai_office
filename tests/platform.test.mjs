@@ -27,6 +27,24 @@ test('platform limits are bounded and refused with a sentence; admin emails and 
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('sandboxes are allowed on a platform by default, the administrator can turn them off, and an older file takes the new default once', () => {
+  const dir = temp();
+  try {
+    const platform = new PlatformStore({ dir, env: {} });
+    assert.equal(platform.sandboxAllowed(), true, 'on by default: the grant that is off by default is per team');
+    assert.deepEqual(platform.summary().sandbox, { allowed: true }); assert.equal(platform.get().version, 3);
+    platform.update({ sandbox: { allowed: false } });
+    assert.equal(new PlatformStore({ dir, env: {} }).sandboxAllowed(), false, 'the administrator’s choice persists');
+    platform.update({ limits: { maxTeams: 3 } }); assert.equal(new PlatformStore({ dir, env: {} }).sandboxAllowed(), false, 'another change leaves it alone');
+    // A version 2 file stored "not allowed" as the old default, not as a choice.
+    const file = path.join(dir, 'platform.json'), old = JSON.parse(fs.readFileSync(file, 'utf8'));
+    fs.writeFileSync(file, JSON.stringify({ ...old, version: 2, sandbox: { allowed: false } }));
+    const upgraded = new PlatformStore({ dir, env: {} });
+    assert.equal(upgraded.sandboxAllowed(), true); assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).version, 3);
+    assert.deepEqual(upgraded.limits(), { maxTeams: 3, maxMembersPerTeam: 7 }, 'nothing else in the file changes');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('the mail set-up lives in the platform file: secrets are write-only and masked, the environment only seeds the first file', () => {
   const dir = temp();
   try {
