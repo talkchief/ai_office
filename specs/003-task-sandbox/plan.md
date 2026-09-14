@@ -25,7 +25,7 @@ Agents that were given the Sandbox tool can run shell commands (Python, Node, te
 - **Validation**: office and task ids match `^[a-z0-9_-]{1,64}$`; command at most 8,000 characters; time limit clamped to 15 minutes; slots enforced in the broker, not trusted from the office.
 
 ### 2. Files cross as copies (FR-003, FR-011)
-- Copy in: the office packs `/work/` (regular files and folders, skipping anything that is not, 200 MB cap) and the broker unpacks it into the container's `/work` tmpfs before each command, only when the workspace changed since the last copy.
+- Copy in: the office packs `/work/` (regular files and folders, skipping anything that is not, 200 MB cap) and the broker unpacks it into the container's `/work` volume before each command, only when the workspace changed since the last copy.
 - Copy out: after the command the broker lists files newer than the run start inside the container and returns them as a tar; the office unpacks with its own checks: relative paths only, no `..`, regular files only (tar entries of any other type are refused), 200 MB and 2,000 files per command, never overwriting a path that is a folder, and names the skipped entries in the tool's answer.
 - Independent hardening in the office: `workspaceFile` resolves real paths and refuses a path whose real location leaves the workspace; `/api/tasks/:id/file` and `listWorkspaceFiles` use `lstat` and serve regular files only; the Deep Agents filesystem backend is wrapped so a symlink read is refused.
 
