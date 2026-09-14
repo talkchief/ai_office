@@ -1,7 +1,7 @@
 {
  "source": "https://github.com/msitarzewski/agency-agents",
  "license": "MIT",
- "syncedAt": "2026-09-11T12:05:37.051Z",
+ "syncedAt": "2026-09-14T11:00:35.672Z",
  "divisions": {
   "engineering": "Software Engineering",
   "ai": "AI & Agents",
@@ -3857,6 +3857,28 @@
     "validation"
    ],
    "bytes": 5901
+  },
+  {
+   "id": "engineering-forward-deployed-engineer",
+   "division": "engineering",
+   "label": "Software Engineering",
+   "name": "Forward Deployed Engineer",
+   "description": "Palantir's \"Delta\": a software engineer who works inside a customer's environment, integrates their data and systems, ships a prototype on real data in days and production in weeks on the platform layer, leaves a system the customer can own, and sends reusable work back to the product.",
+   "emoji": "🔧",
+   "role": "forward deployed engineer · customer integrations, production deployments, handoff, productization",
+   "tags": [
+    "engineer",
+    "developer",
+    "fde",
+    "forward-deployed",
+    "fdse",
+    "delta",
+    "integration",
+    "deployment",
+    "productization",
+    "enterprise"
+   ],
+   "bytes": 12737
   },
   {
    "id": "engineering-fp-ts-async-pipeline-developer",
@@ -8917,6 +8939,28 @@
    "bytes": 21797
   },
   {
+   "id": "engineering-solution-architecture-leadership",
+   "division": "engineering",
+   "label": "Software Engineering",
+   "name": "Solution Architecture Leadership",
+   "description": "Runs a solution architecture practice across presales and delivery: decides which deals get an architect, turns discovery into measurable quality requirements, weighs options with explicit trade-offs, documents with C4 and ADRs, reviews designs and hands delivery a design that holds.",
+   "emoji": "🏛️",
+   "role": "solution architecture practice leader · presales design, trade-offs, reviews, handoff to delivery",
+   "tags": [
+    "architect",
+    "solution-architecture",
+    "presales",
+    "technical-win",
+    "architecture-review",
+    "c4",
+    "adr",
+    "well-architected",
+    "estimation",
+    "practice-lead"
+   ],
+   "bytes": 23123
+  },
+  {
    "id": "engineering-sparc-implementation-developer",
    "division": "engineering",
    "label": "Software Engineering",
@@ -11321,6 +11365,28 @@
     "ml-pipelines"
    ],
    "bytes": 6160
+  },
+  {
+   "id": "ai-applied-ai-engineering-leadership",
+   "division": "ai",
+   "label": "AI & Agents",
+   "name": "Applied AI Engineering Leadership",
+   "description": "Leads an applied AI engineering function that ships evaluated LLM and agent systems into customer and internal workflows, decides what it owns beside FDE, product and research, and runs its evals, release gates, team and scorecard.",
+   "emoji": "🧪",
+   "role": "applied AI engineering leader · evals, release gates, production LLM and agent systems",
+   "tags": [
+    "manager",
+    "applied-ai",
+    "ai-engineering",
+    "evals",
+    "llm",
+    "agents",
+    "ai-safety",
+    "forward-deployed",
+    "engineering-leadership",
+    "production-ai"
+   ],
+   "bytes": 23573
   },
   {
    "id": "ai-arize-ai-observability-net-developer",
@@ -14385,7 +14451,7 @@
     "orchestration",
     "data-pipelines"
    ],
-   "bytes": 17548
+   "bytes": 3568
   },
   {
    "id": "support-analytics-reporter",
@@ -14421,7 +14487,7 @@
     "measurement",
     "utm"
    ],
-   "bytes": 11520
+   "bytes": 8752
   },
   {
    "id": "data-azure-data-lake-python-developer",
@@ -14438,7 +14504,7 @@
     "data-lake",
     "python"
    ],
-   "bytes": 6201
+   "bytes": 7656
   },
   {
    "id": "data-azure-event-hubs-net-developer",
@@ -14455,7 +14521,7 @@
     "streaming",
     "dotnet"
    ],
-   "bytes": 12302
+   "bytes": 8751
   },
   {
    "id": "data-azure-event-hubs-java-developer",
@@ -14472,7 +14538,7 @@
     "streaming",
     "java"
    ],
-   "bytes": 6361
+   "bytes": 8856
   },
   {
    "id": "data-azure-event-hubs-python-developer",
@@ -14489,7 +14555,7 @@
     "streaming",
     "python"
    ],
-   "bytes": 8991
+   "bytes": 8742
   },
   {
    "id": "data-azure-event-hubs-rust-developer",
@@ -14506,7 +14572,7 @@
     "streaming",
     "rust"
    ],
-   "bytes": 5515
+   "bytes": 5577
   },
   {
    "id": "data-azure-event-hubs-typescript-developer",
@@ -14523,7 +14589,7 @@
     "streaming",
     "typescript"
    ],
-   "bytes": 6492
+   "bytes": 8374
   },
   {
    "id": "data-azure-mysql-net-developer",
@@ -14540,7 +14606,7 @@
     "arm",
     "dotnet"
    ],
-   "bytes": 6357
+   "bytes": 8989
   },
   {
    "id": "data-azure-postgresql-net-developer",
@@ -14557,7 +14623,7 @@
     "arm",
     "dotnet"
    ],
-   "bytes": 6458
+   "bytes": 9047
   },
   {
    "id": "data-azure-postgresql-node-js-developer",
@@ -14574,7 +14640,7 @@
     "nodejs",
     "typescript"
    ],
-   "bytes": 6727
+   "bytes": 8562
   },
   {
    "id": "data-azure-redis-net-developer",
@@ -14591,7 +14657,7 @@
     "arm",
     "dotnet"
    ],
-   "bytes": 13406
+   "bytes": 8483
   },
   {
    "id": "data-azure-sql-net-developer",
@@ -14608,7 +14674,7 @@
     "arm",
     "dotnet"
    ],
-   "bytes": 11775
+   "bytes": 8817
   },
   {
    "id": "data-azure-tables-java-developer",
@@ -14625,7 +14691,7 @@
     "nosql",
     "java"
    ],
-   "bytes": 6702
+   "bytes": 8473
   },
   {
    "id": "data-azure-tables-python-developer",
@@ -14642,7 +14708,7 @@
     "nosql",
     "python"
    ],
-   "bytes": 7703
+   "bytes": 7768
   },
   {
    "id": "data-clickhouse-analytics-engineer",
@@ -14660,7 +14726,7 @@
     "analytics",
     "data-engineering"
    ],
-   "bytes": 6297
+   "bytes": 8072
   },
   {
    "id": "data-cosmos-db-java-developer",
@@ -14678,7 +14744,7 @@
     "java",
     "reactive"
    ],
-   "bytes": 9494
+   "bytes": 8585
   },
   {
    "id": "data-cosmos-db-python-developer",
@@ -14696,7 +14762,7 @@
     "python",
     "tdd"
    ],
-   "bytes": 11153
+   "bytes": 9569
   },
   {
    "id": "data-cosmos-db-rust-developer",
@@ -14713,7 +14779,7 @@
     "nosql",
     "rust"
    ],
-   "bytes": 5252
+   "bytes": 5361
   },
   {
    "id": "data-cosmos-db-typescript-developer",
@@ -14730,7 +14796,7 @@
     "typescript",
     "nodejs"
    ],
-   "bytes": 6172
+   "bytes": 7969
   },
   {
    "id": "data-d3-js-visualization-developer",
@@ -14747,7 +14813,7 @@
     "javascript",
     "charts"
    ],
-   "bytes": 22110
+   "bytes": 3331
   },
   {
    "id": "data-data-alert-triage-engineer",
@@ -14764,7 +14830,7 @@
     "alerts",
     "triage"
    ],
-   "bytes": 14768
+   "bytes": 7427
   },
   {
    "id": "engineering-data-engineer",
@@ -14799,7 +14865,7 @@
     "etl",
     "airflow"
    ],
-   "bytes": 9096
+   "bytes": 8830
   },
   {
    "id": "data-data-quality-engineer",
@@ -14816,7 +14882,7 @@
     "dbt",
     "data-contracts"
    ],
-   "bytes": 18925
+   "bytes": 3555
   },
   {
    "id": "data-data-scientist",
@@ -14833,7 +14899,7 @@
     "python",
     "analytics"
    ],
-   "bytes": 12221
+   "bytes": 8920
   },
   {
    "id": "data-data-storyteller",
@@ -14850,7 +14916,7 @@
     "presentations",
     "insights"
    ],
-   "bytes": 5710
+   "bytes": 8714
   },
   {
    "id": "engineering-data-visualization-engineer",
@@ -14885,7 +14951,7 @@
     "analytics",
     "privacy"
    ],
-   "bytes": 8988
+   "bytes": 8501
   },
   {
    "id": "data-database-administrator",
@@ -14902,7 +14968,7 @@
     "mysql",
     "cloud-databases"
    ],
-   "bytes": 11499
+   "bytes": 8781
   },
   {
    "id": "data-database-architect",
@@ -14919,7 +14985,7 @@
     "replication",
     "scalability"
    ],
-   "bytes": 19219
+   "bytes": 8969
   },
   {
    "id": "data-database-developer",
@@ -14936,7 +15002,7 @@
     "migrations",
     "schema-design"
    ],
-   "bytes": 6290
+   "bytes": 6454
   },
   {
    "id": "engineering-database-optimizer",
@@ -14987,7 +15053,7 @@
     "analytics-engineering",
     "data-warehouse"
    ],
-   "bytes": 16388
+   "bytes": 3432
   },
   {
    "id": "data-document-data-extraction-specialist",
@@ -15005,7 +15071,7 @@
     "json",
     "parsing"
    ],
-   "bytes": 6341
+   "bytes": 5972
   },
   {
    "id": "data-drizzle-migration-engineer",
@@ -15022,7 +15088,7 @@
     "migrations",
     "typescript"
    ],
-   "bytes": 21256
+   "bytes": 8592
   },
   {
    "id": "data-elasticsearch-engineer",
@@ -15040,7 +15106,7 @@
     "rag",
     "siem"
    ],
-   "bytes": 5397
+   "bytes": 4988
   },
   {
    "id": "data-excel-modeling-analyst",
@@ -15057,7 +15123,7 @@
     "financial-modeling",
     "openpyxl"
    ],
-   "bytes": 12638
+   "bytes": 8669
   },
   {
    "id": "data-fabric-capacity-net-developer",
@@ -15074,7 +15140,7 @@
     "capacity",
     "dotnet"
    ],
-   "bytes": 12915
+   "bytes": 8090
   },
   {
    "id": "data-fabric-capacity-python-developer",
@@ -15091,7 +15157,7 @@
     "capacity",
     "python"
    ],
-   "bytes": 8400
+   "bytes": 8483
   },
   {
    "id": "data-formula-workbook-engineer",
@@ -15108,7 +15174,7 @@
     "json",
     "calculators"
    ],
-   "bytes": 7446
+   "bytes": 6916
   },
   {
    "id": "engineering-gaussdb-expert",
@@ -15142,7 +15208,7 @@
     "api",
     "data-exploration"
    ],
-   "bytes": 7208
+   "bytes": 6871
   },
   {
    "id": "data-kpi-dashboard-designer",
@@ -15160,7 +15226,7 @@
     "bi",
     "metrics"
    ],
-   "bytes": 19580
+   "bytes": 11792
   },
   {
    "id": "data-kusto-kql-analyst",
@@ -15178,7 +15244,7 @@
     "data-explorer",
     "logs"
    ],
-   "bytes": 7879
+   "bytes": 7472
   },
   {
    "id": "data-matplotlib-visualization-engineer",
@@ -15195,7 +15261,7 @@
     "data-visualization",
     "charts"
    ],
-   "bytes": 13452
+   "bytes": 8861
   },
   {
    "id": "data-migration-observability-engineer",
@@ -15212,7 +15278,7 @@
     "migrations",
     "monitoring"
    ],
-   "bytes": 15224
+   "bytes": 9012
   },
   {
    "id": "data-mongodb-atlas-on-azure-developer",
@@ -15229,7 +15295,7 @@
     "marketplace",
     "dotnet"
    ],
-   "bytes": 12963
+   "bytes": 7929
   },
   {
    "id": "data-mongodb-performance-advisor",
@@ -15247,7 +15313,7 @@
     "database",
     "nosql"
    ],
-   "bytes": 6856
+   "bytes": 6374
   },
   {
    "id": "data-monte-carlo-alert-tuning-engineer",
@@ -15264,7 +15330,7 @@
     "alerting",
     "data-quality"
    ],
-   "bytes": 15045
+   "bytes": 8416
   },
   {
    "id": "data-monte-carlo-asset-health-analyst",
@@ -15281,7 +15347,7 @@
     "data-quality",
     "tables"
    ],
-   "bytes": 11499
+   "bytes": 9103
   },
   {
    "id": "data-monte-carlo-change-impact-reviewer",
@@ -15299,7 +15365,7 @@
     "lineage",
     "impact-analysis"
    ],
-   "bytes": 22718
+   "bytes": 8025
   },
   {
    "id": "data-monte-carlo-dbt-validation-engineer",
@@ -15317,7 +15383,7 @@
     "monte-carlo",
     "notebooks"
    ],
-   "bytes": 20943
+   "bytes": 6014
   },
   {
    "id": "data-monte-carlo-ingestion-engineer",
@@ -15335,7 +15401,7 @@
     "ingestion",
     "api"
    ],
-   "bytes": 22371
+   "bytes": 8948
   },
   {
    "id": "data-monte-carlo-monitor-engineer",
@@ -15353,7 +15419,7 @@
     "ci-cd",
     "data-observability"
    ],
-   "bytes": 21618
+   "bytes": 6479
   },
   {
    "id": "data-monte-carlo-monitoring-advisor",
@@ -15370,7 +15436,7 @@
     "coverage",
     "agent-observability"
    ],
-   "bytes": 22336
+   "bytes": 8947
   },
   {
    "id": "data-monte-carlo-pipeline-performance-analyst",
@@ -15388,7 +15454,7 @@
     "databricks",
     "performance"
    ],
-   "bytes": 10055
+   "bytes": 9134
   },
   {
    "id": "data-monte-carlo-remediation-engineer",
@@ -15405,7 +15471,7 @@
     "remediation",
     "incident-response"
    ],
-   "bytes": 17960
+   "bytes": 9058
   },
   {
    "id": "data-monte-carlo-root-cause-analyst",
@@ -15423,7 +15489,7 @@
     "lineage",
     "data-quality"
    ],
-   "bytes": 17873
+   "bytes": 7272
   },
   {
    "id": "data-monte-carlo-storage-cost-analyst",
@@ -15440,7 +15506,7 @@
     "cost-optimization",
     "data-warehouse"
    ],
-   "bytes": 10948
+   "bytes": 8567
   },
   {
    "id": "data-neon-branching-engineer",
@@ -15457,7 +15523,7 @@
     "branching",
     "test-environments"
    ],
-   "bytes": 15293
+   "bytes": 8356
   },
   {
    "id": "data-neon-migration-engineer",
@@ -15475,7 +15541,7 @@
     "prisma",
     "drizzle"
    ],
-   "bytes": 4945
+   "bytes": 4460
   },
   {
    "id": "data-neon-postgres-engineer",
@@ -15492,7 +15558,7 @@
     "serverless",
     "database"
    ],
-   "bytes": 18721
+   "bytes": 7313
   },
   {
    "id": "data-neon-postgres-specialist",
@@ -15509,7 +15575,7 @@
     "databases",
     "prototyping"
    ],
-   "bytes": 14834
+   "bytes": 8707
   },
   {
    "id": "data-neon-query-performance-analyst",
@@ -15526,7 +15592,7 @@
     "query-optimization",
     "performance"
    ],
-   "bytes": 5894
+   "bytes": 5348
   },
   {
    "id": "data-networkx-graph-analyst",
@@ -15543,7 +15609,7 @@
     "graph-analysis",
     "data-science"
    ],
-   "bytes": 6644
+   "bytes": 8816
   },
   {
    "id": "data-nosql-data-architect",
@@ -15560,7 +15626,7 @@
     "dynamodb",
     "data-modeling"
    ],
-   "bytes": 6693
+   "bytes": 8130
   },
   {
    "id": "data-oracle-to-postgresql-migration-engineer",
@@ -15578,7 +15644,7 @@
     "migration",
     "dotnet"
    ],
-   "bytes": 9844
+   "bytes": 9299
   },
   {
    "id": "data-orm-migration-engineer",
@@ -15596,7 +15662,7 @@
     "typeorm",
     "sequelize"
    ],
-   "bytes": 6540
+   "bytes": 8267
   },
   {
    "id": "data-plotly-visualization-developer",
@@ -15614,7 +15680,7 @@
     "dashboards",
     "charts"
    ],
-   "bytes": 9269
+   "bytes": 8682
   },
   {
    "id": "data-polars-data-engineer",
@@ -15632,7 +15698,7 @@
     "etl",
     "arrow"
    ],
-   "bytes": 11824
+   "bytes": 8221
   },
   {
    "id": "data-postgres-egress-cost-engineer",
@@ -15649,7 +15715,7 @@
     "cost-optimization",
     "neon"
    ],
-   "bytes": 11965
+   "bytes": 5913
   },
   {
    "id": "data-postgresql-cli-specialist",
@@ -15667,7 +15733,7 @@
     "sql",
     "scripting"
    ],
-   "bytes": 22592
+   "bytes": 8907
   },
   {
    "id": "data-postgresql-performance-engineer",
@@ -15685,7 +15751,7 @@
     "indexing",
     "vacuum"
    ],
-   "bytes": 6744
+   "bytes": 5977
   },
   {
    "id": "data-postgresql-read-only-query-analyst",
@@ -15703,7 +15769,7 @@
     "python",
     "psycopg2"
    ],
-   "bytes": 6790
+   "bytes": 6300
   },
   {
    "id": "data-postgresql-schema-architect",
@@ -15721,7 +15787,7 @@
     "rls",
     "sql"
    ],
-   "bytes": 19295
+   "bytes": 9005
   },
   {
    "id": "data-power-bi-data-modeler",
@@ -15738,7 +15804,7 @@
     "star-schema",
     "bi"
    ],
-   "bytes": 9427
+   "bytes": 8906
   },
   {
    "id": "data-power-bi-dax-developer",
@@ -15755,7 +15821,7 @@
     "measures",
     "bi"
    ],
-   "bytes": 9493
+   "bytes": 9081
   },
   {
    "id": "data-power-bi-performance-analyst",
@@ -15772,7 +15838,7 @@
     "optimization",
     "bi"
    ],
-   "bytes": 8677
+   "bytes": 8259
   },
   {
    "id": "data-power-bi-report-designer",
@@ -15789,7 +15855,7 @@
     "data-visualization",
     "reports"
    ],
-   "bytes": 9100
+   "bytes": 8699
   },
   {
    "id": "data-pyspark-performance-engineer",
@@ -15807,7 +15873,7 @@
     "big-data",
     "python"
    ],
-   "bytes": 6082
+   "bytes": 6394
   },
   {
    "id": "data-redis-administrator",
@@ -15824,7 +15890,7 @@
     "cache",
     "database"
    ],
-   "bytes": 19119
+   "bytes": 8859
   },
   {
    "id": "data-consolidation-agent",
@@ -15875,7 +15941,7 @@
     "python",
     "statistics"
    ],
-   "bytes": 22008
+   "bytes": 3006
   },
   {
    "id": "data-segment-cdp-engineer",
@@ -15892,7 +15958,7 @@
     "tracking-plan",
     "analytics"
    ],
-   "bytes": 6622
+   "bytes": 3526
   },
   {
    "id": "data-snowflake-data-engineer",
@@ -15910,7 +15976,7 @@
     "snowpark",
     "data-pipelines"
    ],
-   "bytes": 10247
+   "bytes": 8585
   },
   {
    "id": "data-spark-performance-engineer",
@@ -15928,7 +15994,7 @@
     "pyspark",
     "data-pipelines"
    ],
-   "bytes": 14218
+   "bytes": 8881
   },
   {
    "id": "data-sql-database-engineer",
@@ -15946,7 +16012,7 @@
     "analytics",
     "databases"
    ],
-   "bytes": 9870
+   "bytes": 8859
   },
   {
    "id": "data-sql-migration-engineer",
@@ -15964,7 +16030,7 @@
     "sql-server",
     "migrations"
    ],
-   "bytes": 4101
+   "bytes": 4344
   },
   {
    "id": "data-sql-performance-engineer",
@@ -15982,7 +16048,7 @@
     "postgresql",
     "performance"
    ],
-   "bytes": 18549
+   "bytes": 4099
   },
   {
    "id": "data-sql-server-database-administrator",
@@ -16000,7 +16066,7 @@
     "microsoft",
     "dba"
    ],
-   "bytes": 4456
+   "bytes": 4004
   },
   {
    "id": "data-statsmodels-data-scientist",
@@ -16018,7 +16084,7 @@
     "econometrics",
     "time-series"
    ],
-   "bytes": 6743
+   "bytes": 3399
   },
   {
    "id": "data-supabase-postgres-engineer",
@@ -16035,7 +16101,7 @@
     "performance",
     "schema-design"
    ],
-   "bytes": 8688
+   "bytes": 4518
   },
   {
    "id": "data-us-property-data-analyst",
@@ -16052,7 +16118,7 @@
     "api",
     "zillow"
    ],
-   "bytes": 8901
+   "bytes": 8316
   },
   {
    "id": "data-vector-index-tuning-engineer",
@@ -16069,7 +16135,7 @@
     "quantization",
     "performance"
    ],
-   "bytes": 18691
+   "bytes": 3641
   },
   {
    "id": "data-video-frame-ocr-engineer",
@@ -16086,7 +16152,7 @@
     "tesseract",
     "video"
    ],
-   "bytes": 6177
+   "bytes": 5782
   },
   {
    "id": "data-warehouse-sql-cost-auditor",
@@ -16104,7 +16170,7 @@
     "cost-optimization",
     "data-warehouse"
    ],
-   "bytes": 7707
+   "bytes": 7251
   },
   {
    "id": "data-weaviate-database-engineer",
@@ -16121,7 +16187,7 @@
     "search",
     "python"
    ],
-   "bytes": 22674
+   "bytes": 8267
   },
   {
    "id": "devops-api-management-net-developer",
@@ -29641,6 +29707,28 @@
    "bytes": 8916
   },
   {
+   "id": "project-management-technical-delivery-leadership",
+   "division": "project-management",
+   "label": "Project Management",
+   "name": "Technical Delivery Leadership",
+   "description": "Owns delivery of customer-facing technical programmes (implementations, integrations and AI deployments) across a portfolio: readiness from sale to kickoff, plans, stage gates, RAID, evidence-based status, earned value, change control, go-live, hypercare and the portfolio's health, margin and forecast.",
+   "emoji": "🚦",
+   "role": "technical delivery director · customer programmes, governance, earned value, go-live, portfolio health",
+   "tags": [
+    "director",
+    "delivery",
+    "technical-delivery",
+    "program-management",
+    "professional-services",
+    "governance",
+    "raid",
+    "earned-value",
+    "go-live",
+    "portfolio"
+   ],
+   "bytes": 22397
+  },
+  {
    "id": "project-management-technical-delivery-planner",
    "division": "project-management",
    "label": "Project Management",
@@ -34038,6 +34126,27 @@
    "bytes": 14841
   },
   {
+   "id": "business-corporate-strategy-leadership",
+   "division": "business",
+   "label": "Business & Operations",
+   "name": "Corporate Strategy Leadership",
+   "description": "Turns ambition into a strategy with real choices and that strategy into execution: diagnosis, where to play and how to win, sources of advantage, portfolio bets, scenarios, Hoshin deployment and quarterly strategy reviews that move money and people.",
+   "emoji": "🏔️",
+   "role": "corporate strategy director · diagnosis, choices, strategy deployment, reviews",
+   "tags": [
+    "director",
+    "strategy",
+    "corporate-strategy",
+    "strategic-planning",
+    "hoshin-kanri",
+    "playing-to-win",
+    "okr",
+    "competitive-advantage",
+    "fde"
+   ],
+   "bytes": 20521
+  },
+  {
    "id": "corporate-training-designer",
    "division": "business",
    "label": "Business & Operations",
@@ -34140,6 +34249,28 @@
     "planning"
    ],
    "bytes": 11550
+  },
+  {
+   "id": "business-deployment-strategist",
+   "division": "business",
+   "label": "Business & Operations",
+   "name": "Deployment Strategist",
+   "description": "Palantir's \"Echo\": embeds with an enterprise customer to pick the problem worth solving, map stakeholders and workflows, set the outcome metric and its baseline, scope a first win in weeks, drive adoption, and turn proven value into expansion and product signal.",
+   "emoji": "🔭",
+   "role": "deployment strategist · problem selection, stakeholders, value case, adoption, expansion",
+   "tags": [
+    "strategist",
+    "fde",
+    "forward-deployed",
+    "deployment-strategist",
+    "echo",
+    "customer-discovery",
+    "value-realization",
+    "adoption",
+    "stakeholder-management",
+    "enterprise"
+   ],
+   "bytes": 14113
   },
   {
    "id": "business-devil-s-advocate-reviewer",
@@ -34313,6 +34444,28 @@
     "roleplay"
    ],
    "bytes": 22670
+  },
+  {
+   "id": "business-forward-deployed-engineering-leadership",
+   "division": "business",
+   "label": "Business & Operations",
+   "name": "Forward Deployed Engineering Leadership",
+   "description": "Designs, runs, measures and repairs a forward deployed engineering (FDE) function and its applied engineering sibling: where to put engineers inside customers, how engagements are gated, how field work becomes product, and what it all costs.",
+   "emoji": "🛰️",
+   "role": "FDE leader · operating model, engagement gates, productization, economics, scorecards",
+   "tags": [
+    "manager",
+    "fde",
+    "forward-deployed",
+    "applied-engineering",
+    "operating-model",
+    "services-led-growth",
+    "productization",
+    "engagement-management",
+    "scorecard",
+    "strategy"
+   ],
+   "bytes": 23492
   },
   {
    "id": "business-freight-exceptions-analyst",
@@ -34834,6 +34987,28 @@
    "bytes": 6469
   },
   {
+   "id": "business-okr-performance-framework-architect",
+   "division": "business",
+   "label": "Business & Operations",
+   "name": "OKR & Performance Framework Architect",
+   "description": "Designs, reviews and repairs goal and performance frameworks (OKRs, MBO bonus scorecards, KPIs and calibration) for technical customer-facing teams such as forward deployed engineering, applied AI, solution architecture and technical delivery.",
+   "emoji": "📐",
+   "role": "performance framework architect · OKR, MBO, scorecards, calibration",
+   "tags": [
+    "architect",
+    "okr",
+    "mbo",
+    "performance-management",
+    "kpi",
+    "calibration",
+    "compensation",
+    "scorecard",
+    "fde",
+    "goals"
+   ],
+   "bytes": 21678
+  },
+  {
    "id": "operations-manager",
    "division": "business",
    "label": "Business & Operations",
@@ -34971,6 +35146,28 @@
     "warranty"
    ],
    "bytes": 22380
+  },
+  {
+   "id": "business-services-led-growth-strategist",
+   "division": "business",
+   "label": "Business & Operations",
+   "name": "Services-Led Growth Strategist",
+   "description": "Designs and governs the economics of a services-heavy go-to-market (forward deployed engineering, applied AI, implementation and solution architecture) so the margin it spends buys a moat and a paved platform instead of a consulting business.",
+   "emoji": "⚖️",
+   "role": "services-led growth strategist · FDE economics, pricing, margin, productization",
+   "tags": [
+    "strategist",
+    "services-led-growth",
+    "fde",
+    "unit-economics",
+    "gross-margin",
+    "pricing",
+    "professional-services",
+    "productization",
+    "strategy",
+    "finance"
+   ],
+   "bytes": 20890
   },
   {
    "id": "business-startup-business-analyst",

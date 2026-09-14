@@ -47,6 +47,23 @@ test('the vendored Agency catalogue loads, every persona parses to a person, and
   assert.equal(parsePersona('no front matter'), null);
 });
 
+test('the FDE, applied AI, architecture, delivery and strategy set arrives whole: full methods, whole briefs, leaders named as leadership', () => {
+  const agency = new Agency();
+  const leaders = ['business-forward-deployed-engineering-leadership', 'ai-applied-ai-engineering-leadership', 'engineering-solution-architecture-leadership', 'project-management-technical-delivery-leadership', 'business-corporate-strategy-leadership'];
+  const specialists = ['business-deployment-strategist', 'engineering-forward-deployed-engineer', 'business-okr-performance-framework-architect', 'business-services-led-growth-strategist'];
+  for (const id of [...leaders, ...specialists]) {
+    const p = agency.get(id), skill = agency.skillOf(p);
+    assert.doesNotMatch(skill.instructions, /\(Shortened/, `${id}: the method is not cut`);
+    assert.ok(p.body.length > 10000, `${id}: a real method, not a stub`);
+    assert.ok(p.brief.length < 2000 && /[.)!?`"'\w]$/.test(p.brief.trim()), `${id}: the standing instructions end on a whole line`);
+    assert.match(p.body, /## 📚 Sources[\s\S]*https:\/\//, `${id}: names its sources`);
+    assert.match(p.body, /export_xlsx/, `${id}: knows the office can build a workbook`);
+    assert.equal(p.name.endsWith(' Leadership'), leaders.includes(id), `${id}: a managerial persona, and only one, ends in Leadership`);
+  }
+  assert.equal(agency.list({ q: 'fde' })[0].id, 'business-forward-deployed-engineering-leadership');
+  assert.equal(agency.list({ q: 'mbo' })[0].id, 'business-okr-performance-framework-architect');
+});
+
 test('hiring a persona adds a person and its method as a skill; full teams and the lead swap are handled', () => {
   const dir = temp(), office = new OfficeStore({ dataDir: dir, initialAgents: loadRoster().agents }), agency = new Agency();
   try {
