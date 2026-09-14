@@ -90,12 +90,15 @@ test('a lead and the Program Manager are told which person has a tool the team l
   assert.ok(specialistPrompt({ office, team: fin, agent: invo, leadAgent: alead, toolLabels: labels }).includes('Tools you can call: Google Calendar, Web search & fetch.'));
 });
 
-test('the Program Manager and the leads are told they convert approved files to PDF and decks themselves', () => {
+test('the Program Manager and the leads are told they convert approved files to PDF, decks and workbooks themselves, and read attachments from their text copies', () => {
   const office = { skills: [], agents: [{ id: 'mlead', name: 'Maya', role: 'Marketing Lead', does: 'Leads.', rules: [], skills: [], tools: [] }], teams: [{ id: 'marketing', name: 'Marketing', lead: 'mlead', purpose: 'Demand.', criteria: ['Cites sources'], guardrails: [], checks: [], tools: [], skills: [], rules: [] }] };
   const pm = programManagerPrompt({ office, teams: office.teams });
   assert.match(pm, /make it yourself: assemble_files combines the approved files/); assert.match(pm, /you never write content of your own/);
   const lead = leadPrompt({ office, team: office.teams[0], lead: office.agents[0], specialists: [], reworkRounds: 3 });
-  assert.match(lead, /Converting is not writing: when the CEO wants a PDF or a deck of an approved deliverable, export it yourself/);
+  assert.match(lead, /Converting is not writing: when the CEO wants a PDF, a deck or an Excel workbook of an approved deliverable, export it yourself with export_pdf, export_pptx or export_xlsx/);
+  assert.match(pm, /export_xlsx turns tables \(one ## heading per sheet\) into an Excel workbook/);
+  // Everyone reads attachments from their text copies, and a file that cannot be read stops the work instead of being worked around.
+  for (const text of [pm, lead]) { assert.match(text, /read the text copy the office made beside each one, \/work\/inbox\/<file name>\.md/); assert.match(text, /never replace it with general knowledge, benchmarks or a generic framework/); }
 });
 
 test('the quick-lane prompt tells the lead to work alone, export, review and hand the task to the team when it is bigger', () => {

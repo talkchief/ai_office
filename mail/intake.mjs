@@ -170,10 +170,10 @@ export function createIntake({ accounts, registry, mail = { mailer: null, domain
   async function mailResult(instance, job) {
     const tenant = accounts.tenant(instance.tenant.id), viewer = viewerOf(tenant.id, job.ownerId); if (!viewer) return;
     // The exports the task actually produced ride back with the mail. A report and a deck are both deliverables, and only
-    // export_pdf and export_pptx write these formats, so nothing from the scratch workspace comes along by accident; the
+    // export_pdf, export_pptx and export_xlsx write these formats, so nothing from the scratch workspace comes along by accident; the
     // Mailer drops anything past its cap rather than failing the send.
     const dir = instance.engine.workspaceDir(job.id);
-    const EXPORTS = { '.pdf': 'application/pdf', '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation' };
+    const EXPORTS = { '.pdf': 'application/pdf', '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
     const made = listWorkspaceFiles(dir).filter(f => EXPORTS[path.extname(f.name).toLowerCase()] && !f.name.startsWith('inbox/'))
       .sort((a, b) => (b.modifiedAt || 0) - (a.modifiedAt || 0)).slice(0, 3);
     const attachments = made.map(f => ({ name: path.basename(f.name), contentType: EXPORTS[path.extname(f.name).toLowerCase()], bytes: fs.readFileSync(path.join(dir, f.name)) }));

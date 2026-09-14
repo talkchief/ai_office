@@ -184,7 +184,7 @@ export function renderTaskWorkspace(job, tab, actions = '') {
       <details class="tv-fold" data-detail-key="run-details"><summary>Run details<span class="tv-sp"></span><small>model, calls, tokens</small></summary><div class="tv-in"><table class="tv-ledger"><tbody>${job.model ? `<tr><td>Model</td><td class="k">${esc(job.model)}${job.effort ? ' · ' + esc(job.effort) : ''}</td></tr>` : ''}<tr><td>Model calls</td><td class="k">${job.calls}/${job.team.maxCalls} model calls</td></tr><tr><td>Reported tokens</td><td class="k">${Number(job.tokens || 0).toLocaleString()}/${Number(job.team.maxTokens || 0).toLocaleString()}</td></tr><tr><td>Team configuration</td><td class="k">v${job.officeRevision}</td></tr>${job.skills?.length ? `<tr><td>Skills</td><td class="k">${job.skills.map(s => esc(s.name) + ' v' + s.revision).join(' · ')}</td></tr>` : ''}</tbody></table></div></details>`;
   };
   const artifacts = () => {
-    const exported = n => /\.(pdf|pptx|docx)$/i.test(n);
+    const exported = n => /\.(pdf|pptx|docx|xlsx)$/i.test(n);
     const files = [...(job.files || [])].sort((a, b) => (exported(b.name) - exported(a.name)) || b.modifiedAt - a.modifiedAt);
     if (!files.length) return `<div class="tv-stop"><b>No files.</b>${esc(job.state === 'done' ? 'This task delivered its result as text. Ask for a PDF and the team exports one here.' : 'Files the team writes while working appear here: drafts, exports, data.')}</div>`;
     const size = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';

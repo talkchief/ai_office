@@ -1,7 +1,7 @@
 {
   "name": "talkchief-ai-space",
   "version": "3.7.0-beta.1",
-  "description": "Cloud AI Office \u2014 configurable AI teams with durable workflows and lead verification",
+  "description": "Cloud AI Office — configurable AI teams with durable workflows and lead verification",
   "type": "module",
   "private": true,
   "scripts": {
@@ -28,8 +28,8 @@
     "@langchain/mcp-adapters": "^1.1.4",
     "@langchain/openai": "^1.5.12",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "better-sqlite3": "^12.10.0",
     "@zvec/zvec": "^0.7.1",
+    "better-sqlite3": "^12.10.0",
     "d3-force": "^3.0.0",
     "deepagents": "^1.13.4",
     "langchain": "^1.5.11",
@@ -38,6 +38,7 @@
     "pdfkit": "^0.20.2",
     "playwright-core": "^1.63.0",
     "pptxgenjs": "^4.0.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.6.0"
   },
   "devDependencies": {

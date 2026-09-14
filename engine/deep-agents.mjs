@@ -15,8 +15,9 @@ import { z } from 'zod';
 import { officeBackend, FILE_PERMISSIONS, PM_FILE_PERMISSIONS, SKILL_SOURCES } from './backend.mjs';
 import { ROOT } from '../config.mjs';
 import { programManagerPrompt, leadPrompt, specialistPrompt, quickLeadPrompt, leadName } from './prompts.mjs';
-import { exportPdfTool, exportPptxTool, assembleFilesTool, listWorkspaceFiles, workspaceFile, mimeOf, closeBrowser } from './documents.mjs';
+import { exportPdfTool, exportPptxTool, exportXlsxTool, assembleFilesTool, listWorkspaceFiles, workspaceFile, mimeOf, closeBrowser } from './documents.mjs';
 import { webTools } from './tools.mjs';
+import { readDocument } from '../documents.mjs';
 import { fetchWithRetries } from '../models.mjs';
 import { DatabasePool, validateQuery, markdownTable, schemaText } from '../connectors/database.mjs';
 import { SshRunner, validateCommand } from '../connectors/ssh.mjs';
@@ -99,7 +100,8 @@ class PromoteError extends Error {}
 const TRIAGE_MS = 6000, QUICK_SILENCE_MS = 45000, QUICK_READS = 8, QUICK_CALLS = 14, QUICK_GRACE = 3;
 const QUICK_FINISH = new Set(['write_file', 'edit_file', 'export_pdf', 'export_pptx', 'assemble_files', 'record_review', 'needs_the_team', 'report_progress']);
 const QUICK_READ_TOOLS = new Set(['vault_list', 'api_get', 'db_list', 'db_schema', 'db_query', 'ssh_list']);
-const BINARY_FILE = /\.(pdf|pptx|docx|xlsx|png|jpe?g|gif|webp|bmp|zip)$/i;
+const BINARY_FILE = /\.(pdf|pptx|docx|xlsx|xls|png|jpe?g|gif|webp|bmp|zip)$/i;
+const TEXT_ATTACHMENT = /\.(txt|md|csv|json)$/i, IMAGE_ATTACHMENT = /\.(png|jpe?g|gif|webp|bmp)$/i;
 const TRIAGE_PROMPT = `You size a task for a company office. Answer with one JSON object and nothing else: {"lane":"quick"|"standard","team":"<team id>","effort":"low"|"medium"|"high","why":"<one short sentence>"}.
 quick: one person can finish it in minutes with what the company Brain already holds or what the brief itself says: a lookup, a short answer, a summary, a format conversion (a PDF or a deck from an existing note), a short draft (an email, a note, a checklist) from existing material.
 standard: research with no source at hand, work for several people or teams, numbers that must be computed or verified, anything that needs a specialist's skill, anything the CEO will send out that needs a second pair of eyes, anything you are unsure about.
@@ -139,7 +141,7 @@ export class OfficeEngine {
     // Long-term memory shares the task database; null when the office runs without it (tests, older set-ups).
     this.memory = memoryFactory ? memoryFactory(this.db) : null;
     this.notifications = new Notifications({ db: this.db, bus }); this.threads = new Threads({ db: this.db, bus });
-    this.running = new Map(); this.waiting = []; this.faults = []; this.brain = brain; this.vault = vault; this.followUps = new Map(); this.gates = new Map(); this.closed = false; this.providerTrouble = [];
+    this.running = new Map(); this.waiting = []; this.faults = []; this.brain = brain; this.vault = vault; this.followUps = new Map(); this.gates = new Map(); this.closed = false; this.providerTrouble = []; this.preparing = new Map();
     // Pauses before the automatic retries after a provider failure, and the waits the model calls themselves sat through.
     this.providerRetryDelays = providerRetryDelays; this.providerWaits = [];
     // Efforts delegators asked for ("Effort: low" on a task call), keyed by task and delegate, until the run record takes them.
@@ -290,8 +292,54 @@ export class OfficeEngine {
       this.event(id, 'file_saved', null, `/work/inbox/${name} (${bytes.length} bytes)`, { path: 'inbox/' + name });
     }
     const updated = this.update(id, j => { j.attachments = [...(j.attachments || []), ...saved]; });
-    this.threads.append(id, { role: 'ceo', kind: 'note', text: `Read the attached files under /work/inbox/ before planning: ${saved.map(x => x.name).join(', ')}.`, jobId: id, delivered: !this.running.has(id) });
-    return { attachments: updated.attachments, saved };
+    // The teams read text, never the upload itself: each document gets a text copy beside it before any run starts (runs wait for it).
+    const ready = this.prepareAttachments(id, saved);
+    this.preparing.set(id, Promise.all([this.preparing.get(id), ready]).catch(() => {}));
+    return { attachments: updated.attachments, saved, ready };
+  }
+  /** Text copies of freshly attached files, and the one note that tells the Program Manager where each is, or that one cannot be read. */
+  async prepareAttachments(id, saved) {
+    const dir = this.workspaceDir(id), results = [];
+    for (const file of saved) {
+      const ext = path.extname(file.name).toLowerCase();
+      if (TEXT_ATTACHMENT.test(file.name)) { results.push({ name: file.name, readable: true, path: `/work/inbox/${file.name}` }); continue; }
+      if (IMAGE_ATTACHMENT.test(file.name)) { results.push({ name: file.name, readable: false, picture: true, problem: 'a picture: the teams cannot see images' }); continue; }
+      try {
+        const text = await readDocument({ name: file.name, bytes: fs.readFileSync(workspaceFile(dir, 'inbox/' + file.name).abs) });
+        const copy = `inbox/${file.name}.md`;
+        fs.writeFileSync(workspaceFile(dir, copy).abs, `${text}
+`);
+        results.push({ name: file.name, readable: true, path: '/work/' + copy, characters: text.length });
+        this.event(id, 'file_read', null, `/work/${copy}: the text of ${file.name} (${text.length.toLocaleString('en-GB')} characters)`, { path: copy });
+      } catch (error) {
+        results.push({ name: file.name, readable: false, problem: clean(error.message).replace(/\.$/, '') });
+        this.event(id, 'file_unreadable', null, `${file.name} could not be read: ${clean(error.message)}`, { path: 'inbox/' + file.name, ext });
+      }
+    }
+    if (!this.get(id)) return results;
+    this.update(id, j => { for (const r of results) { const a = (j.attachments || []).find(x => x.name === r.name); if (a) Object.assign(a, { readable: r.readable, ...(r.path ? { text: r.path } : {}), ...(r.problem ? { problem: r.problem } : {}), ...(r.picture ? { picture: true } : {}) }); } }, { touch: false });
+    const lines = results.map(r => r.readable ? `- ${r.name}: read ${r.path}${r.path.endsWith('.md') && !TEXT_ATTACHMENT.test(r.name) ? ' (its full text, made by the office; every sheet or slide is there)' : ''}` : `- ${r.name}: COULD NOT BE READ (${r.problem}).`);
+    const blocked = results.filter(r => !r.readable && !r.picture), pictures = results.filter(r => r.picture);
+    const text = [`The CEO attached ${results.length === 1 ? 'a file' : results.length + ' files'} under /work/inbox/. Read ${results.length === 1 ? 'it' : 'them'} before planning:`, ...lines,
+      blocked.length ? `Do not work around ${blocked.length === 1 ? 'a file that could not be read' : 'files that could not be read'}: the work rests on ${blocked.length === 1 ? 'it' : 'them'}. Call ask_ceo now for a readable copy (an unprotected file, a PDF or a CSV), and do not delegate or write anything in its place until the CEO answers.` : '',
+      pictures.length ? `The teams cannot see pictures. If the brief depends on ${pictures.length === 1 ? 'that picture' : 'those pictures'}, call ask_ceo for the content in words before delegating; if it is only an illustration, carry on.` : ''].filter(Boolean).join('\n');
+    const started = !!this.get(id)?.startedAt;
+    this.threads.append(id, { role: 'ceo', kind: 'note', text, jobId: id, delivered: !this.running.has(id) && !started, meta: { attachments: true } });
+    return results;
+  }
+  /** Notes about files attached to a task already under way, not yet passed on: they go along with the next word to the team. */
+  takeAttachmentNotes(id) {
+    const notes = this.threads.pending(id).filter(m => m.meta?.attachments);
+    if (notes.length) this.threads.markDelivered(notes.map(m => m.seq));
+    return notes.map(m => m.text).join('\n\n');
+  }
+  /** A document the CEO attached that could not be read and that the CEO has not yet answered about: while there is one, the work waits. */
+  unreadableInputs(id) {
+    const job = this.get(id); if (!job) return [];
+    const bad = (job.attachments || []).filter(a => a.readable === false && !a.picture); if (!bad.length) return [];
+    const since = Math.max(...bad.map(a => a.at || 0));
+    const answered = this.threads.list(id).some(m => m.role === 'ceo' && m.at > since && !m.meta?.attachments);
+    return answered ? [] : bad;
   }
   createTestSuite(dept) {
     const team = this.office.team(dept); if (!team?.tests?.length) throw httpError('Save at least one team test first.');
@@ -366,6 +414,8 @@ export class OfficeEngine {
       const signal = AbortSignal.any([controller.signal, stall.signal]);
       let tracker = null;
       try {
+        // Files attached a moment ago are read into text first, so the brief names every text copy (or the file that cannot be read).
+        if (this.preparing.has(id)) { await this.preparing.get(id); this.preparing.delete(id); }
         const job = this.get(id);
         const input = this.inputFrom(job.next, job);
         this.update(id, j => { j.next = null; j.startedAt ||= Date.now(); j.harness = true; j.prunedAt = null; }, { touch: false });
@@ -828,7 +878,16 @@ export class OfficeEngine {
   // The Program Manager delegates only after it has written a plan: a task call before write_todos is refused, not run.
   planFirst(jobId) {
     return createMiddleware({ name: 'plan_first', wrapToolCall: async (request, handler) => {
-      const call = request.toolCall; if (call?.name !== 'task' || (this.get(jobId)?.todos || []).length) return handler(request);
+      const call = request.toolCall;
+      // A document the brief rests on could not be read: nothing is delegated or filed in its place until the CEO has answered.
+      if (['task', 'complete_task'].includes(call?.name)) {
+        const unread = this.unreadableInputs(jobId);
+        if (unread.length) {
+          this.event(jobId, 'delegation_refused', 'pm', `Waiting for a readable copy of ${unread.map(a => a.name).join(', ')}.`);
+          return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `Refused: ${unread.map(a => `${a.name} could not be read (${a.problem || 'unreadable'})`).join('; ')}. Work built without it would be generic and waste the team's time. Call ask_ceo now: say which file, why it could not be read, and ask for a readable copy (an unprotected file, a PDF or a CSV) or for the CEO's word to go ahead without it. Then end your turn.` });
+        }
+      }
+      if (call?.name !== 'task' || (this.get(jobId)?.todos || []).length) return handler(request);
       this.event(jobId, 'delegation_refused', 'pm', 'Delegation before a plan: write_todos first.');
       return new ToolMessage({ tool_call_id: call.id, name: 'task', content: 'Refused: plan first. Call write_todos with one item per work package (team, deliverable, what you need back), then delegate with task.' });
     } });
@@ -840,6 +899,21 @@ export class OfficeEngine {
     return createMiddleware({ name: `binary_read_guard_${agentId.replace(/[^a-zA-Z0-9_]/g, '_')}`, wrapToolCall: async (request, handler) => {
       const call = request.toolCall, target = String(call?.args?.file_path || call?.args?.path || '');
       if (!['read_file', 'edit_file'].includes(call?.name) || !BINARY_FILE.test(target)) return handler(request);
+      const upload = /^\/?work\/inbox\/([^/]+)$/.exec(target.replace(/^\/+/, '/'));
+      if (upload) {
+        const name = upload[1], copy = `inbox/${name}.md`, file = workspaceFile(this.workspaceDir(jobId), copy);
+        let problem = '';
+        if (!fs.existsSync(file.abs) && !IMAGE_ATTACHMENT.test(name)) {
+          try { fs.writeFileSync(file.abs, `${await readDocument({ name, bytes: fs.readFileSync(workspaceFile(this.workspaceDir(jobId), 'inbox/' + name).abs) })}\n`); this.event(jobId, 'file_read', agentId, `/work/${copy}: the text of ${name}, made when it was first read`, { path: copy }); }
+          catch (error) { problem = clean(error.message); }
+        }
+        if (fs.existsSync(file.abs)) {
+          this.event(jobId, 'binary_read_redirected', agentId, `${call.name} on ${target}: pointed to /work/${copy}.`);
+          return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `${target} is the CEO's upload in its original format. Its full text is at /work/${copy} (every sheet, page or slide, made by the office): read that file instead, and cite cells, pages or slides from it.` });
+        }
+        this.event(jobId, 'file_unreadable', agentId, `${name} could not be read: ${problem || 'a picture'}.`);
+        return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `${target} could not be read${problem ? ': ' + problem : ': the teams cannot see pictures'}. Do not replace it with general knowledge or generic work: stop, and report that this file is needed in a readable form (the Program Manager asks the CEO with ask_ceo).` });
+      }
       this.event(jobId, 'binary_read_refused', agentId, `${call.name} refused on ${target}: exports are not read back.`);
       const source = target.replace(BINARY_FILE, '.md');
       return new ToolMessage({ tool_call_id: call.id, name: call.name, content: `Refused: ${target} is a binary file and is not read into the conversation. It was made from ${source}: read or edit that Markdown instead, export again if it changed, and name the Markdown in your hand-over; the CEO downloads the export from the task page.` });
@@ -881,6 +955,7 @@ export class OfficeEngine {
     if (!job.autoRoute && job.depts.length > 1) return standard('more than one team is named.');
     if (job.routine) return standard('routines run through the Program Manager.');
     if (job.completionApproval) return standard('the CEO approves completion.');
+    if (this.unreadableInputs(id).length) return standard('an attached file could not be read: the Program Manager asks the CEO before any work starts.');
     if (!teams.length) return standard('no team with a lead fits.');
     if (clean(job.text).length > 1500) return standard('a long brief.');
     const spec = this.models.resolve({ task: job, role: 'triage' });
@@ -1057,7 +1132,7 @@ export class OfficeEngine {
   files(id) { return listWorkspaceFiles(this.workspaceDir(id)); }
   exportTools(id, agentId) {
     const workspaceDir = this.workspaceDir(id), saved = what => ({ file, pages, slides }) => this.event(id, 'file_saved', agentId, `Saved /work/${file} (${what === 'pdf' ? `${pages} page${pages === 1 ? '' : 's'}` : `${slides} slides`}).`, { file });
-    return [assembleFilesTool({ workspaceDir, onSaved: r => this.event(id, 'file_saved', agentId, `Combined ${r.parts} files into /work/${r.file}.`) }), exportPdfTool({ workspaceDir, onSaved: saved('pdf') }), exportPptxTool({ workspaceDir, onSaved: saved('pptx') })];
+    return [assembleFilesTool({ workspaceDir, onSaved: r => this.event(id, 'file_saved', agentId, `Combined ${r.parts} files into /work/${r.file}.`) }), exportPdfTool({ workspaceDir, onSaved: saved('pdf') }), exportXlsxTool({ workspaceDir, onSaved: ({ file, sheets, formulas }) => this.event(id, 'file_saved', agentId, `Saved /work/${file} (${sheets} sheet${sheets === 1 ? '' : 's'}${formulas ? `, ${formulas} formulas` : ''}).`) }), exportPptxTool({ workspaceDir, onSaved: saved('pptx') })];
   }
   progressTool(id, agentId) {
     return tool(async ({ text }) => { const line = clean(text).slice(0, 240); if (line) { this.update(id, j => { j.progressLine = line; }); this.event(id, 'progress', agentId, line); } return 'Noted.'; },
@@ -1236,22 +1311,23 @@ export class OfficeEngine {
     this.notifications.ackForJob(id, ['question', 'escalated', 'blocked', 'provider_error']);
     this.setState(id, 'working', { error: null, escalation: null });
     const label = kind === 'answer' ? 'CEO answer' : reopening || kind === 'correction' ? 'CEO correction' : 'CEO message';
+    const files = this.takeAttachmentNotes(id);
     // Tasks from before the upgrade, or whose checkpoints were cleared by retention, have no conversation to resume: start one with the brief and the current result.
     const context = job.harness === false || job.prunedAt ? `${this.brief(job)}${job.result ? '\n\nThe current result:\n' + job.result.slice(0, 20000) : ''}\n\n` : '';
-    this.schedule(id, { kind: 'message', text: `${context}${label}${target ? ` for ${target.name} (${target.role})` : ''}: ${body}${this.referenceText(refIds, id)}` });
+    this.schedule(id, { kind: 'message', text: `${context}${label}${target ? ` for ${target.name} (${target.role})` : ''}: ${body}${this.referenceText(refIds, id)}${files ? '\n\n' + files : ''}` });
     return { queued: false, message, job: this.get(id) };
   }
   answer(id, text) { return this.message(id, { text, kind: 'answer' }); }
   retry(id, feedback, { automatic = false } = {}) {
     const job = this.get(id);
     if (!job || this.running.has(id) || !['blocked', 'escalated'].includes(job.state)) throw httpError('Only blocked or escalated tasks can be retried.', 409);
-    const text = clean(feedback), started = job.calls > 0 && job.harness !== false && !job.prunedAt;
+    const text = clean(feedback), started = job.calls > 0 && job.harness !== false && !job.prunedAt, files = this.takeAttachmentNotes(id);
     if (text) this.threads.append(id, { role: 'ceo', kind: 'correction', text, jobId: id });
     this.update(id, j => { j.error = null; j.reprompts = 0; j.reworkRounds = {}; if (!automatic) j.autoRetries = 0; for (const r of j.runs) if (['failed', 'paused'].includes(r.state)) r.state = 'interrupted'; }, { touch: false });
     this.notifications.ackForJob(id, ['blocked', 'provider_error', 'escalated', 'question']);
     this.event(id, 'retry_requested', null, text || (automatic ? 'Retrying after the provider failure.' : 'CEO asked the team to continue.'));
     this.setState(id, 'queued', { escalation: null });
-    this.update(id, j => { j.next = !started ? null : { kind: 'message', text: text ? `CEO: ${text}` : `Office: the task stopped before it was finished. Continue from where the work stopped; do not repeat finished work. ${this.stateSummary(j)}` }; }, { touch: false });
+    this.update(id, j => { j.next = !started ? null : { kind: 'message', text: (text ? `CEO: ${text}` : `Office: the task stopped before it was finished. Continue from where the work stopped; do not repeat finished work. ${this.stateSummary(j)}`) + (files ? '\n\n' + files : '') }; }, { touch: false });
     this.pump(); return this.get(id);
   }
   cancel(id) {

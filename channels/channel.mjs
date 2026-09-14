@@ -29,14 +29,14 @@ import path from 'node:path';
 
 // What may travel into a task's workspace: by extension and by declared type. A generic octet-stream is accepted when the extension is.
 export const ATTACHMENT_TYPES = {
-  pdf: ['application/pdf'], docx: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'], xlsx: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+  pdf: ['application/pdf'], docx: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'], xlsx: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'], xls: ['application/vnd.ms-excel', 'application/excel', 'application/x-excel', 'application/x-msexcel'],
   pptx: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'], csv: ['text/csv', 'text/plain', 'application/csv'], txt: ['text/plain'], md: ['text/markdown', 'text/plain', 'text/x-markdown'],
   json: ['application/json', 'text/plain'], png: ['image/png'], jpg: ['image/jpeg'], jpeg: ['image/jpeg'],
 };
 export const ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
 // Base64 is a third longer than the bytes it carries; a request body is allowed that much and a little for the JSON around it.
 export const ATTACHMENT_MAX_ENCODED = Math.ceil(ATTACHMENT_MAX_BYTES / 3) * 4 + 64 * 1024;
-export const TEXT_EXTENSIONS = new Set(['pdf', 'docx', 'txt', 'md', 'csv']); // what the Brain can extract text from
+export const TEXT_EXTENSIONS = new Set(['pdf', 'docx', 'xlsx', 'xls', 'pptx', 'txt', 'md', 'csv', 'json']); // what the office can read as text (documents.mjs readDocument)
 
 // A file name the workspace accepts: the basename, letters, digits, dots, dashes, underscores and spaces; never a dotfile or empty.
 export function safeFileName(name) {

@@ -19,7 +19,7 @@ const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'talkchief-intake-'));
 const fixture = async (over = {}) => postmark.parse({ rawBody: Buffer.from(JSON.stringify({ ...JSON.parse(fs.readFileSync(path.join(here, 'fixtures', 'postmark-inbound.json'), 'utf8')), ...over })) });
 const to = (address, hash = '') => ({ To: address, ToFull: [{ Email: address, Name: '', MailboxHash: hash }], OriginalRecipient: address, MailboxHash: hash });
 
-test('engine.attach files under /work/inbox/ with safe, unique names, records them and tells the team', () => {
+test('engine.attach files under /work/inbox/ with safe, unique names, records them and tells the team', async () => {
   const dir = temp(), office = new OfficeStore({ dataDir: dir, initialAgents: loadRoster().agents });
   const engine = new OfficeEngine({ dataDir: dir, office, models: {}, knowledgeDir: path.join(dir, 'k') });
   try {
@@ -29,7 +29,13 @@ test('engine.attach files under /work/inbox/ with safe, unique names, records th
     assert.ok(fs.existsSync(path.join(engine.workspaceDir(job.id), 'inbox', 'brief-2.pdf')));
     assert.equal(engine.get(job.id).attachments.length, 3); assert.equal(engine.get(job.id).attachments[0].type, 'application/pdf');
     assert.ok(engine.files(job.id).some(f => f.name === 'inbox/brief.pdf'));
-    assert.match(engine.brief(engine.get(job.id)), /Read the attached files under \/work\/inbox\/ before planning: brief\.pdf, brief-2\.pdf, notes _v2_\.md/);
+    // The note names every file and where to read it; these two "PDFs" are not real documents, so it says they cannot be read.
+    await out.ready;
+    const brief = engine.brief(engine.get(job.id));
+    assert.match(brief, /The CEO attached 3 files under \/work\/inbox\/\. Read them before planning:/);
+    assert.match(brief, /- notes _v2_\.md: read \/work\/inbox\/notes _v2_\.md/);
+    assert.match(brief, /- brief\.pdf: COULD NOT BE READ/); assert.match(brief, /Call ask_ceo now for a readable copy/);
+    assert.deepEqual(engine.unreadableInputs(job.id).map(a => a.name), ['brief.pdf', 'brief-2.pdf']);
     assert.throws(() => engine.attach(job.id, [{ name: '.env', bytes: Buffer.from('x') }]), /not usable/);
     assert.throws(() => engine.attach(job.id, [{ name: 'empty.txt', bytes: Buffer.alloc(0) }]), /empty/);
     assert.throws(() => engine.attach(job.id, [{ name: 'huge.pdf', bytes: Buffer.alloc(6 * 1024 * 1024) }]), /5 MB/);

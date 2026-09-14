@@ -35,7 +35,7 @@ A project starts from a brief: say what to build or achieve, attach the document
 - **Skills** — reusable methods you give to teams or people, typed by you or added from the Agency. See [SKILLS.md](SKILLS.md).
 - **Routines** — tasks the office starts on its own clock, for any team.
 - **Reports & KPIs** — throughput, cycle time, review wait, your response time, rework, overdue work, tokens and cost by model.
-- **Brain** — upload documents (PDF, Word, text, Markdown, CSV), search everything, edit notes, rebuild the search index.
+- **Brain** — upload documents (PDF, Word, Excel, PowerPoint, text, Markdown, CSV), search everything, edit notes, rebuild the search index.
 - **Audit log** — every configuration change, who made it and what changed.
 
 ## The Agency: ready-made people and methods

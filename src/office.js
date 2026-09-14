@@ -37,7 +37,7 @@ export function initOfficeWork(ctx) {
   panel.innerHTML = `<button type="button" id="tpanelHandle" aria-label="Expand or collapse the work panel"></button><form class="space-command">
     <div class="space-team-picker"><button id="spaceDept" type="button" aria-expanded="false" aria-controls="spaceTeamMenu"><i style="background:${teamChip(selectedTeam).chip}"></i><span>${esc(teamChip(selectedTeam).name)}</span><span class="space-chevron">⌄</span></button><div id="spaceTeamMenu" hidden><button type="button" data-pick-team="auto"><i style="background:#465B70"></i>Let the Program Manager choose</button>${DEPT_KEYS.map(k => `<button type="button" data-pick-team="${k}"><i style="background:${DEPTS[k].chip}"></i>${esc(DEPTS[k].name)}</button>`).join('')}</div></div>
     <textarea id="spaceBrief" rows="2" aria-label="Task brief" placeholder="What needs to get done? Enter sends, Shift+Enter for a new line" required></textarea>
-    <details class="space-options" id="spaceOptions"><summary><span class="opt-pill">Options <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span><span class="opt-hint">assign · due date · more teams · documents</span></summary><div class="space-options-grid"><label>For<span><select id="spaceAssignee"></select><small id="spaceAssignHint"></small></span></label><label>Due<input type="datetime-local" id="spaceDue"></label><label>Priority<select id="spacePriority"><option value="1">Normal</option><option value="2">High</option><option value="0">Low</option></select></label><label>Documents<input type="file" id="spaceFiles" multiple accept=".pdf,.docx,.xlsx,.pptx,.csv,.txt,.md,.json,.png,.jpg,.jpeg"></label><label>Project<select id="spaceProject"><option value="">None</option></select></label>${HOSTED ? '<label>Visibility<select id="spaceVisibility"><option value="private">Private</option><option value="public">Everyone in the office</option></select></label><label id="spaceShareWrap">Share with<select id="spaceShare" multiple size="4"></select><small>People and groups who may see this task. You and the office admins always can.</small></label>' : ''}<div class="space-involve" id="spaceInvolve"></div></div></details>
+    <details class="space-options" id="spaceOptions"><summary><span class="opt-pill">Options <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span><span class="opt-hint">assign · due date · more teams · documents</span></summary><div class="space-options-grid"><label>For<span><select id="spaceAssignee"></select><small id="spaceAssignHint"></small></span></label><label>Due<input type="datetime-local" id="spaceDue"></label><label>Priority<select id="spacePriority"><option value="1">Normal</option><option value="2">High</option><option value="0">Low</option></select></label><label>Documents<input type="file" id="spaceFiles" multiple accept=".pdf,.docx,.xlsx,.xls,.pptx,.csv,.txt,.md,.json,.png,.jpg,.jpeg"></label><label>Project<select id="spaceProject"><option value="">None</option></select></label>${HOSTED ? '<label>Visibility<select id="spaceVisibility"><option value="private">Private</option><option value="public">Everyone in the office</option></select></label><label id="spaceShareWrap">Share with<select id="spaceShare" multiple size="4"></select><small>People and groups who may see this task. You and the office admins always can.</small></label>' : ''}<div class="space-involve" id="spaceInvolve"></div></div></details>
     <div class="space-command-actions"><span>Lead-reviewed work</span><button type="submit" class="space-save-draft" data-backlog="true" title="Save without starting agents">Save idea</button><button type="submit">Add task <span aria-hidden="true">↗</span></button></div><p id="spaceHint" role="status"></p></form>
     <div class="space-now-head"><span class="space-h2">Right now</span></div>
     <div id="spaceNow" class="space-now"></div>
@@ -94,7 +94,7 @@ export function initOfficeWork(ctx) {
               <textarea name="text" rows="4" required placeholder="Describe what spans teams, needs a decision, or has to be coordinated… type @ to name a project, a milestone or a task"></textarea>
 
             <div class="pm-bar">
-              <label class="pm-attach" title="Attach documents the teams should read — PDF, Word, Excel, PowerPoint, CSV, text, Markdown, JSON or a picture, up to 5 MB each"><input type="file" id="spacePmFiles" multiple accept=".pdf,.docx,.xlsx,.pptx,.csv,.txt,.md,.json,.png,.jpg,.jpeg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.1 12.3 19.8a5 5 0 0 1-7.1-7.1l8.7-8.7a3.3 3.3 0 0 1 4.7 4.7l-8.7 8.7a1.7 1.7 0 0 1-2.4-2.4l8-8"/></svg>Attach</label>
+              <label class="pm-attach" title="Attach documents the teams should read — PDF, Word, Excel (XLSX or XLS), PowerPoint, CSV, text, Markdown, JSON or a picture, up to 5 MB each"><input type="file" id="spacePmFiles" multiple accept=".pdf,.docx,.xlsx,.xls,.pptx,.csv,.txt,.md,.json,.png,.jpg,.jpeg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.1 12.3 19.8a5 5 0 0 1-7.1-7.1l8.7-8.7a3.3 3.3 0 0 1 4.7 4.7l-8.7 8.7a1.7 1.7 0 0 1-2.4-2.4l8-8"/></svg>Attach</label>
               <span class="pm-files" id="spacePmFileNote"></span>
               <span class="pm-sp"></span>
               <kbd class="pm-kbd">⌘ Enter</kbd>
@@ -162,10 +162,12 @@ export function initOfficeWork(ctx) {
         try {
           const project = marks.find(m => m.kind === 'project') || (marks.find(m => m.kind === 'milestone')?.projectId ? { id: marks.find(m => m.kind === 'milestone').projectId } : null);
           const milestone = marks.find(m => m.kind === 'milestone');
-          const job = await api('/tasks', 'POST', { dept: 'auto', depts: 'auto', text: event.target.elements.text.value, ...(project ? { projectId: project.id } : {}), ...(milestone ? { milestoneId: milestone.id } : {}) });
-          for (const file of picked) { const data = await readFileAsBase64(file); await api(`/tasks/${job.id}/attach`, 'POST', { name: file.name, data, type: file.type }); }
+          // With files, the task waits as an idea until they are on it: a run that started first would plan without them.
+          const job = await api('/tasks', 'POST', { dept: 'auto', depts: 'auto', text: event.target.elements.text.value, ...(picked.length ? { backlog: true } : {}), ...(project ? { projectId: project.id } : {}), ...(milestone ? { milestoneId: milestone.id } : {}) });
+          const unread = picked.length ? await attachFiles(job.id, picked) : '';
+          if (picked.length) await api(`/tasks/${job.id}/queue`, 'POST', { state: 'queued' });
           await refresh(); projectUI.open();
-          feedback(`Task received: ${job.title}. Open it from the list when you want to follow the plan.`);
+          feedback(`Task received: ${job.title.replace(/[.!?]$/, "")}. ${unread || 'Open it from the list when you want to follow the plan.'}`, !!unread);
         } catch (error) { feedback(error.message, true); button.disabled = false; }
       };
     },
@@ -259,14 +261,11 @@ export function initOfficeWork(ctx) {
       const assignee = $('spaceAssignee').value || undefined, forTeam = assignee ? Object.values(R).find(r => r.a.id === assignee)?.a.dept : null;
       const auto = selectedTeam === 'auto' && !forTeam, team = forTeam || selectedTeam, involve = [...$('spaceInvolve').querySelectorAll('input:checked')].map(el => el.value), due = $('spaceDue').value;
       let job = await api('/tasks', 'POST', { dept: auto ? 'auto' : team, ...(auto ? { depts: 'auto' } : involve.length ? { depts: [team, ...involve] } : {}), text: $('spaceBrief').value, assignee, dueAt: due ? new Date(due).getTime() : undefined, priority: Number($('spacePriority').value), backlog: wantBacklog || files.length > 0, projectId: $('spaceProject').value || undefined, ...audienceInput() });
-      for (const file of files) {
-        $('spaceHint').textContent = `Adding ${file.name} to the task…`;
-        const data = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(',')[1]); r.onerror = reject; r.readAsDataURL(file); });
-        await api(`/tasks/${job.id}/attach`, 'POST', { name: file.name, data, type: file.type });
-      }
+      if (files.length) $('spaceHint').textContent = `Adding ${files.length === 1 ? files[0].name : files.length + ' files'} to the task and reading ${files.length === 1 ? 'it' : 'them'}…`;
+      const unread = files.length ? await attachFiles(job.id, files) : '';
       if (files.length && !wantBacklog) job = await api(`/tasks/${job.id}/queue`, 'POST', { state: 'queued' });
       $('spaceDue').value = ''; $('spaceFiles').value = ''; $('spacePriority').value = '1'; $('spaceOptions').open = false; if (HOSTED) { $('spaceVisibility').value = 'private'; $('spaceShareWrap').hidden = false; for (const o of $('spaceShare').options) o.selected = false; } selectedTeam = 'auto'; $('spaceDept').innerHTML = `<i style="background:${teamChip('auto').chip}"></i><span>${esc(teamChip('auto').name)}</span><span class="space-chevron">⌄</span>`; fillOptions();
-      $('spaceBrief').value = ''; $('spaceHint').textContent = job.state === 'backlog' ? 'Idea saved. Start it when you are ready.' : 'Task received. The lead will create the plan; open the task from the list on the right to follow it.';
+      $('spaceBrief').value = ''; $('spaceHint').textContent = unread ? unread : job.state === 'backlog' ? 'Idea saved. Start it when you are ready.' : 'Task received. The lead will create the plan; open the task from the list on the right to follow it.';
       await refresh();
     } catch (error) { $('spaceHint').textContent = error.message; if (/model key/i.test(error.message)) settings.open('models'); }
     finally { button.disabled = false; }
@@ -436,8 +435,15 @@ export function initOfficeWork(ctx) {
     } catch (error) { connectionStale=true;activityByAgent.clear();$('spaceHint').textContent='Live updates interrupted. Showing the last recorded state; reconnecting…'; }
     finally { refreshing = false; }
   }
+  // Attach files to a task and return a sentence about any the teams cannot read (empty when all are readable).
+  async function attachFiles(jobId, files) {
+    const unreadable = [];
+    for (const file of files) { const r = await api(`/tasks/${jobId}/attach`, 'POST', { name: file.name, data: await readFileAsBase64(file), type: file.type }); unreadable.push(...(r.unreadable || [])); }
+    const docs = unreadable.filter(u => !u.picture), pics = unreadable.filter(u => u.picture);
+    return [docs.length ? `${docs.map(u => u.name).join(', ')} could not be read (${docs[0].problem}). The Program Manager will ask you for a readable copy before any work starts.` : '', pics.length ? `${pics.map(u => u.name).join(', ')}: the teams cannot see pictures; describe what matters in the brief.` : ''].filter(Boolean).join(' ');
+  }
   // Anywhere the CEO writes to the team, they can hand over a document too; it lands on the task itself.
-  const TASK_ATTACH = `<label class="tv-attach" title="Attach a document to this task — PDF, Word, Excel, PowerPoint, CSV, text, Markdown, JSON or a picture, up to 5 MB each"><input type="file" id="spaceTaskFiles" multiple accept=".pdf,.docx,.xlsx,.pptx,.csv,.txt,.md,.json,.png,.jpg,.jpeg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.1 12.3 19.8a5 5 0 0 1-7.1-7.1l8.7-8.7a3.3 3.3 0 0 1 4.7 4.7l-8.7 8.7a1.7 1.7 0 0 1-2.4-2.4l8-8"/></svg>Attach</label><span class="tv-filenote" id="spaceTaskFileNote"></span>`;
+  const TASK_ATTACH = `<label class="tv-attach" title="Attach a document to this task — PDF, Word, Excel (XLSX or XLS), PowerPoint, CSV, text, Markdown, JSON or a picture, up to 5 MB each"><input type="file" id="spaceTaskFiles" multiple accept=".pdf,.docx,.xlsx,.xls,.pptx,.csv,.txt,.md,.json,.png,.jpg,.jpeg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.1 12.3 19.8a5 5 0 0 1-7.1-7.1l8.7-8.7a3.3 3.3 0 0 1 4.7 4.7l-8.7 8.7a1.7 1.7 0 0 1-2.4-2.4l8-8"/></svg>Attach</label><span class="tv-filenote" id="spaceTaskFileNote"></span>`;
   function taskActions(job) {
     const queued = job.calls === 0 && ['backlog', 'queued'].includes(job.state);
     if (['cancelled', 'saving'].includes(job.state)) return '';
@@ -834,10 +840,11 @@ export function initOfficeWork(ctx) {
       // A message with a file is work, not conversation: it becomes a task for that person's team, with the file on it.
       if (docs.length) {
         try {
-          const job = await api('/tasks', 'POST', { dept: R[id].a.dept, text });
-          for (const file of docs) await api(`/tasks/${job.id}/attach`, 'POST', { name: file.name, data: await readFileAsBase64(file), type: file.type });
+          const job = await api('/tasks', 'POST', { dept: R[id].a.dept, text, backlog: true });
+          const unread = await attachFiles(job.id, docs);
+          await api(`/tasks/${job.id}/queue`, 'POST', { state: 'queued' });
           await refresh();
-          return `Task received with ${docs.length} file${docs.length === 1 ? '' : 's'}: ${job.title}. ${R[id].a.name} has it.`;
+          return `Task received with ${docs.length} file${docs.length === 1 ? '' : 's'}: ${job.title}. ${unread || R[id].a.name + ' has it.'}`;
         } catch (error) { return `That could not be sent: ${error.message}`; }
       }
       const match=text.match(/^\s*(?:add\s+(?:a\s+)?task|task|todo)\s*:\s*(.+)$/is);if(match){try{const job=await api('/tasks','POST',{dept:R[id].a.dept,text:match[1]});await refresh();return `Task received by the team lead: ${job.title}. Open Work to follow the plan and verification.`;}catch(error){return error.message;}}return null;},

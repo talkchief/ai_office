@@ -21,7 +21,7 @@ export function workspaceFile(workspaceDir, virtualPath) {
   if (abs !== root && !abs.startsWith(root + path.sep)) throw new Error('Only files inside /work/ can be used.');
   return { abs, rel: path.relative(root, abs).split(path.sep).join('/') };
 }
-export const MIME = { pdf: 'application/pdf', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', md: 'text/markdown; charset=utf-8', txt: 'text/plain; charset=utf-8', csv: 'text/csv; charset=utf-8', json: 'application/json', html: 'text/html; charset=utf-8', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml' };
+export const MIME = { pdf: 'application/pdf', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', xls: 'application/vnd.ms-excel', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', md: 'text/markdown; charset=utf-8', txt: 'text/plain; charset=utf-8', csv: 'text/csv; charset=utf-8', json: 'application/json', html: 'text/html; charset=utf-8', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml' };
 export const mimeOf = name => MIME[path.extname(name).slice(1).toLowerCase()] || 'application/octet-stream';
 
 // Every file in a task's workspace, newest first: what the CEO can download from the task page.
@@ -382,6 +382,93 @@ export function exportPdfTool({ workspaceDir, onSaved = () => {} }) {
   }, { name: 'export_pdf', description: 'Turn a Markdown file in /work/ into a formatted PDF the CEO downloads from the task page. Write the document as Markdown first (a title heading, sections, lists, tables), then call this with its path. When the CEO asked for a page count, pass pages and the office fits the print to it. Never try to write PDF bytes yourself, and never export twice to tune pages.',
     schema: z.object({ source: z.string().describe('Path of the Markdown file, e.g. /work/report.md'), output: z.string().optional().describe('PDF path, default: the same name with .pdf'), title: z.string().optional().describe('Title on the first page and in the footer; default: the first heading'), pages: z.number().int().min(1).max(50).optional().describe('The page count the CEO asked for, if any: the print is scaled down to fit it (to 60% at most)') }) });
 }
+// A spreadsheet from what an agent writes: Markdown tables (each ## heading a sheet), a CSV, or JSON { sheets: [{ name, rows }] }.
+// Cells become real values: "=SUM(B2:B9)" a formula Excel calculates, "40%" a percentage, "1,250.50" or "$1,250" a number, an ISO
+// date a date, TRUE/FALSE a boolean; everything else stays text. Columns are sized to their content; a header row gets a filter.
+const SHEET_NAME_BAD = /[\[\]:*?/\\]/g;
+const plainCell = text => String(text ?? '').replace(/\\\|/g, '|').replace(/\*\*(.+?)\*\*|__(.+?)__/g, '$1$2').replace(/`([^`]*)`/g, '$1').replace(/<br\s*\/?>/gi, '\n').trim();
+export function sheetCell(raw) {
+  const text = plainCell(raw);
+  if (text === '') return null;
+  if (/^=[^=]/.test(text)) return { t: 'n', f: text.slice(1) };
+  if (/^(true|false)$/i.test(text)) return { t: 'b', v: /^true$/i.test(text) };
+  const pct = /^(-?\d+(?:[.,]\d+)?)\s*%$/.exec(text); if (pct) return { t: 'n', v: Number(pct[1].replace(',', '.')) / 100, z: pct[1].includes('.') ? '0.0%' : '0%' };
+  const money = /^(-)?([$€£])\s?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?$/.exec(text); if (money) return { t: 'n', v: Number((money[1] || '') + money[3].replace(/,/g, '') + (money[4] || '')), z: `${money[2]}#,##0${money[4] ? '.00' : ''}` };
+  const num = /^-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?$/.exec(text); if (num) return { t: 'n', v: Number(text.replace(/,/g, '')), ...(text.includes(',') ? { z: text.includes('.') ? '#,##0.00' : '#,##0' } : {}) };
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text) && !Number.isNaN(Date.parse(text + 'T00:00:00Z'))) return { t: 'd', v: new Date(text + 'T00:00:00Z'), z: 'yyyy-mm-dd' };
+  return { t: 's', v: text };
+}
+export function sheetsFromMarkdown(markdown) {
+  const sheets = []; let current = null, inTable = false;
+  const sheet = name => { current = { name, rows: [], text: [] }; sheets.push(current); inTable = false; };
+  for (const line of String(markdown).replace(/\r\n?/g, '\n').split('\n')) {
+    const heading = /^(#{1,3})\s+(.+?)\s*#*$/.exec(line);
+    if (heading && (heading[1].length === 2 || !sheets.length || (heading[1].length === 1 && !current?.rows.length))) { if (current && !current.rows.length && !current.text.length) current.name = heading[2]; else sheet(heading[2]); continue; }
+    if (/^\s*\|.*\|\s*$/.test(line)) {
+      if (!current) sheet('Sheet1');
+      const cells = line.trim().slice(1, -1).split(/(?<!\\)\|/).map(c => c.trim());
+      if (cells.every(c => /^:?-{2,}:?$/.test(c))) continue; // the header separator
+      if (!inTable && current.rows.length) current.rows.push([]); // a second table on the same sheet: one blank row between
+      current.rows.push(cells); inTable = true; continue;
+    }
+    inTable = false;
+    if (line.trim() && current) current.text.push(line.trim());
+  }
+  // A section with prose and no table is still worth a sheet (a README): one line per row.
+  return sheets.map(s => ({ name: s.name, rows: s.rows.length ? s.rows : s.text.map(t => [t.replace(/^[-*]\s+/, '• ')]) })).filter(s => s.rows.length);
+}
+export async function renderXlsx({ sheets, out }) {
+  const XLSX = await import('xlsx');
+  const book = XLSX.utils.book_new(), used = new Set(); let formulas = 0;
+  const summary = [];
+  for (const [i, spec] of sheets.entries()) {
+    let name = String(spec.name || `Sheet${i + 1}`).replace(SHEET_NAME_BAD, ' ').replace(/\s+/g, ' ').trim().slice(0, 31) || `Sheet${i + 1}`;
+    for (let n = 2; used.has(name.toLowerCase()); n++) name = `${name.slice(0, 28)} ${n}`;
+    used.add(name.toLowerCase());
+    const rows = (spec.rows || []).map(r => (Array.isArray(r) ? r : [r]));
+    const ws = {}, widths = [];
+    let maxC = 0;
+    rows.forEach((row, r) => row.forEach((raw, c) => {
+      const cell = typeof raw === 'number' ? { t: 'n', v: raw } : typeof raw === 'boolean' ? { t: 'b', v: raw } : sheetCell(raw);
+      if (!cell) return;
+      if (cell.f) formulas++;
+      ws[XLSX.utils.encode_cell({ r, c })] = cell; maxC = Math.max(maxC, c);
+      widths[c] = Math.max(widths[c] || 8, Math.min(60, String(plainCell(raw)).split('\n').reduce((m, l) => Math.max(m, l.length), 0) + 2));
+    }));
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(0, rows.length - 1), c: maxC } });
+    ws['!cols'] = widths.map(w => ({ wch: w || 10 }));
+    // A table with a header row gets Excel's filter over it.
+    const header = rows[0] || [];
+    if (rows.length > 1 && header.length > 1 && header.every(h => typeof h === 'string' && h.trim() && !/^=/.test(h.trim()))) ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: maxC } }) };
+    XLSX.utils.book_append_sheet(book, ws, name);
+    summary.push(`${name} (${rows.length} rows × ${maxC + 1} columns)`);
+  }
+  if (!book.SheetNames.length) throw new Error('there was nothing to put in a sheet: write at least one Markdown table (under a ## heading for each sheet), a CSV or JSON rows');
+  const bytes = XLSX.write(book, { type: 'buffer', bookType: 'xlsx', compression: true });
+  fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out, bytes);
+  return { sheets: book.SheetNames.length, summary, formulas, bytes: bytes.length };
+}
+export function exportXlsxTool({ workspaceDir, onSaved = () => {} }) {
+  return tool(async ({ source, output }) => {
+    try {
+      const src = workspaceFile(workspaceDir, source);
+      if (!fs.existsSync(src.abs)) return `There is no file at /work/${src.rel}. Write the tables there first (Markdown, CSV or JSON), then export it.`;
+      const ext = path.extname(src.rel).toLowerCase(), content = fs.readFileSync(src.abs, 'utf8');
+      let sheets;
+      if (ext === '.md' || ext === '.markdown' || ext === '.txt') sheets = sheetsFromMarkdown(content);
+      else if (ext === '.csv') { const XLSX = await import('xlsx'); const wb = XLSX.read(content, { type: 'string', raw: true }); sheets = [{ name: path.basename(src.rel, ext), rows: XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' }) }]; }
+      else if (ext === '.json') { const data = JSON.parse(content); sheets = Array.isArray(data) ? [{ name: 'Sheet1', rows: data }] : Array.isArray(data.sheets) ? data.sheets : null; if (!sheets) return 'The JSON must be { "sheets": [{ "name": "…", "rows": [["header", …], [value, …]] }] } or an array of rows.'; }
+      else return 'Point this at a Markdown (.md), CSV (.csv) or JSON (.json) file in /work/.';
+      const dest = workspaceFile(workspaceDir, output || src.rel.replace(/\.(md|markdown|txt|csv|json)$/i, '') + '.xlsx');
+      if (!/\.xlsx$/i.test(dest.rel)) return 'The output name must end in .xlsx.';
+      const result = await renderXlsx({ sheets, out: dest.abs });
+      onSaved({ file: dest.rel, ...result });
+      return `Saved /work/${dest.rel}: ${result.sheets} sheet${result.sheets === 1 ? '' : 's'} — ${result.summary.join('; ')}${result.formulas ? `, ${result.formulas} formula${result.formulas === 1 ? '' : 's'} Excel calculates when it opens` : ''}, ${sizeOf(result.bytes)}. Name the file in your answer; the CEO downloads it from the task page under Artifacts.`;
+    } catch (error) { return `Could not export the spreadsheet: ${error.message}`; }
+  }, { name: 'export_xlsx', description: 'Turn tables in /work/ into an Excel workbook (.xlsx) the CEO downloads from the task page. Write the tables first: Markdown with one ## heading per sheet and a table under it (first row the header), or a CSV (one sheet), or JSON {"sheets":[{"name","rows":[[…]]}]}. A cell that starts with = is a formula (=SUM(B2:B9), =B2*C2), "40%" a percentage, "1,250.50" or "$1,250" a number, 2026-09-14 a date. Export again after every change to the source.',
+    schema: z.object({ source: z.string().describe('Path of the Markdown, CSV or JSON file, e.g. /work/model.md'), output: z.string().optional().describe('Workbook path, default: the same name with .xlsx') }) });
+}
+
 export function exportPptxTool({ workspaceDir, onSaved = () => {} }) {
   return tool(async ({ source, output, title }) => {
     try {
