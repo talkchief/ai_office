@@ -28,6 +28,8 @@ async function api(path, method = 'GET', body) {
 export function initOfficeWork(ctx) {
   const { R, deptRT, onLive, onUsage, getFocused } = ctx;
   let jobs = [], config = null, tools = [], selectedTeam = 'auto', filter = 'all', refreshing = false, agentOpen = null, modalKind = '', modalTask = null;
+  // Archived tasks are off the board's list; the Archived filter shows them, and live updates move a task between the two lists.
+  let archivedJobs = [], archivedLoaded = false;
   let reportDays = 7, reportFetchCounter = 0, taskFetchCounter = 0, taskDirty = false, connectionStale = false;
   let taskCurrent = null, taskTab = 'work', taskTabTouched = false, taskSignature = '';
   let taskExpanded = new Map(), taskScroll = {}, taskInputDraft = {}, taskScrollToLatest = false, taskAtLatest = false;
@@ -300,7 +302,18 @@ export function initOfficeWork(ctx) {
   }
   setInterval(renderNow, 1500);
   const involves = (j, key) => (!j.autoRoute && (j.dept === key || (j.depts || []).includes(key))) || (j.runs || []).some(r => r.role === 'lead' && r.dept === key);
-  function scopedJobs() { const dept = getFocused(); return dept && dept !== 'brain' ? jobs.filter(j => involves(j, dept)) : jobs; }
+  function scopedJobs(list = jobs) { const dept = getFocused(); return dept && dept !== 'brain' ? list.filter(j => involves(j, dept)) : list; }
+  // Putting a closed task away: its owner or an office admin may (a single office has one owner).
+  const canTidy = j => !HOSTED || isOfficeAdmin() || (!!j.ownerId && j.ownerId === USER?.id);
+  const deleteQuestion = j => `Delete “${j.title}” for good?\n\n${j.state === 'done' ? 'Its result, its conversation, its files and its note in the Brain are removed.' : 'Its conversation and its files are removed.'} This cannot be undone.`;
+  const tidied = (act, out) => act === 'archive' ? 'Archived. The task is under Archived with its result, conversation and files.' : act === 'restore' ? 'Back on the board.' : out?.brainNote ? 'Deleted, with its note in the Brain.' : 'Deleted.';
+  // A task lives in one list: the board's, or the archive's once it is put away; restoring moves it back.
+  function placeJob(j) {
+    const from = j.archivedAt ? jobs : archivedJobs, to = j.archivedAt ? archivedJobs : jobs;
+    const k = from.findIndex(x => x.id === j.id); if (k >= 0) from.splice(k, 1);
+    const i = to.findIndex(x => x.id === j.id); if (i >= 0) to[i] = j; else if (!j.archivedAt || archivedLoaded) to.unshift(j);
+  }
+  async function refreshArchived() { try { archivedJobs = (await api('/tasks?archived=1')).map(uiJob); archivedLoaded = true; render(); } catch {} }
   // A project is one card on the board: its tasks stay off the lists and add up to one progress line; blocked work turns the card red.
   const PROJECT_STATES = { blocked: ['blocked'], waiting: ['waiting'], active: ['queued', 'planning', 'working', 'reviewing', 'saving'] };
   function projectSummaries() {
@@ -359,13 +372,14 @@ export function initOfficeWork(ctx) {
       if (job.state==='working') for (const r of job.runs||[]) if (r.role==='lead'&&r.state==='working'&&r.agent&&!(job.runs||[]).some(x=>x.role==='specialist'&&x.state==='working'&&x.dept===r.dept)) activityByAgent.set(r.agent,{phase:'working',title:job.title,jobId:job.id});
       if (!['cancelled','done'].includes(job.state)) for (const step of job.subtasks) if (step.state==='working'&&step.agent) activityByAgent.set(step.agent,{phase:'working',title:step.title,jobId:job.id});
     }
-    const scope = scopedJobs().filter(j => !j.projectId), projectCards = projectSummaries();
-    $('spaceFilters').innerHTML = [['all', 'All'], ['backlog', 'Ideas'], ['active', 'Active'], ['waiting', 'Review'], ['blocked', 'Blocked'], ['done', 'Results']].map(([id, name]) => {
+    const scope = scopedJobs().filter(j => !j.projectId), archivedScope = scopedJobs(archivedJobs).filter(j => !j.projectId), projectCards = projectSummaries();
+    $('spaceFilters').innerHTML = [['all', 'All'], ['backlog', 'Ideas'], ['active', 'Active'], ['waiting', 'Review'], ['blocked', 'Blocked'], ['done', 'Results'], ['archived', 'Archived']].map(([id, name]) => {
+      if (id === 'archived') return archivedScope.length || filter === 'archived' ? `<button class="${filter === id ? 'selected' : ''}" data-filter="${id}" title="Tasks put away: off the board, everything kept">${name} <b>${archivedScope.length}</b></button>` : '';
       const count = scope.filter(j => id === 'all' || (id === 'active' ? ['queued', 'planning', 'working', 'reviewing', 'saving'].includes(j.state) : j.state === id)).length + projectCards.filter(p => projectMatches(id, p)).length;
       return `<button class="${filter === id ? 'selected' : ''}" data-filter="${id}">${name} <b>${count}</b></button>`;
     }).join('');
-    $('spaceFilters').querySelectorAll('button').forEach(b => b.onclick = () => { filter = b.dataset.filter; render(); });
-    const visible = scope.filter(j => filter === 'all' || (filter === 'active' ? ['queued', 'planning', 'working', 'reviewing', 'saving'].includes(j.state) : j.state === filter));
+    $('spaceFilters').querySelectorAll('button').forEach(b => b.onclick = () => { filter = b.dataset.filter; render(); if (filter === 'archived') refreshArchived(); });
+    const visible = filter === 'archived' ? archivedScope : scope.filter(j => filter === 'all' || (filter === 'active' ? ['queued', 'planning', 'working', 'reviewing', 'saving'].includes(j.state) : j.state === filter));
     const historyOpen = $('spaceJobs').querySelector('[data-task-history]')?.open || false;
     const projectsFold = $('spaceJobs').querySelector('[data-projects-fold]')?.open ?? true;
     const nameOf = id => (R[id] && R[id].a.name) || AGENT_NAMES[id] || id || 'worker';
@@ -383,11 +397,14 @@ export function initOfficeWork(ctx) {
       const onIt = terminal || ['backlog', 'queued', 'waiting'].includes(j.state) ? [] : [...new Set((j.runs || []).filter(r => r.state === 'working' && r.agent).map(r => nameOf(r.agent)).filter(Boolean))];
       const actions = j.state === 'waiting' ? `<span class="space-card-actions">${j.review?.approved || j.pendingActions?.length ? `<button type="button" data-inline="approve" data-job-id="${j.id}">APPROVE</button>` : ''}<button type="button" class="secondary" data-inline="changes" data-job-id="${j.id}">REQUEST CHANGES</button><button type="button" class="space-text-action" data-inline="read" data-job-id="${j.id}">Read ↗</button></span>`
         : j.state === 'blocked' ? `<span class="space-card-actions"><button type="button" data-inline="retry" data-job-id="${j.id}">RETRY</button><button type="button" class="secondary" data-inline="changes" data-job-id="${j.id}">FIX & RETRY</button><button type="button" class="space-text-action" data-inline="cancel" data-job-id="${j.id}">Cancel</button></span>`
-        : ['queued', 'planning', 'working', 'reviewing', 'backlog'].includes(j.state) ? `<span class="space-card-actions"><button type="button" class="space-text-action" data-inline="cancel" data-job-id="${j.id}">${j.state === 'backlog' ? 'Discard' : 'Cancel'}</button></span>` : '';
-      return `<div class="space-job ${j.state}${loading ? ' loading' : ''}" data-job="${j.id}" role="button" tabindex="0"><span class="space-card-top"><span class="space-state">${j.state === 'done' && unseenResult(j) ? '<i class="space-unread" title="Ready, not opened yet"></i>' : ''}${j.state === 'done' ? 'Ready' : loading ? 'Planning' : labels[j.state] || esc(j.state)}${j.priority === 2 ? ' · Priority' : ''}${j.kind === 'evaluation' ? ' · Test' : ''}${j.lane === 'quick' ? ' · Quick' : ''}</span><time>${dateOf(j)}</time></span><strong>${esc(j.title)}</strong>${j.projectName ? `<span class="space-card-project">${esc(j.projectName)}</span>` : ''}${!terminal && j.state !== 'backlog' ? chain(j) : ''}${j.resultPreview && j.state === 'done' ? `<span class="space-result-excerpt">${esc(j.resultPreview)}</span>` : ''}<span class="space-card-context"><b>${teamsLine}</b> · ${onIt.length ? esc(onIt.join(' & ')) + ' on it · ' : ''}${context}</span>${actions}</div>`;
+        : ['queued', 'planning', 'working', 'reviewing', 'backlog'].includes(j.state) ? `<span class="space-card-actions"><button type="button" class="space-text-action" data-inline="cancel" data-job-id="${j.id}">${j.state === 'backlog' ? 'Discard' : 'Cancel'}</button></span>`
+        : terminal && canTidy(j) ? `<span class="space-card-actions"><button type="button" class="space-text-action" data-inline="${j.archivedAt ? 'restore' : 'archive'}" data-job-id="${j.id}">${j.archivedAt ? 'Restore' : 'Archive'}</button><button type="button" class="space-text-action danger" data-inline="delete" data-job-id="${j.id}">Delete</button></span>` : '';
+      return `<div class="space-job ${j.state}${loading ? ' loading' : ''}" data-job="${j.id}" role="button" tabindex="0"><span class="space-card-top"><span class="space-state">${j.state === 'done' && unseenResult(j) && !j.archivedAt ? '<i class="space-unread" title="Ready, not opened yet"></i>' : ''}${j.state === 'done' ? 'Ready' : loading ? 'Planning' : labels[j.state] || esc(j.state)}${j.archivedAt ? ' · Archived' : ''}${j.priority === 2 ? ' · Priority' : ''}${j.kind === 'evaluation' ? ' · Test' : ''}${j.lane === 'quick' ? ' · Quick' : ''}</span><time>${dateOf(j)}</time></span><strong>${esc(j.title)}</strong>${j.projectName ? `<span class="space-card-project">${esc(j.projectName)}</span>` : ''}${!terminal && j.state !== 'backlog' ? chain(j) : ''}${j.resultPreview && j.state === 'done' ? `<span class="space-result-excerpt">${esc(j.resultPreview)}</span>` : ''}<span class="space-card-context"><b>${teamsLine}</b> · ${onIt.length ? esc(onIt.join(' & ')) + ' on it · ' : ''}${context}</span>${actions}</div>`;
     };
     const groups = [['attention', 'Your call', ['waiting', 'blocked']], ['results', 'Ready to read', ['done']], ['active', 'In progress', ['queued', 'planning', 'working', 'reviewing', 'saving']], ['ideas', 'Ideas', ['backlog']], ['history', 'Closed tasks', ['cancelled']]];
-    $('spaceJobs').innerHTML = groups.map(([id, title, states]) => {
+    // The archive is one list, the most recently put away first.
+    if (filter === 'archived') $('spaceJobs').innerHTML = visible.length ? `<section class="space-feed-group" aria-label="Archived">${[...visible].sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0)).map(card).join('')}</section>` : `<div class="space-empty"><p>${archivedLoaded ? 'Nothing archived. Archive a finished or cancelled task to take it off the board; it keeps its result, its conversation and its files.' : 'Reading the archive…'}</p></div>`;
+    else $('spaceJobs').innerHTML = groups.map(([id, title, states]) => {
       let items = visible.filter(j => states.includes(j.state)).sort((a, b) => (b.doneAt || b.updatedAt || b.createdAt) - (a.doneAt || a.updatedAt || a.createdAt));
       if (!items.length) return '';
       let more = '';
@@ -407,8 +424,13 @@ export function initOfficeWork(ctx) {
       if (act === 'retry-project') { b.disabled = true; try { for (const j of jobs.filter(x => x.projectId === b.dataset.projectId && PROJECT_STATES.blocked.includes(x.state))) await api(`/tasks/${j.id}/retry`, 'POST', { feedback: '' }); await refresh(); } catch (error) { feedback(error.message, true); b.disabled = false; } return; }
       if (act === 'changes') { await showTask(id); const d = content.querySelector('[data-detail-key="revision"]'); if (d) { d.open = true; d.querySelector('textarea')?.focus(); } return; }
       if (act === 'cancel' && !confirm('Cancel this task?')) return;
+      if (act === 'delete') { const j = jobs.find(x => x.id === id) || archivedJobs.find(x => x.id === id); if (!j || !confirm(deleteQuestion(j))) return; }
       b.disabled = true;
-      try { await api(`/tasks/${id}/${act}`, 'POST', act === 'retry' ? { feedback: '' } : {}); await refresh(); } catch (error) { feedback(error.message, true); b.disabled = false; }
+      try {
+        const out = act === 'delete' ? await api(`/tasks/${id}`, 'DELETE') : await api(`/tasks/${id}/${act}`, 'POST', act === 'retry' ? { feedback: '' } : {});
+        if (['archive', 'restore', 'delete'].includes(act)) { feedback(tidied(act, out)); await refreshArchived(); }
+        await refresh();
+      } catch (error) { feedback(error.message, true); b.disabled = false; }
     });
     $('spaceJobs').querySelectorAll('[data-job]').forEach(b => { b.onclick = e => { if (e.target.closest('[data-inline]')) return; showTask(b.dataset.job); }; b.onkeydown = e => { if (e.key === 'Enter') showTask(b.dataset.job); }; });
     renderNow();
@@ -429,6 +451,7 @@ export function initOfficeWork(ctx) {
     try {
       const before = jobs.filter(j => j.state === 'done').length; jobs = (await api('/tasks')).map(uiJob); try { projectsOpen = await api('/projects/open'); fillProjects(); } catch {} try { const health = await api('/health'); providerHealth = health.provider || null; updateLimits(health.limits); } catch {} lastRefreshAt = Date.now(); if(connectionStale){$('spaceHint').textContent='Connection restored.';connectionStale=false;} for (const j of jobs) for (const a of (j.agents || [])) AGENT_NAMES[a.id] = a.name; render(); if (jobs.filter(j => j.state === 'done').length !== before) await syncBrain();
       await projectUI.refresh();
+      if (filter === 'archived') await refreshArchived();
       if (agentOpen) renderAgent(agentOpen);
       if (dialog.open && modalKind === 'reports' && document.activeElement?.id !== 'spaceReportPeriod') await showReports(false);
       if (dialog.open && modalKind === 'task' && !taskDirty && !dialog.contains(document.activeElement?.closest('textarea,input,select'))) await showTask(modalTask, false);
@@ -444,13 +467,20 @@ export function initOfficeWork(ctx) {
   }
   // Anywhere the CEO writes to the team, they can hand over a document too; it lands on the task itself.
   const TASK_ATTACH = `<label class="tv-attach" title="Attach a document to this task — PDF, Word, Excel (XLSX or XLS), PowerPoint, CSV, text, Markdown, JSON or a picture, up to 5 MB each"><input type="file" id="spaceTaskFiles" multiple accept=".pdf,.docx,.xlsx,.xls,.pptx,.csv,.txt,.md,.json,.png,.jpg,.jpeg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.1 12.3 19.8a5 5 0 0 1-7.1-7.1l8.7-8.7a3.3 3.3 0 0 1 4.7 4.7l-8.7 8.7a1.7 1.7 0 0 1-2.4-2.4l8-8"/></svg>Attach</label><span class="tv-filenote" id="spaceTaskFileNote"></span>`;
+  // A closed task can be put away: archived (off the board, everything kept), restored, or deleted for good.
+  function tidyRow(job) {
+    if (!['done', 'cancelled'].includes(job.state) || !canTidy(job)) return '';
+    const archive = job.archivedAt ? '<button type="button" class="tv-btn" data-tidy="restore">Restore to the board</button>' : job.projectId ? '' : '<button type="button" class="tv-btn tv-btn-text" data-tidy="archive" title="Off the board; the result, the conversation and the files are kept">Archive</button>';
+    return `<div class="tv-act tv-tidy"><span class="tv-sp"></span>${archive}<button type="button" class="tv-btn tv-btn-text tv-danger" data-tidy="delete" title="Removes the task, its conversation, its files and its note in the Brain">Delete</button></div>`;
+  }
   function taskActions(job) {
     const queued = job.calls === 0 && ['backlog', 'queued'].includes(job.state);
-    if (['cancelled', 'saving'].includes(job.state)) return '';
+    if (job.state === 'saving') return '';
+    if (job.state === 'cancelled' || job.archivedAt) return tidyRow(job);
     const cancel = '<button type="button" class="tv-btn tv-btn-text tv-danger" data-action="cancel">Cancel task</button>';
     if (job.realState === 'awaiting_ceo' && (job.pendingActions || []).some(a => a.name !== 'complete_task')) return `<div class="tv-pending">${job.pendingActions.map(a => `<div class="tv-pend"><b>${esc(a.name === 'complete_task' ? 'Close the task and file the result' : 'Run ' + a.name)}</b>${a.name === 'complete_task' ? '' : `<pre>${esc(JSON.stringify(a.args, null, 2))}</pre>`}</div>`).join('')}</div><div class="tv-act"><button type="button" class="tv-btn tv-btn-p" data-action="approve">Approve · run it once</button></div><details class="tv-more" data-detail-key="revision"><summary>Reject with a note</summary><label class="tv-field">What should the team do instead?<textarea id="spaceRevision" rows="2"></textarea></label><div class="tv-act"><button type="button" class="tv-btn" data-action="reject">Reject</button></div></details>`;
     if (job.realState === 'escalated') return `<label class="tv-field">Your answer<textarea id="spaceRevision" rows="3" placeholder="Tell the team what to do."></textarea></label><div class="tv-act">${TASK_ATTACH}<button type="button" class="tv-btn tv-btn-p" data-action="answer">Send to the team</button><span class="tv-sp"></span>${cancel}</div>`;
-    if (job.state === 'done') return `<details class="tv-more" data-detail-key="revision"><summary>Ask for changes</summary><label class="tv-field">What should change? The lead reworks it, reviews it again, and you get a new version.<textarea id="spaceRevision" rows="3"></textarea></label><div class="tv-act">${TASK_ATTACH}<span class="tv-sp"></span><button type="button" class="tv-btn tv-btn-p" data-action="message" data-kind="correction">Send correction</button></div></details>`;
+    if (job.state === 'done') return `<details class="tv-more" data-detail-key="revision"><summary>Ask for changes</summary><label class="tv-field">What should change? The lead reworks it, reviews it again, and you get a new version.<textarea id="spaceRevision" rows="3"></textarea></label><div class="tv-act">${TASK_ATTACH}<span class="tv-sp"></span><button type="button" class="tv-btn tv-btn-p" data-action="message" data-kind="correction">Send correction</button></div></details>${tidyRow(job)}`;
     if (queued) return `<label class="tv-field">Task brief<textarea id="spaceQueueBrief" rows="3">${esc(job.text)}</textarea></label><div class="tv-act"><label class="tv-inline">Priority <select id="spaceQueuePriority">${[[2, 'High'], [1, 'Normal'], [0, 'Low']].map(([value, label]) => `<option value="${value}" ${value === (job.priority ?? 1) ? 'selected' : ''}>${label}</option>`).join('')}</select></label><span class="tv-sp"></span><button type="button" class="tv-btn" data-action="queue" data-queue-state="${job.state}">Save changes</button><button type="button" class="tv-btn tv-btn-p" data-action="queue" data-queue-state="${job.state === 'backlog' ? 'queued' : 'backlog'}">${job.state === 'backlog' ? 'Start task' : 'Move to ideas'}</button>${cancel}</div>`;
     if (job.state === 'blocked') return `<label class="tv-field">Tell the team what to change, or leave it blank to retry as it was<textarea id="spaceRevision" rows="2" placeholder="Describe a correction…"></textarea></label><div class="tv-act">${TASK_ATTACH}<button type="button" class="tv-btn tv-btn-p" data-action="retry">Retry task</button><button type="button" class="tv-btn" data-go-models>Change the model</button><span class="tv-sp"></span>${cancel}</div>`;
     if (job.state === 'waiting') return `${job.review?.approved ? '<div class="tv-act"><button type="button" class="tv-btn tv-btn-p" data-action="approve">Approve completion</button></div>' : ''}<details class="tv-more" data-detail-key="revision"><summary>Request changes</summary><label class="tv-field">What needs to change?<textarea id="spaceRevision" rows="2"></textarea></label><div class="tv-act">${TASK_ATTACH}<button type="button" class="tv-btn" data-action="reject">Send for revision</button><span class="tv-sp"></span>${cancel}</div></details>`;
@@ -536,6 +566,17 @@ export function initOfficeWork(ctx) {
           feedback(`Sent to ${job.autoRoute?'the Program Manager':'the team'}.`);
         }
         taskDirty=false;taskInputDraft={};taskSignature='';await refresh();await showTask(job.id,false);
+      }catch(error){feedback(error.message,true);button.disabled=false;}
+    });
+    content.querySelectorAll('[data-tidy]').forEach(button=>button.onclick=async()=>{
+      const act=button.dataset.tidy;
+      if(act==='delete'&&!confirm(deleteQuestion(job)))return;
+      button.disabled=true;
+      try{
+        const out=act==='delete'?await api(`/tasks/${job.id}`,'DELETE'):await api(`/tasks/${job.id}/${act}`,'POST',{});
+        feedback(tidied(act,out));
+        if(act==='delete'){close();await refreshArchived();await refresh();return;}
+        taskSignature='';await refreshArchived();await refresh();await showTask(job.id,false);
       }catch(error){feedback(error.message,true);button.disabled=false;}
     });
   }
@@ -816,10 +857,10 @@ export function initOfficeWork(ctx) {
     lastRefreshAt = Date.now();
     settings.onEvent?.(type, data);
     if (type.startsWith('notification.')) inbox.onEvent(type, data);
-    else if (type === 'task.updated') { const j = uiJob(data), i = jobs.findIndex(x => x.id === j.id); if (i >= 0) jobs[i] = j; else jobs.unshift(j); render(); if (agentOpen) renderAgent(agentOpen); refreshOpenTask(j.id); }
+    else if (type === 'task.updated') { const j = uiJob(data); placeJob(j); render(); if (agentOpen) renderAgent(agentOpen); refreshOpenTask(j.id); }
     else if (['task.state', 'task.live', 'task.event'].includes(type)) refreshOpenTask(data.id);
-    // A task's audience changed: everyone drops it; those who may still see it get it back in the task.updated that follows.
-    else if (type === 'task.removed') { const i = jobs.findIndex(x => x.id === data.id); if (i >= 0) { jobs.splice(i, 1); render(); } if (modalKind === 'task' && modalTask === data.id) setTimeout(() => { if (!jobs.some(x => x.id === data.id) && modalKind === 'task' && modalTask === data.id) { close(); } }, 600); }
+    // A task deleted, or its audience changed: everyone drops it; those who may still see a shared one get it back in the task.updated that follows.
+    else if (type === 'task.removed') { let gone = false; for (const list of [jobs, archivedJobs]) { const i = list.findIndex(x => x.id === data.id); if (i >= 0) { list.splice(i, 1); gone = true; } } if (gone) render(); if (modalKind === 'task' && modalTask === data.id) setTimeout(() => { if (![...jobs, ...archivedJobs].some(x => x.id === data.id) && modalKind === 'task' && modalTask === data.id) { close(); } }, 600); }
     else if (type === 'brain.updated') syncBrain().catch(() => {});
     else if (type === 'resync' || type === 'office.updated') { if (type === 'office.updated' && data?.area === 'office') { rosterChanged = true; reloadForRoster(); } refresh(); }
   };
@@ -829,7 +870,7 @@ export function initOfficeWork(ctx) {
   // A tab that comes back into view catches up at once (background tabs get throttled timers and may have missed events).
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh().catch(() => {}); });
   // A platform session has no office: straight to the Platform page, nothing else is asked of the server.
-  officeReady.then(async()=>{if(PLATFORM_ONLY){settings.open('admin');return;}connectLive({ onEvent, onStatus: status => { const was = liveStatus; liveStatus = status; if (status === 'live' && was !== 'live') refresh(); } });poll();try{const health=await api('/health');onLive?.(health);await syncBrain();await refresh();const wanted=new URLSearchParams(location.hash.slice(1)).get('task');if(wanted)showTask(wanted).catch(()=>{});const usage=await api('/usage');onUsage?.(usage);}catch(error){$('spaceHint').textContent=error.message;}});
+  officeReady.then(async()=>{if(PLATFORM_ONLY){settings.open('admin');return;}connectLive({ onEvent, onStatus: status => { const was = liveStatus; liveStatus = status; if (status === 'live' && was !== 'live') refresh(); } });poll();try{const health=await api('/health');onLive?.(health);await syncBrain();await refresh();refreshArchived();const wanted=new URLSearchParams(location.hash.slice(1)).get('task');if(wanted)showTask(wanted).catch(()=>{});const usage=await api('/usage');onUsage?.(usage);}catch(error){$('spaceHint').textContent=error.message;}});
   const noop=()=>{};
   return { chatContext, chatInput, chatPickerKey, chatSent, loadHistory, openInbox: () => inbox.open(), needsYouCount: () => inbox.counts.needsYou, settings, get tasks(){return jobs.flatMap(j=>[...j.subtasks.filter(s=>s.agent).map(s=>({...s,agent:s.agent,state:s.state==='working'?'doing':s.state})),...(['planning','reviewing'].includes(j.state)?[{agent:j.agent,state:'doing'}]:[]),...(j.state==='working'?(j.runs||[]).filter(r=>r.role==='lead'&&r.state==='working'&&r.agent&&!(j.runs||[]).some(x=>x.role==='specialist'&&x.state==='working'&&x.dept===r.dept)).map(r=>({agent:r.agent,state:'doing'})):[])]);},
     projectActivity:()=>projectUI.activity(),openProjects:()=>projectUI.open(),agentActivity:id=>activityByAgent.get(id),deliveredUnseen:()=>jobs.filter(j=>unseenResult(j)&&j.kind!=='evaluation').sort((a,b)=>(b.doneAt||0)-(a.doneAt||0)).map(j=>({id:j.id,title:j.title,doneAt:j.doneAt||0})),job:id=>jobs.find(j=>j.id===id),jobs:()=>jobs,tick:noop,panelWidth:()=>panel.offsetWidth,onFocusChange:key=>{ /* the composer keeps the Program Manager until the owner picks a team */ },rowHTML,

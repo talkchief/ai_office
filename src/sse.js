@@ -1,6 +1,8 @@
 // Live updates from /api/events. The browser reconnects on its own and replays what it missed;
 // after repeated failures the page falls back to polling until the stream comes back.
-const TYPES = ['task.updated', 'task.state', 'task.live', 'task.event', 'notification.new', 'notification.read', 'office.updated', 'brain.updated', 'thread.message', 'thread.delivered', 'audit.recorded', 'resync'];
+// Every type the server publishes that a page acts on: a type missing here never reaches the page (a deleted task stayed on
+// other boards until the next poll).
+export const TYPES = ['task.updated', 'task.state', 'task.live', 'task.event', 'task.removed', 'notification.new', 'notification.read', 'notification.removed', 'office.updated', 'brain.updated', 'thread.message', 'thread.delivered', 'audit.recorded', 'resync'];
 export function connectLive({ onEvent, onStatus = () => {} }) {
   let source = null, failures = 0, closed = false, lastId = 0, retry = null;
   const open = () => {

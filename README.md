@@ -22,6 +22,7 @@ A project starts from a brief: say what to build or achieve, attach the document
 4. The **Inbox** (top right, or click the lobby) collects everything that needs you: decisions, approvals for outbound actions, questions, blocked work, overdue work and the daily digest. Turn on desktop alerts there.
 5. Click a lead or the Program Manager to talk to them. Type **@** to pick one of the team's tasks, then choose **Ask**, **Correct** or **Note**. A correction reopens the task: the lead reworks it, reviews it again and files a new version. Tick **remember** to keep the correction as a standing rule. Specialists answer questions; corrections go through their lead.
 6. Open a finished task and use **Ask for changes** to correct it from there.
+7. Put finished and cancelled tasks away from their card or the task window. **Archive** takes a task off the board and keeps everything: its result stays filed in the Brain, with its conversation and files; the **Archived** filter lists them, **Restore** brings one back, and a task that starts working again (a correction by email, say) returns by itself. **Delete** removes a task for good: its record, conversation, inbox items, files and its note in the Brain. What it cost stays in the usage ledger. In a shared office only the task's owner or an office admin can do either; a project's tasks stay with the project and can be deleted but not archived.
 
 ## Settings
 

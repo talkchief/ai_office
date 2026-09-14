@@ -79,4 +79,10 @@ export class KnowledgeStore {
     fs.renameSync(file, path.join(trash, `${Date.now()}-${path.basename(file)}`));
     this.emit('remove', id); await this.onChange(); return { ok: true };
   }
+  // Gone for good, not into .archive (a deleted task's filed result); the search index and the graph follow. A missing note is not an error.
+  async remove(id) {
+    const file = this.resolve(id); if (!fs.existsSync(file)) return { ok: true, removed: false };
+    fs.rmSync(file, { force: true });
+    this.emit('remove', id); await this.onChange(); return { ok: true, removed: true };
+  }
 }

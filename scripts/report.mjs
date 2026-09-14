@@ -10,7 +10,7 @@ const t = ms => ms ? new Date(ms).toTimeString().slice(0, 8) : '…';
 const mins = ms => (ms / 60000).toFixed(1) + ' min';
 const k = n => Math.round((n || 0) / 1000) + 'k';
 
-const all = await api('/tasks'); const list = Array.isArray(all) ? all : all.tasks || [];
+const all = await api('/tasks?archived=all'); const list = Array.isArray(all) ? all : all.tasks || [];
 let picked = [];
 if (args[0] === '--latest') picked = [...list].sort((a, b) => b.createdAt - a.createdAt).slice(0, Number(args[1]) || 1);
 else if (args[0]) picked = list.filter(j => j.id === args[0] || j.id.startsWith(args[0]) || j.title.toLowerCase().startsWith(args[0].toLowerCase()));

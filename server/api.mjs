@@ -44,7 +44,8 @@ export function registerApi(router, ctx) {
   const project = (id, user) => { const p = projects.get(id); if (!p) throw httpError('There is no such project.', 404); if (!canSeeProject(user, p)) throw httpError('This project belongs to someone else in the office.', 403); return p; };
   const projectEditor = (p, user) => { if (!canShare(user, p)) throw httpError('Only the project’s owner or an office admin can change it.', 403); };
   /* ---------- tasks ---------- */
-  router.on('GET', '/api/tasks', ({ user }) => { const o = office.get(); return mine(user).map(j => listShape(j, o)); });
+  // The board's list leaves archived tasks out; ?archived=1 lists only those, ?archived=all both.
+  router.on('GET', '/api/tasks', ({ url, user }) => { const o = office.get(), which = url.searchParams.get('archived'); return mine(user).filter(j => which === 'all' || !!j.archivedAt === (which === '1')).map(j => listShape(j, o)); });
   // The task form's project picker: open projects only.
   // Every project that can still take work: the board decides which of them to draw, the task form offers them all.
   router.on('GET', '/api/projects/open', ({ user }) => projects.list().filter(p => p.status !== 'archived' && canSeeProject(user, p)).map(p => ({ id: p.id, name: p.name, status: p.status, dueAt: p.dueAt || null, doneAt: p.doneAt || null, milestones: (p.milestones || []).map(m => ({ id: m.id, title: m.title, done: !!m.done, dueAt: m.dueAt || null, doneAt: m.doneAt || null, ...(Array.isArray(m.after) ? { after: m.after } : {}) })) })));
@@ -90,6 +91,24 @@ export function registerApi(router, ctx) {
   router.on('POST', '/api/tasks/:id/queue', async ({ req, params, user }) => { see(params.id, user); const input = await body(req); if (input.state === 'queued') ready(); return engine.editQueue(params.id, input); });
   router.on('POST', '/api/tasks/:id/cancel', ({ params, user }) => { see(params.id, user); return engine.cancel(params.id); });
   router.on('POST', '/api/tasks/:id/seen', ({ params, user }) => { see(params.id, user); return engine.markSeen(params.id); });
+  // Putting a closed task away, by its owner or an office admin. Archiving takes it off the board and keeps everything, its note
+  // in the Brain included; restoring puts it back. Deleting removes the task for good, and its note in the Brain with it.
+  const tidier = (id, user, verb) => { const job = see(id, user); if (!canShare(user, job)) throw httpError(`Only the task’s owner or an office admin can ${verb} it.`, 403); return job; };
+  router.on('POST', '/api/tasks/:id/archive', ({ params, user }) => {
+    const job = tidier(params.id, user, 'archive');
+    if (job.projectId) throw httpError('A project’s tasks stay with the project. Archive the project instead, or delete the task.', 409);
+    const archived = engine.archive(job.id); record({ area: 'tasks', summary: `Archived “${job.title}”` });
+    return listShape(archived, office.get());
+  });
+  router.on('POST', '/api/tasks/:id/restore', ({ params, user }) => { const job = tidier(params.id, user, 'restore'); const restored = engine.restore(job.id); record({ area: 'tasks', summary: `Restored “${job.title}” to the board` }); return listShape(restored, office.get()); });
+  router.on('DELETE', '/api/tasks/:id', async ({ params, user }) => {
+    const job = tidier(params.id, user, 'delete'); engine.remove(job.id);
+    const note = `Agents Office/task-${job.id}.md`; let filed = false;
+    try { filed = (await knowledge.remove(note)).removed; } catch (error) { console.warn('deleting the task note:', error.message); }
+    if (job.projectId) ctx.syncProject?.(job.projectId);
+    record({ area: 'tasks', summary: `Deleted “${job.title}”${filed ? ' and its note in the Brain' : ''}` });
+    return { ok: true, id: job.id, brainNote: filed ? note : null };
+  });
   router.on('POST', '/api/tasks/:id/retry', async ({ req, params, user }) => { see(params.id, user); ready(); return accepted(engine.retry(params.id, (await body(req)).feedback)); });
   router.on('POST', '/api/tasks/:id/message', async ({ req, params, user }) => { see(params.id, user); const input = await body(req); ready(); return engine.message(params.id, { text: input.text, kind: ['question', 'correction', 'note', 'message'].includes(input.kind) ? input.kind : 'message', agent: input.agent || null, refs: input.refs, remember: ['agent', 'team'].includes(input.remember) ? input.remember : null }); });
   router.on('POST', '/api/tasks/:id/answer', async ({ req, params, user }) => { see(params.id, user); ready(); return engine.answer(params.id, (await body(req)).text); });
@@ -103,7 +122,7 @@ export function registerApi(router, ctx) {
   // The @ picker in a lead's chat: that team's tasks, open ones first, newest first.
   router.on('GET', '/api/teams/:dept/tasks', ({ params, url, user }) => {
     const q = String(url.searchParams.get('q') || '').toLowerCase(), closed = j => ['done', 'cancelled'].includes(j.state) ? 1 : 0;
-    return mine(user).filter(j => (j.depts || [j.dept]).includes(params.dept) && j.kind !== 'evaluation' && (!q || j.title.toLowerCase().includes(q)))
+    return mine(user).filter(j => (j.depts || [j.dept]).includes(params.dept) && j.kind !== 'evaluation' && !j.archivedAt && (!q || j.title.toLowerCase().includes(q)))
       .sort((a, b) => closed(a) - closed(b) || b.createdAt - a.createdAt).slice(0, 30).map(j => ({ id: j.id, title: j.title, state: j.state, createdAt: j.createdAt, doneAt: j.doneAt || null }));
   });
   // A task's thread follows the task; a person's chat is the viewer's own ("agent:<id>" is theirs, in a hosted office "agent:<id>:<userId>").

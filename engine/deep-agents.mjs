@@ -202,8 +202,10 @@ export class OfficeEngine {
   }
   detail(id) { const job = this.get(id); return job && { ...job, events: this.events(id), messages: this.threads.list(id) }; }
   setState(id, to, extra = {}) {
-    let from;
-    const job = this.update(id, j => { from = j.state; if (from !== to) { j.state = to; j.stateSince = Date.now(); } Object.assign(j, extra); });
+    let from, restored = false;
+    // An archived task that starts working again (a correction, an answer by email) is back on the board by itself.
+    const job = this.update(id, j => { from = j.state; if (from !== to) { j.state = to; j.stateSince = Date.now(); } if (j.archivedAt && !TERMINAL.has(to)) { j.archivedAt = null; restored = true; } Object.assign(j, extra); });
+    if (restored) this.event(id, 'restored', null, 'Back on the board: work on the task started again.');
     if (from !== to) { this.event(id, 'state_changed', null, `${from} → ${to}`, { from, to }); this.bus?.publish('task.state', { id, from, to }); }
     return job;
   }
@@ -1345,6 +1347,49 @@ export class OfficeEngine {
     if (!this.get(id)) throw httpError('No such task.', 404);
     this.notifications.readForJob(id);
     return this.update(id, j => { j.seenAt = Date.now(); }, { touch: false });
+  }
+  /* ---------- putting tasks away ---------- */
+  // Only a closed task is put away: one still open could start a run, file a result or ask the CEO from where nobody looks.
+  closedOnly(job, verb) {
+    if (!job) throw httpError('No such task.', 404);
+    if (!TERMINAL.has(job.state) || this.running.has(job.id) || this.preparing.has(job.id)) throw httpError(`Only a finished or cancelled task can be ${verb}. Cancel it first, or let it finish.`, 409);
+  }
+  // Archiving takes a closed task off the board and keeps everything: the record, its conversation, its files and its note in the Brain.
+  archive(id) {
+    const job = this.get(id); this.closedOnly(job, 'archived');
+    if (job.archivedAt) return job;
+    this.notifications.ackForJob(id);
+    const archived = this.update(id, j => { j.archivedAt = Date.now(); j.seenAt ||= j.archivedAt; }, { touch: false });
+    this.event(id, 'archived', null, 'Archived: off the board, everything kept.');
+    return archived;
+  }
+  restore(id) {
+    const job = this.get(id); if (!job) throw httpError('No such task.', 404);
+    if (!job.archivedAt) return job;
+    const restored = this.update(id, j => { j.archivedAt = null; }, { touch: false });
+    this.event(id, 'restored', null, 'Back on the board.');
+    return restored;
+  }
+  // Deleting removes every trace of the task the engine keeps: the record and its events, its conversation and the chat messages
+  // about it, its inbox items, the checkpoints of its runs (the Program Manager's thread and the quick lane's) and its workspace.
+  // What the task cost stays in the usage ledger: what is billed is billed. Its note in the Brain is the office's to remove.
+  remove(id) {
+    const job = this.get(id); this.closedOnly(job, 'deleted');
+    const notices = this.db.prepare('SELECT id FROM office_notifications WHERE job_id = ?').all(id).map(r => r.id);
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM office_events WHERE job_id = ?').run(id);
+      this.db.prepare('DELETE FROM office_messages WHERE thread_id = ? OR job_id = ?').run(id, id);
+      this.db.prepare('DELETE FROM office_threads WHERE id = ?').run(id);
+      this.db.prepare('DELETE FROM office_notifications WHERE job_id = ?').run(id);
+      for (const table of ['checkpoints', 'writes']) if (this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table)) this.db.prepare(`DELETE FROM ${table} WHERE thread_id = ? OR thread_id LIKE ?`).run(id, `${id}:%`);
+      this.db.prepare('DELETE FROM office_jobs WHERE id = ?').run(id);
+    })();
+    fs.rmSync(this.workspaceDir(id), { recursive: true, force: true });
+    this.waiting = this.waiting.filter(w => w !== id); this.followUps.delete(id);
+    for (const key of [...this.askedEfforts.keys()]) if (key.startsWith(id + ':')) this.askedEfforts.delete(key);
+    if (notices.length) this.bus?.publish('notification.removed', { ids: notices });
+    this.bus?.publish('task.removed', { id });
+    return job;
   }
   // After a restart: continuations resume; anything that was mid-run waits for the CEO to retry.
   recover() {

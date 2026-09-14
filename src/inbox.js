@@ -62,6 +62,10 @@ export function initInbox({ api, openTask, openNote, retryTask }) {
     } else if (type === 'notification.read') {
       for (const id of data.ids || []) { const item = items.find(i => i.id === id); if (!item) continue; if (!item.readAt) { item.readAt = Date.now(); counts.unread = Math.max(0, counts.unread - 1); } if (data.acked && !item.ackedAt) { if (needsYou(item)) counts.needsYou = Math.max(0, counts.needsYou - 1); item.ackedAt = Date.now(); } }
       render();
+    } else if (type === 'notification.removed') {
+      // The items of a deleted task: gone from the list, and the counts read again rather than guessed.
+      const gone = new Set(data.ids || []); if (!items.some(i => gone.has(i.id))) return;
+      items = items.filter(i => !gone.has(i.id)); render(); refresh();
     }
   }
   refresh();

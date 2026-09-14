@@ -138,6 +138,20 @@ await step('tests: the full suite passes', async () => {
       const gone = await call(`/api/tasks/${idea.id}/cancel`, 'POST', {}); if (!gone.ok) throw new Error('cancel: ' + gone.status);
       return 'saved, listed, picked, cancelled';
     });
+    await step('server: a closed task is archived off the board, restored, then deleted for good', async () => {
+      const open = await call('/api/tasks', 'POST', { dept: team, text: 'Check: an idea that stays open.', backlog: true });
+      const refused = await call(`/api/tasks/${open.json.id}/archive`, 'POST', {}); if (refused.status !== 409) throw new Error('an open task was archived: ' + refused.status);
+      const archived = await call(`/api/tasks/${idea.id}/archive`, 'POST', {}); if (!archived.ok || !archived.json.archivedAt) throw new Error('archive: ' + JSON.stringify(archived.json));
+      if ((await call('/api/tasks')).json.some(t => t.id === idea.id)) throw new Error('still on the board');
+      if (!(await call('/api/tasks?archived=1')).json.some(t => t.id === idea.id)) throw new Error('not in the archive');
+      const back = await call(`/api/tasks/${idea.id}/restore`, 'POST', {}); if (!back.ok || back.json.archivedAt) throw new Error('restore: ' + JSON.stringify(back.json));
+      if (!(await call('/api/tasks')).json.some(t => t.id === idea.id)) throw new Error('not back on the board');
+      const deleted = await call(`/api/tasks/${idea.id}`, 'DELETE'); if (!deleted.ok) throw new Error('delete: ' + JSON.stringify(deleted.json));
+      if ((await call(`/api/tasks/${idea.id}`)).status !== 404) throw new Error('the deleted task still opens');
+      if ((await call('/api/tasks?archived=all')).json.some(t => t.id === idea.id)) throw new Error('the deleted task is still listed');
+      await call(`/api/tasks/${open.json.id}/cancel`, 'POST', {});
+      return 'open task refused · archived · restored · deleted';
+    });
     if (!up.ready) await step('server: work waits for a model key, with a plain sentence', async () => {
       const r = await call('/api/tasks', 'POST', { dept: team, text: 'Draft a welcome email.' }); if (r.ok) throw new Error('a task started without a key');
       if (!/key/i.test(r.json?.error || '')) throw new Error('no sentence: ' + JSON.stringify(r.json)); return r.json.error;
