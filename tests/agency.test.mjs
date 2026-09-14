@@ -71,14 +71,34 @@ test('hiring a persona adds a person and its method as a skill; full teams and t
     const hired = agency.hire(office, 'marketing-seo-specialist', { dept: team.id });
     assert.equal(hired.person.department, team.id); assert.equal(hired.person.lead, false); assert.ok(hired.person.brief.length > 50);
     assert.deepEqual(hired.person.skills, [hired.skill.id]); assert.ok(hired.skill.instructions.length <= 24000 && /SEO/i.test(hired.skill.instructions));
-    const again = agency.hire(office, 'marketing-seo-specialist', { dept: team.id, name: 'SEO TWO' });
-    assert.notEqual(again.person.id, hired.person.id); assert.equal(office.get().skills.filter(s => s.id === hired.skill.id).length, 1, 'the skill is shared, not duplicated');
+    // A persona is hired once per office: the second hire, on any team, is refused with where the first one works.
+    assert.equal(hired.person.persona, 'marketing-seo-specialist', 'the person remembers the persona they came from');
+    assert.deepEqual(agency.hired(office.get())['marketing-seo-specialist'], { dept: team.id, team: team.name, agent: hired.person.id, name: hired.person.name, lead: false });
+    const other = office.get().teams.find(t => t.id !== team.id);
+    assert.throws(() => agency.hire(office, 'marketing-seo-specialist', { dept: team.id, name: 'SEO TWO' }), e => e.status === 409 && new RegExp(`already hired: ${hired.person.name} works on ${team.name}`).test(e.message));
+    assert.throws(() => agency.hire(office, 'marketing-seo-specialist', { dept: other.id, lead: true }), /already hired/, 'not as another team’s lead either');
+    assert.equal(office.get().agents.filter(a => a.persona === 'marketing-seo-specialist').length, 1);
     const swapped = agency.hire(office, 'project-management-project-shepherd', { dept: team.id, lead: true });
     assert.equal(swapped.person.id, team.lead); assert.equal(swapped.person.lead, true); assert.match(swapped.person.role, /project/i);
+    assert.equal(agency.hired(office.get())['project-management-project-shepherd'].lead, true, 'a lead who took the persona’s job counts as hired');
+    // The persona survives a round trip through the office file, and leaving the team frees it.
+    office.update(office.get(), new Set()); assert.equal(office.get().agents.find(a => a.id === hired.person.id).persona, 'marketing-seo-specialist');
+    const fired = office.get(); fired.agents = fired.agents.filter(a => a.id !== hired.person.id); office.update(fired, new Set());
+    assert.equal(agency.hired(office.get())['marketing-seo-specialist'], undefined, 'removed, the persona can be hired again');
+    assert.equal(agency.hire(office, 'marketing-seo-specialist', { dept: team.id }).person.persona, 'marketing-seo-specialist');
+    // People hired before personas were recorded are recognised by the id a hire gave them, or a lead by method and role together.
+    const legacy = office.get(), spare = legacy.teams.find(t => legacy.agents.filter(a => a.department === t.id).length < 7 && t.id !== team.id);
+    if (spare) {
+      const writer = agency.get('engineering-technical-writer'); legacy.skills.push(agency.skillOf(writer));
+      legacy.agents.push({ id: 'agency-engineering-technical-writer', department: spare.id, name: 'OLD WRITER', role: writer.role, does: writer.does, brief: writer.brief, skills: [agency.skillOf(writer).id] });
+      office.update(legacy, new Set());
+      assert.equal(agency.hired(office.get())['engineering-technical-writer']?.name, 'OLD WRITER');
+    }
     const full = office.get().teams.find(t => office.get().agents.filter(a => a.department === t.id).length >= 7);
-    if (full) assert.throws(() => agency.hire(office, 'marketing-seo-specialist', { dept: full.id }), /full/);
+    if (full) assert.throws(() => agency.hire(office, 'marketing-content-strategist', { dept: full.id }), /full/);
     const skillOnly = agency.addSkill(office, 'sales-outbound-strategist', { teams: [team.id] });
     assert.deepEqual(skillOnly.teams, [team.id]); assert.ok(office.get().teams.find(t => t.id === team.id).skills.includes(skillOnly.skill.id));
+    assert.equal(agency.hired(office.get())['sales-outbound-strategist'], undefined, 'a method added on its own is not a hire');
     assert.throws(() => agency.get('nobody'), /No such persona/);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

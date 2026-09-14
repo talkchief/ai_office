@@ -198,6 +198,8 @@ export function registerApi(router, ctx) {
   router.on('DELETE', '/api/knowledge/note', ({ url, user }) => { admin(user); return knowledge.archive(url.searchParams.get('id')); });
   /* ---------- the Agency: ready-made people and methods ---------- */
   router.on('GET', '/api/agency', ({ url }) => ({ divisions: ctx.agency.divisions(), personas: ctx.agency.list({ q: url.searchParams.get('q') || '', division: url.searchParams.get('division') || '' }) }));
+  // Personas already working in this office, so the picker shows them as hired (before /api/agency/:id, which would take "hired" as an id).
+  router.on('GET', '/api/agency/hired', () => ({ hired: ctx.agency.hired(office.get()) }));
   router.on('GET', '/api/agency/:id', ({ params }) => { const { body, ...p } = ctx.agency.get(params.id); return { ...p, body: body.slice(0, 20000) }; });
   router.on('POST', '/api/agency/:id/hire', async ({ req, params, user }) => { admin(user); const input = await body(req); return audited('office', `Hired ${params.id} from the Agency into ${input.dept}`, () => { const r = ctx.agency.hire(office, params.id, { dept: input.dept, name: input.name, lead: !!input.lead, busy: engine.activeAgents() }); bus.publish('office.updated', { area: 'office' }); return r; }); });
   router.on('POST', '/api/agency/:id/skill', async ({ req, params, user }) => { admin(user); const input = await body(req); return audited('office', `Added the ${params.id} method from the Agency as a skill`, () => { const r = ctx.agency.addSkill(office, params.id, { teams: input.teams || [], agents: input.agents || [], busy: engine.activeAgents() }); bus.publish('office.updated', { area: 'office' }); return r; }); });

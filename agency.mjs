@@ -70,19 +70,40 @@ export class Agency {
     if (instructions.length > max) { const cut = instructions.lastIndexOf('\n## ', max); instructions = instructions.slice(0, cut > max / 2 ? cut : max).trimEnd() + '\n\n(Shortened: the full persona is in the Agency catalogue.)'; }
     return { id: ('agency-' + persona.id).slice(0, 48), name: text(persona.name, 100), description: text(persona.description, 500), instructions };
   }
-  // A persona joins a team as a specialist (or replaces the lead's job when `lead` is set), with its method as a skill.
+  // Who in the office came from which persona: { personaId: { dept, team, agent, name, lead } }. A hire records its persona on the
+  // person; people hired before that are recognised by the id a hire gives them (agency-<persona>, -2 for a second copy) or, for a
+  // lead who took a persona's job, by its method and role together. A method added on its own is not a hire.
+  hired(config) {
+    const personas = this.load().personas, byId = new Map(personas.map(p => [p.id, p])), out = {};
+    const byPersonId = new Map(), bySkill = new Map();
+    for (const p of personas) { byPersonId.set(('agency-' + p.id).slice(0, 44), p.id); bySkill.set(('agency-' + p.id).slice(0, 48), p); }
+    for (const a of config.agents || []) {
+      let id = byId.has(a.persona) ? a.persona : '';
+      // A second copy was agency-<first 34 letters of the persona id>-<n>.
+      if (!id && /^agency-/.test(a.id)) id = byPersonId.get(a.id) || [...byPersonId.entries()].find(([pid]) => /-\d+$/.test(a.id) && a.id.replace(/-\d+$/, '') === pid.slice(0, 41))?.[1] || '';
+      if (!id) id = (a.skills || []).map(s => bySkill.get(s)).find(p => p && text(p.role, 120) === a.role)?.id || '';
+      if (!id || out[id]) continue;
+      const team = config.teams.find(t => t.id === a.department);
+      out[id] = { dept: a.department, team: team?.name || a.department, agent: a.id, name: a.name, lead: team?.lead === a.id };
+    }
+    return out;
+  }
+  // A persona joins a team as a specialist (or replaces the lead's job when `lead` is set), with its method as a skill. Once per office:
+  // a persona already working somewhere is not hired a second time.
   hire(office, id, { dept, name = '', lead = false, busy = new Set() } = {}) {
     const persona = this.get(id), config = office.get(), team = config.teams.find(t => t.id === dept); if (!team) fail('Choose an existing team.');
+    const already = this.hired(config)[persona.id];
+    if (already) fail(`${persona.name} is already hired: ${already.name} works on ${already.team}${already.lead ? ' as the lead' : ''}. Open that team to change their work, or remove them there before hiring the persona again.`, 409);
     const skill = this.skillOf(persona);
     if (!config.skills.some(s => s.id === skill.id)) { if (config.skills.length >= 50) fail('The office already has 50 skills; remove one first.'); config.skills.push(skill); }
     let person;
     if (lead) {
       person = config.agents.find(a => a.id === team.lead); if (!person) fail('This team has no lead.');
-      Object.assign(person, { role: persona.role, does: persona.does, brief: persona.brief, name: text(name, 48) || person.name });
+      Object.assign(person, { role: persona.role, does: persona.does, brief: persona.brief, name: text(name, 48) || person.name, persona: persona.id });
     } else {
       const max = office.limits?.maxMembersPerTeam || 7, members = config.agents.filter(a => a.department === dept); if (members.length >= max) fail(`${team.name} is full: a team is a lead and up to ${max - 1} specialists. Remove someone first.`);
       let pid = ('agency-' + persona.id).slice(0, 44); for (let n = 2; config.agents.some(a => a.id === pid); n++) pid = ('agency-' + persona.id).slice(0, 41) + '-' + n;
-      person = { id: pid, department: dept, name: text(name, 48) || text(persona.name, 48).toUpperCase(), role: persona.role, does: persona.does, brief: persona.brief, model: '', effort: '', tools: [], inheritTools: true, skills: [], rules: [] };
+      person = { id: pid, department: dept, name: text(name, 48) || text(persona.name, 48).toUpperCase(), role: persona.role, does: persona.does, brief: persona.brief, persona: persona.id, model: '', effort: '', tools: [], inheritTools: true, skills: [], rules: [] };
       config.agents.push(person);
     }
     person.skills = [...new Set([...(person.skills || []), skill.id])];

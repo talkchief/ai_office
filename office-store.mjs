@@ -70,7 +70,9 @@ export class OfficeStore {
       if (!text(a.brief, 6000)) fail(`${text(a.name, 48)} needs standing instructions: how the CEO wants this person to work.`);
       return { id: a.id, department: a.department, name: text(a.name, 48), role: text(a.role, 120), does: text(a.does, 1200), brief: text(a.brief, 6000),
         model: modelOf(a.model, legacy), effort: ['', 'low', 'medium', 'high', 'xhigh', 'max'].includes(a.effort || '') ? a.effort || '' : '',
-        skills: skillRefs(a.skills), tools: Array.isArray(a.tools) ? a.tools.map(t => text(t, 80)).filter(Boolean).slice(0, 20) : [], inheritTools: a.inheritTools !== false, rules: rulesOf(a.rules), concurrency: Math.max(1, Math.min(8, Number.isInteger(+a.concurrency) ? +a.concurrency : 4)), lead: false };
+        skills: skillRefs(a.skills), tools: Array.isArray(a.tools) ? a.tools.map(t => text(t, 80)).filter(Boolean).slice(0, 20) : [], inheritTools: a.inheritTools !== false, rules: rulesOf(a.rules), concurrency: Math.max(1, Math.min(8, Number.isInteger(+a.concurrency) ? +a.concurrency : 4)), lead: false,
+        // The Agency persona this person was hired from, so the catalogue shows them as hired and does not hire them twice.
+        ...(/^[a-z0-9][a-z0-9-]{0,79}$/.test(a.persona || '') ? { persona: a.persona } : {}) };
     });
     const seen = new Set();
     const teams = input.teams.map(t => {
